@@ -99,6 +99,16 @@ edit in Shop Admin appear here automatically. **Remove any products you typed by
 | My Account | `SHOP/profile?tab=account` |
 | Contact Us | `SHOP/contact` |
 
+## 8. Remove the extra space at the bottom of the homepage
+
+The shop already has this fixed. On the Webcake homepage:
+1. Scroll to the bottom of the page in the Webcake editor.
+2. Click the empty area under your last section. If a **blank section** gets selected, press **Delete**.
+3. Click your **last section** (usually the footer) → in the right panel, set **Height** to **Auto** (or drag its bottom edge up to just under the text).
+4. In the same panel, set **Padding bottom** to about **24**.
+5. Switch to the **📱 mobile view** (top bar) and repeat steps 2–4. Mobile has its own spacing in Webcake.
+6. Click **Publish**.
+
 ---
 
 ## Where each feature lives

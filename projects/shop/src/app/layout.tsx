@@ -19,12 +19,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href={googleFontsHref()} />
         <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
       </head>
-      <body>
+      <body className="flex min-h-screen flex-col">
         <Providers>
           <Header />
-          <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-          <footer className="space-y-4 border-t border-accent/20 bg-surface py-10 text-center text-xs text-gray-500">
-            <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 uppercase tracking-[0.18em]">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-6 pt-8">{children}</main>
+          <footer className="space-y-3 border-t border-accent/20 bg-surface px-4 py-6 text-center text-xs text-gray-500">
+            <nav className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 uppercase tracking-[0.18em]">
               {[
                 ...MAIN_NAV,
                 { label: "My Orders", href: "/profile?tab=orders" },
