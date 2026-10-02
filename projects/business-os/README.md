@@ -2,17 +2,27 @@
 
 Live app: https://claude.ai/artifact/RbUQpD5J8M2dKELDEEKoyp (private to you until shared)
 
-One place to run the business across Shopee, TikTok Shop, Website and FB/IG.
+Back office for the whole team, plus orders and stock across Shopify, Shopee, TikTok Shop and FB/IG.
 
-- **Dashboard:** sales, net profit, average order, orders to ship, sales by platform, low-stock and expiring items
-- **Orders:** Shopify-style table (Order, Date, Items, Customer, Channel, Total, Payment status, Fulfillment status, Tags) with stats strip, views, search, bulk actions and 50-per-page paging. Manual orders deduct stock; refunded/voided orders put it back.
-- **Import from Shopify:** upload the Orders or Customers CSV export. Order IDs are kept (#RS9978 stays #RS9978). Re-importing a newer export updates payment, fulfillment, tags and notes. Imported orders don't change inventory.
-- **Inventory:** price, cost, margin, stock, reorder level, batch and best-before date, plus quick restock
-- **Customers:** imported from Shopify plus anyone who orders on other channels; contact, address, tags, notes, order history
-- **Expenses:** costs by category, which feed into net profit
-- **Export CSV:** on every page, for your accountant or spreadsheets
+## Open to everyone
+- **Home:** rotating carousel with a greeting (Manila time), RS Mission, Vision and Goals, plus my tasks, team task summary and department shortcuts
+- **Tasks:** calendar (month) and list views; status (To do / In progress / Done / Cancelled), progress %, priority, start and due dates, assigned person and department. Views: whole team, per person, per department. Summary at the top, e.g. `4/10 In progress | 5/10 Done | 1/10 Cancelled`
+- **My account:** link your login to your team-member name, see your tasks, lock departments
 
-Data is stored in the app's cloud database and syncs live across devices.
+## Departments (each has its own password; the owner gets in without one)
+| Department | Pages |
+|---|---|
+| CEO | Overview (sales, profit, to fulfill) + tasks by department |
+| Admin | Team members, department passwords, Home page content |
+| Finance | Profit dashboard, expenses |
+| Sales | Orders (Shopify-style table, import from Shopify), customers |
+| Marketing | Sales by channel, top customers, repeat rate, customers |
+| Packing | Packing queue (mark fulfilled / on hold), inventory |
+
+Every department also has a **Tasks** tab filtered to that department.
+
+## Security note
+Department passwords hide pages from staff who don't need them. They are not strong security: anyone the app is shared with can technically reach its data. Only the owner and Editors can change the team, the passwords or the Home page (enforced by the database rules).
 
 ## Branding
-The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`. They're placeholders until we can read regalspritz.com.
+The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.

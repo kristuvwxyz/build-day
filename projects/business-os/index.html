@@ -181,6 +181,86 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
 .dropzone { border: 1.5px dashed var(--line); border-radius: var(--radius); padding: 20px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .steps { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 
+/* Back office: nav groups, tabs, home, tasks, departments */
+.nav-label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); padding: 14px 10px 4px; }
+.nav .lock-ico { width: 13px; height: 13px; margin-left: auto; opacity: .55; }
+.nav .account-item { margin-top: 10px; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; padding-top: 12px; }
+.mobile-only { display: none !important; }
+.btn-ico { width: 14px; height: 14px; vertical-align: -2px; }
+.linkish { border: 0; background: none; padding: 0; color: var(--brand); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { border: 0; background: none; padding: 8px 14px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--brand); border-bottom-color: var(--brand); }
+
+.carousel { position: relative; overflow: hidden; border-radius: 14px; background: var(--brand); color: var(--brand-ink); }
+.car-track { display: flex; transition: transform .5s ease; }
+@media (prefers-reduced-motion: reduce) { .car-track { transition: none; } }
+.slide { flex: 0 0 100%; min-width: 0; padding: 34px 36px 64px; display: flex; flex-direction: column; gap: 8px; min-height: 230px; }
+.slide-eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+.carousel h2.slide-title { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 4vw, 38px); color: inherit; text-transform: none; letter-spacing: 0; text-wrap: balance; }
+.slide-body { max-width: 62ch; font-size: 15px; opacity: .92; }
+.slide-body p { margin: 0; }
+.slide-quote { font-family: var(--font-display); font-size: 19px; line-height: 1.45; }
+.slide-goals { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.slide-ph { opacity: .8; }
+.slide-ph .linkish { color: inherit; }
+.slide-stats { display: flex; gap: 10px 22px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; }
+.slide-stats b { font-size: 20px; margin-right: 4px; }
+.car-ctrl { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; align-items: center; gap: 12px; }
+.car-btn { border: 1px solid color-mix(in srgb, var(--brand-ink) 35%, transparent); background: none; color: inherit; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; line-height: 1; }
+.car-dots { display: flex; gap: 8px; }
+.car-dots button { width: 8px; height: 8px; border-radius: 4px; border: 0; padding: 0; background: color-mix(in srgb, var(--brand-ink) 40%, transparent); transition: width .2s; }
+.car-dots button[aria-current="true"] { width: 22px; background: var(--gold); }
+
+.dept-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dept-card { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 2px; position: relative; }
+.dept-card:hover { border-color: var(--brand); }
+.dept-card strong { font-size: 15px; }
+.dept-card span { font-size: 12px; color: var(--muted); }
+.dept-card .lock-ico { position: absolute; top: 12px; right: 12px; width: 15px; height: 15px; color: var(--muted); }
+.lock-card { max-width: 380px; margin: 24px auto; align-items: center; text-align: center; padding: 28px; }
+.lock-big { width: 34px; height: 34px; color: var(--brand); }
+
+.tsum { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.tsum-line { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; font-size: 14px; }
+.tsum-part b { font-size: 17px; }
+.tsum-sep { color: var(--line); }
+.tsum-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.tsum-label { font-size: 12px; color: var(--muted); }
+.s-todo { --c: var(--muted); --cb: var(--surface-2); }
+.s-in_progress { --c: var(--info); --cb: var(--info-bg); }
+.s-done { --c: var(--good); --cb: var(--good-bg); }
+.s-cancelled { --c: var(--bad); --cb: var(--bad-bg); }
+.tsum-part b { color: var(--c); }
+.tsum-bar i { background: var(--c); }
+.pbar { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; min-width: 60px; }
+.pbar i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
+
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--line); gap: 1px; }
+.cal-h { background: var(--surface-2); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; }
+.cal-d { background: var(--surface); min-height: 104px; padding: 6px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; min-width: 0; }
+.cal-d.out { background: var(--bg); }
+.cal-d.out .cal-n span { color: var(--muted); opacity: .6; }
+.cal-d.picked { box-shadow: inset 0 0 0 2px var(--gold); }
+.cal-n { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cal-d.today .cal-n span { background: var(--brand); color: var(--brand-ink); border-radius: 999px; padding: 1px 7px; }
+.cal-add { border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; padding: 0 4px; border-radius: 4px; opacity: 0; }
+.cal-d:hover .cal-add, .cal-add:focus-visible { opacity: 1; }
+.cal-add:hover { background: var(--surface-2); color: var(--fg); }
+.cal-items { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tpill { display: flex; align-items: center; gap: 4px; border: 0; border-left: 3px solid var(--c); background: var(--cb); color: var(--fg); border-radius: 4px; padding: 2px 5px; font-size: 11.5px; text-align: left; min-width: 0; width: 100%; }
+.tpill .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tpill.s-cancelled .tt { text-decoration: line-through; color: var(--muted); }
+.tpill.overdue { box-shadow: inset 0 0 0 1px var(--bad); }
+.tpill .ini { flex: none; font-size: 9.5px; font-weight: 800; background: var(--surface); border-radius: 999px; padding: 0 4px; color: var(--muted); }
+.cal-more { font-size: 11px; color: var(--muted); padding-left: 4px; }
+.cal-dots { display: none; gap: 3px; }
+.cal-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+
+.pack-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.pack { gap: 10px; }
+.pick { margin: 0; padding: 10px 12px; list-style: none; background: var(--surface-2); border-radius: 8px; display: flex; flex-direction: column; gap: 4px; }
+
 @media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -191,6 +271,16 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
   main { padding: 18px 16px 96px; }
   h1 { font-size: 24px; }
   .bar-row { grid-template-columns: 80px minmax(0, 1fr) 84px; }
+  .mobile-only { display: flex !important; }
+  .dept-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .desktop-only { display: none !important; }
+  .nav .account-item { margin-top: 0; border-top: 0; border-radius: 8px; padding-top: 6px; }
+  .slide { padding: 24px 20px 60px; min-height: 250px; }
+  .cal-d { min-height: 58px; padding: 4px; }
+  .cal-items { display: none; }
+  .cal-dots { display: flex; flex-wrap: wrap; }
+  .cal-add { display: none; }
+  .cal-h { padding: 4px; font-size: 10px; text-align: center; }
 }
 @media (prefers-reduced-motion: no-preference) { .nav button, .btn { transition: background .15s, color .15s, border-color .15s; } }
 </style>
@@ -203,7 +293,7 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
   </aside>
   <main>
     <div class="head">
-      <h1 id="view-title">Dashboard</h1>
+      <h1 id="view-title">Home</h1>
       <div class="actions" id="head-actions"></div>
     </div>
     <div id="notice"></div>
@@ -248,34 +338,6 @@ const ORDER_VIEWS = [
 ];
 const PAGE = 50;
 const EXP_CATS = ["Ingredients", "Packaging", "Ads & marketing", "Shipping", "Platform fees", "Salaries", "Rent & utilities", "Other"];
-const ICONS = {
-  dashboard: '<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
-  orders: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
-  inventory: '<path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>',
-  customers: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
-  expenses: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-};
-const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Has note"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-const VIEWS = [
-  { id: "dashboard", name: "Dashboard" },
-  { id: "orders", name: "Orders" },
-  { id: "inventory", name: "Inventory" },
-  { id: "customers", name: "Customers" },
-  { id: "expenses", name: "Expenses" },
-];
-
-const S = {
-  products: [], orders: [], expenses: [], customers: [],
-  loaded: { products: false, orders: false, expenses: false, customers: false },
-  view: "dashboard", period: "month",
-  of: { view: "all", platform: "all", q: "", range: "today" },
-  page: 0, sel: new Set(),
-  pq: "", cq: "", cpage: 0,
-  db: null, dl: null, readOnly: false,
-};
-try { const v = localStorage.getItem("rs-view"); if (VIEWS.some(x => x.id === v)) S.view = v; } catch (e) {}
-const hv = location.hash.slice(1); if (VIEWS.some(x => x.id === hv)) S.view = hv;
-
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const peso = n => "₱" + (Number(n) || 0).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -290,6 +352,55 @@ const badge = s => `<span class="badge ${s.cls}">${esc(s.name)}</span>`;
 const fmtDate = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "";
 const exChip = r => r.example ? ' <span class="chip ex">Example</span>' : "";
 const isVoid = o => VOIDPAY.has(o.payment);
+const ICONS = {
+  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  tasks: '<path d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8.5 15l2 2 4-4"/>',
+  depts: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>',
+  account: '<path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.2"/>',
+};
+const svg = (k, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
+const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Has note"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+
+const DEPTS = [
+  { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "passwords", "homecontent", "dtasks"], blurb: "Team, passwords, Home page" },
+  { id: "FINANCE", name: "Finance", tabs: ["dashboard", "expenses", "dtasks"], blurb: "Profit and expenses" },
+  { id: "SALES", name: "Sales", tabs: ["orders", "customers", "dtasks"], blurb: "Orders and customers" },
+  { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "dtasks"], blurb: "Channels and audience" },
+  { id: "PACKING", name: "Packing", tabs: ["packing", "inventory", "dtasks"], blurb: "Packing queue and stock" },
+];
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Team", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", expenses: "Expenses", orders: "Orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TASK_STATUS = [
+  { id: "todo", name: "To do", cls: "" },
+  { id: "in_progress", name: "In progress", cls: "info" },
+  { id: "done", name: "Done", cls: "good" },
+  { id: "cancelled", name: "Cancelled", cls: "bad" },
+];
+const PRIORITIES = [{ id: "low", name: "Low" }, { id: "normal", name: "Normal" }, { id: "high", name: "High" }];
+const dept = id => DEPTS.find(d => d.id === id);
+const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
+
+const S = {
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [],
+  home: {}, security: {}, profile: {},
+  loaded: { products: false, orders: false, expenses: false, customers: false, tasks: false, team: false },
+  view: "home", dept: "SALES", tab: "orders", period: "month",
+  of: { view: "all", platform: "all", q: "", range: "today" },
+  page: 0, sel: new Set(),
+  pq: "", cq: "", cpage: 0,
+  t: { scope: "team", person: "", dept: "", mode: "calendar", month: today().slice(0, 7), day: today() },
+  slide: 0, slidePaused: false,
+  unlocked: new Set(),
+  db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
+};
+try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "account", "depts", "dept"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
+try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
+const hv = location.hash.slice(1); if (["home", "tasks", "account"].includes(hv)) S.view = hv;
+const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
+const saveUnlocked = () => { try { sessionStorage.setItem("rs-unlocked", JSON.stringify([...S.unlocked])); } catch (e) {} };
+const isUnlocked = d => S.isOwner || S.unlocked.has(d);
 
 function relTime(t) {
   if (!t) return "";
@@ -394,20 +505,40 @@ function writeErr(e) {
 
 /* ---------- rendering ---------- */
 function renderNav() {
-  $("#nav").innerHTML = VIEWS.map(v => `<button type="button" data-nav="${v.id}" ${S.view === v.id ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[v.id]}</svg>${v.name}</button>`).join("");
+  const item = (attrs, icon, label, current, extra = "", cls = "") => `<button type="button" class="${cls}" ${attrs} ${current ? 'aria-current="page"' : ""}>${svg(icon)}<span>${label}</span>${extra}</button>`;
+  const inDept = S.view === "dept" || S.view === "depts";
+  $("#nav").innerHTML =
+    item('data-nav="home"', "home", "Home", S.view === "home") +
+    item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
+    item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
+    `<div class="nav-label desktop-only">Departments</div>` +
+    DEPTS.map(d => item(`data-dept="${d.id}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico"), "desktop-only dept-item")).join("") +
+    item('data-nav="account"', "account", "My account", S.view === "account", "", "account-item");
 }
+
+function moduleKey() { return S.view === "dept" ? S.tab : S.view; }
 
 function headActions() {
   const can = !S.readOnly;
   const ex = col => S.dl ? `<button class="btn" type="button" data-act="export" data-col="${col}">Export</button>` : "";
+  if (S.view === "dept" && !isUnlocked(S.dept)) return "";
+  const lockBtn = S.view === "dept" && !S.isOwner ? `<button class="btn ghost" type="button" data-act="lock-dept">${svg("lock", "btn-ico")} Lock</button>` : "";
   const map = {
-    dashboard: can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "",
+    home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
+    tasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
+    dtasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
+    overview: can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "",
+    dashboard: ex("orders"),
     orders: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
+    packing: "",
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
     customers: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
+    channels: ex("customers"),
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
+    team: S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : "",
+    passwords: "", homecontent: "", account: "", depts: "",
   };
-  return map[S.view];
+  return lockBtn + (map[moduleKey()] || "");
 }
 
 function periodSeg() {
@@ -416,17 +547,396 @@ function periodSeg() {
 
 function render() {
   renderNav();
-  $("#view-title").textContent = VIEWS.find(v => v.id === S.view).name;
+  const d = dept(S.dept);
+  const title = { home: "Home", tasks: "Tasks", account: "My account", depts: "Departments" }[S.view] || d.name;
+  $("#view-title").textContent = title;
   $("#head-actions").innerHTML = headActions();
-  const hasEx = [...S.products, ...S.orders, ...S.expenses].some(r => r.example);
   let n = "";
   if (!S.db && S.dbChecked) n += `<div class="notice">Saving is off in this view, so changes disappear when you close the page. Open it on claude.ai while signed in to save.</div>`;
-  if (hasEx && !S.readOnly) n += `<div class="notice" style="background:var(--surface-2);color:var(--fg)"><span>The rows marked <span class="chip ex">Example</span> are sample data showing how things work. Clear them when you're ready to add your own.</span><span id="clear-slot"><button class="btn sm" type="button" data-act="clear-ex">Clear examples</button></span></div>`;
   $("#notice").innerHTML = n;
   const v = $("#view");
   const loading = S.db && !Object.values(S.loaded).every(Boolean);
   if (loading) { v.innerHTML = `<div class="panel"><div class="empty">Loading your records…</div></div>`; return; }
-  v.innerHTML = ({ dashboard: viewDashboard, orders: viewOrders, inventory: viewInventory, customers: viewCustomers, expenses: viewExpenses })[S.view]();
+  if (S.view === "home") { v.innerHTML = viewHome(); applySlide(); return; }
+  if (S.view === "tasks") { v.innerHTML = viewTasks(null); return; }
+  if (S.view === "account") { v.innerHTML = viewAccount(); return; }
+  if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
+  if (!isUnlocked(S.dept)) { v.innerHTML = viewLock(d); const pw = $("#unlock-pw"); if (pw) pw.focus(); return; }
+  if (!d.tabs.includes(S.tab)) S.tab = d.tabs[0];
+  const tabs = `<div class="tabs" role="tablist">${d.tabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
+  const body = ({
+    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, passwords: viewPasswords, homecontent: viewHomeContent,
+    dashboard: viewDashboard, expenses: viewExpenses, orders: viewOrders, customers: viewCustomers, channels: viewChannels,
+    packing: viewPacking, inventory: viewInventory,
+  })[S.tab]();
+  v.innerHTML = tabs + body;
+}
+
+/* ---------- people & tasks helpers ---------- */
+const member = id => S.team.find(m => m.id === id);
+const memberName = id => (member(id) || {}).name || "Unassigned";
+const initials = n => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
+const myMemberId = () => S.profile.memberId || "";
+const firstName = () => (member(myMemberId()) || {}).name?.split(" ")[0] || (S.me && S.me.name ? S.me.name.split(" ")[0] : "");
+function manilaHour() { try { return Number(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila", hour: "numeric", hour12: false })) % 24; } catch (e) { return new Date().getHours(); } }
+const greeting = () => { const h = manilaHour(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
+const longDate = d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+const monthLabel = ym => new Date(ym + "-01T00:00:00").toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+const onDay = (t, d) => t.due && d >= (t.start && t.start <= t.due ? t.start : t.due) && d <= t.due;
+const inMonth = (t, ym) => t.due && ((t.start || t.due).slice(0, 7) <= ym && t.due.slice(0, 7) >= ym);
+const pbar = p => `<div class="pbar" role="img" aria-label="${Number(p) || 0}% done"><i style="width:${Math.max(0, Math.min(100, Number(p) || 0))}%"></i></div>`;
+const isOverdue = t => t.due && t.due < today() && (t.status === "todo" || t.status === "in_progress");
+
+function scopeTasks(forceDept) {
+  return S.tasks.filter(t => {
+    if (forceDept) return t.department === forceDept;
+    if (S.t.scope === "person" && S.t.person) return t.assigneeId === S.t.person;
+    if (S.t.scope === "dept" && S.t.dept) return t.department === S.t.dept;
+    return true;
+  });
+}
+function taskSummary(list, label) {
+  const n = list.length, c = id => list.filter(t => t.status === id).length;
+  const parts = [["in_progress", "In progress"], ["done", "Done"], ["cancelled", "Cancelled"], ["todo", "To do"]];
+  return `<div class="tsum">
+    <div class="tsum-line">${parts.map(([id, nm]) => `<span class="tsum-part s-${id}"><b class="num">${c(id)}/${n}</b> ${nm}</span>`).join('<span class="tsum-sep">|</span>')}</div>
+    <div class="tsum-bar" aria-hidden="true">${n ? parts.map(([id]) => `<i class="s-${id}" style="width:${c(id) / n * 100}%"></i>`).join("") : ""}</div>
+    ${label ? `<div class="tsum-label">${label}</div>` : ""}
+  </div>`;
+}
+function workload(list, by) {
+  const groups = new Map();
+  for (const t of list) { const k = by === "dept" ? t.department || "" : t.assigneeId || ""; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
+  if (by === "person") for (const m of S.team) if (!groups.has(m.id)) groups.set(m.id, []);
+  const rows = [...groups.entries()].map(([k, ts]) => {
+    const live = ts.filter(t => t.status !== "cancelled");
+    const avg = live.length ? Math.round(live.reduce((a, t) => a + (t.status === "done" ? 100 : Number(t.progress) || 0), 0) / live.length) : 0;
+    const name = by === "dept" ? (dept(k) || { name: "No department" }).name : memberName(k);
+    const sub = by === "dept" ? "" : (member(k) ? (dept(member(k).department) || {}).name || "" : "");
+    return { k, name, sub, n: ts.length, ip: ts.filter(t => t.status === "in_progress").length, done: ts.filter(t => t.status === "done").length, avg, over: ts.filter(isOverdue).length };
+  }).sort((a, b) => b.n - a.n);
+  if (!rows.length) return "";
+  return `<section class="panel"><h2>${by === "dept" ? "By department" : "By person"}</h2>
+    <div class="table-wrap" style="border:0"><table>
+      <thead><tr><th>${by === "dept" ? "Department" : "Person"}</th><th class="r">Tasks</th><th class="r">In progress</th><th class="r">Done</th><th class="r">Overdue</th><th style="min-width:140px">Progress</th></tr></thead>
+      <tbody>${rows.map(r => `<tr ${r.k ? `data-w${by}="${esc(r.k)}" style="cursor:pointer"` : ""}><td><div style="font-weight:600">${esc(r.name)}</div>${r.sub ? `<div class="s">${esc(r.sub)}</div>` : ""}</td><td class="r num">${r.n}</td><td class="r num">${r.ip}</td><td class="r num">${r.done}</td><td class="r num" style="color:${r.over ? "var(--bad)" : "inherit"}">${r.over}</td><td><div style="display:flex;gap:8px;align-items:center">${pbar(r.avg)}<span class="num" style="font-size:12px;color:var(--muted)">${r.avg}%</span></div></td></tr>`).join("")}</tbody>
+    </table></div></section>`;
+}
+function taskPill(t) {
+  const a = t.assigneeId ? member(t.assigneeId) : null;
+  return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}" data-task="${t.id}" title="${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${esc(t.title)}</span></button>`;
+}
+function taskRow(t) {
+  return `<tr data-task="${t.id}" style="cursor:pointer">
+    <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
+    <td class="nowrap">${esc(memberName(t.assigneeId))}</td>
+    <td class="nowrap">${esc((dept(t.department) || { name: "–" }).name)}</td>
+    <td class="nowrap" style="color:${isOverdue(t) ? "var(--bad)" : "inherit"}">${t.due ? fmtDate(t.due) : "No date"}${isOverdue(t) ? " · overdue" : ""}</td>
+    <td style="min-width:120px"><div style="display:flex;gap:8px;align-items:center">${pbar(t.status === "done" ? 100 : t.progress)}<span class="num" style="font-size:12px;color:var(--muted)">${t.status === "done" ? 100 : Number(t.progress) || 0}%</span></div></td>
+    <td><span class="chip ${tstat(t.status).cls}">${tstat(t.status).name}</span></td></tr>`;
+}
+
+function viewTasks(forceDept) {
+  const scoped = scopeTasks(forceDept);
+  const ym = S.t.month;
+  const monthTasks = scoped.filter(t => inMonth(t, ym));
+  const undated = scoped.filter(t => !t.due && t.status !== "done" && t.status !== "cancelled");
+  const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : "Whole team";
+  const controls = `<div class="toolbar">
+    ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[["team", "Whole team"], ["person", "Per person"], ["dept", "Per department"]].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
+    ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${S.team.map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
+    ${S.t.scope === "dept" ? `<select id="t-dept" aria-label="Department"><option value="">All departments</option>${DEPTS.map(d => `<option value="${d.id}" ${S.t.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>` : ""}`}
+    <span style="flex:1"></span>
+    <div class="seg" role="group" aria-label="Layout">${[["calendar", "Calendar"], ["list", "List"]].map(([k, l]) => `<button type="button" data-tmode="${k}" aria-pressed="${S.t.mode === k}">${l}</button>`).join("")}</div>
+  </div>`;
+  const monthNav = `<div class="head"><div class="pager"><button class="btn sm" type="button" data-tmonth="-1" aria-label="Previous month">‹</button><strong style="min-width:150px;text-align:center">${monthLabel(ym)}</strong><button class="btn sm" type="button" data-tmonth="1" aria-label="Next month">›</button><button class="btn ghost sm" type="button" data-tmonth="0">Today</button></div></div>`;
+
+  let main;
+  if (S.t.mode === "calendar") {
+    const [y, m] = ym.split("-").map(Number);
+    const first = new Date(y, m - 1, 1), dim = new Date(y, m, 0).getDate();
+    const weeks = Math.ceil((first.getDay() + dim) / 7);
+    const cells = [];
+    for (let i = 0; i < weeks * 7; i++) { const d = new Date(y, m - 1, 1 - first.getDay() + i); cells.push(dstr(d.getTime())); }
+    const dayTasks = scoped.filter(t => onDay(t, S.t.day));
+    main = `<div class="cal">
+      ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => `<div class="cal-h">${d}</div>`).join("")}
+      ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)); const out = d.slice(0, 7) !== ym; return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
+        <div class="cal-n"><span>${Number(d.slice(8))}</span>${S.readOnly ? "" : `<button type="button" class="cal-add" data-act="new-task" data-date="${d}" aria-label="Add task on ${fmtDate(d)}">+</button>`}</div>
+        <div class="cal-items">${ts.slice(0, 3).map(taskPill).join("")}${ts.length > 3 ? `<span class="cal-more">+${ts.length - 3} more</span>` : ""}</div>
+        ${ts.length ? `<div class="cal-dots" aria-hidden="true">${ts.slice(0, 5).map(t => `<i class="s-${t.status}"></i>`).join("")}</div>` : ""}
+      </div>`; }).join("")}
+    </div>
+    <section class="panel"><div class="head"><h2>${longDate(S.t.day)}</h2>${S.readOnly ? "" : `<button class="btn sm" type="button" data-act="new-task" data-date="${S.t.day}">+ Add task for this day</button>`}</div>
+      ${dayTasks.length ? `<div class="table-wrap" style="border:0"><table><tbody>${dayTasks.map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">Nothing due this day.</div>`}
+    </section>`;
+  } else {
+    const sorted = [...monthTasks].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
+    main = `<div class="table-wrap"><table>
+      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
+      <tbody>${sorted.map(taskRow).join("")}</tbody></table>${sorted.length ? "" : `<div class="empty" style="padding:16px">No tasks due in ${monthLabel(ym)}.</div>`}</div>`;
+  }
+  const extra = forceDept ? workload(monthTasks, "person")
+    : S.t.scope === "team" ? workload(monthTasks, "person")
+    : S.t.scope === "dept" && !S.t.dept ? workload(monthTasks, "dept")
+    : S.t.scope === "dept" ? workload(monthTasks, "person") : "";
+  const noTeam = !S.team.length ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span>Add your team in <strong>Admin → Team</strong> so you can assign tasks to people.</span></div>` : "";
+  return `${noTeam}${taskSummary(monthTasks, `${monthLabel(ym)} · ${esc(scopeName)}`)}${controls}${monthNav}${main}
+    ${undated.length ? `<section class="panel"><h2>No due date</h2><div class="table-wrap" style="border:0"><table><tbody>${undated.map(taskRow).join("")}</tbody></table></div></section>` : ""}
+    ${extra}`;
+}
+
+function openTaskForm(id, date, forceDept) {
+  const t = id ? S.tasks.find(x => x.id === id) : { due: date || S.t.day, department: forceDept || (S.t.scope === "dept" ? S.t.dept : "") || (member(myMemberId()) || {}).department || "", assigneeId: S.t.scope === "person" ? S.t.person : "", status: "todo", progress: 0, priority: "normal" };
+  if (!t) return;
+  const ro = S.readOnly;
+  openSheet(`
+    <h3>${id ? "Edit task" : "Add task"}</h3>
+    <div class="field"><label for="k-title">Task</label><input id="k-title" value="${esc(t.title || "")}" placeholder="e.g. Pack Shopee orders for pickup" ${ro ? "disabled" : ""}></div>
+    <div class="field"><label for="k-notes">Details</label><textarea id="k-notes" rows="3" ${ro ? "disabled" : ""}>${esc(t.notes || "")}</textarea></div>
+    <div class="row">
+      <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option>${DEPTS.map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
+      <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="k-start">Start date</label><input id="k-start" type="date" value="${esc(t.start || "")}" ${ro ? "disabled" : ""}></div>
+      <div class="field"><label for="k-due">Due date</label><input id="k-due" type="date" value="${esc(t.due || "")}" ${ro ? "disabled" : ""}></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="k-status">Status</label><select id="k-status" ${ro ? "disabled" : ""}>${TASK_STATUS.map(s => `<option value="${s.id}" ${t.status === s.id ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>
+      <div class="field"><label for="k-pri">Priority</label><select id="k-pri" ${ro ? "disabled" : ""}>${PRIORITIES.map(p => `<option value="${p.id}" ${t.priority === p.id ? "selected" : ""}>${p.name}</option>`).join("")}</select></div>
+    </div>
+    <div class="field"><label for="k-prog">Progress: <span id="k-prog-val" class="num">${t.status === "done" ? 100 : Number(t.progress) || 0}%</span></label><input id="k-prog" type="range" min="0" max="100" step="10" value="${t.status === "done" ? 100 : Number(t.progress) || 0}" ${ro ? "disabled" : ""} style="padding:0;accent-color:var(--brand)"></div>
+    ${id && t.createdByName ? `<div style="font-size:12px;color:var(--muted)">Added by ${esc(t.createdByName)}${t.createdAt ? " · " + relTime(t.createdAt) : ""}</div>` : ""}
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id && !ro ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-task" data-id="${id}">Delete task</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">${ro ? "Close" : "Cancel"}</button>${ro ? "" : `<button class="btn primary" type="submit">Save task</button>`}</div>`,
+  ro ? null : async () => {
+    if (!val("k-title")) return sheetError("Give the task a name.");
+    const start = val("k-start"), due = val("k-due") || start;
+    if (start && due && start > due) return sheetError("The start date is after the due date.");
+    const status = val("k-status");
+    let progress = Math.round(numv("k-prog"));
+    if (status === "done") progress = 100;
+    const data = { ...(id ? clean(t) : {}), title: val("k-title"), notes: val("k-notes"), department: val("k-dept"), assigneeId: val("k-who"), start: start && start !== due ? start : "", due, status, progress, priority: val("k-pri"), updatedAt: Date.now() };
+    if (!id) { data.createdAt = Date.now(); data.createdByName = (member(myMemberId()) || {}).name || (S.me && S.me.name) || ""; }
+    await save("tasks", id || uid("t"), data);
+    if (due) { S.t.day = due; S.t.month = due.slice(0, 7); }
+    closeSheet(); toast(id ? "Task updated." : "Task added.");
+  });
+}
+
+/* ---------- home ---------- */
+function slides() {
+  const h = S.home || {};
+  const fn = firstName();
+  const goals = (h.goals || "").split("\n").map(s => s.trim()).filter(Boolean);
+  const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === myMemberId() && (t.status === "todo" || t.status === "in_progress"));
+  const toPack = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
+  const placeholder = what => `<p class="slide-ph">${S.canEdit ? `Add your ${what} in <button type="button" class="linkish" data-act="edit-home">Admin → Home page</button>.` : `Your Admin hasn't added the ${what} yet.`}</p>`;
+  return [
+    { eyebrow: longDate(today()), title: `${greeting()}${fn ? ", " + esc(fn) : ""}`, body: `<p>${esc(h.welcome || "Welcome to Regal Spritz HQ. Here's what's happening today.")}</p>
+      <div class="slide-stats"><span><b class="num">${mine.length}</b> open task${mine.length === 1 ? "" : "s"} for you</span><span><b class="num">${S.tasks.filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length}</b> due today across the team</span><span><b class="num">${toPack}</b> order${toPack === 1 ? "" : "s"} to pack</span></div>` },
+    { eyebrow: "RS Mission", title: "Our mission", body: h.mission ? `<p class="slide-quote">${esc(h.mission)}</p>` : placeholder("mission statement") },
+    { eyebrow: "RS Vision", title: "Our vision", body: h.vision ? `<p class="slide-quote">${esc(h.vision)}</p>` : placeholder("vision statement") },
+    { eyebrow: "RS Goals", title: "Our goals", body: goals.length ? `<ol class="slide-goals">${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ol>` : placeholder("goals") },
+  ];
+}
+function viewHome() {
+  const sl = slides();
+  S.slide = S.slide % sl.length;
+  const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === myMemberId() && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
+  const monthTasks = S.tasks.filter(t => inMonth(t, today().slice(0, 7)));
+  return `
+  <section class="carousel" id="carousel" aria-roledescription="carousel" aria-label="Welcome">
+    <div class="car-track" id="car-track">${sl.map((s, i) => `<div class="slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${sl.length}" ${i !== S.slide ? 'aria-hidden="true"' : ""}>
+      <div class="slide-eyebrow">${s.eyebrow}</div><h2 class="slide-title">${s.title}</h2><div class="slide-body">${s.body}</div></div>`).join("")}</div>
+    <div class="car-ctrl">
+      <button type="button" class="car-btn" data-slidestep="-1" aria-label="Previous slide">‹</button>
+      <div class="car-dots">${sl.map((s, i) => `<button type="button" data-slide="${i}" aria-label="Show ${esc(s.eyebrow)}" aria-current="${i === S.slide}"></button>`).join("")}</div>
+      <button type="button" class="car-btn" data-slidestep="1" aria-label="Next slide">›</button>
+    </div>
+  </section>
+  <div class="grid-2">
+    <section class="panel"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
+      ${myMemberId() ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
+        : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your tasks here.</div>`}
+    </section>
+    <section class="panel"><h2>Team this month</h2>${taskSummary(monthTasks, monthLabel(today().slice(0, 7)))}</section>
+  </div>
+  <section class="panel"><h2>Departments</h2>
+    <div class="dept-grid">${DEPTS.map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>
+  </section>`;
+}
+function applySlide() {
+  const tr = $("#car-track"); if (!tr) return;
+  tr.style.transform = `translateX(-${S.slide * 100}%)`;
+  tr.querySelectorAll(".slide").forEach((s, i) => i === S.slide ? s.removeAttribute("aria-hidden") : s.setAttribute("aria-hidden", "true"));
+  document.querySelectorAll(".car-dots button").forEach((b, i) => b.setAttribute("aria-current", String(i === S.slide)));
+}
+const reduceMotion = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
+setInterval(() => { if (S.view === "home" && !S.slidePaused && !reduceMotion && $("#car-track") && $("#scrim").hidden) { S.slide = (S.slide + 1) % 4; applySlide(); } }, 7000);
+document.addEventListener("mouseover", e => { S.slidePaused = !!e.target.closest("#carousel"); });
+document.addEventListener("focusin", e => { S.slidePaused = !!e.target.closest("#carousel"); });
+
+function viewHomeContent() {
+  const h = S.home || {};
+  if (!S.canEdit) return `<div class="panel"><div class="empty">Only the owner or an Editor can change the Home page.</div></div>`;
+  return `<form class="panel" id="home-form">
+    <div class="field"><label for="h-welcome">Welcome message (first slide)</label><textarea id="h-welcome" rows="2" placeholder="Welcome to Regal Spritz HQ. Here's what's happening today.">${esc(h.welcome || "")}</textarea></div>
+    <div class="field"><label for="h-mission">RS Mission</label><textarea id="h-mission" rows="3">${esc(h.mission || "")}</textarea></div>
+    <div class="field"><label for="h-vision">RS Vision</label><textarea id="h-vision" rows="3">${esc(h.vision || "")}</textarea></div>
+    <div class="field"><label for="h-goals">RS Goals (one per line)</label><textarea id="h-goals" rows="5">${esc(h.goals || "")}</textarea></div>
+    <div><button class="btn primary" type="submit">Save Home page</button></div>
+  </form>`;
+}
+
+/* ---------- account ---------- */
+function viewAccount() {
+  const lvl = S.isOwner ? "Owner" : S.canEdit ? "Editor" : S.readOnly ? "Viewer" : "Contributor";
+  const m = member(myMemberId());
+  const mine = m ? S.tasks.filter(t => t.assigneeId === m.id) : [];
+  return `<div class="grid-2">
+    <section class="panel"><h2>Profile</h2>
+      <div style="display:flex;gap:12px;align-items:center">${S.me && S.me.avatarUrl ? `<img src="${esc(S.me.avatarUrl)}" alt="" width="48" height="48" style="border-radius:50%">` : ""}
+        <div><div style="font-weight:700;font-size:16px">${esc((S.me && S.me.name) || (m && m.name) || "Signed-in user")}</div><div style="color:var(--muted);font-size:13px">Access: ${lvl}${m ? " · " + esc((dept(m.department) || {}).name || "") + (m.role ? " · " + esc(m.role) : "") : ""}</div></div></div>
+      ${S.uid ? `<div class="field"><label for="my-member">Which team member are you?</label><select id="my-member"><option value="">Choose your name…</option>${S.team.map(x => `<option value="${x.id}" ${myMemberId() === x.id ? "selected" : ""}>${esc(x.name)}${x.department ? " · " + esc((dept(x.department) || {}).name || "") : ""}</option>`).join("")}</select>
+        <div style="font-size:12px;color:var(--muted)">${S.team.length ? "This shows your tasks on Home and pre-fills your department on new tasks." : "Ask Admin to add you in Admin → Team first."}</div></div>`
+        : `<div class="empty">Sign in on claude.ai to link your account.</div>`}
+    </section>
+    <section class="panel"><h2>My tasks</h2>${m ? taskSummary(mine, "All time") : `<div class="empty">Link your name to see your task summary.</div>`}
+      ${m ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.filter(t => t.status === "todo" || t.status === "in_progress").sort((a, b) => (a.due || "9").localeCompare(b.due || "9")).slice(0, 8).map(taskRow).join("")}</tbody></table></div>` : ""}
+    </section>
+  </div>
+  <section class="panel"><h2>Department access</h2>
+    ${S.isOwner ? `<div class="empty">You own this app, so every department opens without a password.</div>` : `
+    <div class="dept-grid">${DEPTS.map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${isUnlocked(d.id) ? "Unlocked on this device" : "Locked"}</span></button>`).join("")}</div>
+    ${S.unlocked.size ? `<div><button class="btn" type="button" data-act="lock-all">Lock all departments</button></div>` : ""}`}
+  </section>`;
+}
+
+/* ---------- departments ---------- */
+function viewDeptPicker() {
+  return `<div class="dept-grid">${DEPTS.map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>`;
+}
+function viewLock(d) {
+  const has = S.security && S.security[d.id] && S.security[d.id].hash;
+  return `<form class="panel lock-card" id="unlock-form">
+    ${svg("lock", "lock-big")}
+    <h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} is locked</h2>
+    ${has ? `<div class="field" style="width:100%"><label for="unlock-pw">${d.name} password</label><input id="unlock-pw" type="password" autocomplete="current-password"></div>
+      <div id="unlock-err" class="confirm" hidden>That password isn't right. Try again.</div>
+      <button class="btn primary" type="submit">Unlock</button>
+      <div style="font-size:12px;color:var(--muted)">Stays unlocked on this device until you close the tab.</div>`
+    : `<div class="empty">No password has been set for ${d.name} yet. Ask the owner to set one in Admin → Passwords.</div>`}
+  </form>`;
+}
+async function sha(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function tryUnlock() {
+  const d = S.dept, rec = S.security[d], pw = val("unlock-pw");
+  if (!rec || !pw) return;
+  if ((await sha(rec.salt + ":" + pw)) === rec.hash) { S.unlocked.add(d); saveUnlocked(); render(); toast(`${dept(d).name} unlocked.`); }
+  else { const e = $("#unlock-err"); if (e) e.hidden = false; $("#unlock-pw").value = ""; $("#unlock-pw").focus(); }
+}
+function viewPasswords() {
+  if (!S.canEdit) return `<div class="panel"><div class="empty">Only the owner or an Editor can change department passwords.</div></div>`;
+  return `<section class="panel"><h2>Department passwords</h2>
+    <div class="table-wrap" style="border:0"><table><tbody>${DEPTS.map(d => { const has = S.security[d.id] && S.security[d.id].hash; return `<tr>
+      <td style="font-weight:600">${d.name}</td>
+      <td><span class="chip ${has ? "good" : "warn"}">${has ? "Password set" : "No password"}</span></td>
+      <td><input id="pw-${d.id}" type="password" autocomplete="new-password" placeholder="New password" style="border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;width:100%;min-width:140px"></td>
+      <td class="r nowrap"><button class="btn sm primary" type="button" data-setpw="${d.id}">${has ? "Change" : "Set"}</button>${has ? ` <button class="btn sm ghost danger" type="button" data-clearpw="${d.id}">Remove</button>` : ""}</td></tr>`; }).join("")}</tbody></table></div>
+    <div class="notice" style="background:var(--surface-2);color:var(--muted);font-weight:500">These passwords keep each department's pages out of view for staff who don't need them. They aren't bank-level security: anyone you share this app with can technically reach its data. Share the app only with your team, and change a password when someone leaves.</div>
+  </section>`;
+}
+async function setPassword(d, clear) {
+  const next = { ...S.security };
+  if (clear) delete next[d];
+  else {
+    const pw = val("pw-" + d);
+    if (pw.length < 4) { toast("Use at least 4 characters."); return; }
+    const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    next[d] = { salt, hash: await sha(salt + ":" + pw), setAt: Date.now() };
+  }
+  await S.db?.doc("config/security").set(next);
+  if (!S.db) S.security = next;
+  render(); toast(clear ? `${dept(d).name} password removed.` : `${dept(d).name} password saved. Share it with that team.`);
+}
+
+function viewTeam() {
+  const rows = [...S.team].sort((a, b) => (a.department || "").localeCompare(b.department || "") || (a.name || "").localeCompare(b.name || ""));
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Contact</th><th class="r">Open tasks</th><th></th></tr></thead>
+    <tbody>${rows.map(m => `<tr><td style="font-weight:600">${esc(m.name)}</td><td>${esc((dept(m.department) || { name: "–" }).name)}</td><td>${esc(m.role || "")}</td><td>${esc(m.contact || "")}</td><td class="r num">${S.tasks.filter(t => t.assigneeId === m.id && (t.status === "todo" || t.status === "in_progress")).length}</td>
+      <td class="r">${S.canEdit ? `<button class="btn ghost sm" type="button" data-act="edit-member" data-id="${m.id}">Edit</button>` : ""}</td></tr>`).join("")}</tbody>
+  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No team members yet. ${S.canEdit ? "Click “Add team member” to add everyone who gets tasks, including staff without a Claude account." : "Ask the owner to add the team."}</div>`}</div>`;
+}
+function openMemberForm(id) {
+  const m = id ? member(id) : {};
+  openSheet(`
+    <h3>${id ? "Edit team member" : "Add team member"}</h3>
+    <div class="field"><label for="m-name">Full name</label><input id="m-name" value="${esc(m.name || "")}"></div>
+    <div class="row">
+      <div class="field"><label for="m-dept">Department</label><select id="m-dept"><option value="">None</option>${DEPTS.map(d => `<option value="${d.id}" ${m.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
+      <div class="field"><label for="m-role">Role / title</label><input id="m-role" value="${esc(m.role || "")}" placeholder="e.g. Packing lead"></div>
+    </div>
+    <div class="field"><label for="m-contact">Phone or email (optional)</label><input id="m-contact" value="${esc(m.contact || "")}"></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-member" data-id="${id}">Remove from team</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("m-name")) return sheetError("Enter a name.");
+    await save("team", id || uid("m"), { ...(id ? clean(m) : {}), name: val("m-name"), department: val("m-dept"), role: val("m-role"), contact: val("m-contact") });
+    closeSheet(); toast(id ? "Team member updated." : "Team member added.");
+  });
+}
+
+function viewPacking() {
+  const q = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const hold = q.filter(o => o.fulfillment === "on_hold").length;
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">To pack</span><span class="value">${q.length - hold}</span><span class="sub">Unfulfilled, oldest first</span></div>
+      <div class="kpi"><span class="label">On hold</span><span class="value">${hold}</span></div>
+      <div class="kpi"><span class="label">Items to pick</span><span class="value">${q.filter(o => o.fulfillment === "unfulfilled").reduce((a, o) => a + itemCount(o), 0)}</span></div>
+      <div class="kpi"><span class="label">Fulfilled today</span><span class="value">${S.orders.filter(o => o.fulfilledAt && dstr(o.fulfilledAt) === today()).length}</span></div>
+    </div>
+    <div class="pack-list">${q.map(o => `<article class="panel pack">
+      <div class="head"><div><span class="onum" style="font-size:15px">#${esc(o.num)}</span> <span style="color:var(--muted);font-size:13px">${esc(plat(o.platform))} · ${relTime(o.createdAt)}</span></div><div style="display:flex;gap:6px">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}</div></div>
+      <div><strong>${esc(o.customer || "No customer")}</strong>${o.phone ? ` · <span style="user-select:all">${esc(o.phone)}</span>` : ""}${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : ""}</div>
+      <ul class="pick">${(o.items || []).map(i => `<li><b class="num">${esc(i.qty)}×</b> ${esc(i.name)}${i.sku ? ` <span style="color:var(--muted)">${esc(i.sku)}</span>` : ""}</li>`).join("")}</ul>
+      ${o.note ? `<div class="notice" style="font-weight:500">${esc(o.note)}</div>` : ""}
+      ${(o.tags || []).length ? tagCell(o.tags) : ""}
+      ${S.readOnly ? "" : `<div class="actions"><button class="btn primary sm" type="button" data-ful="${o.id}" data-to="fulfilled">Mark as fulfilled</button>${o.fulfillment === "on_hold" ? `<button class="btn sm" type="button" data-ful="${o.id}" data-to="unfulfilled">Release hold</button>` : `<button class="btn sm" type="button" data-ful="${o.id}" data-to="on_hold">Put on hold</button>`}<button class="btn ghost sm" type="button" data-open="${o.id}">Details</button></div>`}
+    </article>`).join("") || `<div class="panel"><div class="empty">Nothing to pack. New unfulfilled orders appear here automatically.</div></div>`}</div>`;
+}
+
+function viewChannels() {
+  const live = S.orders.filter(o => inPeriod(o.date) && !isVoid(o));
+  const byPlat = PLATFORMS.map(p => { const os = live.filter(o => (o.platform || "other") === p.id); return { ...p, n: os.length, v: os.reduce((a, o) => a + total(o), 0) }; }).filter(p => p.n || p.id !== "other").sort((a, b) => b.v - a.v);
+  const max = Math.max(1, ...byPlat.map(p => p.v));
+  const cust = customerList();
+  const repeat = cust.filter(c => c.orders > 1).length;
+  const tagCounts = allTags().slice(0, 12).map(t => [t, S.customers.filter(c => (c.tags || []).includes(t)).length + live.filter(o => (o.tags || []).includes(t)).length]);
+  return `<div class="head">${periodSeg()}</div>
+  <div class="kpis">
+    <div class="kpi"><span class="label">Orders</span><span class="value">${live.length.toLocaleString("en-PH")}</span><span class="sub">${periodLabel()}</span></div>
+    <div class="kpi"><span class="label">Customers</span><span class="value">${cust.length.toLocaleString("en-PH")}</span></div>
+    <div class="kpi"><span class="label">Repeat buyers</span><span class="value">${cust.length ? Math.round(repeat / cust.length * 100) : 0}%</span><span class="sub">${repeat.toLocaleString("en-PH")} people</span></div>
+    <div class="kpi"><span class="label">Email subscribers</span><span class="value">${S.customers.filter(c => c.marketing).length.toLocaleString("en-PH")}</span><span class="sub">From Shopify import</span></div>
+  </div>
+  <div class="grid-2">
+    <section class="panel"><h2>Sales by channel</h2><div class="bars">${byPlat.map(p => `<div class="bar-row"><span>${esc(p.name)}</span><div class="bar-track"><div class="bar-fill" style="width:${(p.v / max * 100).toFixed(1)}%"></div></div><span class="num">${peso(p.v)}</span></div>`).join("")}</div>
+      <div style="font-size:12px;color:var(--muted)">${byPlat.map(p => `${esc(p.name)}: ${p.n} order${p.n === 1 ? "" : "s"}`).join(" · ")}</div></section>
+    <section class="panel"><h2>Top customers</h2><div class="list">${cust.slice(0, 8).map(c => `<div class="li" data-cust="${esc(custKey(c))}" style="cursor:pointer"><div class="main"><div class="t">${esc(c.name)}</div><div class="s">${c.orders} order${c.orders === 1 ? "" : "s"}</div></div><span class="num" style="font-weight:700">${peso(c.spent)}</span></div>`).join("") || `<div class="empty">No customers yet.</div>`}</div></section>
+  </div>`;
+}
+
+function viewCEO() {
+  const rows = DEPTS.map(d => { const ts = S.tasks.filter(t => t.department === d.id && inMonth(t, today().slice(0, 7))); return { d, ts }; });
+  return viewDashboard() + `<section class="panel"><h2>Tasks this month by department</h2>${taskSummary(S.tasks.filter(t => inMonth(t, today().slice(0, 7))), "Whole team · " + monthLabel(today().slice(0, 7)))}</section>` + workload(S.tasks.filter(t => inMonth(t, today().slice(0, 7))), "dept");
 }
 
 function viewDashboard() {
@@ -772,7 +1282,7 @@ function updateOrderTotal() {
 }
 
 function openOrderForm() {
-  if (!S.products.length) { toast("Add a product in Inventory first, then create orders."); S.view = "inventory"; render(); return; }
+  if (!S.products.length) { toast("Add your products first in Packing → Inventory, then create orders."); S.view = "dept"; S.dept = "PACKING"; S.tab = "inventory"; render(); return; }
   const num = nextNum();
   openSheet(`
     <h3>Create order #${num}</h3>
@@ -1127,7 +1637,37 @@ function guard(fn) { return async (...a) => { try { await fn(...a); } catch (e) 
 
 document.addEventListener("click", guard(async ev => {
   const nav = ev.target.closest("[data-nav]");
-  if (nav) { S.view = nav.dataset.nav; S.sel.clear(); try { localStorage.setItem("rs-view", S.view); } catch (e) {} render(); window.scrollTo(0, 0); return; }
+  if (nav) { if ($("#scrim").hidden === false) closeSheet(); S.view = nav.dataset.nav; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); return; }
+  const dp = ev.target.closest("[data-dept]");
+  if (dp) { S.view = "dept"; if (S.dept !== dp.dataset.dept) { S.dept = dp.dataset.dept; S.tab = dept(S.dept).tabs[0]; } S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); return; }
+  const tb = ev.target.closest("[data-tab]");
+  if (tb) { S.tab = tb.dataset.tab; S.sel.clear(); saveNav(); render(); return; }
+  const sl = ev.target.closest("[data-slide]");
+  if (sl) { S.slide = Number(sl.dataset.slide); applySlide(); return; }
+  const ss = ev.target.closest("[data-slidestep]");
+  if (ss) { S.slide = (S.slide + Number(ss.dataset.slidestep) + 4) % 4; applySlide(); return; }
+  const tsc = ev.target.closest("[data-tscope]");
+  if (tsc) { S.t.scope = tsc.dataset.tscope; render(); return; }
+  const tmo = ev.target.closest("[data-tmode]");
+  if (tmo) { S.t.mode = tmo.dataset.tmode; render(); return; }
+  const tmn = ev.target.closest("[data-tmonth]");
+  if (tmn) { const k = Number(tmn.dataset.tmonth); if (!k) { S.t.month = today().slice(0, 7); S.t.day = today(); } else { const [y, m] = S.t.month.split("-").map(Number); const d = new Date(y, m - 1 + k, 1); S.t.month = dstr(d.getTime()).slice(0, 7); S.t.day = S.t.month === today().slice(0, 7) ? today() : S.t.month + "-01"; } render(); return; }
+  const wp = ev.target.closest("[data-wperson]");
+  if (wp) { if (S.view === "dept") { S.view = "tasks"; saveNav(); } S.t.scope = "person"; S.t.person = wp.dataset.wperson; render(); return; }
+  const wd = ev.target.closest("[data-wdept]");
+  if (wd) { if (S.view === "dept") { S.view = "tasks"; saveNav(); } S.t.scope = "dept"; S.t.dept = wd.dataset.wdept; render(); return; }
+  const tk = ev.target.closest("[data-task]");
+  if (tk) return openTaskForm(tk.dataset.task);
+  const nt = ev.target.closest('[data-act="new-task"]');
+  if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
+  const dy = ev.target.closest("[data-day]");
+  if (dy) { S.t.day = dy.dataset.day; render(); return; }
+  const fu = ev.target.closest("[data-ful]");
+  if (fu) { const o = S.orders.find(x => x.id === fu.dataset.ful); if (o) { await updateOrder(o, { fulfillment: fu.dataset.to }); toast(`#${o.num} ${ful(fu.dataset.to).name.toLowerCase()}.`); } return; }
+  const sp = ev.target.closest("[data-setpw]");
+  if (sp) return setPassword(sp.dataset.setpw, false);
+  const cp = ev.target.closest("[data-clearpw]");
+  if (cp) return setPassword(cp.dataset.clearpw, true);
   const per = ev.target.closest("[data-period]");
   if (per) { S.period = per.dataset.period; render(); return; }
   if (ev.target === $("#scrim")) { closeSheet(); return; }
@@ -1142,7 +1682,7 @@ document.addEventListener("click", guard(async ev => {
   if (ev.target.matches("input[type=checkbox]")) return;
   const op = ev.target.closest("[data-open]");
   if (op) return openOrderDetails(op.dataset.open);
-  const ct = ev.target.closest("tr[data-cust]");
+  const ct = ev.target.closest("[data-cust]");
   if (ct) return openCustomer(ct.dataset.cust);
   const tr = ev.target.closest("tr[data-row]");
   if (tr) return openOrderDetails(tr.dataset.row);
@@ -1150,6 +1690,13 @@ document.addEventListener("click", guard(async ev => {
   const id = b.dataset.id;
   switch (b.dataset.act) {
     case "new-order": return openOrderForm();
+    case "lock-dept": S.unlocked.delete(S.dept); saveUnlocked(); render(); toast(`${dept(S.dept).name} locked.`); return;
+    case "lock-all": S.unlocked.clear(); saveUnlocked(); render(); toast("All departments locked on this device."); return;
+    case "edit-home": closeSheet(); S.view = "dept"; S.dept = "ADMIN"; S.tab = "homecontent"; saveNav(); render(); return;
+    case "new-member": return openMemberForm();
+    case "edit-member": return openMemberForm(id);
+    case "del-task": await remove("tasks", id); closeSheet(); toast("Task deleted."); return;
+    case "del-member": await remove("team", id); closeSheet(); toast("Removed from team."); return;
     case "import": return openImport();
     case "new-product": return openProductForm();
     case "edit-product": return openProductForm(id);
@@ -1163,7 +1710,7 @@ document.addEventListener("click", guard(async ev => {
     case "clear-ex": $("#clear-slot").innerHTML = `<span class="confirm">Delete all example rows? <button class="btn sm danger" type="button" data-act="clear-ex-yes">Yes, clear</button><button class="btn sm" type="button" data-act="clear-ex-no">Keep</button></span>`; return;
     case "clear-ex-no": render(); return;
     case "clear-ex-yes": return clearExamples();
-    case "ask-del-order": case "ask-del-product": case "ask-del-expense": {
+    case "ask-del-order": case "ask-del-product": case "ask-del-expense": case "ask-del-task": case "ask-del-member": {
       const kind = b.dataset.act.slice(8);
       const extra = kind === "order" ? " Stock is not changed; set payment to Voided first if you want items back in stock." : "";
       $("#del-slot").innerHTML = `<div class="confirm">Delete this ${kind}? This can't be undone.${extra} <button class="btn sm danger" type="button" data-act="del-${kind}" data-id="${id}">Delete</button><button class="btn sm" type="button" data-act="close">Keep</button></div>`;
@@ -1180,6 +1727,10 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
+  if (t.id === "t-person") { S.t.person = t.value; render(); return; }
+  if (t.id === "t-dept") { S.t.dept = t.value; render(); return; }
+  if (t.id === "k-status" && t.value === "done") { $("#k-prog").value = 100; $("#k-prog-val").textContent = "100%"; return; }
+  if (t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
   if (t.id === "of-view") { S.of.view = t.value; S.page = 0; render(); }
   if (t.id === "of-range") { S.of.range = t.value; render(); }
@@ -1189,6 +1740,7 @@ document.addEventListener("change", guard(async ev => {
 document.addEventListener("input", ev => {
   const t = ev.target;
   if (t.matches(".it-q, .it-price")) return updateOrderTotal();
+  if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
   const key = { "of-q": "of", pq: "pq", cq: "cq" }[t.id];
   if (!key) return;
   if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; }
@@ -1202,6 +1754,15 @@ $("#sheet").addEventListener("submit", guard(async ev => {
   const btn = $("#sheet").querySelector('[type="submit"]'); if (btn) btn.disabled = true;
   try { await sheetSubmit(); } finally { if (btn && document.body.contains(btn)) btn.disabled = false; }
 }));
+document.addEventListener("submit", guard(async ev => {
+  if (ev.target.id === "unlock-form") { ev.preventDefault(); return tryUnlock(); }
+  if (ev.target.id === "home-form") {
+    ev.preventDefault();
+    const data = { welcome: val("h-welcome"), mission: val("h-mission"), vision: val("h-vision"), goals: val("h-goals"), updatedAt: Date.now() };
+    if (S.db) await S.db.doc("config/home").set(data); else S.home = data;
+    toast("Home page saved."); render();
+  }
+}));
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
 
 /* ---------- boot ---------- */
@@ -1213,11 +1774,18 @@ render();
     c?.use ? c.use("user").catch(() => null) : null,
     c?.use ? c.use("downloads").catch(() => null) : null,
   ]);
-  S.db = db; S.dl = dl; S.dbChecked = true;
-  if (user) { try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {} }
+  S.db = db; S.dl = dl; S.user = user; S.dbChecked = true;
+  if (user) {
+    try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {}
+    try { S.me = await user.me(); S.uid = S.me.id; S.isOwner = !!S.me.isOwner; S.canEdit = !!S.me.canEdit; } catch (e) {}
+  }
   $("#sync").textContent = db ? "Saved to the cloud · syncs live" : "Not saving in this view";
   if (db) {
-    for (const col of ["products", "orders", "expenses", "customers"]) {
+    const keep = () => { if ($("#scrim").hidden) render(); else renderNav(); };
+    db.doc("config/home").onSnapshot(s => { S.home = s.exists ? s.data() : {}; keep(); }, () => {});
+    db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
+    if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
+    for (const col of ["products", "orders", "expenses", "customers", "tasks", "team"]) {
       db.collection(col).onSnapshot(snap => {
         S[col] = snap.docs.map(d => { const r = { id: d.id, ...d.data() }; return col === "orders" ? norm(r) : r; });
         S.loaded[col] = true;
