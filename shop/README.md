@@ -10,6 +10,9 @@ A ready-to-run **Next.js 15 + TypeScript + Tailwind + Prisma (PostgreSQL)** shop
 
 All you need to add are API keys, a database, and real products.
 
+> **UI developer:** you own the design. Read **[INTEGRATION.md](INTEGRATION.md)**: it maps every feature to the
+> logic, API and example component you can restyle or replace. The pages in `src/app/` are reference screens.
+
 ---
 
 ## 1. The shop processes (as built)
@@ -37,9 +40,32 @@ Allowed. One payment, but it creates **two orders** (two shipments): the on-hand
 Statuses change automatically when a payment succeeds. The rest are set by the shop owner on `/admin`.
 
 ### Buyer profile (`/profile`)
-- **My Orders**: every order with its status, progress tracker, history, tracking number, and the Pay Balance button
+- **My Orders**: every order with its status, progress tracker, history, tracking number, Pay Balance, and **Cancel order**
 - **My Wishlist**: products saved with the ♥ button on any product card or product page
-- **Account**: name, email, log out
+- **My Account**: name, mobile, birthday, scent preferences (notes / accords / brands), Fragrantica profile link, saved addresses
+
+### Security: 2FA (required)
+After logging in with Facebook / Google / Apple, buyers must enter a **6-digit code emailed to them** (`/verify`)
+before they can see their account, check out, or use the wishlist. Codes expire in 10 minutes and allow 5 tries.
+Needs `RESEND_API_KEY` (resend.com) in production.
+
+### Cancellations
+Buyers tap **Cancel order** and give a reason. Unpaid orders cancel right away. Paid orders become a
+**request** that you approve or reject in **Admin → Orders**. Approving cancels the order and returns on-hand
+stock; you then refund the buyer from your Maya / PayPal / BDO dashboard. You and the buyer get emails.
+
+### Cart extras
+**Note** (saved on the order), **special packaging +₱20** (once per checkout), and **voucher codes**
+(created in **Admin → Vouchers**: fixed ₱ or %, minimum spend, cap, expiry, usage limits). Vouchers apply to
+items only, not shipping, and count as used once the payment goes through.
+
+### Product pages
+Every product shows a **perfume card** (brand, concentration, notes pyramid, main accords, longevity, sillage,
+"View on Fragrantica" link) filled in at **Admin → Products**, plus **"You may also like…"** picks based on
+shared accords/notes/brand and the buyer's saved scent preferences.
+
+### Contact Us
+`/contact` form; messages appear in **Admin → Messages** and are emailed to `SHOP_INBOX_EMAIL`.
 
 ---
 
@@ -55,6 +81,9 @@ All in **`src/lib/config.ts`**:
 | Extra on top of Lalamove price | `SAMEDAY_EXTRA_FEE`: ₱0 |
 | Downpayment | 50% |
 | Pre-order **full payment** discount | ₱200 off **per item** (automatic) |
+| Special packaging | ₱20 per checkout (`SPECIAL_PACKAGING_FEE`) |
+| Contact details on Contact Us | `SHOP_CONTACT` |
+| Which statuses buyers can cancel from | `CANCELLABLE_STATUSES` |
 | Shop name | "My Shop" |
 
 Brand colours: `tailwind.config.ts` (`brand`, `accent`).
@@ -73,7 +102,10 @@ npm run dev                   # http://localhost:3000
 
 To try the whole flow without real payment keys, set `PAYMENT_MOCK=true` in `.env`. A "Test payment" option appears that always succeeds. It is automatically disabled in production.
 
-Add products with `npm run db:studio` (prices are in **centavos**: ₱1,250.00 = `125000`; `type` = `PREORDER` or `ONHAND`).
+Add and edit products, including perfume cards, at **`/admin/products`** (prices in pesos there).
+Vouchers: `/admin/vouchers`. Messages: `/admin/messages`.
+
+When testing locally without `RESEND_API_KEY`, the 2FA code is printed in the terminal running `npm run dev`.
 
 ---
 
@@ -129,6 +161,11 @@ src/lib/orderStatus.ts         ← status names / colours
 src/lib/auth.ts                ← Facebook / Google / Apple login
 src/lib/payments/*             ← Maya, PayPal, BDO, test gateway + payment confirmation
 src/lib/sameday.ts             ← live Lalamove same-day price (Google geocoding + Lalamove quote)
+src/lib/twoFactor.ts           ← 2FA email codes
+src/lib/cancellation.ts        ← cancel requests + approval
+src/lib/vouchers.ts            ← voucher rules
+src/lib/perfume.ts             ← perfume card helpers (accords, notes)
+src/lib/recommendations.ts     ← "You may also like…"
 src/app/page.tsx               ← shop (product grid with badges)
 src/app/product/[slug]         ← product page (payment option + add to cart)
 src/app/cart                   ← cart

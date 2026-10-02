@@ -15,6 +15,9 @@ export async function Header() {
           <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100">
             Shop
           </Link>
+          <Link href="/contact" className="hidden rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100 sm:block">
+            Contact Us
+          </Link>
           {session && (
             <Link href="/profile?tab=wishlist" className="hidden rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100 sm:block">
               Wishlist

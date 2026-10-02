@@ -32,7 +32,34 @@ export async function confirmAndFulfil(reference: string): Promise<"PAID" | "PEN
       include: { items: true },
     });
 
+    // A voucher counts as used once its checkout is paid.
+    const withVoucher = orders.filter((o) => o.voucherCode && o.voucherDiscount > 0);
+    if (payment.kind === "INITIAL" && withVoucher.length > 0) {
+      const voucher = await tx.voucher.findUnique({ where: { code: withVoucher[0].voucherCode! } });
+      if (voucher) {
+        await tx.voucherRedemption.upsert({
+          where: { voucherId_checkoutGroup: { voucherId: voucher.id, checkoutGroup: withVoucher[0].checkoutGroup } },
+          update: {},
+          create: {
+            voucherId: voucher.id,
+            userId: withVoucher[0].userId,
+            checkoutGroup: withVoucher[0].checkoutGroup,
+            discount: withVoucher.reduce((s, o) => s + o.voucherDiscount, 0),
+          },
+        });
+      }
+    }
+
     for (const order of orders) {
+      if (order.status === "CANCELLED") {
+        // Buyer cancelled before the payment went through: keep the order cancelled, flag the refund.
+        const share = payment.kind === "INITIAL" ? order.total - order.balanceDue : order.balanceDue;
+        await tx.order.update({ where: { id: order.id }, data: { amountPaid: { increment: share } } });
+        await tx.orderStatusLog.create({
+          data: { orderId: order.id, status: "CANCELLED", note: `Payment received after cancellation. Refund needed (${payment.provider})` },
+        });
+        continue;
+      }
       if (payment.kind === "INITIAL") {
         const status =
           order.type === "PREORDER" && order.balanceDue > 0 ? "DOWNPAYMENT_RECEIVED" : "PAID";

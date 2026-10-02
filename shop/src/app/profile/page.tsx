@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AccountForm } from "@/components/AccountForm";
+import { AddressBook } from "@/components/AddressBook";
 import { SignOutButton } from "@/components/SignOutButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TypeBadge } from "@/components/TypeBadge";
@@ -11,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 const TABS = [
   { id: "orders", label: "My Orders" },
   { id: "wishlist", label: "My Wishlist" },
-  { id: "account", label: "Account" },
+  { id: "account", label: "My Account" },
 ] as const;
 
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
@@ -54,19 +56,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
       {tab === "orders" && <OrdersTab userId={user.id} />}
       {tab === "wishlist" && <WishlistTab userId={user.id} />}
-      {tab === "account" && (
-        <div className="card max-w-md space-y-4 p-5">
-          <div>
-            <span className="label">Name</span>
-            <p>{user.name}</p>
-          </div>
-          <div>
-            <span className="label">Email</span>
-            <p>{user.email ?? "—"}</p>
-          </div>
-          <SignOutButton />
-        </div>
-      )}
+      {tab === "account" && <AccountTab userId={user.id} />}
     </div>
   );
 }
@@ -168,6 +158,43 @@ async function WishlistTab({ userId }: { userId: string }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+async function AccountTab({ userId }: { userId: string }) {
+  const [u, addresses] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+    prisma.address.findMany({ where: { userId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] }),
+  ]);
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className="card p-5">
+        <AccountForm
+          initial={{
+            name: u.name ?? "",
+            email: u.email,
+            phone: u.phone ?? "",
+            birthday: u.birthday ? u.birthday.toISOString().slice(0, 10) : "",
+            favoriteNotes: u.favoriteNotes,
+            favoriteAccords: u.favoriteAccords,
+            favoriteBrands: u.favoriteBrands,
+            fragranticaUrl: u.fragranticaUrl ?? "",
+          }}
+        />
+      </div>
+      <div className="space-y-6">
+        <div className="card p-5">
+          <AddressBook initial={addresses} />
+        </div>
+        <div className="card space-y-2 p-5 text-sm">
+          <h3 className="font-bold">Security</h3>
+          <p className="text-gray-600">
+            Two-step verification is on. Each time you log in, we email a 6-digit code to {u.email ?? "your email"}.
+          </p>
+          <SignOutButton />
+        </div>
+      </div>
     </div>
   );
 }

@@ -20,10 +20,55 @@ model User {
   emailVerified DateTime?
   image         String?
   createdAt     DateTime   @default(now())
+
+  // MY ACCOUNT
+  phone          String?
+  birthday       DateTime?
+  favoriteNotes  String    @default("") // comma-separated, e.g. "vanilla, oud"
+  favoriteAccords String   @default("") // comma-separated, e.g. "woody, amber"
+  favoriteBrands String    @default("")
+  fragranticaUrl String?
+
   accounts      Account[]
   sessions      Session[]
   orders        Order[]
   wishlist      WishlistItem[]
+  addresses     Address[]
+  twoFactorCodes TwoFactorCode[]
+  cancelRequests CancelRequest[]
+  voucherRedemptions VoucherRedemption[]
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String   @default("Home") // "Home", "Office", ...
+  name      String
+  contact   String
+  address   String
+  barangay  String
+  city      String
+  region    String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// 2FA: one-time 6-digit codes sent by email after each login.
+model TwoFactorCode {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   // the login session this code unlocks
+  email        String
+  codeHash     String
+  attempts     Int      @default(0)
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionToken])
 }
 
 model Account {
@@ -49,6 +94,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
+  twoFactorVerifiedAt DateTime? // null until the email code is entered
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -74,6 +120,22 @@ model Product {
   eta         String?  // PREORDER only, e.g. "Arrives mid-December"
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+
+  // Perfume card (filled in by the shop; shown like a Fragrantica card)
+  brand          String   @default("")
+  perfumer       String   @default("")
+  releaseYear    Int?
+  gender         String   @default("") // "Women" | "Men" | "Unisex"
+  concentration  String   @default("") // "EDP", "EDT", "Parfum", "Extrait"...
+  sizeMl         Int?
+  topNotes       String   @default("") // comma-separated
+  heartNotes     String   @default("")
+  baseNotes      String   @default("")
+  accords        String   @default("") // "woody:100, amber:80, vanilla:65" (name:strength 0-100)
+  longevity      String   @default("") // e.g. "Long lasting"
+  sillage        String   @default("") // e.g. "Moderate"
+  fragranticaUrl String?
+
   orderItems  OrderItem[]
   wishlistedBy WishlistItem[]
 }
@@ -121,6 +183,10 @@ model Order {
   balanceDue     Int      @default(0) // remaining 50% for downpayment pre-orders
 
   notes          String?  // internal note from the shop
+  buyerNote      String?  // NOTE from the cart
+  packagingFee   Int      @default(0) // special packaging
+  voucherCode    String?
+  voucherDiscount Int     @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -128,6 +194,7 @@ model Order {
   items          OrderItem[]
   payments       Payment[]
   history        OrderStatusLog[]
+  cancelRequests CancelRequest[]
 
   @@index([userId])
   @@index([checkoutGroup])
@@ -167,4 +234,64 @@ model Payment {
   createdAt   DateTime @default(now())
   paidAt      DateTime?
   orders      Order[]
+}
+
+// Buyer asks to cancel; the shop approves or rejects it.
+model CancelRequest {
+  id         String    @id @default(cuid())
+  orderId    String
+  userId     String
+  reason     String
+  status     String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  shopReply  String?
+  createdAt  DateTime  @default(now())
+  decidedAt  DateTime?
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model Voucher {
+  id            String    @id @default(cuid())
+  code          String    @unique // stored UPPERCASE
+  description   String    @default("")
+  type          String    // "PERCENT" | "FIXED"
+  value         Int       // PERCENT: 10 = 10% · FIXED: centavos (10000 = ₱100)
+  minSpend      Int       @default(0) // centavos, items subtotal
+  maxDiscount   Int?      // centavos, cap for PERCENT vouchers
+  usageLimit    Int?      // total uses allowed (null = unlimited)
+  perUserLimit  Int       @default(1)
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  redemptions   VoucherRedemption[]
+}
+
+// Recorded when the checkout payment succeeds.
+model VoucherRedemption {
+  id            String   @id @default(cuid())
+  voucherId     String
+  userId        String
+  checkoutGroup String
+  discount      Int
+  createdAt     DateTime @default(now())
+  voucher       Voucher  @relation(fields: [voucherId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([voucherId, checkoutGroup])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  orderNumber String?
+  subject   String
+  message   String
+  userId    String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

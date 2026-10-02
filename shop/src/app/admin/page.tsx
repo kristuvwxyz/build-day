@@ -6,7 +6,8 @@ import { SHIPPING_METHODS, type ShippingMethod } from "@/lib/config";
 import { peso } from "@/lib/money";
 import { ORDER_STATUSES } from "@/lib/orderStatus";
 import { prisma } from "@/lib/prisma";
-import { updateOrder } from "./actions";
+import { decideCancel, updateOrder } from "./actions";
+import { AdminNav } from "@/components/AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -17,21 +18,57 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const orders = await prisma.order.findMany({
     where: status ? { status } : { status: { not: "PENDING_PAYMENT" } },
-    include: { items: true, user: true },
+    include: { items: true, user: true, cancelRequests: { where: { status: "PENDING" } } },
     orderBy: { createdAt: "desc" },
     take: 200,
+  });
+  const pendingCancels = await prisma.cancelRequest.findMany({
+    where: { status: "PENDING" },
+    include: { order: true },
+    orderBy: { createdAt: "asc" },
   });
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-extrabold">Orders (Admin)</h1>
+        <h1 className="text-2xl font-extrabold">Admin</h1>
         <p className="text-sm text-gray-500">
           When a pre-order arrives: set a downpayment order to <b>Arrived – Balance Due</b> (the buyer gets a Pay
           Balance button), or set a fully paid one to <b>Processing</b>. Add the tracking number when you ship.
           Products are managed with <code>npm run db:studio</code>.
         </p>
       </div>
+
+      <AdminNav current="orders" />
+
+      {pendingCancels.length > 0 && (
+        <section className="card space-y-3 border-red-300 p-4">
+          <h2 className="font-bold text-red-800">Cancellation requests ({pendingCancels.length})</h2>
+          {pendingCancels.map((r) => (
+            <form key={r.id} action={decideCancel} className="space-y-2 rounded-lg border p-3 text-sm">
+              <input type="hidden" name="requestId" value={r.id} />
+              <p>
+                <b>{r.order.orderNumber}</b> · {r.order.shipName} · paid <b>{peso(r.order.amountPaid)}</b> ·{" "}
+                <StatusBadge status={r.order.status} />
+              </p>
+              <p className="text-gray-700">Reason: “{r.reason}”</p>
+              <input name="reply" className="input py-1.5" placeholder="Message to buyer (optional)" />
+              <div className="flex gap-2">
+                <button name="decision" value="approve" className="btn bg-red-600 py-1.5 text-white">
+                  Approve cancellation
+                </button>
+                <button name="decision" value="reject" className="btn-outline py-1.5">
+                  Reject
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Approving cancels the order and puts on-hand stock back. Refund {peso(r.order.amountPaid)} yourself in
+                your Maya / PayPal / BDO dashboard.
+              </p>
+            </form>
+          ))}
+        </section>
+      )}
 
       <form className="flex flex-wrap gap-2">
         <select name="status" defaultValue={status ?? ""} className="input w-auto">
@@ -77,6 +114,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   {o.shipAddress}, Brgy. {o.shipBarangay}, {o.shipCity}
                 </p>
                 <p className="text-gray-500">{SHIPPING_METHODS[o.shippingMethod as ShippingMethod]?.label}</p>
+                {o.buyerNote && <p className="mt-1 rounded bg-amber-50 p-1.5">Note: {o.buyerNote}</p>}
                 {o.shipLat != null && o.shipLng != null && (
                   <a
                     href={`https://www.google.com/maps?q=${o.shipLat},${o.shipLng}`}
@@ -93,6 +131,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <p>Total {peso(o.total)}</p>
                 <p>Paid {peso(o.amountPaid)}</p>
                 {o.balanceDue > 0 && <p className="font-semibold text-orange-600">Balance {peso(o.balanceDue)}</p>}
+                {o.voucherDiscount > 0 && <p>Voucher {o.voucherCode} −{peso(o.voucherDiscount)}</p>}
+                {o.packagingFee > 0 && <p className="font-semibold">🎁 Special packaging</p>}
+                {o.cancelRequests.length > 0 && <p className="font-semibold text-red-600">Cancellation requested</p>}
               </div>
             </div>
             <form action={updateOrder} className="flex flex-wrap items-end gap-2 border-t pt-3">

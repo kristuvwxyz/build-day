@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { LoginButtons } from "@/components/LoginButtons";
-import { enabledLoginProviders, getSession } from "@/lib/auth";
+import { enabledLoginProviders, getRawSession, isTwoFactorVerified } from "@/lib/auth";
 import { SHOP_NAME } from "@/lib/config";
 
 export default async function LoginPage({
@@ -11,8 +11,11 @@ export default async function LoginPage({
   const { callbackUrl, error } = await searchParams;
   // Only allow redirects back into this site.
   const safeCallback = callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : "/profile";
-  const session = await getSession();
-  if (session) redirect(safeCallback);
+  const session = await getRawSession();
+  if (session) {
+    if (await isTwoFactorVerified()) redirect(safeCallback);
+    redirect(`/verify?callbackUrl=${encodeURIComponent(safeCallback)}`);
+  }
 
   return (
     <div className="card mx-auto max-w-sm space-y-6 p-8">

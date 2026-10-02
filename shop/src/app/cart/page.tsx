@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
+import { CartExtrasForm } from "@/components/CartExtrasForm";
+import { useVoucher } from "@/components/useVoucher";
 import { OrderSummary } from "@/components/OrderSummary";
 import { TypeBadge } from "@/components/TypeBadge";
 import { peso } from "@/lib/money";
@@ -9,8 +11,12 @@ import { PREORDER_FULL_PAYMENT_DISCOUNT } from "@/lib/config";
 import { lineDueNow, lineTotal, priceCart } from "@/lib/pricing";
 
 export default function CartPage() {
-  const { items, setQuantity, setPaymentOption, remove } = useCart();
-  const priced = priceCart(items, null);
+  const { items, extras, setQuantity, setPaymentOption, remove } = useCart();
+  const voucher = useVoucher();
+  const priced = priceCart(items, null, {
+    specialPackaging: extras.specialPackaging,
+    voucherDiscount: voucher.discount,
+  });
 
   if (items.length === 0) {
     return (
@@ -85,6 +91,8 @@ export default function CartPage() {
       </div>
 
       <aside className="card h-fit space-y-4 p-5">
+        <CartExtrasForm />
+        <hr />
         <h2 className="font-bold">Order summary</h2>
         <OrderSummary {...priced} showShipping={false} />
         {priced.shipments.length > 1 && (

@@ -76,3 +76,34 @@ export const LALAMOVE_SERVICE_TYPE = "MOTORCYCLE";
 
 // Added on top of the Lalamove price (e.g. to cover a Grab booking that costs a bit more).
 export const SAMEDAY_EXTRA_FEE = 0; // centavos, e.g. 2000 = ₱20
+
+// ---------- Cart extras ----------
+
+// "Special packaging" option in the cart, charged once per checkout.
+export const SPECIAL_PACKAGING_FEE = 2000; // ₱20
+
+// Longest NOTE a buyer can leave on an order.
+export const ORDER_NOTE_MAX = 500;
+
+// ---------- Contact Us ----------
+
+export const SHOP_CONTACT = {
+  email: "hello@example.com",
+  phone: "0917 000 0000",
+  facebook: "https://facebook.com/yourshop",
+  instagram: "https://instagram.com/yourshop",
+  hours: "Mon–Sat, 10:00 AM – 7:00 PM",
+};
+
+// ---------- Cancellations ----------
+
+// Buyers can ask to cancel only while the order is in one of these statuses.
+// Unpaid orders (Pending Payment) are cancelled right away; the rest wait for your approval.
+export const CANCELLABLE_STATUSES = [
+  "PENDING_PAYMENT",
+  "PAID",
+  "DOWNPAYMENT_RECEIVED",
+  "AWAITING_STOCK",
+  "BALANCE_DUE",
+  "PROCESSING",
+];

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddToCart } from "@/components/AddToCart";
+import { PerfumeCard } from "@/components/PerfumeCard";
+import { YouMayAlsoLike } from "@/components/YouMayAlsoLike";
 import { TypeBadge } from "@/components/TypeBadge";
 import { WishlistButton } from "@/components/WishlistButton";
 import { peso } from "@/lib/money";
@@ -30,6 +32,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         </div>
         <div className="space-y-5">
           <TypeBadge type={product.type} />
+          {product.brand && <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">{product.brand}</p>}
           <h1 className="text-2xl font-extrabold sm:text-3xl">{product.name}</h1>
           <p className="text-2xl font-bold">{peso(product.price)}</p>
           <p className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
@@ -51,6 +54,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           />
         </div>
       </div>
+      <PerfumeCard product={product} />
+      <YouMayAlsoLike productId={product.id} />
     </div>
   );
 }

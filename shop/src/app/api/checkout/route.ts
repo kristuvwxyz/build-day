@@ -1,37 +1,27 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { shippingFee } from "@/lib/config";
+import { ORDER_NOTE_MAX, shippingFee } from "@/lib/config";
 import { appUrl, getGateway, newReference } from "@/lib/payments";
-import { priceCart, unitDiscount } from "@/lib/pricing";
+import { itemsSubtotal, priceCart, unitDiscount } from "@/lib/pricing";
+import { CartItemsSchema, loadCartLines } from "@/lib/cartLines";
+import { checkVoucher } from "@/lib/vouchers";
+import { saveAddress } from "@/lib/addresses";
+import { AddressFields } from "@/lib/validation";
 import { prisma } from "@/lib/prisma";
 import { liveSameDayEnabled, verifyQuote, type SameDayQuote } from "@/lib/sameday";
 import type { ProductType } from "@/lib/types";
 
 const Body = z.object({
-  items: z
-    .array(
-      z.object({
-        productId: z.string(),
-        quantity: z.number().int().min(1).max(99),
-        paymentOption: z.enum(["FULL", "DOWNPAYMENT_50"]),
-      }),
-    )
-    .min(1),
-  shipping: z.object({
-    name: z.string().trim().min(2).max(100),
-    contact: z
-      .string()
-      .trim()
-      .regex(/^(09\d{9}|\+639\d{9})$/, "Use a PH mobile number like 09171234567"),
-    address: z.string().trim().min(5).max(300),
-    barangay: z.string().trim().min(2).max(100),
-    city: z.string().trim().min(2).max(100),
-    region: z.enum(["METRO_MANILA", "LUZON", "VISAYAS", "MINDANAO"]),
-  }),
+  items: CartItemsSchema,
+  shipping: AddressFields,
   shippingMethod: z.enum(["JNT", "SAMEDAY"]),
   provider: z.enum(["MAYA", "PAYPAL", "BDO", "MOCK"]),
   sameDayQuoteToken: z.string().max(2000).optional(),
+  note: z.string().trim().max(ORDER_NOTE_MAX).optional(),
+  specialPackaging: z.boolean().optional(),
+  voucherCode: z.string().trim().max(40).optional(),
+  saveAddress: z.boolean().optional(),
 });
 
 const orderNumber = (type: ProductType) =>
@@ -48,7 +38,8 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid details" }, { status: 400 });
   }
-  const { items, shipping, shippingMethod, provider, sameDayQuoteToken } = parsed.data;
+  const { items, shipping, shippingMethod, provider, sameDayQuoteToken, note, specialPackaging, voucherCode, saveAddress: save } =
+    parsed.data;
 
   const gateway = getGateway(provider);
   if (!gateway) return NextResponse.json({ error: "That payment method is not available." }, { status: 400 });
@@ -71,30 +62,25 @@ export async function POST(req: Request) {
   }
 
   // Re-load products from the database: prices from the browser are never trusted.
-  const products = await prisma.product.findMany({
-    where: { id: { in: items.map((i) => i.productId) }, isActive: true },
-  });
-  const lines = [];
-  for (const item of items) {
-    const p = products.find((x) => x.id === item.productId);
-    if (!p) return NextResponse.json({ error: "An item in your cart is no longer available." }, { status: 400 });
-    const type = p.type as ProductType;
-    if (type === "ONHAND") {
-      const wanted = items.filter((i) => i.productId === p.id).reduce((s, i) => s + i.quantity, 0);
-      if (wanted > p.stock) {
-        return NextResponse.json({ error: `Only ${p.stock} left of "${p.name}".` }, { status: 400 });
-      }
-    }
-    lines.push({
-      product: p,
-      type,
-      price: p.price,
-      quantity: item.quantity,
-      paymentOption: type === "ONHAND" ? ("FULL" as const) : item.paymentOption,
-    });
+  const loaded = await loadCartLines(items);
+  if ("error" in loaded) return NextResponse.json({ error: loaded.error }, { status: 400 });
+  const lines = loaded.lines;
+
+  let voucher: { code: string; discount: number } | null = null;
+  if (voucherCode) {
+    const checked = await checkVoucher(voucherCode, session.user.id, itemsSubtotal(lines));
+    if ("error" in checked) return NextResponse.json({ error: checked.error }, { status: 400 });
+    voucher = { code: checked.voucher.code, discount: checked.discount };
   }
 
-  const priced = priceCart(lines, feePerShipment);
+  const priced = priceCart(lines, feePerShipment, {
+    specialPackaging,
+    voucherDiscount: voucher?.discount ?? 0,
+  });
+  if (priced.dueNow <= 0) {
+    return NextResponse.json({ error: "There's nothing to pay for this order. Please contact us." }, { status: 400 });
+  }
+
   const checkoutGroup = newReference("G");
   const reference = newReference("PAY");
 
@@ -120,6 +106,10 @@ export async function POST(req: Request) {
           shipMapAddress: sameDay?.mapAddress,
           subtotal: s.subtotal,
           shippingFee: s.shippingFee,
+          packagingFee: s.packagingFee,
+          voucherCode: s.voucherDiscount > 0 ? voucher?.code : null,
+          voucherDiscount: s.voucherDiscount,
+          buyerNote: note || null,
           total: s.total,
           balanceDue: s.balanceLater,
           items: {
@@ -147,6 +137,10 @@ export async function POST(req: Request) {
       },
     });
   });
+
+  if (save) {
+    await saveAddress(session.user.id, shipping).catch((err) => console.error("Saving address failed", err));
+  }
 
   try {
     const { redirectUrl, providerRef } = await gateway.startCheckout({

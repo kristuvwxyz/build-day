@@ -25,6 +25,7 @@ export function ProductCard({ product, wishlisted }: { product: Product; wishlis
         )}
       </div>
       <div className="space-y-1 p-3">
+        {product.brand && <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{product.brand}</p>}
         <h3 className="line-clamp-2 text-sm font-semibold">{product.name}</h3>
         <p className="font-bold">{peso(product.price)}</p>
         <p className="text-xs text-gray-500">

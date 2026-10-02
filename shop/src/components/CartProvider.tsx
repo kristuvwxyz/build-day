@@ -3,8 +3,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { CartItem, PaymentOption } from "@/lib/types";
 
+export type CartExtras = { note: string; specialPackaging: boolean; voucherCode: string };
+const NO_EXTRAS: CartExtras = { note: "", specialPackaging: false, voucherCode: "" };
+
 type CartCtx = {
   items: CartItem[];
+  extras: CartExtras; // NOTE, special packaging, voucher code
+  setExtras: (patch: Partial<CartExtras>) => void;
   loaded: boolean; // true once the saved cart has been read from the browser
   count: number;
   add: (item: CartItem) => void;
@@ -21,12 +26,15 @@ const same = (a: CartItem, id: string, opt: PaymentOption) =>
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [extras, setExtrasState] = useState<CartExtras>(NO_EXTRAS);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(KEY);
       if (saved) setItems(JSON.parse(saved));
+      const savedExtras = localStorage.getItem(KEY + "-extras");
+      if (savedExtras) setExtrasState({ ...NO_EXTRAS, ...JSON.parse(savedExtras) });
     } catch {}
     setLoaded(true);
   }, []);
@@ -35,8 +43,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!loaded) return;
     try {
       localStorage.setItem(KEY, JSON.stringify(items));
+      localStorage.setItem(KEY + "-extras", JSON.stringify(extras));
     } catch {}
-  }, [items, loaded]);
+  }, [items, extras, loaded]);
 
   const merge = (list: CartItem[], item: CartItem) => {
     const existing = list.find((i) => same(i, item.productId, item.paymentOption));
@@ -48,6 +57,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const value: CartCtx = {
     items,
+    extras,
+    setExtras: (patch) => setExtrasState((e) => ({ ...e, ...patch })),
     loaded,
     count: items.reduce((s, i) => s + i.quantity, 0),
     add: (item) => setItems((list) => merge(list, item)),
@@ -65,7 +76,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         );
       }),
     remove: (id, opt) => setItems((list) => list.filter((i) => !same(i, id, opt))),
-    clear: () => setItems([]),
+    clear: () => {
+      setItems([]);
+      setExtrasState(NO_EXTRAS);
+    },
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

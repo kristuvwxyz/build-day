@@ -13,7 +13,9 @@ import {
 import { peso } from "@/lib/money";
 import { lineTotal, priceCart, unitDiscount } from "@/lib/pricing";
 import type { PaymentProvider } from "@/lib/types";
+import type { SavedAddress } from "./AddressBook";
 import { useCart } from "./CartProvider";
+import { useVoucher } from "./useVoucher";
 import { OrderSummary } from "./OrderSummary";
 
 type Shipping = { name: string; contact: string; address: string; barangay: string; city: string; region: string };
@@ -23,19 +25,26 @@ type Quote = { status: "idle" | "loading" | "ok" | "error"; fee?: number; mapAdd
 export function CheckoutForm({
   providers,
   liveSameDayQuote,
+  savedAddresses,
   defaults,
 }: {
   providers: { id: PaymentProvider; label: string }[];
   liveSameDayQuote: boolean;
+  savedAddresses: SavedAddress[];
   defaults: Shipping;
 }) {
-  const { items } = useCart();
+  const { items, extras } = useCart();
+  const voucher = useVoucher();
   const [ship, setShip] = useState<Shipping>(defaults);
   const [method, setMethod] = useState<ShippingMethod>("JNT");
   const [provider, setProvider] = useState<PaymentProvider | "">(providers[0]?.id ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [quote, setQuote] = useState<Quote>({ status: "idle" });
+  const [saveAddress, setSaveAddress] = useState(savedAddresses.length === 0);
+  const matchesSaved = savedAddresses.some(
+    (a) => a.address === ship.address && a.barangay === ship.barangay && a.city === ship.city,
+  );
 
   const region = (ship.region || null) as Region | null;
   const methodAllowed = (m: ShippingMethod) => !region || shippingFee(m, region) !== null;
@@ -79,7 +88,10 @@ export function CheckoutForm({
         ? quote.fee!
         : null
       : shippingFee(effectiveMethod, region);
-  const priced = priceCart(items, feePerShipment);
+  const priced = priceCart(items, feePerShipment, {
+    specialPackaging: extras.specialPackaging,
+    voucherDiscount: voucher.discount,
+  });
   const shippingReady = feePerShipment !== null;
 
   if (items.length === 0) {
@@ -110,6 +122,10 @@ export function CheckoutForm({
         shippingMethod: effectiveMethod,
         provider,
         sameDayQuoteToken: useLiveQuote ? quote.token : undefined,
+        note: extras.note.trim() || undefined,
+        specialPackaging: extras.specialPackaging,
+        voucherCode: voucher.state.status === "applied" ? voucher.state.code : undefined,
+        saveAddress: saveAddress && !matchesSaved,
       }),
     });
     const data = (await res.json().catch(() => ({}))) as { redirectUrl?: string; error?: string };
@@ -129,6 +145,30 @@ export function CheckoutForm({
         {/* Shipping details */}
         <section className="card space-y-4 p-5">
           <h2 className="font-bold">1. Shipping details</h2>
+          {savedAddresses.length > 0 && (
+            <label className="block">
+              <span className="label">Saved addresses</span>
+              <select
+                id="checkout-saved-address"
+                className="input"
+                defaultValue=""
+                onChange={(e) => {
+                  const a = savedAddresses.find((x) => x.id === e.target.value);
+                  if (a) {
+                    setShip({ name: a.name, contact: a.contact, address: a.address, barangay: a.barangay, city: a.city, region: a.region });
+                  }
+                }}
+              >
+                <option value="">Choose a saved address…</option>
+                {savedAddresses.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}: {a.address}, {a.city}
+                    {a.isDefault ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Name">
               <input className="input" required value={ship.name} onChange={set("name")} autoComplete="name" />
@@ -166,6 +206,12 @@ export function CheckoutForm({
               </select>
             </Field>
           </div>
+          {!matchesSaved && (
+            <label className="flex items-center gap-2 text-sm">
+              <input id="checkout-save-address" type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} />
+              Save this address to my account
+            </label>
+          )}
         </section>
 
         {/* Mode of shipping */}
@@ -259,6 +305,17 @@ export function CheckoutForm({
         </ul>
         <hr />
         <OrderSummary {...priced} showShipping={shippingReady} />
+        {extras.note.trim() && (
+          <p className="rounded-lg bg-gray-50 p-2 text-xs text-gray-600">
+            <b>Note:</b> {extras.note}
+          </p>
+        )}
+        {voucher.state.status === "invalid" && (
+          <p className="text-xs text-red-600">Voucher not applied: {voucher.state.error}</p>
+        )}
+        <Link href="/cart" className="block text-center text-xs text-gray-500 underline">
+          Edit cart, note, packaging or voucher
+        </Link>
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <button className="btn-primary w-full" disabled={busy || !provider || !shippingReady}>
           {busy ? "Redirecting to payment…" : `Pay ${peso(priced.dueNow)}`}

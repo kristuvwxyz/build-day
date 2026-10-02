@@ -23,6 +23,10 @@ export function OrderSummary({
             </p>
           )}
           <Row label="Items subtotal" value={peso(s.subtotal)} />
+          {s.voucherDiscount > 0 && (
+            <Row label="Voucher" value={<span className="text-green-700">−{peso(s.voucherDiscount)}</span>} />
+          )}
+          {s.packagingFee > 0 && <Row label="Special packaging" value={peso(s.packagingFee)} />}
           {showShipping && <Row label="Shipping fee" value={peso(s.shippingFee)} />}
         </div>
       ))}

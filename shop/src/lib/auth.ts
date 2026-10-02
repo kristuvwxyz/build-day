@@ -1,5 +1,6 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { getServerSession, type NextAuthOptions } from "next-auth";
+import { cookies } from "next/headers";
 import AppleProvider from "next-auth/providers/apple";
 import FacebookProvider from "next-auth/providers/facebook";
 import GoogleProvider from "next-auth/providers/google";
@@ -61,6 +62,30 @@ export function isAdminEmail(email?: string | null) {
   return admins.includes(email.toLowerCase());
 }
 
-export function getSession() {
+/** Logged in, but maybe not through 2FA yet. Only for the login / 2FA pages. */
+export function getRawSession() {
   return getServerSession(authOptions);
+}
+
+/** The current login session token (from NextAuth's cookie). */
+export async function currentSessionToken() {
+  const jar = await cookies();
+  return jar.get("__Secure-next-auth.session-token")?.value ?? jar.get("next-auth.session-token")?.value ?? null;
+}
+
+export async function isTwoFactorVerified() {
+  const token = await currentSessionToken();
+  if (!token) return false;
+  const row = await prisma.session.findUnique({ where: { sessionToken: token } });
+  return Boolean(row?.twoFactorVerifiedAt);
+}
+
+/**
+ * The logged-in buyer, only after they entered their 2FA email code.
+ * Everything that shows or changes a buyer's data must use this.
+ */
+export async function getSession() {
+  const session = await getRawSession();
+  if (!session) return null;
+  return (await isTwoFactorVerified()) ? session : null;
 }

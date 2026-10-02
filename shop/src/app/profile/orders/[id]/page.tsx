@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { CancelOrderButton } from "@/components/CancelOrderButton";
 import { PayBalance } from "@/components/PayBalance";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TypeBadge } from "@/components/TypeBadge";
 import { getSession } from "@/lib/auth";
-import { REGIONS, SHIPPING_METHODS, type ShippingMethod } from "@/lib/config";
+import { CANCELLABLE_STATUSES, REGIONS, SHIPPING_METHODS, type ShippingMethod } from "@/lib/config";
 import { peso } from "@/lib/money";
 import { statusLabel, statusSteps } from "@/lib/orderStatus";
 import { enabledPaymentProviders } from "@/lib/payments";
@@ -24,13 +25,19 @@ export default async function OrderPage({
 
   const order = await prisma.order.findFirst({
     where: { id, userId: session.user.id },
-    include: { items: true, history: { orderBy: { createdAt: "asc" } } },
+    include: {
+      items: true,
+      history: { orderBy: { createdAt: "asc" } },
+      cancelRequests: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
   });
   if (!order) notFound();
 
   const hadBalance = order.items.some((i) => i.paymentOption === "DOWNPAYMENT_50");
   const steps = statusSteps(order.type, hadBalance);
   const currentIdx = steps.indexOf(order.status as (typeof steps)[number]);
+  const cancelReq = order.cancelRequests[0];
+  const canCancel = CANCELLABLE_STATUSES.includes(order.status) && cancelReq?.status !== "PENDING";
   const region = REGIONS.find((r) => r.value === order.shipRegion)?.label ?? order.shipRegion;
 
   return (
@@ -54,6 +61,18 @@ export default async function OrderPage({
 
       {payment === "cancelled" && (
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Payment was not completed. You can try again below.</p>
+      )}
+
+      {cancelReq?.status === "PENDING" && (
+        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          Your cancellation request was sent on {cancelReq.createdAt.toLocaleDateString("en-PH", { dateStyle: "medium" })}. We'll
+          update you once the shop reviews it.
+        </p>
+      )}
+      {cancelReq?.status === "REJECTED" && order.status !== "CANCELLED" && (
+        <p className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
+          Your cancellation request was declined{cancelReq.shopReply ? `: ${cancelReq.shopReply}` : "."}
+        </p>
       )}
 
       {order.status === "BALANCE_DUE" && order.balanceDue > 0 && (
@@ -115,6 +134,10 @@ export default async function OrderPage({
           ))}
           <hr />
           <Row label="Subtotal" value={peso(order.subtotal)} />
+          {order.voucherDiscount > 0 && (
+            <Row label={`Voucher ${order.voucherCode ?? ""}`} value={`−${peso(order.voucherDiscount)}`} />
+          )}
+          {order.packagingFee > 0 && <Row label="Special packaging" value={peso(order.packagingFee)} />}
           <Row label="Shipping" value={peso(order.shippingFee)} />
           <Row label={<b>Total</b>} value={<b>{peso(order.total)}</b>} />
           <Row label="Paid" value={peso(order.amountPaid)} />
@@ -136,6 +159,11 @@ export default async function OrderPage({
             Brgy. {order.shipBarangay}, {order.shipCity}
           </p>
           <p>{region}</p>
+          {order.buyerNote && (
+            <p className="mt-3 rounded bg-gray-50 p-2 text-gray-700">
+              <b>Your note:</b> {order.buyerNote}
+            </p>
+          )}
         </div>
       </div>
 
@@ -155,6 +183,11 @@ export default async function OrderPage({
           ))}
         </ul>
       </div>
+      {canCancel && (
+        <div className="flex justify-end">
+          <CancelOrderButton orderId={order.id} isPaid={order.amountPaid > 0} />
+        </div>
+      )}
     </div>
   );
 }
