@@ -15,7 +15,7 @@ Back office for the whole team, plus orders and stock across Shopify, Shopee, Ti
 |---|---|
 | CEO | Overview (sales, profit, to fulfill) + tasks by department |
 | Admin | Directory (ID, nickname, full name, phone, email, address, department, date started, Active/Inactive), department passwords, Home page content |
-| Finance | Profit dashboard, expenses |
+| Finance | Profit dashboard, **Payroll** (semi-monthly or monthly; days worked, lates and leave pulled from Attendance; daily rates by position; additions/deductions; payslip copy or download), **Investors** (ongoing with payout schedule and mark-paid, finished by year, loans), expenses |
 | Sales | Orders (Shopify-style table, import from Shopify), customers |
 | Marketing | Sales by channel, top customers, repeat rate, customers |
 | Packing | Packing queue (mark fulfilled / on hold), inventory |
