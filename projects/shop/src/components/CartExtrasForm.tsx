@@ -42,7 +42,7 @@ export function CartExtrasForm() {
       <div>
         <span className="label">Voucher code</span>
         {voucher.state.status === "applied" ? (
-          <div className="flex items-center justify-between rounded-lg bg-green-50 p-2 text-sm text-green-800">
+          <div className="flex items-center justify-between rounded-theme bg-green-50 p-2 text-sm text-green-800">
             <span>
               <b>{voucher.state.code}</b> · {voucher.state.description} (−{peso(voucher.state.discount)})
             </span>

@@ -31,7 +31,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-extrabold">Admin</h1>
+        <h1 className="text-2xl font-medium text-brand">Admin</h1>
         <p className="text-sm text-gray-500">
           When a pre-order arrives: set a downpayment order to <b>Arrived – Balance Due</b> (the buyer gets a Pay
           Balance button), or set a fully paid one to <b>Processing</b>. Add the tracking number when you ship.
@@ -43,9 +43,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       {pendingCancels.length > 0 && (
         <section className="card space-y-3 border-red-300 p-4">
-          <h2 className="font-bold text-red-800">Cancellation requests ({pendingCancels.length})</h2>
+          <h2 className="font-medium text-brand text-red-800">Cancellation requests ({pendingCancels.length})</h2>
           {pendingCancels.map((r) => (
-            <form key={r.id} action={decideCancel} className="space-y-2 rounded-lg border p-3 text-sm">
+            <form key={r.id} action={decideCancel} className="space-y-2 rounded-theme border p-3 text-sm">
               <input type="hidden" name="requestId" value={r.id} />
               <p>
                 <b>{r.order.orderNumber}</b> · {r.order.shipName} · paid <b>{peso(r.order.amountPaid)}</b> ·{" "}

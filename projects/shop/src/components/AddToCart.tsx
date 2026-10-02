@@ -61,7 +61,7 @@ export function AddToCart({ product }: Props) {
           ).map(([value, title, sub]) => (
             <label
               key={value}
-              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${
+              className={`flex cursor-pointer items-start gap-3 rounded-theme border p-3 ${
                 option === value ? "border-brand bg-gray-50 ring-1 ring-brand" : "border-gray-300"
               }`}
             >
@@ -83,7 +83,7 @@ export function AddToCart({ product }: Props) {
 
       <div>
         <span className="label">Quantity</span>
-        <div className="flex w-32 items-center rounded-lg border border-gray-300 bg-white">
+        <div className="flex w-32 items-center rounded-theme border border-gray-300 bg-white">
           <button className="px-3 py-2" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Decrease">
             −
           </button>

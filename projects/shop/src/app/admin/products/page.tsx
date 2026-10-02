@@ -15,7 +15,7 @@ export default async function AdminProductsPage() {
   const products = await prisma.product.findMany({ orderBy: { createdAt: "desc" } });
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-extrabold">Admin</h1>
+      <h1 className="text-2xl font-medium text-brand">Admin</h1>
       <AdminNav current="products" />
       <div className="flex flex-wrap gap-2">
         <Link href="/admin/products/new" className="btn-primary">

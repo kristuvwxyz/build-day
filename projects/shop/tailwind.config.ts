@@ -1,13 +1,25 @@
 import type { Config } from "tailwindcss";
 
+// Colors and fonts come from src/lib/theme.ts (edit them there, not here).
+const v = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        // Change these two to match your brand.
-        brand: { DEFAULT: "#111827", light: "#374151" },
-        accent: { DEFAULT: "#e11d48", light: "#fff1f2" },
+        brand: { DEFAULT: v("brand"), light: v("brand-hover") },
+        accent: { DEFAULT: v("accent"), light: "rgb(var(--accent) / 0.08)" },
+        page: v("bg"),
+        surface: v("surface"),
+        ink: v("text"),
+      },
+      fontFamily: {
+        heading: "var(--font-heading)",
+        body: "var(--font-body)",
+      },
+      borderRadius: {
+        theme: "var(--radius)",
       },
     },
   },

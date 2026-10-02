@@ -33,9 +33,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         <div className="space-y-5">
           <TypeBadge type={product.type} />
           {product.brand && <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">{product.brand}</p>}
-          <h1 className="text-2xl font-extrabold sm:text-3xl">{product.name}</h1>
+          <h1 className="text-2xl font-medium text-brand sm:text-3xl">{product.name}</h1>
           <p className="text-2xl font-bold">{peso(product.price)}</p>
-          <p className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
+          <p className="rounded-theme bg-gray-100 p-3 text-sm text-gray-700">
             {product.type === "PREORDER"
               ? `🕒 Pre-order · ${product.eta ?? "ETA to follow"}. Pay in full and get ${peso(PREORDER_FULL_PAYMENT_DISCOUNT)} off per item, or reserve with a 50% downpayment.`
               : `✅ On-hand · ${product.stock} in stock. Ships within 1–2 business days.`}

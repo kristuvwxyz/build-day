@@ -40,7 +40,7 @@ export function PerfumeCard({ product, className = "" }: { product: Product; cla
             {accords.map((a) => (
               <li key={a.name}>
                 <span
-                  className="block rounded-md px-2 py-0.5 text-xs font-semibold capitalize"
+                  className="block rounded-theme px-2 py-0.5 text-xs font-semibold capitalize"
                   style={{ width: `${a.strength}%`, background: accordColor(a.name), color: textOn(accordColor(a.name)) }}
                 >
                   {a.name}

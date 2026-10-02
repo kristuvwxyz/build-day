@@ -27,7 +27,7 @@ export function ContactForm({ defaults }: { defaults: { name: string; email: str
   }
 
   if (state === "sent") {
-    return <p className="rounded-lg bg-green-50 p-4 text-green-800">Thanks! Your message was sent. We'll reply to {form.email}.</p>;
+    return <p className="rounded-theme bg-green-50 p-4 text-green-800">Thanks! Your message was sent. We'll reply to {form.email}.</p>;
   }
 
   return (

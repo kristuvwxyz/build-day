@@ -16,7 +16,7 @@ export default async function ImportPage({
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-extrabold">Import products from Shopify</h1>
+      <h1 className="text-2xl font-medium text-brand">Import products from Shopify</h1>
       <AdminNav current="products" />
 
       {done && (
@@ -30,7 +30,7 @@ export default async function ImportPage({
           </p>
         </div>
       )}
-      {r.error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{r.error}</p>}
+      {r.error && <p className="rounded-theme bg-red-50 p-3 text-sm text-red-700">{r.error}</p>}
 
       <ol className="card list-decimal space-y-2 p-5 pl-10 text-sm">
         <li>

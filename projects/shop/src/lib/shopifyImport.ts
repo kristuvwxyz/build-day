@@ -2,6 +2,7 @@
 // One shop product per Shopify variant. Re-importing updates name, price, stock and photo, and keeps
 // anything you added here (perfume card, pre-order ETA).
 import { prisma } from "./prisma";
+import { normalizeTags } from "./productFilters";
 
 /** Minimal CSV parser: handles quotes, commas and new lines inside quoted fields. */
 export function parseCsv(text: string): string[][] {
@@ -154,6 +155,8 @@ export async function importShopifyCsv(text: string): Promise<ImportResult> {
             imageUrl,
             description: stripHtml(get(g.first, idx.body)),
             brand: get(g.first, idx.vendor),
+            tags: normalizeTags(tags.replace(/\bpre[\s-]?orders?\b/gi, "")),
+            gender: /\b(for her|women|female)\b/i.test(tags) ? "Women" : /\b(for him|men|male)\b/i.test(tags) ? "Men" : /\bunisex\b/i.test(tags) ? "Unisex" : "",
             type: preorder ? "PREORDER" : "ONHAND",
             stock: preorder ? 0 : stock,
             isActive: active,

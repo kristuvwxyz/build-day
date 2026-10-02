@@ -32,10 +32,10 @@ export default function CartPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
       <div className="space-y-3">
-        <h1 className="text-2xl font-extrabold">Your Cart</h1>
+        <h1 className="text-2xl font-medium text-brand">Your Cart</h1>
         {items.map((item) => (
           <div key={item.productId + item.paymentOption} className="card flex gap-4 p-4">
-            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-theme bg-gray-100">
               {item.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -93,10 +93,10 @@ export default function CartPage() {
       <aside className="card h-fit space-y-4 p-5">
         <CartExtrasForm />
         <hr />
-        <h2 className="font-bold">Order summary</h2>
+        <h2 className="font-medium text-brand">Order summary</h2>
         <OrderSummary {...priced} showShipping={false} />
         {priced.shipments.length > 1 && (
-          <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          <p className="rounded-theme bg-amber-50 p-3 text-xs text-amber-900">
             Your cart has on-hand and pre-order items. They will be shipped separately: on-hand now, pre-order when it
             arrives.
           </p>

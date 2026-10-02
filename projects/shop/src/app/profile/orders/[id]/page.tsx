@@ -49,7 +49,7 @@ export default async function OrderPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-extrabold">{order.orderNumber}</h1>
+            <h1 className="text-2xl font-medium text-brand">{order.orderNumber}</h1>
             <TypeBadge type={order.type} />
           </div>
           <p className="text-sm text-gray-500">
@@ -60,17 +60,17 @@ export default async function OrderPage({
       </div>
 
       {payment === "cancelled" && (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Payment was not completed. You can try again below.</p>
+        <p className="rounded-theme bg-amber-50 p-3 text-sm text-amber-900">Payment was not completed. You can try again below.</p>
       )}
 
       {cancelReq?.status === "PENDING" && (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="rounded-theme bg-amber-50 p-3 text-sm text-amber-900">
           Your cancellation request was sent on {cancelReq.createdAt.toLocaleDateString("en-PH", { dateStyle: "medium" })}. We'll
           update you once the shop reviews it.
         </p>
       )}
       {cancelReq?.status === "REJECTED" && order.status !== "CANCELLED" && (
-        <p className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
+        <p className="rounded-theme bg-gray-100 p-3 text-sm text-gray-700">
           Your cancellation request was declined{cancelReq.shopReply ? `: ${cancelReq.shopReply}` : "."}
         </p>
       )}
@@ -119,7 +119,7 @@ export default async function OrderPage({
 
       <div className="grid gap-5 md:grid-cols-2">
         <div className="card space-y-2 p-5 text-sm">
-          <h2 className="font-bold">Items</h2>
+          <h2 className="font-medium text-brand">Items</h2>
           {order.items.map((i) => (
             <div key={i.id} className="flex justify-between gap-2">
               <span>
@@ -150,7 +150,7 @@ export default async function OrderPage({
         </div>
 
         <div className="card space-y-1 p-5 text-sm">
-          <h2 className="mb-2 font-bold">Shipping</h2>
+          <h2 className="mb-2 font-medium text-brand">Shipping</h2>
           <p className="font-semibold">{SHIPPING_METHODS[order.shippingMethod as ShippingMethod]?.label}</p>
           <p>{order.shipName}</p>
           <p>{order.shipContact}</p>
@@ -168,7 +168,7 @@ export default async function OrderPage({
       </div>
 
       <div className="card p-5">
-        <h2 className="mb-3 font-bold">Order history</h2>
+        <h2 className="mb-3 font-medium text-brand">Order history</h2>
         <ul className="space-y-2 text-sm">
           {order.history.map((h) => (
             <li key={h.id} className="flex justify-between gap-3">

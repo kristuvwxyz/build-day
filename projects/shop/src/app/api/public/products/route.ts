@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { PREORDER_FULL_PAYMENT_DISCOUNT } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
+import { productWhere } from "@/lib/productFilters";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -21,8 +22,7 @@ export async function GET(req: Request) {
 
   const products = await prisma.product.findMany({
     where: {
-      isActive: true,
-      ...(type === "PREORDER" || type === "ONHAND" ? { type } : {}),
+      ...productWhere({ type, gender: url.searchParams.get("gender"), tag: url.searchParams.get("tag") }),
       ...(brand ? { brand: { equals: brand, mode: "insensitive" } } : {}),
     },
     orderBy: { createdAt: "desc" },

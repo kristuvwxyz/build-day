@@ -55,10 +55,10 @@ export function AddressBook({ initial }: { initial: SavedAddress[] }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-bold">Saved addresses</h3>
+      <h3 className="font-medium text-brand">Saved addresses</h3>
       {list.length === 0 && <p className="text-sm text-gray-500">No saved addresses yet.</p>}
       {list.map((a) => (
-        <div key={a.id} className="rounded-lg border p-3 text-sm">
+        <div key={a.id} className="rounded-theme border p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <b>
               {a.label} {a.isDefault && <span className="ml-1 rounded bg-gray-900 px-1.5 py-0.5 text-[10px] text-white">DEFAULT</span>}
@@ -84,7 +84,7 @@ export function AddressBook({ initial }: { initial: SavedAddress[] }) {
       ))}
 
       {form ? (
-        <form onSubmit={add} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+        <form onSubmit={add} className="grid gap-3 rounded-theme border p-3 sm:grid-cols-2">
           <input id="addr-label" className="input" placeholder="Label (Home, Office…)" value={form.label} onChange={set("label")} />
           <input id="addr-name" className="input" placeholder="Name" required value={form.name} onChange={set("name")} />
           <input id="addr-contact" className="input" placeholder="09XXXXXXXXX" required value={form.contact} onChange={set("contact")} />

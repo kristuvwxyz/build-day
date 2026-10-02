@@ -17,7 +17,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   return (
     <div className="card mx-auto max-w-sm space-y-5 p-8">
       <div className="text-center">
-        <h1 className="text-2xl font-extrabold">Verify it's you</h1>
+        <h1 className="text-2xl font-medium text-brand">Verify it's you</h1>
         <p className="mt-1 text-sm text-gray-500">
           For your protection, enter the code we email you each time you log in.
         </p>

@@ -35,7 +35,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </div>
         )}
         <div>
-          <h1 className="text-2xl font-extrabold">Hi, {user.name?.split(" ")[0] ?? "there"}!</h1>
+          <h1 className="text-2xl font-medium text-brand">Hi, {user.name?.split(" ")[0] ?? "there"}!</h1>
           <p className="text-sm text-gray-500">{user.email}</p>
         </div>
       </div>
@@ -101,7 +101,7 @@ async function OrdersTab({ userId }: { userId: string }) {
             </span>
           </div>
           {o.status === "BALANCE_DUE" && (
-            <p className="mt-3 rounded-lg bg-orange-50 p-2 text-center text-sm font-semibold text-orange-800">
+            <p className="mt-3 rounded-theme bg-orange-50 p-2 text-center text-sm font-semibold text-orange-800">
               Your pre-order has arrived! Tap to pay the balance →
             </p>
           )}
@@ -188,7 +188,7 @@ async function AccountTab({ userId }: { userId: string }) {
           <AddressBook initial={addresses} />
         </div>
         <div className="card space-y-2 p-5 text-sm">
-          <h3 className="font-bold">Security</h3>
+          <h3 className="font-medium text-brand">Security</h3>
           <p className="text-gray-600">
             Two-step verification is on. Each time you log in, we email a 6-digit code to {u.email ?? "your email"}.
           </p>

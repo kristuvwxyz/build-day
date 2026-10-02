@@ -7,11 +7,11 @@ export default async function ContactPage() {
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
       <div className="card space-y-4 p-6">
-        <h1 className="text-2xl font-extrabold">Contact Us</h1>
+        <h1 className="text-2xl font-medium text-brand">Contact Us</h1>
         <ContactForm defaults={{ name: session?.user.name ?? "", email: session?.user.email ?? "" }} />
       </div>
       <aside className="card h-fit space-y-3 p-6 text-sm">
-        <h2 className="font-bold">Other ways to reach us</h2>
+        <h2 className="font-medium text-brand">Other ways to reach us</h2>
         <p>
           <span className="label">Email</span>
           {SHOP_CONTACT.email}

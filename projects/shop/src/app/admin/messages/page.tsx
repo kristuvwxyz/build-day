@@ -13,7 +13,7 @@ export default async function MessagesPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-extrabold">Admin</h1>
+      <h1 className="text-2xl font-medium text-brand">Admin</h1>
       <AdminNav current="messages" />
       {messages.length === 0 && <p className="text-gray-500">No messages yet.</p>}
       {messages.map((m) => (

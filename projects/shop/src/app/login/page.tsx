@@ -20,11 +20,11 @@ export default async function LoginPage({
   return (
     <div className="card mx-auto max-w-sm space-y-6 p-8">
       <div className="text-center">
-        <h1 className="text-2xl font-extrabold">Log in to {SHOP_NAME}</h1>
+        <h1 className="text-2xl font-medium text-brand">Log in to {SHOP_NAME}</h1>
         <p className="mt-1 text-sm text-gray-500">Track your orders, pay balances, and save your wishlist.</p>
       </div>
       {error && (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+        <p className="rounded-theme bg-red-50 p-3 text-sm text-red-700">
           {error === "OAuthAccountNotLinked"
             ? "This email is already linked to another login method. Please use the one you used before."
             : "Login failed. Please try again."}

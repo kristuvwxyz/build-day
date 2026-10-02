@@ -17,7 +17,7 @@ export default async function FailedPage({
     <div className="card mx-auto max-w-lg space-y-4 p-8 text-center">
       {pending ? (
         <>
-          <h1 className="text-2xl font-extrabold">We're confirming your payment</h1>
+          <h1 className="text-2xl font-medium text-brand">We're confirming your payment</h1>
           <p className="text-sm text-gray-600">
             If you completed the payment, your order status will update shortly in <b>My Orders</b>. If not, your cart
             is still saved and you can try again.
@@ -25,7 +25,7 @@ export default async function FailedPage({
         </>
       ) : (
         <>
-          <h1 className="text-2xl font-extrabold">Payment not completed</h1>
+          <h1 className="text-2xl font-medium text-brand">Payment not completed</h1>
           <p className="text-sm text-gray-600">No money was taken. Your cart is still saved. Please try again.</p>
         </>
       )}

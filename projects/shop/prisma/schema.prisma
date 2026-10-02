@@ -137,6 +137,7 @@ model Product {
   longevity      String   @default("") // e.g. "Long lasting"
   sillage        String   @default("") // e.g. "Moderate"
   fragranticaUrl String?
+  tags           String   @default("") // comma-separated collections, e.g. "arabian, designer, tester"
 
   orderItems  OrderItem[]
   wishlistedBy WishlistItem[]
