@@ -23,7 +23,7 @@ Vercel publishes the **main** branch, so merge it first:
 
 1. Go to **vercel.com** → log in with GitHub → **Add New… → Project**.
 2. Pick **build-day** → **Import**.
-3. **Root Directory**: click **Edit** → choose **`shop`** → Continue. *(Important: the shop code is in this folder.)*
+3. **Root Directory**: click **Edit** → choose **`projects/shop`** → Continue. *(Important: the shop code is in this folder.)*
 4. Framework: **Next.js** (detected automatically). Leave the build settings as they are.
 5. **Don't deploy yet**: open **Environment Variables** and do Step 3 first.
    (If it already deployed and failed, that's fine. It will work after Step 3.)
