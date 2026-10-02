@@ -17,6 +17,6 @@ Setup runs in a Claude Code **cloud** session (browser only, no desktop app). Fi
 
 ## Blockers / notes
 - Cloud network blocks api.telegram.org and vercel.com: K needs to allow them in the environment settings.
-- Test page is built (`hello-k`, local only for now). Needs an empty private GitHub repo `hello-k` created by K at github.com/new (Claude can't create repos from this session), then Vercel import.
+- ✅ Test page saved on GitHub: kristuvwxyz/hello-k (private). Next: Vercel import.
 - Telegram bot not made yet.
 - ✅ Test Apps Script "Build Day test" created and pushed (`buildday-test-script/`).
