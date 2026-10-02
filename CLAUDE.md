@@ -7,6 +7,8 @@ This file is my profile. Read it at the start of every session and follow it.
 - **Coding level:** Beginner. When I need to run something, give me the exact command and say what it does in one line. Don't assume I know setup steps.
 - **Timezone:** Asia/Manila (PHT, UTC+8). Use it for anything time-based: schedules, cron jobs, deadlines.
 - **Main uses:** building apps and websites, writing and docs, automation and workflows.
+- **No developer:** I build and edit my sites myself (the online shop in `projects/shop`, Webcake pages). Write guides for me, not for a developer: click-by-click, in order.
+- **Live store:** my current shop runs on Shopify. Never suggest changes that could take it offline without warning me first.
 
 ## Communication
 - Short and direct. Lead with the answer, and use bullets where they help.
