@@ -10,6 +10,8 @@ A ready-to-run **Next.js 15 + TypeScript + Tailwind + Prisma (PostgreSQL)** shop
 
 All you need to add are API keys, a database, and real products.
 
+> **Going live?** Follow **[GO-LIVE.md](GO-LIVE.md)**, a click-by-click guide (GitHub → Vercel → Neon → domain).
+>
 > **Using Webcake?** Read **[WEBCAKE.md](WEBCAKE.md)**: Webcake is the main site, this app runs on
 > `shop.yourdomain.com`, and copy-paste blocks put live products and shop buttons on Webcake pages.
 >

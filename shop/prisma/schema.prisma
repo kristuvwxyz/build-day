@@ -1,14 +1,16 @@
 // Database schema for the shop.
 // Production: PostgreSQL (Supabase, Neon, Railway, etc.).
-// Quick local test: change provider to "sqlite" and DATABASE_URL to "file:./dev.db".
+// Vercel + Neon sets DATABASE_URL and DATABASE_URL_UNPOOLED automatically.
+// Quick local test: change provider to "sqlite", remove directUrl, and use DATABASE_URL="file:./dev.db".
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")          // pooled connection (used by the website)
+  directUrl = env("DATABASE_URL_UNPOOLED") // direct connection (used to create/update tables)
 }
 
 // ---------- Login (NextAuth: Facebook / Google / Apple) ----------
