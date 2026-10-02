@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Download full-resolution photos for every product in a public Shopify collection.
 
+All photos go into one folder, named <product-handle>_<NN>.<ext>.
+
 Uses the storefront's public products.json feed, so no API key is needed.
 The image URLs in that feed point at the original uploads, not resized
 thumbnails.
@@ -81,10 +83,9 @@ def main():
                 src = img["src"]
                 src = "https:" + src if src.startswith("//") else src
                 ext = os.path.splitext(urllib.parse.urlparse(src).path)[1] or ".jpg"
-                rel = os.path.join(safe(p["handle"]), f"{safe(p['handle'])}_{i:02d}{ext}")
+                rel = f"{safe(p['handle'])}_{i:02d}{ext}"
                 dest = os.path.join(out_dir, rel)
                 if not os.path.exists(dest):
-                    os.makedirs(os.path.dirname(dest), exist_ok=True)
                     with open(dest + ".part", "wb") as img_file:
                         img_file.write(fetch(src))
                     os.replace(dest + ".part", dest)
