@@ -129,3 +129,20 @@ export async function saveProduct(formData: FormData) {
   revalidatePath("/admin/products");
   redirect("/admin/products");
 }
+
+export async function importShopifyProducts(formData: FormData) {
+  await requireAdmin();
+  const { redirect } = await import("next/navigation");
+  const { importShopifyCsv } = await import("@/lib/shopifyImport");
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) redirect("/admin/products/import?error=Choose+a+CSV+file");
+  const result = await importShopifyCsv(await (file as File).text());
+  revalidatePath("/admin/products");
+  const q = new URLSearchParams({
+    created: String(result.created),
+    updated: String(result.updated),
+    skipped: String(result.skipped),
+    ...(result.errors.length ? { error: result.errors.slice(0, 5).join(" · ") } : {}),
+  });
+  redirect(`/admin/products/import?${q}`);
+}

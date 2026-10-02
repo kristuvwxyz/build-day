@@ -17,9 +17,14 @@ export default async function AdminProductsPage() {
     <div className="space-y-5">
       <h1 className="text-2xl font-extrabold">Admin</h1>
       <AdminNav current="products" />
-      <Link href="/admin/products/new" className="btn-primary">
-        + Add product
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link href="/admin/products/new" className="btn-primary">
+          + Add product
+        </Link>
+        <Link href="/admin/products/import" className="btn-outline">
+          Import from Shopify
+        </Link>
+      </div>
       <div className="space-y-2">
         {products.map((p) => (
           <Link key={p.id} href={`/admin/products/${p.id}`} className="card flex flex-wrap items-center justify-between gap-2 p-3 text-sm hover:shadow">

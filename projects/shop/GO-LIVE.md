@@ -86,7 +86,11 @@ Start with Google; it's the quickest. Facebook and Apple can come later.
 Open **Admin → Products → + Add product**. For each perfume, fill in the price, pre-order or on-hand,
 the stock or ETA, a photo link, and the perfume card details (brand, notes, accords, Fragrantica link).
 
-*(Your products are already in Shopify. Claude can help copy them over instead of retyping. Just ask.)*
+**Faster: import from Shopify.**
+1. Shopify admin → **Products → Export** → All products → **CSV for Excel…** → Export. Shopify emails you the file.
+2. New shop → **Admin → Products → Import from Shopify** → upload the file.
+3. Check the list: tag pre-order items as **Pre-order** (or tag them `pre-order` in Shopify before exporting), add ETAs,
+   and fill in the perfume cards. Each size (50ml / 100ml) becomes its own product.
 
 ## Step 8: Payments, in test mode first
 
