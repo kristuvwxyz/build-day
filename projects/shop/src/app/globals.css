@@ -3,21 +3,27 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  @apply bg-page font-body text-ink antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-theme px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
     @apply btn bg-brand text-white hover:bg-brand-light;
   }
   .btn-outline {
-    @apply btn border border-gray-300 bg-white hover:bg-gray-100;
+    @apply btn border border-gray-300 bg-surface hover:bg-gray-100;
   }
   .card {
-    @apply rounded-xl border border-gray-200 bg-white;
+    @apply rounded-theme border border-gray-200 bg-surface;
   }
   .input {
     @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;

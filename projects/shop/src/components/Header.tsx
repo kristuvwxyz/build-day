@@ -1,23 +1,28 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { MAIN_SITE_URL, SHOP_NAME } from "@/lib/config";
+import { MAIN_NAV, THEME } from "@/lib/theme";
 import { CartLink } from "./CartLink";
 
 export async function Header() {
   const session = await getSession();
   return (
-    <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-gray-200 bg-surface/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        {MAIN_SITE_URL ? (
-          <a href={MAIN_SITE_URL} className="text-lg font-extrabold tracking-tight">
-            {SHOP_NAME}
-          </a>
-        ) : (
-          <Link href="/" className="text-lg font-extrabold tracking-tight">
-            {SHOP_NAME}
-          </Link>
-        )}
+        <a href={MAIN_SITE_URL || "/"} className="font-heading text-lg font-extrabold tracking-tight">
+          {THEME.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={THEME.logoUrl} alt={SHOP_NAME} className="h-9 w-auto" />
+          ) : (
+            SHOP_NAME
+          )}
+        </a>
         <nav className="flex items-center gap-1">
+          {MAIN_NAV.map((l) => (
+            <a key={l.href} href={l.href} className="hidden rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100 md:block">
+              {l.label}
+            </a>
+          ))}
           <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100">
             Shop
           </Link>
