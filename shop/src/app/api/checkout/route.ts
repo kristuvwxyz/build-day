@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { SHIPPING_METHODS } from "@/lib/config";
+import { shippingFee } from "@/lib/config";
 import { appUrl, getGateway, newReference } from "@/lib/payments";
-import { priceCart } from "@/lib/pricing";
+import { priceCart, unitDiscount } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 import type { ProductType } from "@/lib/types";
 
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
   const gateway = getGateway(provider);
   if (!gateway) return NextResponse.json({ error: "That payment method is not available." }, { status: 400 });
 
-  if (!SHIPPING_METHODS[shippingMethod].allowedRegions.includes(shipping.region)) {
+  if (shippingFee(shippingMethod, shipping.region) === null) {
     return NextResponse.json({ error: "Same-day delivery is only available in Metro Manila." }, { status: 400 });
   }
 
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const priced = priceCart(lines, shippingMethod);
+  const priced = priceCart(lines, shippingMethod, shipping.region);
   const checkoutGroup = newReference("G");
   const reference = newReference("PAY");
 
@@ -109,6 +109,7 @@ export async function POST(req: Request) {
               productId: l.product.id,
               name: l.product.name,
               unitPrice: l.price,
+              discountPerUnit: unitDiscount(l),
               quantity: l.quantity,
               paymentOption: l.paymentOption,
             })),

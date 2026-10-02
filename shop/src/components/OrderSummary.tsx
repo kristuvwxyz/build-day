@@ -34,7 +34,7 @@ export function OrderSummary({
           value={<span className="text-gray-500">{peso(balanceLater)}</span>}
         />
       )}
-      {!showShipping && <p className="text-xs text-gray-500">Shipping is calculated at checkout.</p>}
+      {!showShipping && <p className="text-xs text-gray-500">Shipping fee is based on your region and shown once it is selected.</p>}
     </div>
   );
 }

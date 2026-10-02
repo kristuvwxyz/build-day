@@ -3,7 +3,9 @@
 import {
   CHARGE_SHIPPING_PER_SHIPMENT,
   DOWNPAYMENT_PERCENT,
-  SHIPPING_METHODS,
+  PREORDER_FULL_PAYMENT_DISCOUNT,
+  shippingFee as feeFor,
+  type Region,
   type ShippingMethod,
 } from "./config";
 import type { PaymentOption, ProductType } from "./types";
@@ -15,8 +17,16 @@ export type PricedLine = {
   paymentOption: PaymentOption;
 };
 
+/** Discount per item: pre-order items paid in full get ₱200 off each. */
+export function unitDiscount(l: Pick<PricedLine, "type" | "price" | "paymentOption">) {
+  if (l.type === "PREORDER" && l.paymentOption === "FULL") {
+    return Math.min(PREORDER_FULL_PAYMENT_DISCOUNT, l.price);
+  }
+  return 0;
+}
+
 export function lineTotal(l: PricedLine) {
-  return l.price * l.quantity;
+  return (l.price - unitDiscount(l)) * l.quantity;
 }
 
 export function lineDueNow(l: PricedLine) {
@@ -40,6 +50,7 @@ export type Shipment = {
 export function priceCart<T extends PricedLine>(
   lines: T[],
   method: ShippingMethod | null,
+  region: Region | null,
 ): { shipments: (Shipment & { lines: T[] })[]; dueNow: number; balanceLater: number } {
   const order: ProductType[] = ["ONHAND", "PREORDER"];
   const shipments: (Shipment & { lines: T[] })[] = [];
@@ -51,8 +62,8 @@ export function priceCart<T extends PricedLine>(
     const subtotal = group.reduce((s, l) => s + lineTotal(l), 0);
     const itemsDueNow = group.reduce((s, l) => s + lineDueNow(l), 0);
     let shippingFee = 0;
-    if (method && (CHARGE_SHIPPING_PER_SHIPMENT || !shippingCharged)) {
-      shippingFee = SHIPPING_METHODS[method].fee;
+    if (method && region && (CHARGE_SHIPPING_PER_SHIPMENT || !shippingCharged)) {
+      shippingFee = feeFor(method, region) ?? 0;
       shippingCharged = true;
     }
     // Shipping is paid upfront together with the first payment.

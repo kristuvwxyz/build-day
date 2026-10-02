@@ -135,7 +135,8 @@ model OrderItem {
   orderId       String
   productId     String
   name          String  // snapshot at time of purchase
-  unitPrice     Int
+  unitPrice     Int     // regular price
+  discountPerUnit Int   @default(0) // e.g. ₱200 off for pre-order full payment
   quantity      Int
   paymentOption String  // "FULL" | "DOWNPAYMENT_50"
   order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)

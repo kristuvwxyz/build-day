@@ -18,7 +18,7 @@ All you need to add are API keys, a database, and real products.
 | # | Step | Where |
 |---|------|-------|
 | 1 | Browse and choose a product (yellow **PRE-ORDER** badge) | `/` → `/product/[slug]` |
-| 2 | Choose payment option: **Full payment** or **50% downpayment** | Product page (can also be changed in the cart) |
+| 2 | Choose payment option: **Full payment (₱200 off per item)** or **50% downpayment** | Product page (can also be changed in the cart) |
 | 3 | Add to cart | Product page |
 | 4 | Checkout | `/cart` → `/checkout` (login required) |
 | 5 | Mode of shipping: **J&T** or **Same-day Lalamove/Grab** | Checkout, section 2 |
@@ -49,9 +49,10 @@ All in **`src/lib/config.ts`**:
 
 | Setting | Current value |
 |---|---|
-| J&T shipping fee | ₱150 flat, nationwide |
+| J&T shipping fee | Metro Manila & Luzon ₱130 · Visayas ₱160 · Mindanao ₱170 |
 | Same-day (Lalamove/Grab) fee | ₱250 flat, **Metro Manila only** |
 | Downpayment | 50% |
+| Pre-order **full payment** discount | ₱200 off **per item** (automatic) |
 | Shop name | "My Shop" |
 
 Brand colours: `tailwind.config.ts` (`brand`, `accent`).

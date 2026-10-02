@@ -2,9 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { REGIONS, SHIPPING_METHODS, type Region, type ShippingMethod } from "@/lib/config";
+import {
+  REGIONS,
+  SHIPPING_METHODS,
+  lowestShippingFee,
+  shippingFee,
+  type Region,
+  type ShippingMethod,
+} from "@/lib/config";
 import { peso } from "@/lib/money";
-import { priceCart } from "@/lib/pricing";
+import { lineTotal, priceCart, unitDiscount } from "@/lib/pricing";
 import type { PaymentProvider } from "@/lib/types";
 import { useCart } from "./CartProvider";
 import { OrderSummary } from "./OrderSummary";
@@ -25,10 +32,10 @@ export function CheckoutForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const region = ship.region as Region;
-  const methodAllowed = (m: ShippingMethod) => !region || SHIPPING_METHODS[m].allowedRegions.includes(region);
+  const region = (ship.region || null) as Region | null;
+  const methodAllowed = (m: ShippingMethod) => !region || shippingFee(m, region) !== null;
   const effectiveMethod: ShippingMethod = methodAllowed(method) ? method : "JNT";
-  const priced = priceCart(items, effectiveMethod);
+  const priced = priceCart(items, effectiveMethod, region);
 
   if (items.length === 0) {
     return (
@@ -142,7 +149,11 @@ export function CheckoutForm({
                     {allowed ? info.description : "Not available for your region"}
                   </span>
                 </span>
-                <span className="text-sm font-semibold">{peso(info.fee)}</span>
+                <span className="text-sm font-semibold">
+                  {region
+                    ? allowed && peso(shippingFee(m, region)!)
+                    : `from ${peso(lowestShippingFee(m))}`}
+                </span>
               </label>
             );
           })}
@@ -176,13 +187,16 @@ export function CheckoutForm({
               <span className="truncate">
                 {i.quantity}× {i.name}
                 {i.paymentOption === "DOWNPAYMENT_50" && <span className="text-xs text-gray-500"> (50% DP)</span>}
+                {unitDiscount(i) > 0 && (
+                  <span className="text-xs text-green-700"> (−{peso(unitDiscount(i) * i.quantity)})</span>
+                )}
               </span>
-              <span>{peso(i.price * i.quantity)}</span>
+              <span>{peso(lineTotal(i))}</span>
             </li>
           ))}
         </ul>
         <hr />
-        <OrderSummary {...priced} showShipping />
+        <OrderSummary {...priced} showShipping={Boolean(region)} />
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <button className="btn-primary w-full" disabled={busy || !provider}>
           {busy ? "Redirecting to payment…" : `Pay ${peso(priced.dueNow)}`}

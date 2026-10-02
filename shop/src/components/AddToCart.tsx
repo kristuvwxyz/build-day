@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { DOWNPAYMENT_PERCENT } from "@/lib/config";
+import { DOWNPAYMENT_PERCENT, PREORDER_FULL_PAYMENT_DISCOUNT } from "@/lib/config";
 import { peso } from "@/lib/money";
 import type { PaymentOption, ProductType } from "@/lib/types";
 import { useCart } from "./CartProvider";
@@ -47,7 +47,11 @@ export function AddToCart({ product }: Props) {
           <legend className="label">Payment option</legend>
           {(
             [
-              ["FULL", "Full payment", `Pay ${peso(product.price)} now`],
+              [
+                "FULL",
+                `Full payment · save ${peso(Math.min(PREORDER_FULL_PAYMENT_DISCOUNT, product.price))}`,
+                `Pay ${peso(product.price - Math.min(PREORDER_FULL_PAYMENT_DISCOUNT, product.price))} now`,
+              ],
               [
                 "DOWNPAYMENT_50",
                 `${DOWNPAYMENT_PERCENT}% downpayment`,

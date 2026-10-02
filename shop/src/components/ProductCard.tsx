@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Product } from "@prisma/client";
 import { peso } from "@/lib/money";
+import { PREORDER_FULL_PAYMENT_DISCOUNT } from "@/lib/config";
 import { TypeBadge } from "./TypeBadge";
 import { WishlistButton } from "./WishlistButton";
 
@@ -28,7 +29,7 @@ export function ProductCard({ product, wishlisted }: { product: Product; wishlis
         <p className="font-bold">{peso(product.price)}</p>
         <p className="text-xs text-gray-500">
           {product.type === "PREORDER"
-            ? `${product.eta ?? "ETA to follow"} · 50% DP available`
+            ? `${product.eta ?? "ETA to follow"} · ${peso(PREORDER_FULL_PAYMENT_DISCOUNT)} off if paid in full`
             : soldOut
               ? "Out of stock"
               : `${product.stock} in stock · ships now`}

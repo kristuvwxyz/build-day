@@ -106,8 +106,11 @@ export default async function OrderPage({
               <span>
                 {i.quantity}× {i.name}
                 {i.paymentOption === "DOWNPAYMENT_50" && <span className="text-xs text-gray-500"> (50% DP)</span>}
+                {i.discountPerUnit > 0 && (
+                  <span className="text-xs text-green-700"> (full payment −{peso(i.discountPerUnit * i.quantity)})</span>
+                )}
               </span>
-              <span>{peso(i.unitPrice * i.quantity)}</span>
+              <span>{peso((i.unitPrice - i.discountPerUnit) * i.quantity)}</span>
             </div>
           ))}
           <hr />

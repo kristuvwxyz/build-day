@@ -4,6 +4,7 @@ import { AddToCart } from "@/components/AddToCart";
 import { TypeBadge } from "@/components/TypeBadge";
 import { WishlistButton } from "@/components/WishlistButton";
 import { peso } from "@/lib/money";
+import { PREORDER_FULL_PAYMENT_DISCOUNT } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 import type { ProductType } from "@/lib/types";
 import { getWishlistIds } from "@/lib/wishlist";
@@ -33,7 +34,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           <p className="text-2xl font-bold">{peso(product.price)}</p>
           <p className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
             {product.type === "PREORDER"
-              ? `🕒 Pre-order · ${product.eta ?? "ETA to follow"}. Pay in full or with a 50% downpayment.`
+              ? `🕒 Pre-order · ${product.eta ?? "ETA to follow"}. Pay in full and get ${peso(PREORDER_FULL_PAYMENT_DISCOUNT)} off per item, or reserve with a 50% downpayment.`
               : `✅ On-hand · ${product.stock} in stock. Ships within 1–2 business days.`}
           </p>
           {product.description && <p className="whitespace-pre-line text-sm text-gray-700">{product.description}</p>}

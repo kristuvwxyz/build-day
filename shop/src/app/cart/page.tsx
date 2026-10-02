@@ -5,11 +5,12 @@ import { useCart } from "@/components/CartProvider";
 import { OrderSummary } from "@/components/OrderSummary";
 import { TypeBadge } from "@/components/TypeBadge";
 import { peso } from "@/lib/money";
-import { lineDueNow, priceCart } from "@/lib/pricing";
+import { PREORDER_FULL_PAYMENT_DISCOUNT } from "@/lib/config";
+import { lineDueNow, lineTotal, priceCart } from "@/lib/pricing";
 
 export default function CartPage() {
   const { items, setQuantity, setPaymentOption, remove } = useCart();
-  const priced = priceCart(items, null);
+  const priced = priceCart(items, null, null);
 
   if (items.length === 0) {
     return (
@@ -68,14 +69,14 @@ export default function CartPage() {
                     className="input w-auto py-1.5"
                     aria-label="Payment option"
                   >
-                    <option value="FULL">Full payment</option>
+                    <option value="FULL">Full payment ({peso(PREORDER_FULL_PAYMENT_DISCOUNT)} off each)</option>
                     <option value="DOWNPAYMENT_50">50% downpayment</option>
                   </select>
                 )}
                 <span className="ml-auto text-sm font-semibold">
                   {item.paymentOption === "DOWNPAYMENT_50"
                     ? `${peso(lineDueNow(item))} now`
-                    : peso(item.price * item.quantity)}
+                    : peso(lineTotal(item))}
                 </span>
               </div>
             </div>
