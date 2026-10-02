@@ -57,7 +57,8 @@ button { cursor: pointer; }
 .nav button svg { width: 18px; height: 18px; flex: none; }
 .nav button:hover { background: var(--surface-2); color: var(--fg); }
 .nav button[aria-current="page"] { background: var(--brand); color: var(--brand-ink); }
-.rail-foot { margin-top: auto; font-size: 12px; color: var(--muted); padding-inline: 10px; }
+.rail-foot { margin-top: auto; font-size: 12px; color: var(--muted); padding-inline: 10px; display: flex; flex-direction: column; gap: 10px; }
+#theme-slot .seg button { padding: 4px 8px; font-size: 12px; }
 
 main { min-width: 0; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 20px; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -261,6 +262,28 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
 .pack { gap: 10px; }
 .pick { margin: 0; padding: 10px 12px; list-style: none; background: var(--surface-2); border-radius: 8px; display: flex; flex-direction: column; gap: 4px; }
 
+/* attendance */
+.a-present { --c: var(--good); --cb: var(--good-bg); }
+.a-late { --c: var(--warn); --cb: var(--warn-bg); }
+.a-leave, .a-sick { --c: var(--info); --cb: var(--info-bg); }
+.a-absent { --c: var(--bad); --cb: var(--bad-bg); }
+.a-off, .a-holiday { --c: var(--muted); --cb: var(--surface-2); }
+.a-notin { --c: var(--line); --cb: var(--surface); }
+.tsum-part[class*="a-"] b { color: var(--c); }
+.tsum-bar i[class*="a-"] { background: var(--c); }
+.att-sheet { font-size: 12px; }
+.att-sheet th, .att-sheet td { padding: 6px 4px; text-align: center; }
+.att-sheet th { font-size: 11px; text-transform: none; letter-spacing: 0; line-height: 1.2; }
+.att-sheet th small { color: var(--muted); font-weight: 500; }
+.att-sheet th.wk { color: var(--muted); opacity: .6; }
+.att-sheet th.now { color: var(--brand); }
+.att-sheet .sticky { position: sticky; left: 0; background: var(--surface); text-align: left; padding-inline: 12px; white-space: nowrap; z-index: 1; }
+.att-sheet td.r, .att-sheet th.r { text-align: right; padding-inline: 10px; }
+.ac { background: var(--cb, transparent); color: var(--c, var(--muted)); font-weight: 700; font-size: 10.5px; cursor: pointer; min-width: 26px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
+.clock-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.clock-big { font-family: var(--font-display); font-size: 30px; line-height: 1; }
+
 @media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -289,7 +312,7 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
   <aside class="rail">
     <div class="mark">Regal Spritz<small>Business OS</small></div>
     <nav class="nav" id="nav"></nav>
-    <div class="rail-foot" id="sync">Connecting…</div>
+    <div class="rail-foot"><div id="theme-slot"></div><div id="sync">Connecting…</div></div>
   </aside>
   <main>
     <div class="head">
@@ -357,6 +380,7 @@ const ICONS = {
   tasks: '<path d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8.5 15l2 2 4-4"/>',
   depts: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>',
   account: '<path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.2"/>',
 };
@@ -383,9 +407,10 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
-  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [],
-  home: {}, security: {}, profile: {},
-  loaded: { products: false, orders: false, expenses: false, customers: false, tasks: false, team: false },
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [],
+  home: {}, security: {}, profile: {}, attSettings: {},
+  att: { mode: "day", date: "", month: "", dept: "" },
+  loaded: { products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false },
   view: "home", dept: "SALES", tab: "orders", period: "month",
   of: { view: "all", platform: "all", q: "", range: "today" },
   page: 0, sel: new Set(),
@@ -395,9 +420,9 @@ const S = {
   unlocked: new Set(),
   db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
 };
-try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "account", "depts", "dept"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
 try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
-const hv = location.hash.slice(1); if (["home", "tasks", "account"].includes(hv)) S.view = hv;
+const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account"].includes(hv)) S.view = hv;
 const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
 const saveUnlocked = () => { try { sessionStorage.setItem("rs-unlocked", JSON.stringify([...S.unlocked])); } catch (e) {} };
 const isUnlocked = d => S.isOwner || S.unlocked.has(d);
@@ -510,6 +535,7 @@ function renderNav() {
   $("#nav").innerHTML =
     item('data-nav="home"', "home", "Home", S.view === "home") +
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
+    item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
     DEPTS.map(d => item(`data-dept="${d.id}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico"), "desktop-only dept-item")).join("") +
@@ -526,6 +552,7 @@ function headActions() {
   const map = {
     home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
     tasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
+    attendance: ex("attendance"),
     dtasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
     overview: can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "",
     dashboard: ex("orders"),
@@ -548,7 +575,7 @@ function periodSeg() {
 function render() {
   renderNav();
   const d = dept(S.dept);
-  const title = { home: "Home", tasks: "Tasks", account: "My account", depts: "Departments" }[S.view] || d.name;
+  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments" }[S.view] || d.name;
   $("#view-title").textContent = title;
   $("#head-actions").innerHTML = headActions();
   let n = "";
@@ -560,6 +587,7 @@ function render() {
   if (S.view === "home") { v.innerHTML = viewHome(); applySlide(); return; }
   if (S.view === "tasks") { v.innerHTML = viewTasks(null); return; }
   if (S.view === "account") { v.innerHTML = viewAccount(); return; }
+  if (S.view === "attendance") { v.innerHTML = viewAttendance(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
   if (!isUnlocked(S.dept)) { v.innerHTML = viewLock(d); const pw = $("#unlock-pw"); if (pw) pw.focus(); return; }
   if (!d.tabs.includes(S.tab)) S.tab = d.tabs[0];
@@ -757,6 +785,7 @@ function viewHome() {
       <button type="button" class="car-btn" data-slidestep="1" aria-label="Next slide">›</button>
     </div>
   </section>
+  ${myClockCard()}
   <div class="grid-2">
     <section class="panel"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
       ${myMemberId() ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
@@ -808,6 +837,8 @@ function viewAccount() {
       ${m ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.filter(t => t.status === "todo" || t.status === "in_progress").sort((a, b) => (a.due || "9").localeCompare(b.due || "9")).slice(0, 8).map(taskRow).join("")}</tbody></table></div>` : ""}
     </section>
   </div>
+  ${myClockCard()}
+  <section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div style="font-size:12px;color:var(--muted)">System follows your device's light or dark setting. Saved on this device.</div></section>
   <section class="panel"><h2>Department access</h2>
     ${S.isOwner ? `<div class="empty">You own this app, so every department opens without a password.</div>` : `
     <div class="dept-grid">${DEPTS.map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${isUnlocked(d.id) ? "Unlocked on this device" : "Locked"}</span></button>`).join("")}</div>
@@ -1613,15 +1644,198 @@ function summary(n, kind, fresh, updated, sample, warn, foot) {
     ${foot ? `<div style="font-size:12px;color:var(--muted)">${foot}</div>` : ""}</div>`;
 }
 
+/* ---------- appearance ---------- */
+const THEMES = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
+let themePref = "system";
+try { const t = localStorage.getItem("rs-theme"); if (["system", "light", "dark"].includes(t)) themePref = t; } catch (e) {}
+let hostTheme = document.documentElement.getAttribute("data-theme");
+function applyTheme() {
+  const root = document.documentElement, want = themePref === "system" ? hostTheme : themePref, cur = root.getAttribute("data-theme");
+  if (want === cur) return;
+  want ? root.setAttribute("data-theme", want) : root.removeAttribute("data-theme");
+}
+try {
+  new MutationObserver(() => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    if (themePref === "system") hostTheme = cur; else if (cur !== themePref) applyTheme();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+} catch (e) {}
+applyTheme();
+function setTheme(t) { themePref = t; try { localStorage.setItem("rs-theme", t); } catch (e) {} applyTheme(); renderThemeSwitch(); if (S.view === "account") render(); }
+const themeSeg = id => `<div class="seg" role="group" aria-label="Appearance" id="${id}">${THEMES.map(([k, l]) => `<button type="button" data-theme-set="${k}" aria-pressed="${themePref === k}">${l}</button>`).join("")}</div>`;
+function renderThemeSwitch() { const el = $("#theme-slot"); if (el) el.innerHTML = themeSeg("theme-rail"); }
+
+/* ---------- attendance ---------- */
+const TZ = "Asia/Manila";
+const mDate = t => new Date(t).toLocaleDateString("en-CA", { timeZone: TZ });
+const mToday = () => mDate(Date.now());
+const mMinutes = t => { const p = new Date(t).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).split(":"); return Number(p[0]) % 24 * 60 + Number(p[1]); };
+const mTime = t => t ? new Date(t).toLocaleTimeString("en-PH", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).replace(/\s?(AM|PM)/i, (m, x) => " " + x.toLowerCase()) : "";
+const hhmm = t => t ? new Date(t).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+const fromHHMM = (date, v) => v ? new Date(`${date}T${v}:00+08:00`).getTime() : 0;
+const toMin = v => { const [h, m] = (v || "09:00").split(":").map(Number); return h * 60 + (m || 0); };
+const ATT_STATUS = [
+  { id: "present", name: "Present", cls: "good", short: "P" },
+  { id: "late", name: "Late", cls: "warn", short: "L" },
+  { id: "leave", name: "On leave", cls: "info", short: "VL" },
+  { id: "sick", name: "Sick leave", cls: "info", short: "SL" },
+  { id: "off", name: "Day off", cls: "", short: "OFF" },
+  { id: "holiday", name: "Holiday", cls: "", short: "H" },
+  { id: "absent", name: "Absent", cls: "bad", short: "A" },
+  { id: "notin", name: "Not in yet", cls: "", short: "" },
+];
+const astat = id => ATT_STATUS.find(s => s.id === id) || ATT_STATUS[7];
+const attCfg = () => ({ start: "09:00", end: "18:00", grace: 15, workdays: [1, 2, 3, 4, 5, 6], ...(S.attSettings || {}) });
+const attId = (date, mid) => date + "_" + mid;
+const attRec = (date, mid) => S.attendance.find(a => a.id === attId(date, mid));
+const isWorkday = d => attCfg().workdays.includes(new Date(d + "T12:00:00+08:00").getDay());
+function attStatus(date, mid) {
+  const r = attRec(date, mid);
+  if (r && r.status && r.status !== "present") return r.status;
+  if (r && r.in) return mMinutes(r.in) > toMin(attCfg().start) + (Number(attCfg().grace) || 0) ? "late" : "present";
+  if (!isWorkday(date)) return "off";
+  if (date < mToday()) return "absent";
+  return "notin";
+}
+const hoursOf = r => r && r.in ? ((r.out || (mDate(r.in) === mToday() ? Date.now() : r.in)) - r.in) / 36e5 : 0;
+const fmtHours = h => h > 0 ? `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, "0")}m` : "–";
+
+async function clock(mid, dir) {
+  const date = mToday(), id = attId(date, mid), r = attRec(date, mid), now = Date.now();
+  const by = (member(myMemberId()) || {}).name || (S.me && S.me.name) || "";
+  if (dir === "in") {
+    if (r && r.in) { toast(`${memberName(mid)} already timed in at ${mTime(r.in)}.`); return; }
+    await save("attendance", id, { ...(r ? clean(r) : {}), date, memberId: mid, in: now, out: 0, status: "present", recordedByName: by, updatedAt: now });
+    toast(`${memberName(mid)} timed in at ${mTime(now)}.`);
+  } else {
+    if (!r || !r.in) { toast("Time in first."); return; }
+    await patch("attendance", id, { out: now, updatedAt: now });
+    toast(`${memberName(mid)} timed out at ${mTime(now)} · ${fmtHours((now - r.in) / 36e5)}.`);
+  }
+}
+function clockButtons(mid, date) {
+  if (S.readOnly || date !== mToday()) return "";
+  const r = attRec(date, mid);
+  if (r && r.status && !["present"].includes(r.status)) return "";
+  if (!r || !r.in) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in</button>`;
+  if (!r.out) return `<button class="btn sm" type="button" data-clock="out" data-mid="${mid}">Time out</button>`;
+  return "";
+}
+function myClockCard() {
+  const mid = myMemberId(); if (!mid || !member(mid)) return "";
+  const r = attRec(mToday(), mid), st = attStatus(mToday(), mid);
+  return `<section class="panel clock-card"><div class="head"><h2>My attendance today</h2><span class="chip ${astat(st).cls}">${astat(st).name}</span></div>
+    <div class="clock-row"><div><div class="clock-big num" data-live-clock>${mTime(Date.now())}</div><div style="font-size:12px;color:var(--muted)">Manila time · shift ${esc(attCfg().start)}–${esc(attCfg().end)}</div></div>
+    <div style="font-size:13px">${r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))}` : "Not timed in yet"}</div>
+    <div class="actions">${clockButtons(mid, mToday())}</div></div></section>`;
+}
+setInterval(() => document.querySelectorAll("[data-live-clock]").forEach(e => e.textContent = mTime(Date.now())), 20000);
+
+function attSummary(date) {
+  const ms = S.team, n = ms.length, c = id => ms.filter(m => attStatus(date, m.id) === id).length;
+  const leave = c("leave") + c("sick");
+  const parts = [["present", "Present", c("present")], ["late", "Late", c("late")], ["leave", "On leave", leave], ["absent", "Absent", c("absent")], ["notin", "Not in yet", c("notin")], ["off", "Day off / holiday", c("off") + c("holiday")]].filter(p => p[2] || ["present", "late", "absent"].includes(p[0]));
+  return `<div class="tsum"><div class="tsum-line">${parts.map(([id, nm, v]) => `<span class="tsum-part a-${id}"><b class="num">${v}/${n}</b> ${nm}</span>`).join('<span class="tsum-sep">|</span>')}</div>
+    <div class="tsum-bar" aria-hidden="true">${n ? parts.map(([id, , v]) => `<i class="a-${id}" style="width:${v / n * 100}%"></i>`).join("") : ""}</div>
+    <div class="tsum-label">${longDate(date)}${isWorkday(date) ? "" : " · not a work day"}</div></div>`;
+}
+
+function viewAttendance() {
+  const A = S.att;
+  if (!S.team.length) return `<div class="panel"><div class="empty">Add your team in <strong>Admin → Team</strong> first. Attendance is tracked per team member.</div></div>`;
+  const seg = `<div class="seg" role="group" aria-label="Attendance view">${[["day", "Daily"], ["month", "Monthly sheet"]].map(([k, l]) => `<button type="button" data-amode="${k}" aria-pressed="${A.mode === k}">${l}</button>`).join("")}</div>`;
+  const deptSel = `<select id="a-dept" aria-label="Department"><option value="">All departments</option>${DEPTS.map(d => `<option value="${d.id}" ${A.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>`;
+  const team = S.team.filter(m => !A.dept || m.department === A.dept).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  let body;
+  if (A.mode === "day") {
+    body = `${attSummary(A.date)}
+    <div class="toolbar">${seg}${deptSel}<span style="flex:1"></span>
+      <div class="pager"><button class="btn sm" type="button" data-aday="-1" aria-label="Previous day">‹</button><input id="a-date" type="date" value="${A.date}" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 8px"><button class="btn sm" type="button" data-aday="1" aria-label="Next day">›</button><button class="btn ghost sm" type="button" data-aday="0">Today</button></div></div>
+    <div class="table-wrap"><table class="otable">
+      <thead><tr><th>Team member</th><th>Department</th><th>Status</th><th>Time in</th><th>Time out</th><th class="r">Hours</th><th>Note</th><th></th></tr></thead>
+      <tbody>${team.map(m => { const r = attRec(A.date, m.id), st = astat(attStatus(A.date, m.id)); return `<tr data-att="${m.id}">
+        <td style="font-weight:600">${esc(m.name)}${m.id === myMemberId() ? ' <span class="chip">You</span>' : ""}</td>
+        <td>${esc((dept(m.department) || { name: "–" }).name)}</td>
+        <td><span class="chip ${st.cls}">${st.name}</span></td>
+        <td class="num nowrap">${r && r.in ? mTime(r.in) : "–"}</td>
+        <td class="num nowrap">${r && r.out ? mTime(r.out) : r && r.in ? '<span style="color:var(--muted)">still in</span>' : "–"}</td>
+        <td class="r num">${fmtHours(hoursOf(r))}</td>
+        <td style="max-width:200px;color:var(--muted)">${esc(r && r.note || "")}</td>
+        <td class="r nowrap">${clockButtons(m.id, A.date)} ${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-att" data-mid="${m.id}">Edit</button>`}</td></tr>`; }).join("")}</tbody>
+    </table></div>`;
+  } else {
+    const [y, mo] = A.month.split("-").map(Number), dim = new Date(y, mo, 0).getDate();
+    const days = Array.from({ length: dim }, (_, i) => `${A.month}-${String(i + 1).padStart(2, "0")}`);
+    const rows = team.map(m => {
+      const cells = days.map(d => d > mToday() ? null : attStatus(d, m.id));
+      const cnt = id => cells.filter(c => c === id).length;
+      const hrs = days.reduce((a, d) => a + hoursOf(attRec(d, m.id)), 0);
+      return { m, cells, p: cnt("present") + cnt("late"), late: cnt("late"), abs: cnt("absent"), lv: cnt("leave") + cnt("sick"), hrs };
+    });
+    body = `<div class="toolbar">${seg}${deptSel}<span style="flex:1"></span>
+      <div class="pager"><button class="btn sm" type="button" data-amonth="-1" aria-label="Previous month">‹</button><strong style="min-width:140px;text-align:center">${monthLabel(A.month)}</strong><button class="btn sm" type="button" data-amonth="1" aria-label="Next month">›</button></div></div>
+    <div class="table-wrap"><table class="att-sheet">
+      <thead><tr><th class="sticky">Team member</th>${days.map(d => `<th class="${isWorkday(d) ? "" : "wk"}${d === mToday() ? " now" : ""}" title="${longDate(d)}">${Number(d.slice(8))}<br><small>${"SMTWTFS"[new Date(d + "T12:00:00+08:00").getDay()]}</small></th>`).join("")}<th class="r">Present</th><th class="r">Late</th><th class="r">Absent</th><th class="r">Leave</th><th class="r">Hours</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="sticky" style="font-weight:600">${esc(r.m.name)}</td>${r.cells.map((c, i) => `<td class="ac ${c ? "a-" + c : ""}" data-aday-pick="${days[i]}" title="${esc(r.m.name)} · ${fmtDate(days[i])}${c ? " · " + astat(c).name : ""}">${c && c !== "notin" ? astat(c).short : ""}</td>`).join("")}
+        <td class="r num">${r.p}</td><td class="r num" style="color:${r.late ? "var(--warn)" : "inherit"}">${r.late}</td><td class="r num" style="color:${r.abs ? "var(--bad)" : "inherit"}">${r.abs}</td><td class="r num">${r.lv}</td><td class="r num nowrap">${fmtHours(r.hrs)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <div class="legend">${ATT_STATUS.filter(s => s.short).map(s => `<span><span class="ac a-${s.id}" style="display:inline-block;min-width:28px;text-align:center;border-radius:4px">${s.short}</span> ${s.name}</span>`).join("")}</div>`;
+  }
+  const c = attCfg();
+  const settings = S.canEdit ? `<details class="panel"><summary style="font-weight:700;cursor:pointer">Attendance settings</summary>
+    <form id="att-cfg" style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+      <div class="row"><div class="field"><label for="ac-start">Shift starts</label><input id="ac-start" type="time" value="${esc(c.start)}"></div><div class="field"><label for="ac-end">Shift ends</label><input id="ac-end" type="time" value="${esc(c.end)}"></div></div>
+      <div class="field"><label for="ac-grace">Grace period before "Late" (minutes)</label><input id="ac-grace" type="number" min="0" step="1" value="${Number(c.grace) || 0}"></div>
+      <fieldset class="field" style="border:0;padding:0;margin:0"><legend style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">Work days</legend><div style="display:flex;gap:10px;flex-wrap:wrap">${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => `<label style="display:flex;gap:4px;align-items:center;font-size:13px"><input type="checkbox" name="ac-wd" value="${i}" ${c.workdays.includes(i) ? "checked" : ""}> ${d}</label>`).join("")}</div></fieldset>
+      <div><button class="btn primary" type="submit">Save settings</button></div>
+    </form></details>` : "";
+  return body + settings;
+}
+
+function openAttForm(mid) {
+  const date = S.att.date, r = attRec(date, mid) || {}, cur = r.status && r.status !== "present" ? r.status : (r.in ? "present" : "");
+  openSheet(`
+    <h3>${esc(memberName(mid))}</h3>
+    <div style="color:var(--muted);font-size:13px">${longDate(date)} · times in Manila time</div>
+    <div class="field"><label for="at-status">Status</label><select id="at-status">
+      <option value="present" ${cur === "present" ? "selected" : ""}>Worked (Present / Late is automatic)</option>
+      ${ATT_STATUS.filter(s => ["leave", "sick", "off", "holiday", "absent"].includes(s.id)).map(s => `<option value="${s.id}" ${cur === s.id ? "selected" : ""}>${s.name}</option>`).join("")}
+      ${cur ? "" : `<option value="" selected>No record</option>`}
+    </select></div>
+    <div class="row">
+      <div class="field"><label for="at-in">Time in</label><input id="at-in" type="time" value="${hhmm(r.in)}"></div>
+      <div class="field"><label for="at-out">Time out</label><input id="at-out" type="time" value="${hhmm(r.out)}"></div>
+    </div>
+    <div class="field"><label for="at-note">Note</label><input id="at-note" value="${esc(r.note || "")}" placeholder="e.g. Half day, approved by CEO"></div>
+    ${r.recordedByName ? `<div style="font-size:12px;color:var(--muted)">Last recorded by ${esc(r.recordedByName)}${r.updatedAt ? " · " + relTime(r.updatedAt) : ""}</div>` : ""}
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${r.id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-att" data-id="${r.id}">Clear this record</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    const status = val("at-status"), tin = fromHHMM(date, val("at-in")), tout = fromHHMM(date, val("at-out"));
+    if (!status) { closeSheet(); return; }
+    if (status === "present" && !tin) return sheetError("Enter a time in, or choose a leave status.");
+    if (tin && tout && tout < tin) return sheetError("Time out is earlier than time in.");
+    const by = (member(myMemberId()) || {}).name || (S.me && S.me.name) || "";
+    await save("attendance", attId(date, mid), { date, memberId: mid, status, in: status === "present" ? tin : 0, out: status === "present" ? tout : 0, note: val("at-note"), recordedByName: by, updatedAt: Date.now() });
+    closeSheet(); toast("Attendance saved.");
+  });
+}
+
 /* ---------- export ---------- */
 function csv(rows) { return rows.map(r => r.map(c => { const s = String(c ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n"); }
 async function exportCol(col) {
   let rows;
   if (col === "orders") rows = [["Order", "Date", "Channel", "Platform ref", "Customer", "Phone", "Items", "Item count", "Total", "Payment status", "Fulfillment status", "Tags", "Fees", "Shipping paid", "Product cost", "Profit", "Note"], ...filteredOrders().map(o => ["#" + o.num, new Date(o.createdAt).toLocaleString("en-PH"), plat(o.platform), o.ref, o.customer, o.phone, (o.items || []).map(i => `${i.qty}x ${i.name}`).join("; "), itemCount(o), total(o), pay(o.payment).name, ful(o.fulfillment).name, (o.tags || []).join(", "), o.fees, o.shipping, cogs(o), profit(o), o.note])];
+  if (col === "attendance") {
+    const [y, mo] = S.att.month.split("-").map(Number), dim = new Date(y, mo, 0).getDate();
+    rows = [["Date", "Team member", "Department", "Status", "Time in", "Time out", "Hours", "Note"]];
+    for (let i = 1; i <= dim; i++) { const d = `${S.att.month}-${String(i).padStart(2, "0")}`; if (d > mToday()) break; for (const m of S.team) { const r = attRec(d, m.id); rows.push([d, m.name, (dept(m.department) || {}).name || "", astat(attStatus(d, m.id)).name, mTime(r && r.in), mTime(r && r.out), Math.round(hoursOf(r) * 100) / 100, r && r.note || ""]); } }
+  }
   if (col === "products") rows = [["Name", "SKU", "Category", "Price", "Cost", "Stock", "Reorder at", "Batch", "Best before"], ...S.products.map(p => [p.name, p.sku, p.category, p.price, p.cost, p.stock, p.reorder, p.batch, p.expiry])];
   if (col === "expenses") rows = [["Date", "Category", "Note", "Amount"], ...S.expenses.map(e => [e.date, e.category, e.note, e.amount])];
   if (col === "customers") rows = [["Name", "Email", "Phone", "Address", "Channels", "Orders", "Amount spent", "Last order", "Tags", "Note"], ...customerList().map(c => [c.name, c.email, c.phone, c.address, [...c.platforms].join("; "), c.orders, c.spent, c.last ? new Date(c.last).toLocaleDateString("en-CA") : "", (c.tags || []).join(", "), c.note])];
-  try { await S.dl.save({ filename: `regal-spritz-${col}-${today()}.csv`, data: csv(rows) }); toast("Export ready."); }
+  try { await S.dl.save({ data: csv(rows), filename: col === "attendance" ? `regal-spritz-attendance-${S.att.month}.csv` : `regal-spritz-${col}-${today()}.csv` }); toast("Export ready."); }
   catch (e) { if (e && e.code !== "declined") toast("Couldn't export. Try again in a moment."); }
 }
 
@@ -1664,6 +1878,18 @@ document.addEventListener("click", guard(async ev => {
   if (dy) { S.t.day = dy.dataset.day; render(); return; }
   const fu = ev.target.closest("[data-ful]");
   if (fu) { const o = S.orders.find(x => x.id === fu.dataset.ful); if (o) { await updateOrder(o, { fulfillment: fu.dataset.to }); toast(`#${o.num} ${ful(fu.dataset.to).name.toLowerCase()}.`); } return; }
+  const th = ev.target.closest("[data-theme-set]");
+  if (th) return setTheme(th.dataset.themeSet);
+  const ck = ev.target.closest("[data-clock]");
+  if (ck) return clock(ck.dataset.mid, ck.dataset.clock);
+  const am = ev.target.closest("[data-amode]");
+  if (am) { S.att.mode = am.dataset.amode; if (S.att.mode === "month") S.att.month = S.att.date.slice(0, 7); render(); return; }
+  const ad = ev.target.closest("[data-aday]");
+  if (ad) { const k = Number(ad.dataset.aday); S.att.date = k ? dstr(new Date(S.att.date + "T12:00:00").getTime() + k * 864e5) : mToday(); render(); return; }
+  const amo = ev.target.closest("[data-amonth]");
+  if (amo) { const [y, m] = S.att.month.split("-").map(Number); S.att.month = dstr(new Date(y, m - 1 + Number(amo.dataset.amonth), 1).getTime()).slice(0, 7); render(); return; }
+  const ap = ev.target.closest("[data-aday-pick]");
+  if (ap) { S.att.date = ap.dataset.adayPick; S.att.mode = "day"; render(); return; }
   const sp = ev.target.closest("[data-setpw]");
   if (sp) return setPassword(sp.dataset.setpw, false);
   const cp = ev.target.closest("[data-clearpw]");
@@ -1694,6 +1920,8 @@ document.addEventListener("click", guard(async ev => {
     case "lock-all": S.unlocked.clear(); saveUnlocked(); render(); toast("All departments locked on this device."); return;
     case "edit-home": closeSheet(); S.view = "dept"; S.dept = "ADMIN"; S.tab = "homecontent"; saveNav(); render(); return;
     case "new-member": return openMemberForm();
+    case "edit-att": return openAttForm(b.dataset.mid);
+    case "del-att": await remove("attendance", id); closeSheet(); toast("Attendance record cleared."); return;
     case "edit-member": return openMemberForm(id);
     case "del-task": await remove("tasks", id); closeSheet(); toast("Task deleted."); return;
     case "del-member": await remove("team", id); closeSheet(); toast("Removed from team."); return;
@@ -1710,10 +1938,10 @@ document.addEventListener("click", guard(async ev => {
     case "clear-ex": $("#clear-slot").innerHTML = `<span class="confirm">Delete all example rows? <button class="btn sm danger" type="button" data-act="clear-ex-yes">Yes, clear</button><button class="btn sm" type="button" data-act="clear-ex-no">Keep</button></span>`; return;
     case "clear-ex-no": render(); return;
     case "clear-ex-yes": return clearExamples();
-    case "ask-del-order": case "ask-del-product": case "ask-del-expense": case "ask-del-task": case "ask-del-member": {
+    case "ask-del-order": case "ask-del-product": case "ask-del-expense": case "ask-del-task": case "ask-del-member": case "ask-del-att": {
       const kind = b.dataset.act.slice(8);
       const extra = kind === "order" ? " Stock is not changed; set payment to Voided first if you want items back in stock." : "";
-      $("#del-slot").innerHTML = `<div class="confirm">Delete this ${kind}? This can't be undone.${extra} <button class="btn sm danger" type="button" data-act="del-${kind}" data-id="${id}">Delete</button><button class="btn sm" type="button" data-act="close">Keep</button></div>`;
+      $("#del-slot").innerHTML = `<div class="confirm">Delete this ${({ att: "attendance record", member: "team member" })[kind] || kind}? This can't be undone.${extra} <button class="btn sm danger" type="button" data-act="del-${kind}" data-id="${id}">Delete</button><button class="btn sm" type="button" data-act="close">Keep</button></div>`;
       return;
     }
     case "del-order": await remove("orders", id); closeSheet(); toast("Order deleted."); return;
@@ -1727,6 +1955,8 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
+  if (t.id === "a-date") { if (t.value) S.att.date = t.value; render(); return; }
+  if (t.id === "a-dept") { S.att.dept = t.value; render(); return; }
   if (t.id === "t-person") { S.t.person = t.value; render(); return; }
   if (t.id === "t-dept") { S.t.dept = t.value; render(); return; }
   if (t.id === "k-status" && t.value === "done") { $("#k-prog").value = 100; $("#k-prog-val").textContent = "100%"; return; }
@@ -1756,6 +1986,12 @@ $("#sheet").addEventListener("submit", guard(async ev => {
 }));
 document.addEventListener("submit", guard(async ev => {
   if (ev.target.id === "unlock-form") { ev.preventDefault(); return tryUnlock(); }
+  if (ev.target.id === "att-cfg") {
+    ev.preventDefault();
+    const data = { start: val("ac-start") || "09:00", end: val("ac-end") || "18:00", grace: Math.max(0, Math.round(numv("ac-grace"))), workdays: [...document.querySelectorAll('input[name="ac-wd"]:checked')].map(x => Number(x.value)) };
+    if (S.db) await S.db.doc("config/attendance").set(data); else S.attSettings = data;
+    toast("Attendance settings saved."); render(); return;
+  }
   if (ev.target.id === "home-form") {
     ev.preventDefault();
     const data = { welcome: val("h-welcome"), mission: val("h-mission"), vision: val("h-vision"), goals: val("h-goals"), updatedAt: Date.now() };
@@ -1766,6 +2002,8 @@ document.addEventListener("submit", guard(async ev => {
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
 
 /* ---------- boot ---------- */
+S.att.date = mToday(); S.att.month = S.att.date.slice(0, 7);
+renderThemeSwitch();
 render();
 (async () => {
   const c = window.claude;
@@ -1783,9 +2021,10 @@ render();
   if (db) {
     const keep = () => { if ($("#scrim").hidden) render(); else renderNav(); };
     db.doc("config/home").onSnapshot(s => { S.home = s.exists ? s.data() : {}; keep(); }, () => {});
+    db.doc("config/attendance").onSnapshot(s => { S.attSettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["products", "orders", "expenses", "customers", "tasks", "team"]) {
+    for (const col of ["products", "orders", "expenses", "customers", "tasks", "team", "attendance"]) {
       db.collection(col).onSnapshot(snap => {
         S[col] = snap.docs.map(d => { const r = { id: d.id, ...d.data() }; return col === "orders" ? norm(r) : r; });
         S.loaded[col] = true;

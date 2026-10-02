@@ -7,7 +7,8 @@ Back office for the whole team, plus orders and stock across Shopify, Shopee, Ti
 ## Open to everyone
 - **Home:** rotating carousel with a greeting (Manila time), RS Mission, Vision and Goals, plus my tasks, team task summary and department shortcuts
 - **Tasks:** calendar (month) and list views; status (To do / In progress / Done / Cancelled), progress %, priority, start and due dates, assigned person and department. Views: whole team, per person, per department. Summary at the top, e.g. `4/10 In progress | 5/10 Done | 1/10 Cancelled`
-- **My account:** link your login to your team-member name, see your tasks, lock departments
+- **Attendance:** time in / time out (Manila time), automatic Late after the shift start + grace period, leave / sick / day off / holiday, auto Absent for missed work days. Daily board with summary (e.g. `7/10 Present | 2/10 Late | 1/10 On leave`), monthly sheet per person with totals and hours, CSV export for payroll. Admin sets shift times, grace and work days.
+- **My account:** link your login to your team-member name, see your tasks, time in/out, choose Light / Dark / System appearance, lock departments
 
 ## Departments (each has its own password; the owner gets in without one)
 | Department | Pages |
