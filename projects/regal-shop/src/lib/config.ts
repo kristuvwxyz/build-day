@@ -3,7 +3,7 @@
 //  All money is in centavos: ₱150.00 = 15000
 // ============================================================
 
-export const SHOP_NAME = "My Shop";
+export const SHOP_NAME = "Regal Spritz";
 
 export const DOWNPAYMENT_PERCENT = 50;
 

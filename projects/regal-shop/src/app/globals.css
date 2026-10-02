@@ -26,3 +26,6 @@ body {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600;
   }
 }
+
+html, body { touch-action: manipulation; }
+input, select, textarea { font-size: 16px; }
