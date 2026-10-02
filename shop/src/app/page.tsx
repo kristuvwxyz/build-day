@@ -4,9 +4,11 @@ import { getWishlistIds } from "@/lib/wishlist";
 
 export const dynamic = "force-dynamic";
 
-export default async function ShopPage() {
+export default async function ShopPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+  const { type } = await searchParams;
+  const typeFilter = type === "PREORDER" || type === "ONHAND" ? type : undefined;
   const [products, wishlist] = await Promise.all([
-    prisma.product.findMany({ where: { isActive: true }, orderBy: { createdAt: "desc" } }),
+    prisma.product.findMany({ where: { isActive: true, type: typeFilter }, orderBy: { createdAt: "desc" } }),
     getWishlistIds(),
   ]);
 
@@ -19,6 +21,22 @@ export default async function ShopPage() {
           <b className="text-emerald-300">ON-HAND</b> items ship right away.
         </p>
       </section>
+
+      <nav className="flex gap-2 text-sm">
+        {[
+          ["", "All"],
+          ["PREORDER", "Pre-order"],
+          ["ONHAND", "On-hand"],
+        ].map(([v, label]) => (
+          <a
+            key={v}
+            href={v ? `/?type=${v}` : "/"}
+            className={`rounded-full border px-3 py-1 ${(typeFilter ?? "") === v ? "border-brand bg-brand text-white" : "bg-white"}`}
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
 
       {products.length === 0 ? (
         <p className="text-center text-gray-500">No products yet.</p>

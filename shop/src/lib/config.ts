@@ -5,6 +5,9 @@
 
 export const SHOP_NAME = "My Shop";
 
+// Your main website (e.g. the Webcake site). The shop logo links back to it. Leave "" to link to the shop home.
+export const MAIN_SITE_URL = process.env.NEXT_PUBLIC_MAIN_SITE_URL ?? "";
+
 export const DOWNPAYMENT_PERCENT = 50;
 
 // PRE-ORDER items paid in FULL get this much off per item (₱200 = 20000).

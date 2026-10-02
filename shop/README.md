@@ -10,6 +10,9 @@ A ready-to-run **Next.js 15 + TypeScript + Tailwind + Prisma (PostgreSQL)** shop
 
 All you need to add are API keys, a database, and real products.
 
+> **Using Webcake?** Read **[WEBCAKE.md](WEBCAKE.md)**: Webcake is the main site, this app runs on
+> `shop.yourdomain.com`, and copy-paste blocks put live products and shop buttons on Webcake pages.
+>
 > **UI developer:** you own the design. Read **[INTEGRATION.md](INTEGRATION.md)**: it maps every feature to the
 > logic, API and example component you can restyle or replace. The pages in `src/app/` are reference screens.
 
