@@ -33,7 +33,7 @@
 If I give step-by-step instructions, gently remind me I can just say what I want and who it's for.
 
 ## My setup
-- Computer: browser only (Chrome); building happens in Claude Code cloud sessions.
+- Computer: MacBook, browser only (Chrome; no Claude desktop app yet); building happens in Claude Code cloud sessions.
 - Projects live in this GitHub repo: kristuvwxyz/build-day.
 - Reliable automations go in Google Apps Script.
 - (More filled in as setup continues.)
