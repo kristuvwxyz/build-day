@@ -1,11 +1,12 @@
 # K's Build Ideas
 
-Ranked by how much time or worry each one saves you. ⭐ = your favourites (to be marked).
+Ranked by how much time or worry each one saves you. ⭐ = your favourites.
 
-### 1. Perfect Perfume Finder 🌟 *(the wow project)*
-**What it does for you:** Customers answer 5 fun questions (who it's for, vibe, sweet or fresh, day or night, budget) and get their top 3 matches from your 40+ perfumes, with photo, price, an "100% Authentic" badge and a **Buy now** button to your Shopify page or a **Message me** button to Messenger.
-- **Uses:** a website (link you can post on FB, IG, TikTok bio); your Shopify product list
-- **Bonus:** a gift-mode path ("Buying for someone?") and a Telegram ping when someone finishes the quiz
+### 1. ⭐ Find My Scent Quiz + Spin the Wheel 🌟 *(the wow project)*
+**What it does for you:** A department-store-style "find your scent" quiz. Customers answer 5 fun questions (who it's for, vibe, sweet or fresh, day or night, occasion) and get their top 3 matches from your 40+ perfumes, with photo, price, a "100% Authentic" badge and a **Buy now** button to your Shopify page or a **Message me** button to Messenger. At the end they **spin a wheel to win a voucher** (e.g. 5% off, free shipping, free sample), which is a real discount code they use at your Shopify checkout.
+- **Uses:** a website (link you can post on FB, IG, TikTok bio); your Shopify product list; discount codes you make in Shopify (free on Basic)
+- **Bonus:** a gift-mode path ("Buying for someone?") and a Telegram ping when someone wins a voucher
+- **Note:** the wheel's prizes and odds are set by you, so you control the cost. We'll show the voucher terms clearly on the page.
 - **One afternoon?** ✅ Yes. Bring your product list exported from Shopify.
 
 ### 2. Morning Shop Briefing on Telegram *(automation, runs by itself)*
@@ -18,12 +19,12 @@ Ranked by how much time or worry each one saves you. ⭐ = your favourites (to b
 - **Uses:** Shopify, Google Sheet, Telegram message, runs on a schedule
 - **One afternoon?** ✅ Yes. It uses the same Shopify key as #2, so it pairs well as the "make it better" round.
 
-### 4. My Money Tracker *(just for you, automation)*
+### 4. ⭐ My Money Tracker *(just for you, automation)*
 **What it does for you:** A tiny phone page for logging any expense in 5 seconds (amount, category, GCash or cash). It saves to a Google Sheet with a monthly chart, and every Sunday Telegram tells you your spending vs budget and how much you saved.
 - **Uses:** a website, Google Sheet, chart, Telegram message, runs weekly
 - **One afternoon?** ✅ Yes
 
-### 5. "Is It Authentic?" Trust Page
+### 5. ⭐ "Is It Authentic?" Trust Page
 **What it does for you:** One beautiful page that answers your #1 customer question: where you source, proof of authenticity, how to check batch codes, plus your shipping and payment FAQs. Paste the link in DMs instead of typing the same answer again.
 - **Uses:** a website
 - **One afternoon?** ✅ Yes, about an hour. It's a good "make it better" add-on to #1.
