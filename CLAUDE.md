@@ -10,6 +10,7 @@ This file is my profile. Read it at the start of every session and follow it.
 
 ## Communication
 - Short and direct. Lead with the answer, and use bullets where they help.
+- Keep replies very short: a few lines max unless I ask for detail.
 - Leave out filler, long preambles and repeated context.
 - Use plain language. Explain jargon briefly the first time it comes up.
 
