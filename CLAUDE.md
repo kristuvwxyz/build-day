@@ -12,6 +12,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Short and direct. Lead with the answer, and use bullets where they help.
 - Leave out filler, long preambles and repeated context.
 - Use plain language. Explain jargon briefly the first time it comes up.
+- Keep replies SHORT: a few lines or bullets max. No tables or long step lists unless I ask. Give one step at a time when I'm doing something by hand.
 
 ## How to work
 - **Just do it.** Make sensible decisions yourself and tell me what you did afterward.
