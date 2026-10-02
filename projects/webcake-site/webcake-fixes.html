@@ -1,0 +1,133 @@
+<!-- ===== Webcake site fixes: no zoom, centered video, faster/snappier =====
+     Paste this whole block into Webcake: Settings > Custom code > <head> (or "Before </head>").
+     Safe to paste once per page or once site-wide. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="preconnect" href="https://www.youtube.com">
+<link rel="preconnect" href="https://i.ytimg.com">
+
+<style>
+  /* 1) No zoom + no 300ms tap delay (makes taps feel instant) */
+  html, body { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { overflow-x: hidden; }
+  /* iPhone zooms in when you tap a form field with text under 16px. Stop that. */
+  input, select, textarea { font-size: 16px !important; }
+  a, button, [onclick] { -webkit-tap-highlight-color: transparent; }
+
+  /* 2) Center the video on phone + tablet (class is added by the script below) */
+  @media (max-width: 1024px) {
+    .wc-video-center {
+      left: 0 !important;
+      right: 0 !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      max-width: 100% !important;
+    }
+    .wc-video-center.wc-static { position: relative !important; display: block !important; }
+    .wc-video-center video,
+    .wc-video-center iframe { display: block; max-width: 100%; margin: 0 auto; }
+  }
+
+  /* 3) Snappier: no waiting for delayed entrance animations on phone + tablet */
+  @media (max-width: 1024px) {
+    *, *::before, *::after { animation-delay: 0s !important; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+
+<script>
+(function () {
+  // ---- 1) Block zoom (iPhone ignores user-scalable=no, so we also block gestures) ----
+  var vp = document.querySelector('meta[name="viewport"]');
+  if (vp) vp.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover');
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (e) {
+    document.addEventListener(e, function (ev) { ev.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener('touchmove', function (ev) {
+    if (ev.touches && ev.touches.length > 1) ev.preventDefault(); // pinch
+  }, { passive: false });
+  var lastTap = 0;
+  document.addEventListener('touchend', function (ev) {
+    var now = Date.now();
+    var t = ev.target;
+    var isField = t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
+    if (!isField && now - lastTap < 300) ev.preventDefault(); // double-tap zoom
+    lastTap = now;
+  }, { passive: false });
+  document.addEventListener('wheel', function (ev) { if (ev.ctrlKey) ev.preventDefault(); }, { passive: false }); // trackpad pinch
+  document.addEventListener('keydown', function (ev) {
+    if ((ev.ctrlKey || ev.metaKey) && /^(=|\+|-|0)$/.test(ev.key)) ev.preventDefault(); // Ctrl +/-
+  });
+
+  var VIDEO_SEL = 'video, iframe[src*="youtube"], iframe[src*="youtu.be"], iframe[src*="vimeo"], iframe[src*="facebook.com/plugins/video"], iframe[data-src*="youtube"], iframe[data-src*="vimeo"]';
+
+  // ---- 2) Center videos: find each video's outer box inside its section and tag it ----
+  function centerVideos() {
+    document.querySelectorAll(VIDEO_SEL).forEach(function (v) {
+      // Walk up to the builder's element box (absolutely positioned), or else the
+      // outermost wrapper that is still narrower than what it sits in.
+      var box = v, el = v, depth = 0;
+      while (el && el !== document.body && depth++ < 8) {
+        var parent = el.parentElement;
+        if (!parent || parent === document.body) break;
+        if (getComputedStyle(el).position === 'absolute') { box = el; break; }
+        if (el.offsetWidth && el.offsetWidth < parent.offsetWidth - 2) box = el;
+        el = parent;
+      }
+      if (box.classList.contains('wc-video-center')) return;
+      box.classList.add('wc-video-center');
+      if (getComputedStyle(box).position === 'static') box.classList.add('wc-static');
+    });
+  }
+
+  // ---- 3) Faster loading ----
+  function speedUp() {
+    var vh = window.innerHeight || 800;
+    document.querySelectorAll('img').forEach(function (img) {
+      if (!img.hasAttribute('decoding')) img.decoding = 'async';
+      if (!img.hasAttribute('loading') && img.getBoundingClientRect().top > vh * 1.5) img.loading = 'lazy';
+    });
+    document.querySelectorAll('iframe').forEach(function (f) {
+      if (!f.hasAttribute('loading') && f.getBoundingClientRect().top > vh) f.loading = 'lazy';
+    });
+    document.querySelectorAll('video').forEach(function (v) {
+      v.setAttribute('playsinline', '');
+      if (!v.autoplay && !v.hasAttribute('preload')) v.preload = 'metadata';
+    });
+  }
+
+  // Pause background/autoplay videos while they are off screen (saves battery + CPU).
+  function pauseOffscreen() {
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        var v = e.target;
+        if (!v.autoplay || !v.muted) return; // only touch muted autoplay videos
+        if (e.isIntersecting) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+        else v.pause();
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('video').forEach(function (v) {
+      if (!v.dataset.wcObs) { v.dataset.wcObs = '1'; io.observe(v); }
+    });
+  }
+
+  function run() { centerVideos(); speedUp(); pauseOffscreen(); }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  window.addEventListener('load', run);
+
+  // Webcake can insert videos late (e.g. after clicking a thumbnail). Catch those too.
+  var timer;
+  new MutationObserver(function () { clearTimeout(timer); timer = setTimeout(run, 150); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+
+  // Re-check when rotating the phone / resizing.
+  var rt;
+  window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(centerVideos, 150); }, { passive: true });
+})();
+</script>
+<!-- ===== end Webcake site fixes ===== -->
