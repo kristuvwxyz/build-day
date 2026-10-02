@@ -2,7 +2,7 @@
 
 ## About me
 - Call me: **K**. Language: **Taglish**.
-- Phone: iPhone. Browser: Safari. Claude plan: Pro. Tech comfort: 4–5.
+- Phone: iPhone. Browser: Chrome (Claude in Chrome extension installed; side panel not working yet). Safari also used. Claude plan: Pro. Tech comfort: 4–5.
 - I use Claude in the browser only (claude.ai, no desktop app yet). Work happens in Claude Code cloud sessions on this repo.
 - Work: I sell original branded perfumes on my own Shopify website. Orders, order records and stock are all in Shopify.
 - Apps: Gmail, Google Sheets, Messenger, Facebook, Instagram, Canva, Shopee, Lazada, GCash, Telegram.
@@ -33,7 +33,7 @@
 If I give step-by-step instructions, gently remind me I can just say what I want and who it's for.
 
 ## My setup
-- Computer: browser only (Safari); building happens in Claude Code cloud sessions.
+- Computer: browser only (Chrome); building happens in Claude Code cloud sessions.
 - Projects live in this GitHub repo: kristuvwxyz/build-day.
 - Reliable automations go in Google Apps Script.
 - (More filled in as setup continues.)
