@@ -12,7 +12,7 @@ Setup runs in a Claude Code **cloud** session (browser only, no desktop app). Fi
 - [ ] 8. Telegram: bot made, test message received
 - [ ] 9. Connections checked
 - [ ] 10. Dry run: test page live + link on Telegram + test Apps Script
-- [ ] 11. Cheat sheet + what to bring
+- [x] 11. Cheat sheet + what to bring (`CHEAT-SHEET.md`, `bring/` folder)
 - [ ] 12. Final report
 
 ## Blockers / notes
