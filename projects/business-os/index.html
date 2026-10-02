@@ -155,6 +155,7 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
 .otable td, .otable th { padding: 9px 12px; }
 .otable th { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--muted); font-weight: 600; background: var(--surface-2); }
 .otable tbody tr { cursor: pointer; }
+.otable.dir td { vertical-align: top; }
 .otable tbody tr:hover td { background: var(--surface-2); }
 .otable tr.sel td { background: var(--info-bg); }
 .otable tr.done td { color: var(--muted); }
@@ -389,13 +390,13 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "passwords", "homecontent", "dtasks"], blurb: "Team, passwords, Home page" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "passwords", "homecontent", "dtasks"], blurb: "Directory, passwords, Home page" },
   { id: "FINANCE", name: "Finance", tabs: ["dashboard", "expenses", "dtasks"], blurb: "Profit and expenses" },
   { id: "SALES", name: "Sales", tabs: ["orders", "customers", "dtasks"], blurb: "Orders and customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "dtasks"], blurb: "Channels and audience" },
   { id: "PACKING", name: "Packing", tabs: ["packing", "inventory", "dtasks"], blurb: "Packing queue and stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Team", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", expenses: "Expenses", orders: "Orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", expenses: "Expenses", orders: "Orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -562,7 +563,7 @@ function headActions() {
     customers: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
     channels: ex("customers"),
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
-    team: S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : "",
+    team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
   return lockBtn + (map[moduleKey()] || "");
@@ -602,7 +603,8 @@ function render() {
 
 /* ---------- people & tasks helpers ---------- */
 const member = id => S.team.find(m => m.id === id);
-const memberName = id => (member(id) || {}).name || "Unassigned";
+const memberName = id => { const m = member(id); return m ? (m.nickname || m.name) : "Unassigned"; };
+const activeTeam = () => S.team.filter(m => m.status !== "inactive");
 const initials = n => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
 const myMemberId = () => S.profile.memberId || "";
 const firstName = () => (member(myMemberId()) || {}).name?.split(" ")[0] || (S.me && S.me.name ? S.me.name.split(" ")[0] : "");
@@ -635,7 +637,7 @@ function taskSummary(list, label) {
 function workload(list, by) {
   const groups = new Map();
   for (const t of list) { const k = by === "dept" ? t.department || "" : t.assigneeId || ""; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
-  if (by === "person") for (const m of S.team) if (!groups.has(m.id)) groups.set(m.id, []);
+  if (by === "person") for (const m of activeTeam()) if (!groups.has(m.id)) groups.set(m.id, []);
   const rows = [...groups.entries()].map(([k, ts]) => {
     const live = ts.filter(t => t.status !== "cancelled");
     const avg = live.length ? Math.round(live.reduce((a, t) => a + (t.status === "done" ? 100 : Number(t.progress) || 0), 0) / live.length) : 0;
@@ -672,7 +674,7 @@ function viewTasks(forceDept) {
   const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : "Whole team";
   const controls = `<div class="toolbar">
     ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[["team", "Whole team"], ["person", "Per person"], ["dept", "Per department"]].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
-    ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${S.team.map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
+    ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${activeTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
     ${S.t.scope === "dept" ? `<select id="t-dept" aria-label="Department"><option value="">All departments</option>${DEPTS.map(d => `<option value="${d.id}" ${S.t.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>` : ""}`}
     <span style="flex:1"></span>
     <div class="seg" role="group" aria-label="Layout">${[["calendar", "Calendar"], ["list", "List"]].map(([k, l]) => `<button type="button" data-tmode="${k}" aria-pressed="${S.t.mode === k}">${l}</button>`).join("")}</div>
@@ -724,7 +726,7 @@ function openTaskForm(id, date, forceDept) {
     <div class="field"><label for="k-notes">Details</label><textarea id="k-notes" rows="3" ${ro ? "disabled" : ""}>${esc(t.notes || "")}</textarea></div>
     <div class="row">
       <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option>${DEPTS.map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
-      <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
+      <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.filter(m => m.status !== "inactive" || m.id === t.assigneeId).map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
     </div>
     <div class="row">
       <div class="field"><label for="k-start">Start date</label><input id="k-start" type="date" value="${esc(t.start || "")}" ${ro ? "disabled" : ""}></div>
@@ -897,30 +899,66 @@ async function setPassword(d, clear) {
   render(); toast(clear ? `${dept(d).name} password removed.` : `${dept(d).name} password saved. Share it with that team.`);
 }
 
+const DEPT_COLORS = { CEO: "#8B5CF6", ADMIN: "#EC4899", FINANCE: "#DC2626", SALES: "#F59E0B", MARKETING: "#10B981", PACKING: "#3B82F6" };
 function viewTeam() {
-  const rows = [...S.team].sort((a, b) => (a.department || "").localeCompare(b.department || "") || (a.name || "").localeCompare(b.name || ""));
-  return `<div class="table-wrap"><table>
-    <thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Contact</th><th class="r">Open tasks</th><th></th></tr></thead>
-    <tbody>${rows.map(m => `<tr><td style="font-weight:600">${esc(m.name)}</td><td>${esc((dept(m.department) || { name: "–" }).name)}</td><td>${esc(m.role || "")}</td><td>${esc(m.contact || "")}</td><td class="r num">${S.tasks.filter(t => t.assigneeId === m.id && (t.status === "todo" || t.status === "in_progress")).length}</td>
-      <td class="r">${S.canEdit ? `<button class="btn ghost sm" type="button" data-act="edit-member" data-id="${m.id}">Edit</button>` : ""}</td></tr>`).join("")}</tbody>
-  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No team members yet. ${S.canEdit ? "Click “Add team member” to add everyone who gets tasks, including staff without a Claude account." : "Ask the owner to add the team."}</div>`}</div>`;
+  const q = (S.tq || "").trim().toLowerCase(), sf = S.tstatus || "active";
+  const rows = [...S.team].filter(m => (sf === "all" || (sf === "active" ? m.status !== "inactive" : m.status === "inactive")) && (!q || [m.idNumber, m.nickname, m.name, m.phone, m.email, m.address, m.role, (dept(m.department) || {}).name].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => String(a.idNumber || "zzz").localeCompare(String(b.idNumber || "zzz")) || (a.name || "").localeCompare(b.name || ""));
+  const active = S.team.filter(m => m.status !== "inactive").length;
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">Active members</span><span class="value">${active}</span></div>
+      <div class="kpi"><span class="label">Today's date</span><span class="value" style="font-size:20px">${new Date(mToday() + "T12:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</span></div>
+      <div class="kpi"><span class="label">Departments</span><span class="value">${new Set(S.team.filter(m => m.status !== "inactive").map(m => m.department).filter(Boolean)).size}</span></div>
+      <div class="kpi"><span class="label">Inactive</span><span class="value">${S.team.length - active}</span></div>
+    </div>
+    <div class="toolbar"><input id="tq" type="search" placeholder="Search ID, name, phone, email, address" value="${esc(S.tq || "")}" aria-label="Search directory">
+      <select id="tstatus" aria-label="Status">${[["active", "Active"], ["inactive", "Inactive"], ["all", "All"]].map(([k, l]) => `<option value="${k}" ${sf === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    <div class="table-wrap"><table class="otable dir">
+    <thead><tr><th>ID Number</th><th>Nickname</th><th>Full Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Department</th><th>Date Started</th><th>Status</th></tr></thead>
+    <tbody>${rows.map(m => `<tr ${S.canEdit ? `data-act="edit-member" data-id="${m.id}"` : ""} style="${S.canEdit ? "" : "cursor:default"}">
+      <td class="nowrap num" style="box-shadow:inset 4px 0 0 ${DEPT_COLORS[m.department] || "var(--line)"}">${esc(m.idNumber || "")}</td>
+      <td style="font-weight:600">${esc(m.nickname || "")}</td>
+      <td class="nowrap">${esc(m.name)}</td>
+      <td class="nowrap num" style="user-select:all">${esc(m.phone || m.contact || "")}</td>
+      <td style="user-select:all">${esc(m.email || "")}</td>
+      <td style="min-width:200px">${esc(m.address || "")}</td>
+      <td class="nowrap">${esc(m.role || (dept(m.department) || { name: "–" }).name)}</td>
+      <td class="nowrap">${m.started ? new Date(m.started + "T12:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : ""}</td>
+      <td><span class="chip ${m.status === "inactive" ? "" : "good"}">${m.status === "inactive" ? "Inactive" : "Active"}</span></td></tr>`).join("")}</tbody>
+  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.team.length ? "No one matches." : S.canEdit ? "No team members yet. Click “Add team member”, including staff without a Claude account." : "Ask the owner to add the team."}</div>`}</div>`;
 }
 function openMemberForm(id) {
-  const m = id ? member(id) : {};
+  const m = id ? member(id) : { status: "active" };
+  const nextId = () => { let max = 0; for (const x of S.team) { const n = Number(String(x.idNumber || "").replace(/\D/g, "")); if (n > max) max = n; } const s = String(max + 1).padStart(6, "0"); return s.slice(0, 3) + " " + s.slice(3); };
   openSheet(`
     <h3>${id ? "Edit team member" : "Add team member"}</h3>
+    <div class="row">
+      <div class="field"><label for="m-idn">ID Number</label><input id="m-idn" value="${esc(m.idNumber || (id ? "" : nextId()))}"></div>
+      <div class="field"><label for="m-nick">Nickname</label><input id="m-nick" value="${esc(m.nickname || "")}"></div>
+    </div>
     <div class="field"><label for="m-name">Full name</label><input id="m-name" value="${esc(m.name || "")}"></div>
     <div class="row">
-      <div class="field"><label for="m-dept">Department</label><select id="m-dept"><option value="">None</option>${DEPTS.map(d => `<option value="${d.id}" ${m.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
-      <div class="field"><label for="m-role">Role / title</label><input id="m-role" value="${esc(m.role || "")}" placeholder="e.g. Packing lead"></div>
+      <div class="field"><label for="m-phone">Phone</label><input id="m-phone" type="tel" value="${esc(m.phone || m.contact || "")}"></div>
+      <div class="field"><label for="m-email">Email</label><input id="m-email" type="email" value="${esc(m.email || "")}"></div>
     </div>
-    <div class="field"><label for="m-contact">Phone or email (optional)</label><input id="m-contact" value="${esc(m.contact || "")}"></div>
+    <div class="field"><label for="m-addr">Address</label><textarea id="m-addr" rows="2">${esc(m.address || "")}</textarea></div>
+    <div class="row">
+      <div class="field"><label for="m-dept">Department</label><select id="m-dept"><option value="">None</option>${DEPTS.map(d => `<option value="${d.id}" ${m.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
+      <div class="field"><label for="m-role">Title shown</label><input id="m-role" value="${esc(m.role || "")}" placeholder="e.g. Founder / CEO, Packer"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="m-start">Date started</label><input id="m-start" type="date" value="${esc(m.started || "")}"></div>
+      <div class="field"><label for="m-status">Status</label><select id="m-status"><option value="active" ${m.status !== "inactive" ? "selected" : ""}>Active</option><option value="inactive" ${m.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted)">Inactive members drop off attendance and can't be assigned new tasks, but their history stays.</div>
     <div id="sheet-err" class="confirm" hidden></div>
-    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-member" data-id="${id}">Remove from team</button></div>` : ""}
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-member" data-id="${id}">Remove from directory</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
-    if (!val("m-name")) return sheetError("Enter a name.");
-    await save("team", id || uid("m"), { ...(id ? clean(m) : {}), name: val("m-name"), department: val("m-dept"), role: val("m-role"), contact: val("m-contact") });
+    if (!val("m-name")) return sheetError("Enter the full name.");
+    const data = { ...(id ? clean(m) : {}), idNumber: val("m-idn"), nickname: val("m-nick"), name: val("m-name"), phone: val("m-phone"), email: val("m-email").toLowerCase(), address: val("m-addr"), department: val("m-dept"), role: val("m-role"), started: val("m-start"), status: val("m-status") };
+    delete data.contact;
+    await save("team", id || uid("m"), data);
     closeSheet(); toast(id ? "Team member updated." : "Team member added.");
   });
 }
@@ -1732,7 +1770,7 @@ function myClockCard() {
 setInterval(() => document.querySelectorAll("[data-live-clock]").forEach(e => e.textContent = mTime(Date.now())), 20000);
 
 function attSummary(date) {
-  const ms = S.team, n = ms.length, c = id => ms.filter(m => attStatus(date, m.id) === id).length;
+  const ms = activeTeam(), n = ms.length, c = id => ms.filter(m => attStatus(date, m.id) === id).length;
   const leave = c("leave") + c("sick");
   const parts = [["present", "Present", c("present")], ["late", "Late", c("late")], ["leave", "On leave", leave], ["absent", "Absent", c("absent")], ["notin", "Not in yet", c("notin")], ["off", "Day off / holiday", c("off") + c("holiday")]].filter(p => p[2] || ["present", "late", "absent"].includes(p[0]));
   return `<div class="tsum"><div class="tsum-line">${parts.map(([id, nm, v]) => `<span class="tsum-part a-${id}"><b class="num">${v}/${n}</b> ${nm}</span>`).join('<span class="tsum-sep">|</span>')}</div>
@@ -1742,10 +1780,10 @@ function attSummary(date) {
 
 function viewAttendance() {
   const A = S.att;
-  if (!S.team.length) return `<div class="panel"><div class="empty">Add your team in <strong>Admin → Team</strong> first. Attendance is tracked per team member.</div></div>`;
+  if (!activeTeam().length) return `<div class="panel"><div class="empty">Add your team in <strong>Admin → Team</strong> first. Attendance is tracked per team member.</div></div>`;
   const seg = `<div class="seg" role="group" aria-label="Attendance view">${[["day", "Daily"], ["month", "Monthly sheet"]].map(([k, l]) => `<button type="button" data-amode="${k}" aria-pressed="${A.mode === k}">${l}</button>`).join("")}</div>`;
   const deptSel = `<select id="a-dept" aria-label="Department"><option value="">All departments</option>${DEPTS.map(d => `<option value="${d.id}" ${A.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>`;
-  const team = S.team.filter(m => !A.dept || m.department === A.dept).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const team = activeTeam().filter(m => !A.dept || m.department === A.dept).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   let body;
   if (A.mode === "day") {
     body = `${attSummary(A.date)}
@@ -1830,8 +1868,9 @@ async function exportCol(col) {
   if (col === "attendance") {
     const [y, mo] = S.att.month.split("-").map(Number), dim = new Date(y, mo, 0).getDate();
     rows = [["Date", "Team member", "Department", "Status", "Time in", "Time out", "Hours", "Note"]];
-    for (let i = 1; i <= dim; i++) { const d = `${S.att.month}-${String(i).padStart(2, "0")}`; if (d > mToday()) break; for (const m of S.team) { const r = attRec(d, m.id); rows.push([d, m.name, (dept(m.department) || {}).name || "", astat(attStatus(d, m.id)).name, mTime(r && r.in), mTime(r && r.out), Math.round(hoursOf(r) * 100) / 100, r && r.note || ""]); } }
+    for (let i = 1; i <= dim; i++) { const d = `${S.att.month}-${String(i).padStart(2, "0")}`; if (d > mToday()) break; for (const m of activeTeam()) { const r = attRec(d, m.id); rows.push([d, m.name, (dept(m.department) || {}).name || "", astat(attStatus(d, m.id)).name, mTime(r && r.in), mTime(r && r.out), Math.round(hoursOf(r) * 100) / 100, r && r.note || ""]); } }
   }
+  if (col === "team") rows = [["ID Number", "Nickname", "Full Name", "Phone", "Email", "Address", "Department", "Date Started", "Status"], ...S.team.map(m => [m.idNumber, m.nickname, m.name, m.phone || m.contact, m.email, m.address, m.role || (dept(m.department) || {}).name || "", m.started, m.status === "inactive" ? "Inactive" : "Active"])];
   if (col === "products") rows = [["Name", "SKU", "Category", "Price", "Cost", "Stock", "Reorder at", "Batch", "Best before"], ...S.products.map(p => [p.name, p.sku, p.category, p.price, p.cost, p.stock, p.reorder, p.batch, p.expiry])];
   if (col === "expenses") rows = [["Date", "Category", "Note", "Amount"], ...S.expenses.map(e => [e.date, e.category, e.note, e.amount])];
   if (col === "customers") rows = [["Name", "Email", "Phone", "Address", "Channels", "Orders", "Amount spent", "Last order", "Tags", "Note"], ...customerList().map(c => [c.name, c.email, c.phone, c.address, [...c.platforms].join("; "), c.orders, c.spent, c.last ? new Date(c.last).toLocaleDateString("en-CA") : "", (c.tags || []).join(", "), c.note])];
@@ -1956,6 +1995,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
   if (t.id === "a-date") { if (t.value) S.att.date = t.value; render(); return; }
+  if (t.id === "tstatus") { S.tstatus = t.value; render(); return; }
   if (t.id === "a-dept") { S.att.dept = t.value; render(); return; }
   if (t.id === "t-person") { S.t.person = t.value; render(); return; }
   if (t.id === "t-dept") { S.t.dept = t.value; render(); return; }
@@ -1971,7 +2011,7 @@ document.addEventListener("input", ev => {
   const t = ev.target;
   if (t.matches(".it-q, .it-price")) return updateOrderTotal();
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
-  const key = { "of-q": "of", pq: "pq", cq: "cq" }[t.id];
+  const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq" }[t.id];
   if (!key) return;
   if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; }
   const pos = t.selectionStart; render();
