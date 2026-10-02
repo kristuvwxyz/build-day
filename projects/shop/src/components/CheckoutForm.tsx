@@ -140,11 +140,11 @@ export function CheckoutForm({
   return (
     <form onSubmit={placeOrder} className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <div className="space-y-6">
-        <h1 className="text-2xl font-extrabold">Checkout</h1>
+        <h1 className="text-2xl font-medium text-brand">Checkout</h1>
 
         {/* Shipping details */}
         <section className="card space-y-4 p-5">
-          <h2 className="font-bold">1. Shipping details</h2>
+          <h2 className="font-medium text-brand">1. Shipping details</h2>
           {savedAddresses.length > 0 && (
             <label className="block">
               <span className="label">Saved addresses</span>
@@ -216,14 +216,14 @@ export function CheckoutForm({
 
         {/* Mode of shipping */}
         <section className="card space-y-3 p-5">
-          <h2 className="font-bold">2. Mode of shipping</h2>
+          <h2 className="font-medium text-brand">2. Mode of shipping</h2>
           {(Object.keys(SHIPPING_METHODS) as ShippingMethod[]).map((m) => {
             const info = SHIPPING_METHODS[m];
             const allowed = methodAllowed(m);
             return (
               <label
                 key={m}
-                className={`flex items-start gap-3 rounded-lg border p-3 ${
+                className={`flex items-start gap-3 rounded-theme border p-3 ${
                   !allowed ? "cursor-not-allowed opacity-50" : "cursor-pointer"
                 } ${effectiveMethod === m ? "border-brand ring-1 ring-brand" : "border-gray-300"}`}
               >
@@ -269,14 +269,14 @@ export function CheckoutForm({
 
         {/* Payment */}
         <section className="card space-y-3 p-5">
-          <h2 className="font-bold">3. Payment</h2>
+          <h2 className="font-medium text-brand">3. Payment</h2>
           {providers.length === 0 && (
             <p className="text-sm text-red-600">No payment method is set up yet. (Shop owner: add your keys to .env)</p>
           )}
           {providers.map((p) => (
             <label
               key={p.id}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${
+              className={`flex cursor-pointer items-center gap-3 rounded-theme border p-3 ${
                 provider === p.id ? "border-brand ring-1 ring-brand" : "border-gray-300"
               }`}
             >
@@ -288,7 +288,7 @@ export function CheckoutForm({
       </div>
 
       <aside className="card h-fit space-y-4 p-5 lg:sticky lg:top-24">
-        <h2 className="font-bold">Order summary</h2>
+        <h2 className="font-medium text-brand">Order summary</h2>
         <ul className="space-y-1 text-sm">
           {items.map((i) => (
             <li key={i.productId + i.paymentOption} className="flex justify-between gap-2">
@@ -306,7 +306,7 @@ export function CheckoutForm({
         <hr />
         <OrderSummary {...priced} showShipping={shippingReady} />
         {extras.note.trim() && (
-          <p className="rounded-lg bg-gray-50 p-2 text-xs text-gray-600">
+          <p className="rounded-theme bg-gray-50 p-2 text-xs text-gray-600">
             <b>Note:</b> {extras.note}
           </p>
         )}
@@ -316,7 +316,7 @@ export function CheckoutForm({
         <Link href="/cart" className="block text-center text-xs text-gray-500 underline">
           Edit cart, note, packaging or voucher
         </Link>
-        {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {error && <p className="rounded-theme bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <button className="btn-primary w-full" disabled={busy || !provider || !shippingReady}>
           {busy ? "Redirecting to payment…" : `Pay ${peso(priced.dueNow)}`}
         </button>

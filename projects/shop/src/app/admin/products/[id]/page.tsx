@@ -13,7 +13,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   if (id !== "new" && !product) notFound();
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-extrabold">{product ? `Edit: ${product.name}` : "Add product"}</h1>
+      <h1 className="text-2xl font-medium text-brand">{product ? `Edit: ${product.name}` : "Add product"}</h1>
       <AdminNav current="products" />
       <ProductForm product={product} />
     </div>

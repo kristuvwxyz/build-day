@@ -38,7 +38,7 @@ const STYLES: Record<string, { label: string; className: string; icon: React.Rea
 export function LoginButtons({ providers, callbackUrl }: { providers: { id: string }[]; callbackUrl: string }) {
   if (providers.length === 0) {
     return (
-      <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+      <p className="rounded-theme bg-amber-50 p-3 text-sm text-amber-900">
         No login method is set up yet. Add the Facebook / Google / Apple keys to <code>.env</code>.
       </p>
     );

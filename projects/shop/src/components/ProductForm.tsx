@@ -52,7 +52,15 @@ export function ProductForm({ product }: { product?: Product | null }) {
         {txt("perfumer", "Perfumer", "Francis Kurkdjian")}
         {txt("concentration", "Concentration", "EDP")}
         {txt("sizeMl", "Size (ml)", "70")}
-        {txt("gender", "For", "Unisex")}
+        <label>
+          <span className="label">For</span>
+          <select id="product-gender" name="gender" className="input" defaultValue={p?.gender ?? ""}>
+            <option value="">—</option>
+            <option value="Women">For Her (Women)</option>
+            <option value="Men">For Him (Men)</option>
+            <option value="Unisex">Unisex</option>
+          </select>
+        </label>
         {txt("releaseYear", "Year launched", "2015")}
         {txt("topNotes", "Top notes (comma-separated)", "saffron, jasmine", true)}
         {txt("heartNotes", "Heart notes", "amberwood, ambergris", true)}
@@ -61,6 +69,7 @@ export function ProductForm({ product }: { product?: Product | null }) {
         {txt("longevity", "Longevity", "Long lasting")}
         {txt("sillage", "Sillage", "Strong")}
         {txt("fragranticaUrl", "Fragrantica page link", "https://www.fragrantica.com/perfume/…", true)}
+        {txt("tags", "Collections (comma-separated, e.g. arabian, designer, tester)", "arabian", true)}
       </fieldset>
 
       <button className="btn-primary">{p ? "Save changes" : "Add product"}</button>

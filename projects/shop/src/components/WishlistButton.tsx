@@ -44,7 +44,7 @@ export function WishlistButton({
       title={on ? "Remove from wishlist" : "Add to wishlist"}
       className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow transition hover:scale-110 ${className}`}
     >
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill={on ? "#e11d48" : "none"} stroke="#e11d48" strokeWidth="2">
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill={on ? "rgb(var(--brand))" : "none"} stroke="rgb(var(--brand))" strokeWidth="2">
         <path d="M12 21s-7.5-4.6-9.5-9.2C1 8.3 3.2 4.5 7 4.5c2.1 0 3.6 1.1 5 2.8 1.4-1.7 2.9-2.8 5-2.8 3.8 0 6 3.8 4.5 7.3C19.5 16.4 12 21 12 21z" />
       </svg>
     </button>

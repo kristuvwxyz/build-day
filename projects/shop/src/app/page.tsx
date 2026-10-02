@@ -1,25 +1,31 @@
 import { ProductCard } from "@/components/ProductCard";
 import { prisma } from "@/lib/prisma";
+import { productWhere } from "@/lib/productFilters";
+import { SHOP_HERO } from "@/lib/theme";
 import { getWishlistIds } from "@/lib/wishlist";
 
 export const dynamic = "force-dynamic";
 
-export default async function ShopPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
-  const { type } = await searchParams;
-  const typeFilter = type === "PREORDER" || type === "ONHAND" ? type : undefined;
+export default async function ShopPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string; gender?: string; tag?: string }>;
+}) {
+  const filter = await searchParams;
+  const typeFilter = filter.type === "PREORDER" || filter.type === "ONHAND" ? filter.type : undefined;
   const [products, wishlist] = await Promise.all([
-    prisma.product.findMany({ where: { isActive: true, type: typeFilter }, orderBy: { createdAt: "desc" } }),
+    prisma.product.findMany({ where: productWhere(filter), orderBy: { createdAt: "desc" } }),
     getWishlistIds(),
   ]);
 
   return (
     <div className="space-y-8">
-      <section className="rounded-2xl bg-brand px-6 py-10 text-white sm:px-10">
-        <h1 className="text-3xl font-extrabold sm:text-4xl">Shop the latest drops</h1>
-        <p className="mt-2 max-w-xl text-sm text-gray-300">
-          <b className="text-amber-300">PRE-ORDER</b> items: pay in full or secure yours with a 50% downpayment.{" "}
-          <b className="text-emerald-300">ON-HAND</b> items ship right away.
-        </p>
+      <section className="space-y-3 py-6 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">{SHOP_HERO.eyebrow}</p>
+        <h1 className="font-heading text-4xl text-brand sm:text-5xl">
+          {pageTitle(filter)}
+        </h1>
+        <p className="mx-auto max-w-xl text-sm text-gray-600">{SHOP_HERO.subtitle}</p>
       </section>
 
       <nav className="flex gap-2 text-sm">
@@ -30,7 +36,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
         ].map(([v, label]) => (
           <a
             key={v}
-            href={v ? `/?type=${v}` : "/"}
+            href={chipHref(filter, v)}
             className={`rounded-full border px-3 py-1 ${(typeFilter ?? "") === v ? "border-brand bg-brand text-white" : "bg-white"}`}
           >
             {label}
@@ -49,4 +55,23 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
       )}
     </div>
   );
+}
+
+function pageTitle(f: { type?: string; gender?: string; tag?: string }) {
+  if (f.tag) return f.tag.charAt(0).toUpperCase() + f.tag.slice(1);
+  if (f.gender === "Women") return "For Her";
+  if (f.gender === "Men") return "For Him";
+  if (f.gender === "Unisex") return "Unisex";
+  if (f.type === "PREORDER") return "Pre-order";
+  if (f.type === "ONHAND") return "On-hand";
+  return "Shop";
+}
+
+function chipHref(f: { gender?: string; tag?: string }, type: string) {
+  const q = new URLSearchParams();
+  if (f.gender) q.set("gender", f.gender);
+  if (f.tag) q.set("tag", f.tag);
+  if (type) q.set("type", type);
+  const s = q.toString();
+  return s ? `/?${s}` : "/";
 }

@@ -36,7 +36,7 @@ export function PayBalance({
 
   return (
     <div className="card space-y-3 border-orange-300 bg-orange-50 p-5">
-      <h2 className="font-bold text-orange-900">Your pre-order has arrived! 🎉</h2>
+      <h2 className="font-medium text-brand text-orange-900">Your pre-order has arrived! 🎉</h2>
       <p className="text-sm text-orange-900">
         Pay the remaining balance of <b>{peso(amount)}</b> so we can ship your order.
       </p>

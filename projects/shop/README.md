@@ -12,6 +12,8 @@ All you need to add are API keys, a database, and real products.
 
 > **Going live?** Follow **[GO-LIVE.md](GO-LIVE.md)**, a click-by-click guide (GitHub → Vercel → Neon → domain).
 >
+> **Regal Spritz Webcake site:** follow **[REGAL-WEBCAKE.md](REGAL-WEBCAKE.md)**, which lists exactly what to change on each part of regal.famcoventures.com.
+>
 > **Using Webcake?** Read **[WEBCAKE.md](WEBCAKE.md)**: Webcake is the main site, this app runs on
 > `shop.yourdomain.com`, and copy-paste blocks put live products and shop buttons on Webcake pages.
 >

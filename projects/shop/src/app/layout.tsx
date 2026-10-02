@@ -23,16 +23,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <Header />
           <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-          <footer className="space-y-3 border-t border-gray-200 py-8 text-center text-xs text-gray-500">
-            {MAIN_NAV.length > 0 && (
-              <nav className="flex flex-wrap justify-center gap-4">
-                {MAIN_NAV.map((l) => (
-                  <a key={l.href} href={l.href} className="hover:underline">
-                    {l.label}
-                  </a>
-                ))}
-              </nav>
-            )}
+          <footer className="space-y-4 border-t border-accent/20 bg-surface py-10 text-center text-xs text-gray-500">
+            <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 uppercase tracking-[0.18em]">
+              {[
+                ...MAIN_NAV,
+                { label: "My Orders", href: "/profile?tab=orders" },
+                { label: "Wishlist", href: "/profile?tab=wishlist" },
+                { label: "My Account", href: "/profile?tab=account" },
+                { label: "Contact Us", href: "/contact" },
+              ].map((l) => (
+                <a key={l.href} href={l.href} className="hover:text-accent">
+                  {l.label}
+                </a>
+              ))}
+            </nav>
             <p>
               © {new Date().getFullYear()} {SHOP_NAME}. {FOOTER_TEXT}
             </p>

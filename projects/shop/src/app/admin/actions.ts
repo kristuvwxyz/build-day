@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { ORDER_STATUSES } from "@/lib/orderStatus";
 import { prisma } from "@/lib/prisma";
+import { normalizeTags } from "@/lib/productFilters";
 
 export async function updateOrder(formData: FormData) {
   const session = await getSession();
@@ -123,6 +124,7 @@ export async function saveProduct(formData: FormData) {
     longevity: str("longevity"),
     sillage: str("sillage"),
     fragranticaUrl: str("fragranticaUrl") || null,
+    tags: normalizeTags(str("tags")),
   };
   if (id) await prisma.product.update({ where: { id }, data });
   else await prisma.product.create({ data });

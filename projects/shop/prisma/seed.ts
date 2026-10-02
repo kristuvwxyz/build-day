@@ -15,7 +15,7 @@ const products = [
     slug: "sample-vanilla-preorder", name: "Sample Vanilla Tobacco", price: 120000, type: "PREORDER", eta: "Arrives January", stock: 0,
     brand: "Sample House", concentration: "EDP", sizeMl: 50, gender: "Unisex", releaseYear: 2007,
     topNotes: "tobacco leaf, spicy notes", heartNotes: "vanilla, cacao, tonka bean", baseNotes: "dried fruits, woody notes",
-    accords: "tobacco:100, vanilla:90, sweet:70, warm spicy:55, woody:40", longevity: "Very long lasting", sillage: "Enormous",
+    accords: "tobacco:100, vanilla:90, sweet:70, warm spicy:55, woody:40", longevity: "Very long lasting", sillage: "Enormous", tags: "arabian",
   },
   {
     slug: "sample-citrus-onhand", name: "Sample Citrus Cologne", price: 25000, type: "ONHAND", stock: 20,
@@ -27,7 +27,7 @@ const products = [
     slug: "sample-rose-onhand", name: "Sample Rose Oud", price: 59900, type: "ONHAND", stock: 5,
     brand: "Fresh Co.", concentration: "Parfum", sizeMl: 50, gender: "Women", releaseYear: 2021,
     topNotes: "pink pepper, raspberry", heartNotes: "rose, saffron", baseNotes: "oud, amber, patchouli",
-    accords: "rose:100, oud:75, amber:60, warm spicy:50", longevity: "Long lasting", sillage: "Strong",
+    accords: "rose:100, oud:75, amber:60, warm spicy:50", longevity: "Long lasting", sillage: "Strong", tags: "arabian",
   },
   {
     slug: "sample-woody-onhand", name: "Sample Cedar & Amber", price: 89000, type: "ONHAND", stock: 8,

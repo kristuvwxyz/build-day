@@ -3,10 +3,10 @@
 //  All money is in centavos: ₱150.00 = 15000
 // ============================================================
 
-export const SHOP_NAME = "My Shop";
+export const SHOP_NAME = "Regal Spritz";
 
 // Your main website (e.g. the Webcake site). The shop logo links back to it. Leave "" to link to the shop home.
-export const MAIN_SITE_URL = process.env.NEXT_PUBLIC_MAIN_SITE_URL ?? "";
+export const MAIN_SITE_URL = process.env.NEXT_PUBLIC_MAIN_SITE_URL ?? "https://regal.famcoventures.com";
 
 export const DOWNPAYMENT_PERCENT = 50;
 

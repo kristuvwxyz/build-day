@@ -35,7 +35,7 @@ export function CancelOrderButton({ orderId, isPaid }: { orderId: string; isPaid
     );
   }
   return (
-    <form onSubmit={submit} className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-4">
+    <form onSubmit={submit} className="space-y-2 rounded-theme border border-red-200 bg-red-50 p-4">
       <p className="text-sm text-red-900">
         {isPaid
           ? "Your request will be reviewed by the shop. If approved, your payment will be refunded."

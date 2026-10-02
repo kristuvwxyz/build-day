@@ -18,11 +18,11 @@ export default async function VouchersPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-extrabold">Admin</h1>
+      <h1 className="text-2xl font-medium text-brand">Admin</h1>
       <AdminNav current="vouchers" />
 
       <form action={createVoucher} className="card grid gap-3 p-4 text-sm sm:grid-cols-3">
-        <h2 className="font-bold sm:col-span-3">New voucher</h2>
+        <h2 className="font-medium text-brand sm:col-span-3">New voucher</h2>
         <label>
           <span className="label">Code</span>
           <input name="code" required className="input uppercase" placeholder="WELCOME100" />
