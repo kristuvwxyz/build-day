@@ -50,7 +50,9 @@ All in **`src/lib/config.ts`**:
 | Setting | Current value |
 |---|---|
 | J&T shipping fee | Metro Manila & Luzon ₱130 · Visayas ₱160 · Mindanao ₱170 |
-| Same-day (Lalamove/Grab) fee | ₱250 flat, **Metro Manila only** |
+| Same-day (Lalamove/Grab) fee | **Live Lalamove price** to the buyer's address, Metro Manila only (₱250 flat until Lalamove is connected) |
+| Shop pickup point for Lalamove | `SHOP_PICKUP`: **must be filled in** |
+| Extra on top of Lalamove price | `SAMEDAY_EXTRA_FEE`: ₱0 |
 | Downpayment | 50% |
 | Pre-order **full payment** discount | ₱200 off **per item** (automatic) |
 | Shop name | "My Shop" |
@@ -97,6 +99,13 @@ Apple notes: it requires a paid Apple Developer account, does **not** work on `l
 
 How payment confirmation works: the buyer is sent to the gateway's page. On return (and via the Maya webhook), the server **asks the gateway directly** whether the payment succeeded and the amount matches, then updates the orders. Browser-sent prices and webhook bodies are never trusted.
 
+### Same-day delivery price (Lalamove)
+1. Fill in `SHOP_PICKUP` in `src/lib/config.ts` (pickup address + lat/lng from Google Maps).
+2. Set `LALAMOVE_API_KEY`, `LALAMOVE_API_SECRET` (Lalamove Partner Portal) and `GOOGLE_MAPS_API_KEY` (Geocoding API) in `.env`.
+
+At checkout, when the buyer picks same-day, the server finds the address on Google Maps, asks Lalamove for a motorcycle quote (`src/lib/sameday.ts`), and shows the price plus "Delivering to: …" so the buyer can confirm the address. The price is signed by the server and valid for 30 minutes, so the buyer pays exactly what they saw. The drop-off pin is saved on the order and shown on `/admin` for booking the rider.
+Grab has no public price API (GrabExpress API access is for approved partners only), so Grab bookings use the Lalamove price.
+
 **Before go-live:** test each gateway in **sandbox** mode end to end, then switch the base URLs and keys to live.
 
 ---
@@ -119,6 +128,7 @@ src/lib/pricing.ts             ← downpayment + shipping maths (shared by cart 
 src/lib/orderStatus.ts         ← status names / colours
 src/lib/auth.ts                ← Facebook / Google / Apple login
 src/lib/payments/*             ← Maya, PayPal, BDO, test gateway + payment confirmation
+src/lib/sameday.ts             ← live Lalamove same-day price (Google geocoding + Lalamove quote)
 src/app/page.tsx               ← shop (product grid with badges)
 src/app/product/[slug]         ← product page (payment option + add to cart)
 src/app/cart                   ← cart
@@ -126,7 +136,7 @@ src/app/checkout               ← shipping details, shipping mode, payment
 src/app/profile                ← My Orders / My Wishlist / Account
 src/app/profile/orders/[id]    ← order details, tracker, Pay Balance
 src/app/admin                  ← owner: update statuses & tracking numbers
-src/app/api/*                  ← checkout, pay-balance, payment return, Maya webhook, wishlist
+src/app/api/*                  ← checkout, shipping quote, pay-balance, payment return, Maya webhook, wishlist
 prisma/schema.prisma           ← database tables
 ```
 

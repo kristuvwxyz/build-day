@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   REGIONS,
   SHIPPING_METHODS,
@@ -18,11 +18,15 @@ import { OrderSummary } from "./OrderSummary";
 
 type Shipping = { name: string; contact: string; address: string; barangay: string; city: string; region: string };
 
+type Quote = { status: "idle" | "loading" | "ok" | "error"; fee?: number; mapAddress?: string; token?: string; error?: string };
+
 export function CheckoutForm({
   providers,
+  liveSameDayQuote,
   defaults,
 }: {
   providers: { id: PaymentProvider; label: string }[];
+  liveSameDayQuote: boolean;
   defaults: Shipping;
 }) {
   const { items } = useCart();
@@ -31,11 +35,52 @@ export function CheckoutForm({
   const [provider, setProvider] = useState<PaymentProvider | "">(providers[0]?.id ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [quote, setQuote] = useState<Quote>({ status: "idle" });
 
   const region = (ship.region || null) as Region | null;
   const methodAllowed = (m: ShippingMethod) => !region || shippingFee(m, region) !== null;
   const effectiveMethod: ShippingMethod = methodAllowed(method) ? method : "JNT";
-  const priced = priceCart(items, effectiveMethod, region);
+  const useLiveQuote = liveSameDayQuote && effectiveMethod === "SAMEDAY";
+
+  // Fetch the live Lalamove price when same-day is chosen (and again if the address changes).
+  useEffect(() => {
+    if (!useLiveQuote) return;
+    const { address, barangay, city } = ship;
+    if (address.trim().length < 5 || barangay.trim().length < 2 || city.trim().length < 2) {
+      setQuote({ status: "idle" });
+      return;
+    }
+    setQuote({ status: "loading" });
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/shipping/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address, barangay, city }),
+          signal: ctrl.signal,
+        });
+        const data = (await res.json()) as { fee?: number; mapAddress?: string; token?: string; error?: string };
+        setQuote(res.ok ? { status: "ok", ...data } : { status: "error", error: data.error });
+      } catch (err) {
+        if (!ctrl.signal.aborted) setQuote({ status: "error", error: "Couldn't get the same-day price." });
+      }
+    }, 800);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [useLiveQuote, ship.address, ship.barangay, ship.city]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const feePerShipment = !region
+    ? null
+    : useLiveQuote
+      ? quote.status === "ok"
+        ? quote.fee!
+        : null
+      : shippingFee(effectiveMethod, region);
+  const priced = priceCart(items, feePerShipment);
+  const shippingReady = feePerShipment !== null;
 
   if (items.length === 0) {
     return (
@@ -64,6 +109,7 @@ export function CheckoutForm({
         shipping: ship,
         shippingMethod: effectiveMethod,
         provider,
+        sameDayQuoteToken: useLiveQuote ? quote.token : undefined,
       }),
     });
     const data = (await res.json().catch(() => ({}))) as { redirectUrl?: string; error?: string };
@@ -148,11 +194,27 @@ export function CheckoutForm({
                   <span className="block text-xs text-gray-500">
                     {allowed ? info.description : "Not available for your region"}
                   </span>
+                  {m === "SAMEDAY" && useLiveQuote && (
+                    <span className="mt-1 block text-xs">
+                      {quote.status === "idle" && "Enter your address above to see the price."}
+                      {quote.status === "loading" && "Getting the Lalamove price…"}
+                      {quote.status === "error" && <span className="text-red-600">{quote.error}</span>}
+                      {quote.status === "ok" && (
+                        <span className="text-gray-600">
+                          Delivering to: <b>{quote.mapAddress}</b>
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </span>
                 <span className="text-sm font-semibold">
-                  {region
-                    ? allowed && peso(shippingFee(m, region)!)
-                    : `from ${peso(lowestShippingFee(m))}`}
+                  {m === "SAMEDAY" && liveSameDayQuote
+                    ? useLiveQuote && quote.status === "ok"
+                      ? peso(quote.fee!)
+                      : "Live rate"
+                    : region
+                      ? allowed && peso(shippingFee(m, region)!)
+                      : `from ${peso(lowestShippingFee(m))}`}
                 </span>
               </label>
             );
@@ -196,9 +258,9 @@ export function CheckoutForm({
           ))}
         </ul>
         <hr />
-        <OrderSummary {...priced} showShipping={Boolean(region)} />
+        <OrderSummary {...priced} showShipping={shippingReady} />
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        <button className="btn-primary w-full" disabled={busy || !provider}>
+        <button className="btn-primary w-full" disabled={busy || !provider || !shippingReady}>
           {busy ? "Redirecting to payment…" : `Pay ${peso(priced.dueNow)}`}
         </button>
         <p className="text-center text-xs text-gray-500">You will be redirected to a secure payment page.</p>

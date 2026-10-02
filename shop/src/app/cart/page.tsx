@@ -10,7 +10,7 @@ import { lineDueNow, lineTotal, priceCart } from "@/lib/pricing";
 
 export default function CartPage() {
   const { items, setQuantity, setPaymentOption, remove } = useCart();
-  const priced = priceCart(items, null, null);
+  const priced = priceCart(items, null);
 
   if (items.length === 0) {
     return (

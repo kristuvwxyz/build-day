@@ -5,6 +5,7 @@ import { shippingFee } from "@/lib/config";
 import { appUrl, getGateway, newReference } from "@/lib/payments";
 import { priceCart, unitDiscount } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
+import { liveSameDayEnabled, verifyQuote, type SameDayQuote } from "@/lib/sameday";
 import type { ProductType } from "@/lib/types";
 
 const Body = z.object({
@@ -30,6 +31,7 @@ const Body = z.object({
   }),
   shippingMethod: z.enum(["JNT", "SAMEDAY"]),
   provider: z.enum(["MAYA", "PAYPAL", "BDO", "MOCK"]),
+  sameDayQuoteToken: z.string().max(2000).optional(),
 });
 
 const orderNumber = (type: ProductType) =>
@@ -46,13 +48,26 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid details" }, { status: 400 });
   }
-  const { items, shipping, shippingMethod, provider } = parsed.data;
+  const { items, shipping, shippingMethod, provider, sameDayQuoteToken } = parsed.data;
 
   const gateway = getGateway(provider);
   if (!gateway) return NextResponse.json({ error: "That payment method is not available." }, { status: 400 });
 
-  if (shippingFee(shippingMethod, shipping.region) === null) {
+  let feePerShipment = shippingFee(shippingMethod, shipping.region);
+  if (feePerShipment === null) {
     return NextResponse.json({ error: "Same-day delivery is only available in Metro Manila." }, { status: 400 });
+  }
+  // Same-day: use the live Lalamove price the buyer was shown (signed by our server).
+  let sameDay: SameDayQuote | null = null;
+  if (shippingMethod === "SAMEDAY" && liveSameDayEnabled()) {
+    sameDay = sameDayQuoteToken ? verifyQuote(sameDayQuoteToken, shipping, session.user.id) : null;
+    if (!sameDay) {
+      return NextResponse.json(
+        { error: "The same-day delivery price expired or your address changed. Please review the price and try again." },
+        { status: 400 },
+      );
+    }
+    feePerShipment = sameDay.fee;
   }
 
   // Re-load products from the database: prices from the browser are never trusted.
@@ -79,7 +94,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const priced = priceCart(lines, shippingMethod, shipping.region);
+  const priced = priceCart(lines, feePerShipment);
   const checkoutGroup = newReference("G");
   const reference = newReference("PAY");
 
@@ -100,6 +115,9 @@ export async function POST(req: Request) {
           shipBarangay: shipping.barangay,
           shipCity: shipping.city,
           shipRegion: shipping.region,
+          shipLat: sameDay?.lat,
+          shipLng: sameDay?.lng,
+          shipMapAddress: sameDay?.mapAddress,
           subtotal: s.subtotal,
           shippingFee: s.shippingFee,
           total: s.total,

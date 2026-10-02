@@ -77,6 +77,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   {o.shipAddress}, Brgy. {o.shipBarangay}, {o.shipCity}
                 </p>
                 <p className="text-gray-500">{SHIPPING_METHODS[o.shippingMethod as ShippingMethod]?.label}</p>
+                {o.shipLat != null && o.shipLng != null && (
+                  <a
+                    href={`https://www.google.com/maps?q=${o.shipLat},${o.shipLng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    📍 Drop-off pin (for booking Lalamove / Grab)
+                  </a>
+                )}
               </div>
               <div>
                 <span className="label">Money</span>

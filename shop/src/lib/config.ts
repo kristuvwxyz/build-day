@@ -38,8 +38,10 @@ export const SHIPPING_METHODS: Record<
   },
   SAMEDAY: {
     label: "Same-day Delivery (Lalamove / Grab)",
-    description: "Metro Manila only. Booked once your order is ready.",
+    description: "Metro Manila only. Price is the live Lalamove rate to your address.",
     fees: {
+      // Live Lalamove price is used when Lalamove is connected (see below).
+      // This flat fee is only a fallback while it isn't connected yet.
       METRO_MANILA: 25000, // ₱250
     },
   },
@@ -60,3 +62,17 @@ export function lowestShippingFee(method: ShippingMethod): number {
 // true  = charge the shipping fee for each shipment
 // false = charge the shipping fee only once (on the first shipment)
 export const CHARGE_SHIPPING_PER_SHIPMENT = true;
+
+// ---------- Same-day delivery (Lalamove live price) ----------
+
+// Where the rider picks up your parcels. Get the exact lat/lng by right-clicking
+// your shop's location in Google Maps. Live quotes stay off until this is filled in.
+export const SHOP_PICKUP: { address: string; lat: number; lng: number } | null = null;
+// Example:
+// export const SHOP_PICKUP = { address: "123 Shop St, Brgy. Kapitolyo, Pasig City", lat: 14.5683, lng: 121.0595 };
+
+// Lalamove vehicle used for the quote. "MOTORCYCLE" fits most small parcels.
+export const LALAMOVE_SERVICE_TYPE = "MOTORCYCLE";
+
+// Added on top of the Lalamove price (e.g. to cover a Grab booking that costs a bit more).
+export const SAMEDAY_EXTRA_FEE = 0; // centavos, e.g. 2000 = ₱20

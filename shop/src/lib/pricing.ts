@@ -4,9 +4,6 @@ import {
   CHARGE_SHIPPING_PER_SHIPMENT,
   DOWNPAYMENT_PERCENT,
   PREORDER_FULL_PAYMENT_DISCOUNT,
-  shippingFee as feeFor,
-  type Region,
-  type ShippingMethod,
 } from "./config";
 import type { PaymentOption, ProductType } from "./types";
 
@@ -49,8 +46,8 @@ export type Shipment = {
 /** Splits the cart into shipments (on-hand / pre-order) and prices each. */
 export function priceCart<T extends PricedLine>(
   lines: T[],
-  method: ShippingMethod | null,
-  region: Region | null,
+  /** Fee for one shipment in centavos, or null if not known yet. */
+  feePerShipment: number | null,
 ): { shipments: (Shipment & { lines: T[] })[]; dueNow: number; balanceLater: number } {
   const order: ProductType[] = ["ONHAND", "PREORDER"];
   const shipments: (Shipment & { lines: T[] })[] = [];
@@ -62,8 +59,8 @@ export function priceCart<T extends PricedLine>(
     const subtotal = group.reduce((s, l) => s + lineTotal(l), 0);
     const itemsDueNow = group.reduce((s, l) => s + lineDueNow(l), 0);
     let shippingFee = 0;
-    if (method && region && (CHARGE_SHIPPING_PER_SHIPMENT || !shippingCharged)) {
-      shippingFee = feeFor(method, region) ?? 0;
+    if (feePerShipment !== null && (CHARGE_SHIPPING_PER_SHIPMENT || !shippingCharged)) {
+      shippingFee = feePerShipment;
       shippingCharged = true;
     }
     // Shipping is paid upfront together with the first payment.

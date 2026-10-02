@@ -108,6 +108,9 @@ model Order {
   shipBarangay   String
   shipCity       String
   shipRegion     String   // "METRO_MANILA" | "LUZON" | "VISAYAS" | "MINDANAO"
+  shipLat        Float?   // same-day only: exact drop-off point used for the Lalamove quote
+  shipLng        Float?
+  shipMapAddress String?  // address as Google Maps understood it
   trackingNumber String?
 
   // Money (centavos)

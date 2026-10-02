@@ -3,6 +3,7 @@ import { CheckoutForm } from "@/components/CheckoutForm";
 import { getSession } from "@/lib/auth";
 import { enabledPaymentProviders } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
+import { liveSameDayEnabled } from "@/lib/sameday";
 
 export default async function CheckoutPage() {
   const session = await getSession();
@@ -17,6 +18,7 @@ export default async function CheckoutPage() {
   return (
     <CheckoutForm
       providers={enabledPaymentProviders()}
+      liveSameDayQuote={liveSameDayEnabled()}
       defaults={{
         name: last?.shipName ?? session.user.name ?? "",
         contact: last?.shipContact ?? "",
