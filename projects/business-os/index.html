@@ -496,6 +496,7 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
 .ltable td { vertical-align: middle; } .lthumb { width: 52px; } .lthumb img, .lthumb svg { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: var(--surface-2); display: block; } .lthumb svg { padding: 8px; color: var(--gold); }
 tr[data-lrow] { cursor: pointer; } tr[data-lrow]:hover td { background: var(--surface-2); }
 .gs { position: relative; display: flex; align-items: center; }
+body.no-orders .gs { display: none !important; }
 .gs .gs-in { width: 100%; border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 9px 10px 9px 32px; font-size: 14px; }
 .gs .gs-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; border: 2px solid var(--muted); border-radius: 50%; pointer-events: none; }
 .gs .gs-ico::after { content: ""; position: absolute; width: 6px; height: 2px; background: var(--muted); right: -6px; bottom: -3px; transform: rotate(45deg); }
@@ -609,7 +610,7 @@ const pickCourier = (title, hasAddr) => /j\s*&\s*t|jnt|j\s*n\s*t/i.test(title ||
 const onum = o => [o.num, ...(o.merged || [])].map(n => "#" + n).join(" ");
 const findOrder = id => S.orders.find(o => o.id === id) || S.archived.find(o => o.id === id);
 /* who can do what on orders: CEO, Sales, Admin everything · Finance payment + fulfillment · Packing fulfillment + shipping · others view */
-const myDept = () => S.isOwner ? "CEO" : ((member(myMemberId()) || {}).department || "");
+const myDept = () => S.isOwner ? "CEO" : ((boundMember() || {}).department || "");
 const orderRole = () => S.readOnly ? "view" : (S.isOwner || ["CEO", "SALES", "ADMIN"].includes(myDept())) ? "all" : myDept() === "FINANCE" ? "status" : myDept() === "PACKING" ? "pack" : "view";
 const canAll = () => orderRole() === "all";
 const canPay = () => ["all", "status"].includes(orderRole());
@@ -619,7 +620,7 @@ const actor = () => { const m = member(myMemberId()); if (m) return `${m.nicknam
 const logAdd = (o, msgs, by) => [...(o.log || []), ...msgs.map(msg => ({ at: Date.now(), by: by || actor(), msg }))].slice(-80);
 const salesTeam = () => activeTeam().filter(m => m.department === "SALES");
 const canSuppliers = () => S.isOwner || myDept() === "CEO" || myMemberId() === "m-000005";
-const tabAllowed = t => t === "suppliers" ? canSuppliers() : t === "archived" ? canAll() : true;
+const tabAllowed = t => t === "orders" || t === "archived" ? canOrders() && (t === "orders" || canAll()) : t === "suppliers" ? canSuppliers() : t === "archived" ? canAll() : true;
 const ctxDept = () => S.view === "dept" ? S.dept : (myDept() || "SALES");
 const COURIER_LABEL = { "J&T": "J&T", SDD: "SDD / Pickup" };
 const clsKey = st => String(st.cls || "").split(" ")[0] || "grey";
@@ -668,7 +669,7 @@ const DEPTS = [
   { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "archived", "listings", "reviews", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
   { id: "FINANCE", name: "Finance", tabs: ["orders", "dues", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["orders", "suppliers", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
-  { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "orders", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
+  { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["orders", "inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
 const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
@@ -697,7 +698,7 @@ const S = {
   t: { scope: "team", person: "", dept: "", mode: "calendar", month: today().slice(0, 7), day: today() },
   slide: 0, slidePaused: false,
   unlocked: new Set(),
-  db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
+  accessreq: [], db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
 };
 try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
 try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
@@ -709,7 +710,7 @@ const isUnlocked = d => S.isOwner || S.unlocked.has(d) || S.unlocked.has("CEO") 
 function allowedDepts() {
   const all = DEPTS.map(d => d.id);
   if (S.isOwner) return all;
-  const m = S.team.find(x => x.id === (S.profile || {}).memberId);
+  const m = member(myMemberId());
   if (!m || !m.department) return [];
   if (m.department === "CEO") return all;
   if (m.department === "ADMIN") return all.filter(x => x !== "CEO");
@@ -1337,7 +1338,7 @@ async function eomRate(mid, n) {
 }
 async function eomVote() {
   const me = myMemberId(), nom = val("eom-nom"), ym = eomMonth();
-  if (!me) return toast("Link your name in My account first.");
+  if (!me) return toast("Your account isn't linked to the team directory yet.");
   if (!nom) return toast("Choose a teammate to vote for.");
   await save("eomvotes", ym + "_" + me, { month: ym, voter: me, nominee: nom, reason: val("eom-why"), at: Date.now() });
   toast(`Vote saved for ${memberName(nom)}.`);
@@ -1387,10 +1388,12 @@ function renderNav() {
   renderNavPre();
   const item = (attrs, icon, label, current, extra = "", cls = "") => `<button type="button" class="${cls}" ${attrs} ${current ? 'aria-current="page"' : ""}>${svg(icon)}<span>${label}</span>${extra}</button>`;
   const inDept = S.view === "dept" || S.view === "depts";
+  document.body.classList.toggle("no-orders", !canOrders() || gated());
+  if (gated()) { $("#nav").innerHTML = ""; return; }
   $("#nav").innerHTML =
     item('data-nav="home"', "home", "Home", S.view === "home") +
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
-    item('data-nav="orders"', "orders", "Orders", S.view === "orders") +
+    (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders") : "") +
     item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") +
     item('data-nav="eom"', "award", "Awards", S.view === "eom") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
@@ -1476,14 +1479,15 @@ function renderInner() {
   const loading = S.db && !Object.values(S.loaded).every(Boolean);
   if (loading) { v.innerHTML = `<div class="panel"><div class="empty">Loading your records…</div></div>`; return; }
   if (S.loggedOut) { v.innerHTML = viewLoggedOut(); return; }
+  if (gated()) { v.innerHTML = viewGate(); return; }
   if (S.view === "home") { v.innerHTML = viewHome(); applySlide(); return; }
   if (S.view === "tasks") { v.innerHTML = viewTasks(null); return; }
   if (S.view === "account") { v.innerHTML = viewAccount(); return; }
   if (S.view === "attendance") { v.innerHTML = viewAttendance(); return; }
   if (S.view === "eom") { v.innerHTML = viewEom(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
-  if (S.view === "orders") { v.innerHTML = viewOrders(); return; }
-  if (!canSee(S.dept)) { v.innerHTML = `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} isn't part of your access</h2><div class="empty">${myMemberId() ? "Your department decides what you can open. Ask the owner if you need this one." : `Link your name in <button type="button" class="linkish" data-nav="account">My account</button> first.`}</div></div>`; return; }
+  if (S.view === "orders") { if (!canOrders()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewOrders(); return; }
+  if (!canSee(S.dept)) { v.innerHTML = `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} isn't part of your access</h2><div class="empty">${myMemberId() ? "Your department decides what you can open. Ask the owner if you need this one." : "Your account isn't linked to the team directory yet."}</div></div>`; return; }
   if (!isUnlocked(S.dept)) { v.innerHTML = viewLock(d); const pw = $("#unlock-pw"); if (pw) pw.focus(); return; }
   const dtabs = d.tabs.filter(tabAllowed);
   if (!dtabs.includes(S.tab)) S.tab = dtabs[0];
@@ -1501,7 +1505,21 @@ const member = id => S.team.find(m => m.id === id);
 const memberName = id => { const m = member(id); return m ? (m.nickname || m.name) : "Unassigned"; };
 const activeTeam = () => S.team.filter(m => m.status !== "inactive");
 const initials = n => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
-const myMemberId = () => S.profile.memberId || "";
+// Sign-in binding: the owner is always Kristin H Sumiran; everyone else is matched by the
+// claude.ai account the owner linked, or by the sign-in email listed in Admin → Team.
+const normName = x => String(x || "").toLowerCase().replace(/[^a-z]/g, "");
+const ownerMember = () => S.team.find(m => normName(m.name) === "kristinhsumiran") || S.team.find(m => /kristin/.test(normName(m.name)) && /sumiran/.test(normName(m.name))) || member("m-000001");
+const emailsOf = m => String(m.email || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
+function boundMember() {
+  if (S.isOwner) return ownerMember() || null;
+  if (!S.uid) return member((S.profile || {}).memberId) || null;
+  const em = String((S.me && S.me.email) || "").toLowerCase();
+  const act = S.team.filter(m => m.status !== "inactive");
+  return act.find(m => m.uid === S.uid) || (em ? act.find(m => emailsOf(m).includes(em)) : null) || null;
+}
+const myMemberId = () => (boundMember() || {}).id || "";
+const gated = () => !!S.uid && !S.isOwner && S.loaded.team && !boundMember();
+const canOrders = () => myDept() !== "MARKETING";
 const scentOf = id => ((S.scents.find(s => s.id === id) || {}).scent || "");
 const BOTTLE = '<svg viewBox="0 0 16 20" aria-hidden="true"><rect x="6" y="1" width="4" height="3" rx="1" fill="var(--gold)"/><rect x="5" y="4" width="6" height="2" fill="currentColor" opacity=".55"/><rect x="2.5" y="6" width="11" height="12.5" rx="3" fill="var(--gold)"/><rect x="4.5" y="9.5" width="7" height="4.5" rx="1" fill="#fff" opacity=".75"/></svg>';
 const extraOf = id => S.scents.find(s => s.id === id) || {};
@@ -1679,7 +1697,7 @@ function viewTasks(forceDept) {
   const ym = S.t.month;
   const monthTasks = scoped.filter(t => inMonth(t, ym));
   const undated = scoped.filter(t => !t.due && t.status !== "done" && t.status !== "cancelled");
-  const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : "Whole team";
+  const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name;
   const controls = `<div class="toolbar">
     ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[["team", fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name], ["person", "Per person"], ...(taskDepts().length > 1 ? [["dept", "Per department"]] : [])].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
     ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${taskTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
@@ -1799,7 +1817,7 @@ function viewHome() {
   const [q, who] = quoteOfDay();
   const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === mid && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
   const dueToday = visTasks().filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
-  const showOrders = canSee("SALES") || canSee("PACKING") || visDepts().length > 0;
+  const showOrders = canOrders() && (canSee("SALES") || canSee("PACKING") || visDepts().length > 0);
   const toShip = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
   const st = mid && member(mid) ? attStatus(mToday(), mid) : "";
   const r = mid ? attRec(mToday(), mid) : null;
@@ -1816,7 +1834,7 @@ function viewHome() {
     <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
     ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="eom"><b>🏆</b><span>Employee of the Month</span></button>`}
     <div>${st ? `<b style="font-size:20px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
-      : `<b style="font-size:20px">–</b><span>Attendance</span><button type="button" class="linkish" data-nav="account" style="font-size:12px">Link your name</button>`}</div>
+      : `<b style="font-size:20px">–</b><span>Attendance</span><span style="font-size:12px">Not linked</span>`}</div>
   </section>
   ${eomHomeCard()}
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
@@ -1842,6 +1860,7 @@ function homeOrders() {
   </section>`;
 }
 function goOrders(view) {
+  if (!canOrders()) return;
   S.view = "orders"; S.page = 0;
   if (view === "today") { S.of.view = "all"; S.of.range = "today"; } else if (view === "all") { S.of.view = "all"; } else S.of.view = view;
   saveNav(); render(); window.scrollTo(0, 0);
@@ -1866,13 +1885,11 @@ function viewAccount() {
   return `<div class="grid-2">
     <section class="panel"><h2>Profile</h2>
       <div style="display:flex;gap:12px;align-items:center">${m ? avatar(m, 52) : S.me && S.me.avatarUrl ? `<img src="${esc(S.me.avatarUrl)}" alt="" width="48" height="48" style="border-radius:50%">` : ""}
-        <div><div style="font-weight:700;font-size:16px">${esc((S.me && S.me.name) || (m && m.name) || "Signed-in user")}</div><div style="color:var(--muted);font-size:13px">Access: ${lvl}${m ? " · " + esc((dept(m.department) || {}).name || "") + (m.role ? " · " + esc(m.role) : "") : ""}</div></div></div>
+        <div><div style="font-weight:700;font-size:16px">${esc((m && m.name) || (S.me && S.me.name) || "Signed-in user")}</div><div style="color:var(--muted);font-size:13px">Access: ${lvl}${m ? " · " + esc((dept(m.department) || {}).name || "") + (m.role ? " · " + esc(m.role) : "") : ""}</div></div></div>
       ${m && !S.readOnly ? `<div><label class="btn sm" for="my-photo" style="cursor:pointer">Upload my photo</label><input id="my-photo" type="file" accept="image/*" hidden></div>` : ""}
-      ${S.uid ? `<div class="field"><label for="my-member">Which team member are you?</label><select id="my-member"><option value="">Choose your name…</option>${S.team.map(x => `<option value="${x.id}" ${myMemberId() === x.id ? "selected" : ""}>${esc(x.name)}${x.department ? " · " + esc((dept(x.department) || {}).name || "") : ""}</option>`).join("")}</select>
-        <div style="font-size:12px;color:var(--muted)">${S.team.length ? "This shows your tasks on Home and pre-fills your department on new tasks." : "Ask Admin to add you in Admin → Team first."}</div></div>`
-        : `<div class="empty">Sign in on claude.ai to link your account.</div>`}
+      <div style="font-size:12.5px;color:var(--muted)">${S.me && S.me.email ? `Signed in as ${esc(S.me.email)}. ` : ""}${m ? `Linked to <b>${esc(m.name)}</b> automatically${S.isOwner ? " (owner account)" : " from the team directory"}.` : S.uid ? "Not linked yet." : "Sign in on claude.ai to link your account."}</div>
     </section>
-    <section class="panel"><h2>My tasks</h2>${m ? taskSummary(mine, "All time") : `<div class="empty">Link your name to see your task summary.</div>`}
+    <section class="panel"><h2>My tasks</h2>${m ? taskSummary(mine, "All time") : `<div class="empty">Your account isn't linked to the team directory yet.</div>`}
       ${m ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.filter(t => t.status === "todo" || t.status === "in_progress").sort((a, b) => (a.due || "9").localeCompare(b.due || "9")).slice(0, 8).map(taskRow).join("")}</tbody></table></div>` : ""}
     </section>
   </div>
@@ -1882,7 +1899,7 @@ function viewAccount() {
   <section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div style="font-size:12px;color:var(--muted)">System follows your device's light or dark setting. Saved on this device.</div></section>
   <section class="panel"><h2>Department access</h2>
     ${S.isOwner ? `<div class="empty">You own this app, so every department opens without a password.</div>` : `
-    <div style="font-size:13px;color:var(--muted)">${visDepts().length ? `You can open: ${visDepts().map(d => d.name).join(", ")}.` : "Link your name above to see your departments."}</div>
+    <div style="font-size:13px;color:var(--muted)">${visDepts().length ? `You can open: ${visDepts().map(d => d.name).join(", ")}.` : "Your account isn't linked to the team directory yet."}</div>
     <div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${isUnlocked(d.id) ? "Unlocked on this device" : "Locked"}</span></button>`).join("")}</div>
     ${S.unlocked.size ? `<div><button class="btn" type="button" data-act="lock-all">Lock all departments</button></div>` : ""}`}
   </section>
@@ -1892,7 +1909,7 @@ function viewAccount() {
 
 /* ---------- departments ---------- */
 function viewDeptPicker() {
-  if (!visDepts().length) return `<div class="panel"><div class="empty">Link your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your department.</div></div>`;
+  if (!visDepts().length) return `<div class="panel"><div class="empty">Your account isn't linked to the team directory yet.</div></div>`;
   return `<div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>`;
 }
 function viewLock(d) {
@@ -1944,7 +1961,8 @@ async function setPassword(d, clear) {
 }
 
 const DEPT_COLORS = { CEO: "#8B5CF6", ADMIN: "#EC4899", FINANCE: "#DC2626", SALES: "#F59E0B", MARKETING: "#10B981", PACKING: "#3B82F6" };
-function viewTeam() {
+function viewTeam() { return accessReqPanel() + viewTeamDir(); }
+function viewTeamDir() {
   const q = (S.tq || "").trim().toLowerCase(), sf = S.tstatus || "active";
   const rows = [...S.team].filter(m => (sf === "all" || (sf === "active" ? m.status !== "inactive" : m.status === "inactive")) && (!q || [m.idNumber, m.nickname, m.name, m.phone, m.email, m.address, m.role, scentOf(m.id), (dept(m.department) || {}).name].join(" ").toLowerCase().includes(q)))
     .sort((a, b) => String(a.idNumber || "zzz").localeCompare(String(b.idNumber || "zzz")) || (a.name || "").localeCompare(b.name || ""));
@@ -1962,7 +1980,7 @@ function viewTeam() {
     <tbody>${rows.map(m => `<tr ${S.canEdit ? `data-act="edit-member" data-id="${m.id}"` : ""} style="${S.canEdit ? "" : "cursor:default"}">
       <td class="nowrap num" style="box-shadow:inset 4px 0 0 ${DEPT_COLORS[m.department] || "var(--line)"}">${esc(m.idNumber || "")}</td>
       <td style="font-weight:600"><span style="display:inline-flex;gap:10px;align-items:center">${avatar(m, 34)}${esc(m.nickname || "")}</span></td>
-      <td class="nowrap">${esc(m.name)}</td>
+      <td class="nowrap">${esc(m.name)}${m.uid ? ' <span class="chip" title="Linked to a claude.ai account">Linked</span>' : ""}</td>
       <td class="nowrap num" style="user-select:all">${esc(m.phone || m.contact || "")}</td>
       <td style="user-select:all">${esc(m.email || "")}</td>
       <td style="min-width:200px">${esc(m.address || "")}</td>
@@ -2379,6 +2397,22 @@ function viewSuppliers() {
     <div style="font-size:12px;color:var(--muted)">Supplier invoices will link here next.</div></section>
   <h2 style="margin:4px 0 -8px">Orders</h2>
   ${ordersTable(os.slice(0, 200), "orders", S.of, "osort", "sel-all")}`;
+}
+function viewGate() {
+  const em = (S.me && S.me.email) || "", sent = S.accessreq.some(r => r.id === S.uid);
+  return `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:16px;color:var(--fg);text-transform:none;letter-spacing:0">This account isn't in the team directory</h2>
+    <div class="empty">${em ? `You're signed in as <b>${esc(em)}</b>. Only emails listed in Admin → Team can open the app. Sign in with your work email, or ask the owner to add this one.` : "Only team members listed in Admin → Team can open the app. Ask the owner to link your account."}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${sent ? `<span class="chip good">Request sent. The owner will link you.</span>` : `<button class="btn primary" type="button" data-act="req-access">Ask the owner for access</button>`}<a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign in with another account</a></div></div>`;
+}
+S.reqProf = {};
+function accessReqPanel() {
+  if (!S.isOwner || !S.accessreq.length) return "";
+  const ids = S.accessreq.map(r => r.id).filter(id => !S.reqProf[id]);
+  if (ids.length && S.user && S.user.profiles) S.user.profiles(ids).then(p => { Object.assign(S.reqProf, p); render(); }).catch(() => {});
+  const opts = S.team.filter(m => m.status !== "inactive").map(m => `<option value="${m.id}">${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("");
+  return `<section class="panel"><h2>Access requests</h2><div style="font-size:12.5px;color:var(--muted)">These people signed in with an account that isn't in the directory. Link each one to their name, or remove the request.</div>
+    ${S.accessreq.map(r => { const p = S.reqProf[r.id] || {}; return `<div class="toolbar"><span style="font-weight:600">${esc(p.name || "Someone")}</span><span style="color:var(--muted)">${esc(p.email || "")}</span><span style="flex:1"></span>
+      <select id="ar-${r.id}" aria-label="Team member"><option value="">Choose who this is…</option>${opts}</select><button class="btn sm primary" type="button" data-act="ar-link" data-id="${r.id}">Link</button><button class="btn sm" type="button" data-act="ar-del" data-id="${r.id}">Remove</button></div>`; }).join("")}</section>`;
 }
 function viewLoggedOut() {
   return `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:16px;color:var(--fg);text-transform:none;letter-spacing:0">You're logged out of Regal Spritz PH OS</h2>
@@ -4519,6 +4553,9 @@ document.addEventListener("click", guard(async ev => {
     case "edit-review": return openReviewForm(id);
     case "rv-toggle": { const r = S.reviews.find(x => x.id === id); if (!r) return; const was = r.status; await patch("reviews", id, { status: was === "hidden" ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); toast(was === "hidden" ? "Review shown on the website." : "Review hidden from the website."); rvQueue([r.chunk]); return; }
     case "del-review": { const r = S.reviews.find(x => x.id === id); await remove("reviews", id); closeSheet(); toast("Review deleted."); if (r) rvQueue([r.chunk]); return; }
+    case "req-access": if (S.db && S.uid) { await S.db.collection("accessreq").doc(S.uid).set({ at: Date.now() }); toast("Request sent to the owner."); } return;
+    case "ar-link": { const mid = val("ar-" + id); if (!mid) return toast("Choose who this is first."); await patch("team", mid, { uid: id }); await remove("accessreq", id); toast(`Linked to ${memberName(mid)}.`); return; }
+    case "ar-del": await remove("accessreq", id); toast("Request removed."); return;
     case "rv-sync": return rvFlush();
     case "rv-sync-all": rvQueue(rvAllChunks()); toast("Sending every review to the website…"); return;
     case "rv-web": return openRvWebsite();
@@ -4661,7 +4698,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.eomrate) return eomRate(t.dataset.eomrate, Number(t.value));
   if (t.matches(".ws-num")) return setWorkStyle({ [t.dataset.k]: Math.max(1, Math.round(Number(t.value) || 1)) });
   if (t.id === "k-who" && t.value) { const m = member(t.value), d = $("#k-dept"); if (m && m.department && d && [...d.options].some(o => o.value === m.department)) d.value = m.department; return; }
-  if (t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
+  if (false && t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
   if (t.id === "ei-dtype") return eiTotal();
   if (t.dataset.oset) { const o = findOrder(t.dataset.id); if (!o) return; const f = t.dataset.oset; await updateOrder(o, { [f]: t.value }); const lab = { payment: pay(t.value).name, fulfillment: ful(t.value).name, courier: t.value, assignee: t.value ? memberName(t.value) : "Unassigned" }[f]; toast(`${onum(o)} → ${lab}`); if (!S.db) render(); return; }
@@ -4916,7 +4953,7 @@ render();
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq"]) {
       db.collection(col).onSnapshot(snap => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         if (col === "orders") { S.orders = docs.filter(r => !r.archived).map(norm); S.archived = docs.filter(r => r.archived); }

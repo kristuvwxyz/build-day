@@ -134,3 +134,10 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - **Tasks:** new tasks default to you and your department. There is no start date, only a due date. CEO sees every task, Admin sees all except CEO's, and every other department sees only its own (plus tasks assigned to them).
 - **Department access:** CEO sees all, Admin sees all except CEO, and everyone else sees only their own.
 - **Awards:** ₱1,000 a month in total: ₱700 for the Employee of the Month, plus a ₱300 perfect attendance draw. If no one qualifies for the draw, the ₱300 goes to a year-end pot. There is no runner-up.
+
+## Batch 4: sign-in binding
+- Owner account is always linked to Kristin H Sumiran (no picker).
+- Staff are linked automatically by matching their claude.ai sign-in email to the email in Admin → Team (several emails allowed, comma-separated).
+- Anyone not in the directory sees a locked screen and can send an access request; the owner links them in Admin → Team → Access requests.
+- Orders tab, Orders menu item and order search are hidden from Marketing.
+- Task views follow department access (CEO all, Admin all but CEO, others own department).
