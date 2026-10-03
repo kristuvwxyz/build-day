@@ -367,6 +367,17 @@ h1.dept-title::before { content: ""; width: 12px; height: 12px; border-radius: 5
 .scanres { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
 @media (max-width: 720px) { .otiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .orow { grid-template-columns: auto minmax(0, 1fr) auto; } .orow .badge { display: none; } .lgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lcard .lphoto { height: 130px; } }
 
+.shop-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.shop-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.shop-chip.ok { color: var(--fg); } .shop-chip.ok i { background: #16A34A; box-shadow: 0 0 0 3px color-mix(in srgb, #16A34A 22%, transparent); }
+.shop-chip.syncing i { background: var(--gold); animation: shoppulse 1s infinite alternate; }
+.shop-chip.error i, .shop-chip.blocked i { background: var(--bad); }
+.shop-chip.off { cursor: default; }
+@keyframes shoppulse { to { opacity: .3; } }
+.shop-msg { font-size: 12px; color: var(--bad); }
+.shop-slot { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; margin-right: 8px; }
+.shop-line { display: flex; margin: 0 0 10px; }
+.shop-line:empty { display: none; }
 @media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -910,7 +921,7 @@ function viewTasks(forceDept) {
       ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)); const out = d.slice(0, 7) !== ym; return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
         <div class="cal-n"><span>${Number(d.slice(8))}</span>${S.readOnly ? "" : `<button type="button" class="cal-add" data-act="new-task" data-date="${d}" aria-label="Add task on ${fmtDate(d)}">+</button>`}</div>
         <div class="cal-items">${moneyOn(d).slice(0, 2).map(moneyPill).join("")}${moneyOn(d).length > 2 ? `<span class="cal-more">+${moneyOn(d).length - 2} payments</span>` : ""}${ts.slice(0, 3).map(taskPill).join("")}${ts.length > 3 ? `<span class="cal-more">+${ts.length - 3} more</span>` : ""}</div>
-        ${ts.length || moneyOn(d).length ? `<div class="cal-dots" aria-hidden="true">${moneyOn(d).slice(0, 2).map(() => `<i class="s-money"></i>`).join("")}${ts.slice(0, 4).map(t => `<i class="s-${t.status}"></i>`).join("")}</div>` : ""}
+        ${ts.length || moneyOn(d).length ? `<div class="cal-dots" aria-hidden="true">${moneyOn(d).slice(0, 2).map(() => `<i class="s-money"></i>`).join("")}${ts.slice(0, 4).map(t => `<i class="s-${t.status}"${DEPT_COLORS[t.department] ? ` style="background:${DEPT_COLORS[t.department]}"` : ""}></i>`).join("")}</div>` : ""}
       </div>`; }).join("")}
     </div>
     <section class="panel"><div class="head"><h2>${longDate(S.t.day)}</h2>${S.readOnly ? "" : `<button class="btn sm" type="button" data-act="new-task" data-date="${S.t.day}">+ Add task for this day</button>`}</div>
@@ -1038,7 +1049,7 @@ function homeOrders() {
   const unpaid = live.filter(o => o.payment === "pending" || o.payment === "partial"), todays = S.orders.filter(o => o.createdAt && mDate(o.createdAt) === mToday());
   const tile = (n, label, view, cls) => `<button type="button" class="otile ${cls}" data-goorders="${view}"><b class="num">${n}</b><span>${label}</span></button>`;
   const recent = [...toPack, ...hold].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).slice(0, 6);
-  return `<section class="panel orders-home" style="--dc:${DEPT_COLORS.SALES}"><div class="head"><h2>Orders</h2><button class="btn sm" type="button" data-goorders="all">${sales ? "Open all orders" : "Open packing"} →</button></div>
+  return `<section class="panel orders-home" style="--dc:${DEPT_COLORS.SALES}"><div class="head"><h2>Orders</h2><span class="shop-slot">${shopChip()}</span><button class="btn sm" type="button" data-goorders="all">${sales ? "Open all orders" : "Open packing"} →</button></div>
     <div class="otiles">${tile(toPack.length, "To pack", "unfulfilled", toPack.length ? "hot" : "")}${tile(hold.length, "On hold", "on_hold", "")}${tile(unpaid.length, "Unpaid", "unpaid", "")}${tile(todays.length, "New today", "today", "")}</div>
     ${recent.length ? `<div class="olist">${recent.map(o => `<button type="button" class="orow" data-open="${o.id}"><span class="onum">#${esc(o.num)}</span><span class="ocust">${esc(o.customer || "No customer")}<small>${esc(plat(o.platform))} · ${relTime(o.createdAt)} · ${itemCount(o)} item${itemCount(o) === 1 ? "" : "s"}</small></span><span class="ototal num">${peso(total(o))}</span>${badge(ful(o.fulfillment))}</button>`).join("")}</div>`
       : `<div class="empty">${S.orders.length ? "Everything is packed. 🎉" : sales ? "No orders yet. Import them in Sales → Orders." : "No orders to pack."}</div>`}
@@ -1393,6 +1404,7 @@ function viewOrders() {
       <button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
   return `
+  <div class="shop-slot shop-line">${shopChip()}</div>
   ${statsStrip()}
   <div class="toolbar">
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
@@ -3160,6 +3172,7 @@ document.addEventListener("click", guard(async ev => {
     case "del-task": await remove("tasks", id); closeSheet(); toast("Task deleted."); return;
     case "del-member": await remove("team", id); closeSheet(); toast("Removed from team."); return;
     case "import": return openImport();
+    case "shop-sync": if (S.shop.state === "blocked" || S.shop.state === "off") { toast(S.shop.msg || "Live sync works when the app is open in claude.ai with Shopify connected."); if (S.shop.state === "off") return; } return shopSync(true);
     case "new-product": return openProductForm();
     case "edit-product": return openProductForm(id);
     case "restock": return openRestock(id);
@@ -3258,6 +3271,126 @@ document.addEventListener("keydown", ev => {
   if (ev.key === "Enter" && ev.target.id === "scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handleScan(v); return; }
   if (ev.key === "Enter" && ev.target.id === "pack-scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handlePackScan(v); return; } if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
 
+/* ---------- Shopify live sync (viewer's Shopify connector via mcp) ---------- */
+const SHOP_SERVER = "Shopify", SHOP_TOOL = "graphql_query", SHOP_EVERY = 60000;
+const SHOP_FIELDS = `id name createdAt cancelledAt displayFinancialStatus displayFulfillmentStatus note tags email phone
+  customer { displayName email phone }
+  shippingAddress { name phone address1 address2 city province zip country }
+  totalPriceSet { shopMoney { amount } }
+  lineItems(first: 50) { nodes { name sku quantity originalUnitPriceSet { shopMoney { amount } } } }`;
+const SHOP_LIST_Q = `query RSOpenOrders($first: Int!, $after: String) { orders(first: $first, after: $after, query: "-fulfillment_status:fulfilled -status:cancelled", sortKey: CREATED_AT, reverse: true) { pageInfo { hasNextPage endCursor } nodes { ${SHOP_FIELDS} } } }`;
+const SHOP_NODES_Q = `query RSOrderStatus($ids: [ID!]!) { nodes(ids: $ids) { ... on Order { ${SHOP_FIELDS} } } }`;
+const SHOP_OPEN = new Set(["UNFULFILLED", "PARTIALLY_FULFILLED", "ON_HOLD", "SCHEDULED", "IN_PROGRESS", "OPEN", "PENDING_FULFILLMENT"]);
+S.shop = { state: "off", at: 0, msg: "", n: 0 };
+let shopTimer = 0, shopBusy = false;
+
+function shopPayload(res) {
+  let p = res && res.payload !== undefined ? res.payload : (res && Array.isArray(res.content) ? ((res.content.find(c => c.type === "text") || {}).text || res.structuredContent || res) : res);
+  if (typeof p === "string") { const i = p.indexOf("{"); try { p = JSON.parse(i > 0 ? p.slice(i) : p); } catch (e) { throw { code: "tool_error", message: p.slice(0, 200) }; } }
+  return p;
+}
+function dig(obj, key, depth = 0) {
+  if (!obj || typeof obj !== "object" || depth > 6) return undefined;
+  if (Object.prototype.hasOwnProperty.call(obj, key)) return obj[key];
+  for (const v of Object.values(obj)) { const r = dig(v, key, depth + 1); if (r !== undefined) return r; }
+  return undefined;
+}
+async function shopCall(query, variables, first) {
+  const input = { query, variables, first: first || 50 };
+  if (variables.after) input.after = variables.after;
+  const p = shopPayload(await S.mcp.callTool(SHOP_SERVER, SHOP_TOOL, input, { cache: false }));
+  const errs = dig(p, "errors");
+  if (Array.isArray(errs) && errs.length && !dig(p, "orders") && !dig(p, "nodes")) throw { code: "tool_error", message: errs.map(e => e.message || e).join("; ") };
+  return p;
+}
+const money = x => Number(x && x.shopMoney && x.shopMoney.amount) || 0;
+function shopToOrder(n) {
+  const fin = String(n.displayFinancialStatus || "").toUpperCase(), fs = String(n.displayFulfillmentStatus || "").toUpperCase();
+  const payment = { PAID: "paid", PENDING: "pending", AUTHORIZED: "pending", PARTIALLY_PAID: "partial", PARTIALLY_REFUNDED: "paid", REFUNDED: "refunded", VOIDED: "voided", EXPIRED: "voided" }[fin] || "pending";
+  const createdAt = Date.parse(n.createdAt) || Date.now();
+  const fulfillment = n.cancelledAt ? "not_required" : fs === "FULFILLED" ? "fulfilled" : fs === "ON_HOLD" ? "on_hold" : SHOP_OPEN.has(fs) ? "unfulfilled" : "not_required";
+  const a = n.shippingAddress || {}, c = n.customer || {};
+  const items = ((n.lineItems && n.lineItems.nodes) || []).filter(i => i.quantity).map(i => {
+    const p = S.products.find(x => (i.sku && x.sku && x.sku.toLowerCase() === i.sku.toLowerCase()) || (x.name || "").toLowerCase() === (i.name || "").toLowerCase());
+    return { productId: p ? p.id : "", name: i.name || "", sku: i.sku || "", qty: Number(i.quantity) || 0, price: money(i.originalUnitPriceSet), cost: p ? Number(p.cost) || 0 : 0 };
+  });
+  const o = {
+    num: String(n.name || "").replace(/^#/, ""), createdAt, date: dstr(createdAt), platform: "website",
+    customer: c.displayName || a.name || n.email || "", phone: cleanPhone(n.phone || a.phone || c.phone || ""), email: String(n.email || c.email || "").toLowerCase(),
+    address: [a.address1, a.address2, a.city, a.province, a.zip, a.country].filter(Boolean).join(", "),
+    ref: String(n.id || "").split("/").pop(), items, fees: 0, shipping: 0,
+    payment, fulfillment, tags: Array.isArray(n.tags) ? n.tags : parseTags(n.tags || ""), note: n.note || "",
+    imported: true, noStock: true, restocked: false, source: "shopify-live",
+    fulfilledAt: fulfillment === "fulfilled" ? Date.now() : 0, deliveredAt: 0,
+    voidedAt: VOIDPAY.has(payment) || n.cancelledAt ? (Date.parse(n.cancelledAt) || createdAt) : 0,
+  };
+  o.adjust = Math.round((money(n.totalPriceSet) - itemsTotal(o)) * 100) / 100;
+  return o;
+}
+async function shopApply(o, isNew) {
+  const id = orderDocId(o), ex = S.orders.find(x => x.id === id);
+  if (!ex) { if (isNew) { await save("orders", id, o); return 1; } return 0; }
+  const fl = ex.fulfillment === "delivered" && o.fulfillment === "fulfilled" ? "delivered" : (ex.fulfillment === "fulfilled" || ex.fulfillment === "delivered") && OPEN_FUL.has(o.fulfillment) ? ex.fulfillment : o.fulfillment;
+  const ch = { payment: o.payment, fulfillment: fl, tags: o.tags, note: o.note || ex.note || "", fulfilledAt: fl === "fulfilled" ? (ex.fulfilledAt || o.fulfilledAt) : (ex.fulfilledAt || 0), voidedAt: o.voidedAt || 0 };
+  if (["payment", "fulfillment", "note"].some(k => ch[k] !== ex[k]) || (ch.tags || []).join() !== (ex.tags || []).join()) { await patch("orders", id, ch); return 1; }
+  return 0;
+}
+async function shopSync(manual) {
+  if (!S.mcp || shopBusy || S.readOnly) return;
+  if (!manual && document.hidden) return;
+  shopBusy = true; S.shop.state = "syncing"; paintShop();
+  try {
+    const seen = new Set(); let after = null, pages = 0, changed = 0;
+    do {
+      const p = await shopCall(SHOP_LIST_Q, after ? { first: 50, after } : { first: 50 }, 50);
+      const conn = dig(p, "orders");
+      if (!conn) throw { code: "tool_error", message: "Shopify sent back an unexpected answer." };
+      for (const n of conn.nodes || (conn.edges || []).map(e => e.node)) {
+        const o = shopToOrder(n);
+        if (!OPEN_FUL.has(o.fulfillment) || n.cancelledAt) continue;
+        seen.add(orderDocId(o)); changed += await shopApply(o, true);
+      }
+      const pi = conn.pageInfo || {}; after = pi.hasNextPage ? pi.endCursor : null;
+    } while (after && ++pages < 40);
+    // orders still open here but no longer open in Shopify → fetch their real status
+    const stale = S.orders.filter(o => o.ref && /^\d+$/.test(o.ref) && OPEN_FUL.has(o.fulfillment) && !seen.has(o.id) && o.id.startsWith("sh-"));
+    for (let i = 0; i < stale.length; i += 50) {
+      const p = await shopCall(SHOP_NODES_Q, { ids: stale.slice(i, i + 50).map(o => "gid://shopify/Order/" + o.ref) }, 50);
+      for (const n of (dig(p, "nodes") || []).filter(Boolean)) if (n.id) changed += await shopApply(shopToOrder(n), false);
+    }
+    S.shop = { state: "ok", at: Date.now(), msg: "", n: seen.size };
+    if (manual) toast(changed ? `Shopify synced · ${changed} order${changed === 1 ? "" : "s"} added or updated.` : "Shopify synced · everything is up to date.");
+  } catch (e) {
+    const code = e && e.code;
+    const msg = code === "needs_reauth" ? "Shopify needs you to sign in again: claude.ai → Settings → Connectors → Shopify → Reconnect."
+      : code === "server_not_connected" ? "Connect Shopify for live orders: claude.ai → Settings → Connectors → add Shopify."
+      : code === "not_in_manifest" ? "Shopify isn't allowed for this page. Open the artifact's Permissions menu and allow Shopify."
+      : code === "blocked_by_policy" || code === "approval_required" ? "Your organization blocks Shopify for this page."
+      : code === "selection_required" ? "Pick which Shopify connection to use in the prompt claude.ai showed."
+      : (e && e.message) ? "Shopify sync failed: " + e.message : "Shopify sync failed. It will try again in a minute.";
+    S.shop = { ...S.shop, state: ["needs_reauth", "server_not_connected", "not_in_manifest", "blocked_by_policy", "approval_required"].includes(code) ? "blocked" : "error", msg };
+    if (manual) toast(msg);
+  } finally { shopBusy = false; paintShop(); }
+}
+function shopChip() {
+  if (!canSee("SALES") && !canSee("PACKING")) return "";
+  const st = S.shop;
+  if (st.state === "off") return S.mcp === null ? `<span class="shop-chip off" title="Live Shopify sync works when the app is open in claude.ai">Shopify sync off in this view</span>` : "";
+  const label = st.state === "syncing" ? "Syncing Shopify…" : st.state === "ok" ? `Shopify live · ${st.n} open · ${new Date(st.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}` : st.state === "blocked" ? "Shopify not connected" : "Shopify sync paused";
+  return `<button type="button" class="shop-chip ${st.state}" data-act="shop-sync" title="${esc(st.msg || "Syncs unfulfilled Shopify orders every minute. Click to sync now.")}"><i></i>${esc(label)}</button>${st.msg && st.state !== "ok" ? `<span class="shop-msg">${esc(st.msg)}</span>` : ""}`;
+}
+function paintShop() { document.querySelectorAll(".shop-slot").forEach(el => { el.innerHTML = shopChip(); }); }
+async function startShopSync(c) {
+  S.mcp = c?.use ? await c.use("mcp").catch(() => null) : null;
+  if (!S.mcp) { paintShop(); return; }
+  S.shop.state = "syncing"; paintShop();
+  const t0 = Date.now();
+  while (S.db && (!S.loaded.orders || !S.loaded.products)) { if (Date.now() - t0 > 20000) break; await new Promise(r => setTimeout(r, 300)); }
+  await shopSync(false);
+  shopTimer = setInterval(() => { if (S.shop.state !== "blocked") shopSync(false); }, SHOP_EVERY);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && S.shop.state !== "blocked" && Date.now() - S.shop.at > SHOP_EVERY) shopSync(false); });
+}
+
 /* ---------- boot ---------- */
 S.att.date = mToday(); S.att.month = S.att.date.slice(0, 7);
 S.pay.month = mToday().slice(0, 7); S.pay.half = Number(mToday().slice(8)) <= 15 ? 1 : 2;
@@ -3293,6 +3426,7 @@ render();
     }
   }
   render();
+  startShopSync(c);
 })();
 })();
 </script>

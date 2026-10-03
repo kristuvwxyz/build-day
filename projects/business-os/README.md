@@ -68,6 +68,12 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - An unknown code opens "Add listing" with the barcode filled in.
 - **To pack:** scanning or typing an order number opens that order.
 
+## Shopify live sync
+- While the app is open in claude.ai, it pulls every **unfulfilled / on-hold** Shopify order through your Shopify connector, then again every minute. It adds new orders and updates payment, fulfillment, tags and notes.
+- An order that's fulfilled or cancelled in Shopify gets updated in the app on the next sync.
+- The chip on Home → Orders and Sales → Orders shows the status. Click it to sync now.
+- It needs the Shopify connector signed in (claude.ai → Settings → Connectors). The first sync asks you to allow Shopify for the page.
+
 ## Look and feel
 - Each department has its own colour, used in the menu, page title, tabs, cards and task rows.
 - The Home banner is smaller.
