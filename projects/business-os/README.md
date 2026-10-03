@@ -52,3 +52,20 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - **BIR records:**
   - Daily sales per month, with totals by payment method and by quarter, and BIR tax payments.
   - "Add this month's paid orders from Sales" copies orders from the Sales tab into the month.
+
+## Listings (Sales, Admin, Marketing)
+- One shared product list, edited from the Listings tab in Sales, Admin or Marketing.
+- **Fields:** photo, brand, size, type (sealed, tester, partial and so on), price, compare-at price, cost, stock, SKU, barcode, category, description and website link.
+- **Website sync:** every add or edit is marked "To sync". A live connection to regal.famcoventures.com isn't set up yet; until then, use Export to get the file for the website.
+- **Import CSV:** columns are matched by name, and a matching SKU or barcode updates the existing listing.
+
+## Packing: barcode scan
+- **Inventory → Scan barcode** works with a USB or Bluetooth scanner (it types the code and presses Enter) or with the phone camera.
+- **Modes:** Receive +1, Remove −1 and Look up. Undo reverses the last scan.
+- An unknown code opens "Add listing" with the barcode filled in.
+- **To pack:** scanning or typing an order number opens that order.
+
+## Look and feel
+- Each department has its own colour, used in the menu, page title, tabs, cards and task rows.
+- The Home banner is smaller.
+- Home has an Orders panel with big To pack, On hold, Unpaid and New today tiles, plus the oldest open orders, each clickable.
