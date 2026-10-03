@@ -141,3 +141,12 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - Anyone not in the directory sees a locked screen and can send an access request; the owner links them in Admin → Team → Access requests.
 - Orders tab, Orders menu item and order search are hidden from Marketing.
 - Task views follow department access (CEO all, Admin all but CEO, others own department).
+
+## Batch 5: orders, disputes, speed
+- DISPUTE tag: always suggested; ⚠️ Dispute badge on order rows; order sheet warns and asks for a second Save before To ship / Shipped; bulk To ship / Shipped skips disputed orders.
+- Admin → Disputes tab: every DISPUTE order, with a Resolved button that removes the tag.
+- Order sheet: action bar at the top (Edit items, Merge, Unmerge, Delete); Merge picks other open orders, same customer first.
+- Back button when moving between sheets (order → customer → order).
+- Archived orders: "Unarchive" (restores the last payment and fulfillment status), select one or all, bulk Unarchive / Delete forever.
+- Dropdowns no longer snap shut: background updates wait while a dropdown is open and are batched.
+- Faster on low-end devices: cached number/date formatters, memoized customer list and order stats.
