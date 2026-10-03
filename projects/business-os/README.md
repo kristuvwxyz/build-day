@@ -150,3 +150,17 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - Archived orders: "Unarchive" (restores the last payment and fulfillment status), select one or all, bulk Unarchive / Delete forever.
 - Dropdowns no longer snap shut: background updates wait while a dropdown is open and are batched.
 - Faster on low-end devices: cached number/date formatters, memoized customer list and order stats.
+
+## Batch 6
+- Directory: Company IDs (TIN, SSS, PhilHealth, Pag-IBIG) stored encrypted with the logins vault passphrase; emergency contact (name, relationship, phone).
+- Finance dues and checks show on Gigi's and Yany's calendars (editable per due: "Shows on the calendar of").
+- Sideways scrolling keeps its place when the screen refreshes (tables, tabs, filter bars).
+- Sales stats strip only on CEO → Orders.
+- Stage tags (8.FWD, 7.CONF, 6.BILLED, 5.DP, 4.ARRIVED, 3.SORTED, 2.AB) become the Fulfillment Status and are removed from Tags (existing orders cleaned up once; Shopify imports too).
+- Shopify syncs every 30 minutes, or with Sync now.
+- Orders: "All months" filter (SEPT 2026 · n orders · n still open).
+- Order screen: Assigned to beside Merge, tracking at the bottom, items open their inventory listing.
+- Awards visible to the CEO only.
+- My account → Developer options → View as (owner only; preview, nothing saves).
+- Customer names open their order history (orders, archived, disputes, popups).
+- Suppliers: no payment filter, status chips like the supplier bar, search on top.

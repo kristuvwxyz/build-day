@@ -112,6 +112,7 @@ h2 { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: u
 .toolbar input, .toolbar select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
 .toolbar input { flex: 1 1 200px; }
 
+.table-wrap, .strip, .tabs, .team-strip, .supbar { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -498,6 +499,10 @@ tr[data-lrow] { cursor: pointer; } tr[data-lrow]:hover td { background: var(--su
 .gs { position: relative; display: flex; align-items: center; }
 body.no-orders .gs { display: none !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.oactions .oassign { width: auto; max-width: 220px; padding: 6px 10px; font-size: 13px; }
+.item-link { text-align: left; font: inherit; font-weight: 600; color: inherit; }
+#viewas-bar { position: sticky; top: 0; z-index: 60; background: #7c3aed; color: #fff; font-size: 13px; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#viewas-bar .btn { background: #fff; color: #4c1d95; border-color: #fff; }
 .oactions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .sheet-back { align-self: flex-start; margin-bottom: -4px; }
 .gs .gs-in { width: 100%; border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 9px 10px 9px 32px; font-size: 14px; }
@@ -581,9 +586,9 @@ const PAYMENTS = [
 /* pre-order pipeline stages come from Shopify tags (8.FWD … 2.AB); lower number = further along */
 const STAGES = [
   { id: "fwd", name: "FWD", tag: "8.FWD", cls: "violet hollow" },
-  { id: "to_confirm", name: "To confirm", tag: "7.CONF", cls: "violet hollow" },
+  { id: "to_confirm", name: "To Confirm", tag: "7.CONF", cls: "violet hollow" },
   { id: "billed", name: "Billed", tag: "6.BILLED", cls: "blue hollow" },
-  { id: "dp", name: "Partially paid (DP)", tag: "5.DP", cls: "blue hollow" },
+  { id: "dp", name: "Partially paid", tag: "5.DP", cls: "blue hollow" },
   { id: "arrived", name: "Arrived", tag: "4.ARRIVED", cls: "teal hollow" },
   { id: "sorted", name: "Sorted", tag: "3.SORTED", cls: "teal hollow" },
   { id: "arrived_hold", name: "Arrived-Hold", tag: "2.AB", cls: "orange hollow" },
@@ -602,11 +607,13 @@ const STAGE_IDS = new Set(STAGES.map(x => x.id));
 const OPEN_FUL = new Set(["unfulfilled", "on_hold", ...STAGE_IDS]);
 const normTag = t => String(t || "").toUpperCase().replace(/\s+/g, "");
 const isDispute = o => (o.tags || []).some(t => normTag(t) === "DISPUTE");
+const custLink = o => o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "";
 const disputeChip = o => isDispute(o) ? `<span class="badge red" title="This order has a DISPUTE tag. Check it's resolved before dispatch.">⚠️ Dispute</span>` : "";
 const tagStage = tags => { const set = new Set((tags || []).map(normTag)); for (let i = STAGES.length - 1; i >= 0; i--) if (set.has(STAGES[i].tag)) return STAGES[i].id; return ""; };
 /* open orders follow their stage tag; a stage with its tag removed falls back to To ship */
 const fulFromTags = (f, tags) => !OPEN_FUL.has(f) ? f : (tagStage(tags) || (STAGE_IDS.has(f) ? "unfulfilled" : f));
 const STAGE_TAGS = new Set(STAGES.map(x => x.tag));
+const stripStage = tags => (tags || []).filter(t => !STAGE_TAGS.has(normTag(t)));
 const withStageTag = (tags, f) => { const st = STAGES.find(x => x.id === f); const rest = (tags || []).filter(t => !STAGE_TAGS.has(normTag(t))); return st ? [...rest, st.tag] : rest; };
 const COURIERS = ["J&T", "SDD"];
 const SHOP_COMPANY = { "J&T": "J&T Express", SDD: "Other" };
@@ -810,8 +817,8 @@ async function updateOrder(o, ch) {
   ch = { ...ch };
   const upd = { ...ch }, now = Date.now();
   let stockDelta = 0;
-  if (ch.fulfillment && ch.fulfillment !== o.fulfillment) { if (OPEN_FUL.has(ch.fulfillment)) upd.tags = withStageTag(ch.tags || o.tags, ch.fulfillment); }
-  else if (ch.tags) { const f = fulFromTags(o.fulfillment, ch.tags); if (f !== o.fulfillment) { upd.fulfillment = f; ch = { ...ch, fulfillment: f }; } }
+  // Stage tags (8.FWD … 2.AB) are not kept as tags: typing one sets the Fulfillment Status instead.
+  if (ch.tags) { const st = tagStage(ch.tags); upd.tags = stripStage(ch.tags); if (st && (!ch.fulfillment || ch.fulfillment === o.fulfillment) && OPEN_FUL.has(o.fulfillment) && st !== o.fulfillment) { upd.fulfillment = st; ch = { ...ch, fulfillment: st }; } }
   if (ch.fulfillment && ch.fulfillment !== o.fulfillment) {
     if (ch.fulfillment === "fulfilled") upd.fulfilledAt = o.fulfilledAt || now;
     if (ch.fulfillment === "delivered") { upd.deliveredAt = now; upd.fulfilledAt = o.fulfilledAt || now; }
@@ -834,6 +841,7 @@ async function updateOrder(o, ch) {
 }
 
 function writeErr(e) {
+  if (e && e.code === "viewas") { toast("Preview only: you're viewing as a team member, so nothing was saved."); return; }
   if (e && e.code === "invalid_argument") { S.readOnly = true; toast("You have view-only access. Ask the owner for Contributor access to make changes."); render(); }
   else if (e && e.code === "quota_exceeded") toast("Storage is full. Delete old records to add new ones.");
   else toast("Couldn't save. Check your connection and try again.");
@@ -1391,7 +1399,7 @@ async function saveEomCfg() {
 }
 
 /* ---------- rendering ---------- */
-function renderNavPre() { try { renderPomo(); } catch (e) {} }
+function renderNavPre() { try { renderPomo(); } catch (e) {} try { viewAsBar(); } catch (e) {} }
 function renderNav() {
   renderNavPre();
   const item = (attrs, icon, label, current, extra = "", cls = "") => `<button type="button" class="${cls}" ${attrs} ${current ? 'aria-current="page"' : ""}>${svg(icon)}<span>${label}</span>${extra}</button>`;
@@ -1403,7 +1411,7 @@ function renderNav() {
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
     (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders") : "") +
     item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") +
-    item('data-nav="eom"', "award", "Awards", S.view === "eom") +
+    (isCEO() ? item('data-nav="eom"', "award", "Awards", S.view === "eom") : "") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
     visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico"), "desktop-only dept-item")).join("") +
@@ -1455,7 +1463,13 @@ function periodSeg() {
   return `<div class="seg" role="group" aria-label="Period">${[["month", "This month"], ["last", "Last month"], ["all", "All time"]].map(([k, l]) => `<button type="button" data-period="${k}" aria-pressed="${S.period === k}">${l}</button>`).join("")}</div>`;
 }
 
-function render() { renderInner(); enhanceTables(); enhanceSearch(); }
+const SCROLLERS = "#view .table-wrap, #view .strip, #view .tabs, #view .team-strip, #view .supbar, #view .seg";
+function render() {
+  const keep = [...document.querySelectorAll(SCROLLERS)].map(e => e.scrollLeft), y = window.scrollY, key = S.view + "|" + S.dept + "|" + S.tab;
+  renderInner(); enhanceTables(); enhanceSearch();
+  if (key === S._rkey) { document.querySelectorAll(SCROLLERS).forEach((e, i) => { if (keep[i]) e.scrollLeft = keep[i]; }); if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); }
+  S._rkey = key;
+}
 // Background updates (live sync, Shopify) are batched into one redraw, and wait while a
 // dropdown is open so it doesn't snap shut under the user's finger.
 let bgT = 0; S.lastAct = 0;
@@ -1502,7 +1516,7 @@ function renderInner() {
   if (S.view === "tasks") { v.innerHTML = viewTasks(null); return; }
   if (S.view === "account") { v.innerHTML = viewAccount(); return; }
   if (S.view === "attendance") { v.innerHTML = viewAttendance(); return; }
-  if (S.view === "eom") { v.innerHTML = viewEom(); return; }
+  if (S.view === "eom") { if (!isCEO()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewEom(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
   if (S.view === "orders") { if (!canOrders()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewOrders(); return; }
   if (!canSee(S.dept)) { v.innerHTML = `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} isn't part of your access</h2><div class="empty">${myMemberId() ? "Your department decides what you can open. Ask the owner if you need this one." : "Your account isn't linked to the team directory yet."}</div></div>`; return; }
@@ -1528,7 +1542,32 @@ const initials = n => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w 
 const normName = x => String(x || "").toLowerCase().replace(/[^a-z]/g, "");
 const ownerMember = () => S.team.find(m => normName(m.name) === "kristinhsumiran") || S.team.find(m => /kristin/.test(normName(m.name)) && /sumiran/.test(normName(m.name))) || member("m-000001");
 const emailsOf = m => String(m.email || "").toLowerCase().split(/[\s,;]+/).filter(Boolean);
+// "View as" preview: the owner sees the app exactly as a team member would, but nothing can be saved.
+const VIEWAS_ERR = { code: "viewas" };
+function roRef(r) {
+  const w = {};
+  for (const k of ["onSnapshot", "get"]) if (typeof r[k] === "function") w[k] = (...a) => r[k](...a);
+  for (const k of ["doc", "collection", "where", "orderBy", "limit"]) if (typeof r[k] === "function") w[k] = (...a) => roRef(r[k](...a));
+  for (const k of ["set", "update", "delete", "add"]) w[k] = async () => { throw VIEWAS_ERR; };
+  return w;
+}
+const roDb = db => ({ collection: c => roRef(db.collection(c)), doc: p => roRef(db.doc(p)) });
+function viewAsBar() {
+  let el = document.getElementById("viewas-bar");
+  if (!S.viewAs) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement("div"); el.id = "viewas-bar"; document.body.prepend(el); }
+  const m = member(S.viewAs) || {};
+  const h = `👁 Viewing as <b>${esc(m.name || "team member")}</b> · ${esc((dept(m.department) || {}).name || "")}. Preview only: nothing is saved. <button type="button" class="btn sm" data-act="viewas-stop">Stop viewing as</button>`;
+  if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
+}
+function devPanel() {
+  if (!S.realOwner) return "";
+  return `<section class="panel"><h2>Developer options</h2>
+    <div class="field"><label for="dev-viewas">View as</label><select id="dev-viewas"><option value="">Myself (owner)</option>${activeTeam().filter(m => m.id !== (ownerMember() || {}).id).map(m => `<option value="${m.id}" ${S.viewAs === m.id ? "selected" : ""}>${esc(m.name)} · ${esc((dept(m.department) || {}).name || "")}</option>`).join("")}</select></div>
+    <div style="font-size:12px;color:var(--muted)">See the app exactly as that person does: their menu, departments, tasks and buttons. It's a preview: anything you try to save is blocked. Department passwords still apply.</div></section>`;
+}
 function boundMember() {
+  if (S.viewAs) return member(S.viewAs) || null;
   if (S.isOwner) return ownerMember() || null;
   if (!S.uid) return member((S.profile || {}).memberId) || null;
   const em = String((S.me && S.me.email) || "").toLowerCase();
@@ -1733,8 +1772,9 @@ function viewTasks(forceDept) {
     const cells = [];
     for (let i = 0; i < weeks * 7; i++) { const d = new Date(y, m - 1, 1 - first.getDay() + i); cells.push(dstr(d.getTime())); }
     const dayTasks = scoped.filter(t => onDay(t, S.t.day));
-    const showMoney = finOpen() && (!forceDept || forceDept === "FINANCE");
-    const money = showMoney ? moneyEvents(cells[0], cells[cells.length - 1]) : [];
+    const pPerson = !forceDept && S.t.scope === "person" ? S.t.person : "";
+    const showMoney = (finOpen() || DUE_PEOPLE.includes(myMemberId())) && (!forceDept || forceDept === "FINANCE");
+    const money = showMoney ? moneyEvents(cells[0], cells[cells.length - 1]).filter(e => !pPerson || e.who.includes(pPerson)) : [];
     const moneyOn = d => money.filter(e => e.date === d);
     const dayMoney = moneyOn(S.t.day);
     main = `<div class="cal">
@@ -1850,11 +1890,11 @@ function viewHome() {
   <section class="today" aria-label="Today">
     <button type="button" data-nav="tasks"><b class="num">${mine.length}</b><span>My open tasks</span></button>
     <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
-    ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="eom"><b>🏆</b><span>Employee of the Month</span></button>`}
+    ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="tasks"><b class="num">${visTasks().filter(t => t.status === "in_progress").length}</b><span>In progress</span></button>`}
     <div>${st ? `<b style="font-size:20px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
       : `<b style="font-size:20px">–</b><span>Attendance</span><span style="font-size:12px">Not linked</span>`}</div>
   </section>
-  ${eomHomeCard()}
+  ${isCEO() ? eomHomeCard() : ""}
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
     ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 5).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
       : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your tasks here.</div>`}
@@ -1914,6 +1954,7 @@ function viewAccount() {
   ${myClockCard()}
   ${mySalary()}
   ${workStylePanel()}
+  ${devPanel()}
   <section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div style="font-size:12px;color:var(--muted)">System follows your device's light or dark setting. Saved on this device.</div></section>
   <section class="panel"><h2>Department access</h2>
     ${S.isOwner ? `<div class="empty">You own this app, so every department opens without a password.</div>` : `
@@ -1994,7 +2035,7 @@ function viewTeamDir() {
     <div class="toolbar"><input id="tq" type="search" placeholder="Search ID, name, phone, email, address" value="${esc(S.tq || "")}" aria-label="Search directory">
       <select id="tstatus" aria-label="Status">${[["active", "Active"], ["inactive", "Inactive"], ["all", "All"]].map(([k, l]) => `<option value="${k}" ${sf === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     <div class="table-wrap"><table class="otable dir">
-    <thead><tr><th>ID Number</th><th>Nickname</th><th>Full Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Department</th><th>Birthday</th><th>Favorite scent</th><th>Date Started</th><th>Status</th></tr></thead>
+    <thead><tr><th>ID Number</th><th>Nickname</th><th>Full Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Department</th><th>Birthday</th><th>Favorite scent</th><th>Date Started</th><th>Emergency contact</th><th>Company IDs</th><th>Status</th></tr></thead>
     <tbody>${rows.map(m => `<tr ${S.canEdit ? `data-act="edit-member" data-id="${m.id}"` : ""} style="${S.canEdit ? "" : "cursor:default"}">
       <td class="nowrap num" style="box-shadow:inset 4px 0 0 ${DEPT_COLORS[m.department] || "var(--line)"}">${esc(m.idNumber || "")}</td>
       <td style="font-weight:600"><span style="display:inline-flex;gap:10px;align-items:center">${avatar(m, 34)}${esc(m.nickname || "")}</span></td>
@@ -2006,11 +2047,17 @@ function viewTeamDir() {
       <td class="nowrap">${m.birthday ? fmtBday(m.birthday) + (isBirthday(m) ? " 🎂" : "") : ""}</td>
       <td>${esc(scentOf(m.id))}</td>
       <td class="nowrap">${m.started ? new Date(m.started + "T12:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : ""}</td>
+      <td style="font-size:12.5px;min-width:160px">${m.emergency && m.emergency.name ? `${esc(m.emergency.name)}${m.emergency.relation ? " (" + esc(m.emergency.relation) + ")" : ""}<br><span class="num" style="user-select:all">${esc(m.emergency.phone || "")}</span>` : ""}</td>
+      <td class="nowrap" style="font-size:12.5px">${m.govIds ? "🔒 On file" : `<span style="color:var(--muted)">–</span>`}</td>
       <td><span class="chip ${m.status === "inactive" ? "" : "good"}">${m.status === "inactive" ? "Inactive" : "Active"}</span></td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.team.length ? "No one matches." : S.canEdit ? "No team members yet. Click “Add team member”, including staff without a Claude account." : "Ask the owner to add the team."}</div>`}</div>`;
 }
-function openMemberForm(id) {
+const GOV_IDS = [["tin", "TIN"], ["sss", "SSS"], ["philhealth", "PhilHealth"], ["pagibig", "Pag-IBIG"]];
+async function openMemberForm(id) {
   const m = id ? member(id) : { status: "active" };
+  let gov = {}; if (S.vaultKey && m.govIds) { try { gov = JSON.parse(await vDec(S.vaultKey, m.govIds)); } catch (e) {} }
+  const ec = m.emergency || {};
+  S.sheetReopen = () => openMemberForm(id);
   const nextId = () => { let max = 0; for (const x of S.team) { const n = Number(String(x.idNumber || "").replace(/\D/g, "")); if (n > max) max = n; } const s = String(max + 1).padStart(6, "0"); return s.slice(0, 3) + " " + s.slice(3); };
   openSheet(`
     <h3>${id ? "Edit team member" : "Add team member"}</h3>
@@ -2038,6 +2085,15 @@ function openMemberForm(id) {
       ${m.photo ? `<button class="btn sm ghost" type="button" data-act="m-photo-clear">Remove</button>` : ""}
       <input type="hidden" id="m-photo" value="${esc(m.photo || "")}"></div>
       <div style="font-size:12px;color:var(--muted)">Cropped to a square and made small automatically.</div></div>
+    <div class="field"><label>Company IDs</label>
+      ${S.vaultKey ? `<div class="row">${GOV_IDS.map(([k, l]) => `<div class="field"><label for="m-g-${k}" style="font-weight:400">${l}</label><input id="m-g-${k}" value="${esc(gov[k] || "")}" autocomplete="off" inputmode="numeric"></div>`).join("")}</div>
+        <div style="font-size:12px;color:var(--muted)">Saved encrypted with the logins vault passphrase. Only people who unlock the vault can see these.</div>`
+      : S.vault ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:13px;color:var(--muted)">🔒 ${m.govIds ? "IDs on file." : "No IDs yet."} Unlock to view or edit:</span><input id="mv-pass" type="password" placeholder="Vault passphrase" autocomplete="off" style="width:auto;flex:1;min-width:140px"><button class="btn sm" type="button" data-act="mv-unlock" data-id="${id || ""}">Unlock</button></div>`
+      : `<div style="font-size:13px;color:var(--muted)">Set up the vault in Admin → Logins first. TIN, SSS, PhilHealth and Pag-IBIG are stored encrypted with it.</div>`}</div>
+    <div class="field"><label>Emergency contact</label><div class="row">
+      <div class="field"><label for="m-ec-name" style="font-weight:400">Name</label><input id="m-ec-name" value="${esc(ec.name || "")}"></div>
+      <div class="field"><label for="m-ec-rel" style="font-weight:400">Relationship</label><input id="m-ec-rel" value="${esc(ec.relation || "")}" placeholder="e.g. Mother"></div>
+      <div class="field"><label for="m-ec-phone" style="font-weight:400">Phone</label><input id="m-ec-phone" type="tel" value="${esc(ec.phone || "")}"></div></div></div>
     <div class="row">
       <div class="field"><label for="m-status">Status</label><select id="m-status"><option value="active" ${m.status !== "inactive" ? "selected" : ""}>Active</option><option value="inactive" ${m.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
     </div>
@@ -2049,6 +2105,8 @@ function openMemberForm(id) {
     if (!val("m-name")) return sheetError("Enter the full name.");
     const data = { ...(id ? clean(m) : {}), idNumber: val("m-idn"), nickname: val("m-nick"), name: val("m-name"), phone: val("m-phone"), email: val("m-email").toLowerCase(), address: val("m-addr"), department: val("m-dept"), role: val("m-role"), started: val("m-start"), birthday: val("m-bday"), photo: document.getElementById("m-photo").value, status: val("m-status") };
     delete data.contact;
+    data.emergency = { name: val("m-ec-name"), relation: val("m-ec-rel"), phone: val("m-ec-phone") };
+    if (S.vaultKey && $("#m-g-tin")) { const g = Object.fromEntries(GOV_IDS.map(([k]) => [k, val("m-g-" + k)]).filter(x => x[1])); data.govIds = Object.keys(g).length ? await vEnc(S.vaultKey, JSON.stringify(g)) : null; }
     await save("team", id || uid("m"), data);
     closeSheet(); toast(id ? "Team member updated." : "Team member added.");
   });
@@ -2176,6 +2234,7 @@ function filteredOrders() {
     if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
     if (S.of.sup && S.of.sup !== "all" && !(o.tags || []).some(t => t.toUpperCase() === S.of.sup)) return false;
     if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
+    if (S.of.month && dstr(o.createdAt || 0).slice(0, 7) !== S.of.month) return false;
     if (vw === "unfulfilled" && (o.fulfillment !== "unfulfilled" || isVoid(o))) return false;
     if (vw === "unpaid" && !(o.payment === "pending" || o.payment === "partial")) return false;
     if (vw === "on_hold" && o.fulfillment !== "on_hold") return false;
@@ -2304,7 +2363,7 @@ function notesPop(btn) {
   closePop(); const o = findOrder(btn.dataset.notes); if (!o) return;
   const r = btn.getBoundingClientRect();
   const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop";
-  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span></div>${o.note ? `<div class="ipop-n"><div class="olog-h">Order note</div><div style="white-space:pre-wrap">${esc(o.note)}</div></div>` : ""}${(o.comments || []).map(c => `<div class="ipop-n"><div class="olog-h">Shopify comment · ${relTime(c.at)}</div><div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join("")}<button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
+  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${custLink(o)}</span></div>${o.note ? `<div class="ipop-n"><div class="olog-h">Order note</div><div style="white-space:pre-wrap">${esc(o.note)}</div></div>` : ""}${(o.comments || []).map(c => `<div class="ipop-n"><div class="olog-h">Shopify comment · ${relTime(c.at)}</div><div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join("")}<button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
   el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
@@ -2339,7 +2398,13 @@ function openSupplierList() {
     <div style="font-size:12px;color:var(--muted)">Supplier invoices will link here next.</div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button>${S.dl ? `<button class="btn" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn primary" type="button" data-act="sup-copy">Copy list</button></div>`, null);
 }
-const ofActive = () => !!(S.of.q || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all" || (S.of.sup && S.of.sup !== "all"));
+const MON_UP = ["JAN", "FEB", "MAR", "APR", "MAY", "JUNE", "JULY", "AUG", "SEPT", "OCT", "NOV", "DEC"];
+const monUp = ym => MON_UP[Number(ym.slice(5, 7)) - 1] + " " + ym.slice(0, 4);
+function monthSelect() {
+  const m = memo("omonths", [S.orders, S.orders.length], () => { const c = new Map(); for (const o of S.orders) { if (!o.createdAt) continue; const k = dstr(o.createdAt).slice(0, 7), x = c.get(k) || { n: 0, open: 0 }; x.n++; if (OPEN_FUL.has(o.fulfillment) && !isVoid(o)) x.open++; c.set(k, x); } return [...c].sort((a, b) => b[0].localeCompare(a[0])); });
+  return `<select id="of-month" aria-label="Month placed"><option value="">All months</option>${m.map(([k, x]) => `<option value="${k}" ${S.of.month === k ? "selected" : ""}>${monUp(k)} · ${x.n} order${x.n === 1 ? "" : "s"}${x.open ? ` · ${x.open} still open` : ""}</option>`).join("")}</select>`;
+}
+const ofActive = () => !!(S.of.month || S.of.q || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all" || (S.of.sup && S.of.sup !== "all"));
 function packTools() {
   const open = S.orders.filter(o => !isVoid(o) && PACK_SHOW.includes(o.fulfillment)), toShip = open.filter(o => o.fulfillment === "unfulfilled");
   return `<div class="kpis">
@@ -2364,15 +2429,16 @@ function viewOrders() {
       ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
       ${canShip() ? `<button class="btn sm" type="button" data-act="jnt-file">J&T booking file</button>` : ""}
       ${canAll() ? `<button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>
-      <input id="bulk-tag" placeholder="Tag e.g. 8.FWD" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
+      <input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
   return `
   <div class="shop-slot shop-line">${shopChip()}</div>
-  ${statsStrip()}
+  ${S.view === "dept" && S.dept === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
   <div class="bigsearch">${svg("search")}<input id="of-q" type="search" placeholder="Search order #, customer, phone, product, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
   <div class="toolbar">
+    ${monthSelect()}
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
     <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
     <select id="of-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${S.of.pay === f.id ? "selected" : ""}>${f.name} (${S.orders.filter(o => o.payment === f.id).length})</option>`).join("")}</select>
@@ -2393,7 +2459,7 @@ function viewSuppliers() {
   const sp = S.sp || (S.sp = { sup: "all", ful: "all", pay: "all", q: "" });
   const m = new Map(); for (const o of S.orders) for (const t of o.tags || []) if (/^S-/i.test(t)) m.set(t.toUpperCase(), (m.get(t.toUpperCase()) || 0) + 1);
   const q = sp.q.trim().toLowerCase();
-  const os = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)) && (sp.ful === "all" || o.fulfillment === sp.ful) && (sp.pay === "all" || o.payment === sp.pay)
+  const os = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)) && (sp.ful === "all" || o.fulfillment === sp.ful)
     && (!q || [o.num, ...(o.merged || []), o.customer, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q))).sort(orderSorter());
   const agg = new Map();
   for (const o of os) for (const i of o.items || []) { const k = i.name || "?"; const a = agg.get(k) || { name: k, qty: 0, orders: [] }; a.qty += Number(i.qty) || 0; a.orders.push(i.from || o.num); agg.set(k, a); }
@@ -2402,14 +2468,12 @@ function viewSuppliers() {
   S.supText = `ORDER LIST · ${label} · ${mToday()}\n` + rows.map(r => `${r.qty}x ${r.name}  (${[...new Set(r.orders)].map(n => "#" + n).join(", ")})`).join("\n") + `\n\nTotal pcs: ${rows.reduce((a, r) => a + r.qty, 0)}`;
   S.supRows = [["Qty", "Item", "Orders"], ...rows.map(r => [r.qty, r.name, [...new Set(r.orders)].map(n => "#" + n).join(" ")])];
   S.supLabel = label;
-  const active = sp.sup !== "all" || sp.ful !== "all" || sp.pay !== "all" || sp.q;
-  return `<div class="supbar"><span class="lab">Supplier</span><button type="button" data-spsup="all" aria-pressed="${sp.sup === "all"}">All <span>${S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t))).length}</span></button>${[...m].sort().map(([t, n]) => `<button type="button" data-spsup="${esc(t)}" aria-pressed="${sp.sup === t}">${esc(t)} <span>${n}</span></button>`).join("")}</div>
-  <div class="bigsearch">${svg("search")}<input id="spq" type="search" placeholder="Search item, order # or customer" value="${esc(sp.q)}" aria-label="Search supplier orders" autocomplete="off"></div>
-  <div class="toolbar">
-    <select id="sp-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${sp.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""}</option>`).join("")}</select>
-    <select id="sp-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${sp.pay === f.id ? "selected" : ""}>${f.name}</option>`).join("")}</select>
-    ${active ? `<button class="btn ghost" type="button" data-act="sp-clear">✕ Clear filters</button>` : ""}
-  </div>
+  const active = sp.sup !== "all" || sp.ful !== "all" || sp.q;
+  const sAll = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)));
+  const fc = new Map(); sAll.forEach(o => fc.set(o.fulfillment, (fc.get(o.fulfillment) || 0) + 1));
+  return `<div class="bigsearch">${svg("search")}<input id="spq" type="search" placeholder="Search item, order # or customer" value="${esc(sp.q)}" aria-label="Search supplier orders" autocomplete="off"></div>
+  <div class="supbar"><span class="lab">Supplier</span><button type="button" data-spsup="all" aria-pressed="${sp.sup === "all"}">All <span>${S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t))).length}</span></button>${[...m].sort().map(([t, n]) => `<button type="button" data-spsup="${esc(t)}" aria-pressed="${sp.sup === t}">${esc(t)} <span>${n}</span></button>`).join("")}</div>
+  <div class="supbar"><span class="lab">Status</span><button type="button" data-spful="all" aria-pressed="${sp.ful === "all"}">All <span>${sAll.length}</span></button>${FULFILLMENTS.filter(f => fc.get(f.id)).map(f => `<button type="button" data-spful="${f.id}" aria-pressed="${sp.ful === f.id}">${esc(f.name)} <span>${fc.get(f.id)}</span></button>`).join("")}${active ? `<button type="button" data-act="sp-clear">✕ Clear</button>` : ""}</div>
   <section class="panel"><div class="head"><h2>Order list · ${esc(label)} · ${rows.reduce((a, r) => a + r.qty, 0)} pcs from ${os.length} order${os.length === 1 ? "" : "s"}</h2><div style="display:flex;gap:6px">${S.dl ? `<button class="btn sm" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn sm primary" type="button" data-act="sup-copy">Copy list</button></div></div>
     <div class="table-wrap"><table><thead><tr><th class="r">Qty</th><th>Item</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr><td class="r num" style="font-weight:700">${r.qty}</td><td>${esc(r.name)}</td><td style="font-size:12px">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody></table>${rows.length ? "" : `<div class="empty" style="padding:16px">No orders match. Supplier tags look like S-JEFF, S-GAL, S-MEI.</div>`}</div>
     <div style="font-size:12px;color:var(--muted)">Supplier invoices will link here next.</div></section>
@@ -2444,7 +2508,7 @@ function viewDisputes() {
   <div style="font-size:12.5px;color:var(--muted)">Orders tagged DISPUTE. Open one to check it, then press <b>Resolved</b> to remove the tag.</div>
   <div class="table-wrap"><table>
     <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Note</th><th></th></tr></thead>
-    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Archived</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${esc(o.customer || "")}</td><td class="r num nowrap">${peso2(total(o))}</td><td>${o.archived ? "–" : badge(pay(o.payment))}</td><td>${o.archived ? "–" : badge(ful(o.fulfillment))}${risky.includes(o) ? " ⚠️" : ""}</td><td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Archived</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td><td>${o.archived ? "–" : badge(pay(o.payment))}</td><td>${o.archived ? "–" : badge(ful(o.fulfillment))}${risky.includes(o) ? " ⚠️" : ""}</td><td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
       <td class="nowrap">${canAll() || isUnlocked("ADMIN") ? `<button class="btn sm" type="button" data-act="disp-ok" data-id="${o.id}">Resolved</button>` : ""}</td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No disputes. Add the DISPUTE tag to an order to track it here.</div>`}</div>`;
 }
@@ -2459,7 +2523,7 @@ function viewArchived() {
   ${bulk}
   <div class="table-wrap"><table>
     <thead><tr>${ca ? `<th style="width:34px"><input type="checkbox" data-aselall="1" aria-label="Select all" ${allOn ? "checked" : ""}></th>` : ""}<th>Order</th><th>Customer</th><th>Items</th><th class="r">Total</th><th>Archived</th><th>Why</th><th>By</th><th></th></tr></thead>
-    <tbody>${rows.map(o => `<tr data-row="${o.id}">${ca ? `<td><input type="checkbox" data-asel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.asel.has(o.id) ? "checked" : ""}></td>` : ""}<td class="nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}</td><td>${esc(o.customer || "")}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}">${ca ? `<td><input type="checkbox" data-asel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.asel.has(o.id) ? "checked" : ""}></td>` : ""}<td class="nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}</td><td>${custLink(o)}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
       <td class="nowrap">${ca ? `<button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button> <button class="btn ghost sm" type="button" data-act="ask-del-forever" data-id="${o.id}">Delete forever</button>` : ""}</td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No archived orders. “Delete” on an order moves it here; you can unarchive it any time.</div>`}</div>`;
 }
@@ -2548,7 +2612,7 @@ function itemsPop(btn) {
   closePop(); const o = findOrder(btn.dataset.items); if (!o) return;
   const r = btn.getBoundingClientRect();
   const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop"; el.setAttribute("role", "dialog");
-  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span></div>${(o.items || []).map(i => `<div class="ipop-i"><span class="num">${esc(i.qty)}×</span><span>${esc(i.name)}${i.from && (o.merged || []).length ? ` <span class="from">#${esc(i.from)}</span>` : ""}</span><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("") || `<div class="ipop-i">No items</div>`}<div class="ipop-t"><span>Total</span><b class="num">${peso2(total(o))}</b></div><button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
+  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${custLink(o)}</span></div>${(o.items || []).map(i => `<div class="ipop-i"><span class="num">${esc(i.qty)}×</span><span>${esc(i.name)}${i.from && (o.merged || []).length ? ` <span class="from">#${esc(i.from)}</span>` : ""}</span><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("") || `<div class="ipop-i">No items</div>`}<div class="ipop-t"><span>Total</span><b class="num">${peso2(total(o))}</b></div><button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
   el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
@@ -2897,7 +2961,7 @@ const opts = (list, sel) => list.map(s => `<option value="${s.id}" ${sel === s.i
 function allTags() { const m = new Map(); for (const o of S.orders) for (const t of o.tags || []) m.set(t, (m.get(t) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]); }
 function tagField(tags) {
   const sug = ["DISPUTE", ...allTags().filter(t => t !== "DISPUTE").slice(0, 14)];
-  return `<div class="field"><label for="o-tags">Tags (comma separated)</label><input id="o-tags" value="${esc((tags || []).join(", "))}" placeholder="e.g. 1.AA, 6.BILLED, 8.FWD" autocomplete="off">
+  return `<div class="field"><label for="o-tags">Tags (comma separated)</label><input id="o-tags" value="${esc((tags || []).join(", "))}" placeholder="e.g. DISPUTE, S-JEFF" autocomplete="off"><div style="font-size:12px;color:var(--muted)">Stage tags like 8.FWD or 6.BILLED set the Fulfillment Status instead of staying as tags.</div>
     ${sug.length ? `<div class="tags" style="flex-wrap:wrap;margin-top:4px">${sug.map(t => `<button type="button" class="tag" data-addtag="${esc(t)}">+ ${esc(t)}</button>`).join("")}</div>` : ""}</div>`;
 }
 
@@ -2972,12 +3036,12 @@ function openOrderDetails(id) {
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
     <div class="sheet-title"><h3>${esc(onum(o))}</h3></div>
-    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
+    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
     ${isDispute(o) ? `<div class="notice" style="border-color:var(--bad);color:var(--bad)">⚠️ <b>Dispute.</b> Check that this is resolved before dispatch. Remove the DISPUTE tag once it is.</div>` : ""}
     <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
     ${arch ? `<div class="notice">Archived ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(COURIER_LABEL[courierOf(o)])}</span></div>`}
     <div><div style="font-weight:700">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</div><div style="color:var(--muted);font-size:13px;user-select:all">${[o.email, o.phone].filter(Boolean).map(esc).join(" · ")}</div>${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : o.pickup ? `<div style="color:var(--muted);font-size:13px">Pickup${o.shipTitle ? " · " + esc(o.shipTitle) : ""}</div>` : ""}</div>
-    <div class="list">${(o.items || []).map(i => `<div class="li"><div class="main"><div class="t">${esc(i.qty)}× ${esc(i.name)}</div><div class="s num">${showFrom ? `<span class="from">${i.from ? "from #" + esc(i.from) : "order # unknown"}</span> ` : ""}${peso2(i.price)} each${i.cost ? " · cost " + peso2(i.cost) : ""}${i.sku ? " · " + esc(i.sku) : ""}</div></div><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("")}</div>
+    <div class="list">${(o.items || []).map(i => `<div class="li"><div class="main"><div class="t"><button type="button" class="linkish item-link" data-act="item-inv" data-pid="${esc(i.productId || "")}" data-name="${esc(i.name)}" title="Open in inventory">${esc(i.qty)}× ${esc(i.name)}</button></div><div class="s num">${showFrom ? `<span class="from">${i.from ? "from #" + esc(i.from) : "order # unknown"}</span> ` : ""}${peso2(i.price)} each${i.cost ? " · cost " + peso2(i.cost) : ""}${i.sku ? " · " + esc(i.sku) : ""}</div></div><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("")}</div>
     ${multi && (o.items || []).some(i => !i.from) && all ? `<button class="btn sm" type="button" data-act="trace-items" data-id="${o.id}" style="align-self:flex-start">Find which order # each item came from (Shopify)</button>` : ""}
     ${o.note || (o.comments || []).length ? `<div class="notebox">${o.note ? `<div><div class="olog-h">Order note</div><div style="white-space:pre-wrap">${esc(o.note)}</div></div>` : ""}${(o.comments || []).map(c => `<div><div class="olog-h">Shopify comment · ${relTime(c.at)}</div><div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join("")}</div>` : ""}
     <div class="list costs">
@@ -2990,19 +3054,18 @@ function openOrderDetails(id) {
       <div class="li"><span style="font-weight:700">Profit</span><span class="num" style="font-weight:700;color:${profit(o) < 0 ? "var(--bad)" : "var(--good)"}">${isVoid(o) || arch ? "–" : peso2(profit(o))}</span></div>
     </div>
     ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
+    ${cp || cf ? `<div class="row">
+      ${cp ? `<div class="field"><label for="d-pay">Payment status</label><select id="d-pay">${opts(PAYMENTS, o.payment)}</select></div>` : ""}
+      ${cf ? `<div class="field"><label for="d-ful">Fulfillment status</label><select id="d-ful">${opts(FULFILLMENTS, o.fulfillment)}</select></div>` : ""}
+    </div>` : ""}
+    ${all ? `${tagField(o.tags)}
+    <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2">${esc(o.note || "")}</textarea></div>
+    <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Delete moves the order to Archived orders.</div>` : ""}
     ${cs ? `<div class="row">
       <div class="field"><label for="d-track">Tracking # (waybill)</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
       <div class="field"><label for="d-courier">Courier</label><select id="d-courier">${COURIERS.map(c => `<option value="${c}" ${c === courierOf(o) ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select></div>
     </div>
     ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}` : o.tracking ? `<div>🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}
-    ${cp || cf || all ? `<div class="row">
-      ${cp ? `<div class="field"><label for="d-pay">Payment status</label><select id="d-pay">${opts(PAYMENTS, o.payment)}</select></div>` : ""}
-      ${cf ? `<div class="field"><label for="d-ful">Fulfillment status</label><select id="d-ful">${opts(FULFILLMENTS, o.fulfillment)}</select></div>` : ""}
-      ${all ? `<div class="field"><label for="d-assign">Assigned to</label><select id="d-assign"><option value="">Unassigned</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></div>` : ""}
-    </div>` : ""}
-    ${all ? `${tagField(o.tags)}
-    <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2">${esc(o.note || "")}</textarea></div>
-    <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Delete moves the order to Archived orders.</div>` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${editable ? "Cancel" : "Close"}</button>${editable ? `<button class="btn primary" type="submit">Save changes</button>` : ""}</div>
     ${(o.log || []).length ? `<div class="olog"><div class="olog-h">Team activity</div>${[...o.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>` : ""}`,
@@ -3438,7 +3501,7 @@ function shopifyOrders(text) {
       o.items.push({ productId: p ? p.id : "", name: iname, sku, qty, price: Number(get(r, "Lineitem price")) || 0, cost: p ? Number(p.cost) || 0 : 0 });
     }
   }
-  return [...byName.values()].map(o => { o.adjust = Math.round((o.shopifyTotal - itemsTotal(o)) * 100) / 100; delete o.shopifyTotal; o.fulfillment = fulFromTags(o.fulfillment, o.tags); return o; });
+  return [...byName.values()].map(o => { o.adjust = Math.round((o.shopifyTotal - itemsTotal(o)) * 100) / 100; delete o.shopifyTotal; o.fulfillment = fulFromTags(o.fulfillment, o.tags); o.tags = stripStage(o.tags); return o; });
 }
 const cleanPhone = s => (s || "").replace(/^'+/, "").trim();
 const safeId = s => String(s).replace(/[^A-Za-z0-9_\-.]/g, "").slice(0, 120) || uid("x");
@@ -3909,12 +3972,15 @@ async function markPastPaid() {
 const DUE_KINDS = [["investor", "Investor payout"], ["card", "Credit card"], ["bill", "Bill"], ["loan", "Loan"], ["other", "Other"]];
 const dueKind = k => (DUE_KINDS.find(x => x[0] === k) || DUE_KINDS[4])[1];
 const CHECK_STATUS = { pending: { name: "Pending", cls: "warn" }, cleared: { name: "Cleared", cls: "good" }, bounced: { name: "Bounced", cls: "bad" }, cancelled: { name: "Cancelled", cls: "" } };
+// Finance dues and checks show on these people's calendars (Gigi and Yany by default).
+const DUE_PEOPLE = ["m-000007", "m-000008"];
+const dueWho = d => Array.isArray(d.who) ? d.who : DUE_PEOPLE;
 const dueDateIn = (due, ym) => { const [y, m] = ym.split("-").map(Number), dim = new Date(y, m, 0).getDate(); return `${ym}-${String(Math.min(Number(due.day) || 1, dim)).padStart(2, "0")}`; };
 function moneyEvents(from, to) {
   const out = [];
   const months = new Set([from.slice(0, 7), to.slice(0, 7)]); { const [y, m] = from.slice(0, 7).split("-").map(Number); months.add(dstr(new Date(y, m, 1).getTime()).slice(0, 7)); }
-  for (const d of S.dues) if (d.active !== false) for (const ym of months) { const date = dueDateIn(d, ym); if (date >= from && date <= to) out.push({ kind: d.kind, id: d.id, date, title: d.name, sub: dueKind(d.kind) + (d.method ? " · " + d.method : ""), amount: Number(d.amount) || 0, paid: (d.paid || []).includes(ym) }); }
-  for (const c of S.checks) if (c.checkDate && c.checkDate >= from && c.checkDate <= to && c.status !== "cancelled") out.push({ kind: "check", id: c.id, date: c.checkDate, title: `Check #${c.checkNo || "–"} · ${c.payee || ""}`, sub: c.bank || "Check", amount: Number(c.amount) || 0, status: c.status || "pending", paid: c.status === "cleared" });
+  for (const d of S.dues) if (d.active !== false) for (const ym of months) { const date = dueDateIn(d, ym); if (date >= from && date <= to) out.push({ who: dueWho(d), kind: d.kind, id: d.id, date, title: d.name, sub: dueKind(d.kind) + (d.method ? " · " + d.method : ""), amount: Number(d.amount) || 0, paid: (d.paid || []).includes(ym) }); }
+  for (const c of S.checks) if (c.checkDate && c.checkDate >= from && c.checkDate <= to && c.status !== "cancelled") out.push({ who: dueWho(c), kind: "check", id: c.id, date: c.checkDate, title: `Check #${c.checkNo || "–"} · ${c.payee || ""}`, sub: c.bank || "Check", amount: Number(c.amount) || 0, status: c.status || "pending", paid: c.status === "cleared" });
   return out;
 }
 const moneyPill = e => `<button type="button" class="tpill s-money${e.paid ? " paid" : ""}" data-act="${e.kind === "check" ? "edit-check" : "edit-due"}" data-id="${e.id}" title="${esc(e.title)} · ${peso(e.amount)}"><span class="ini">₱</span><span class="tt">${esc(e.title)}</span></button>`;
@@ -3983,6 +4049,7 @@ function openDueForm(id) {
     <div class="row"><div class="field"><label for="du-holder">Holder</label><input id="du-holder" value="${esc(d.holder || "")}"></div>
       <div class="field"><label for="du-active">Status</label><select id="du-active"><option value="1" ${d.active !== false ? "selected" : ""}>Active</option><option value="0" ${d.active === false ? "selected" : ""}>Stopped</option></select></div></div>
     <div class="field"><label for="du-notes">Notes</label><input id="du-notes" value="${esc(d.notes || "")}"></div>
+    <div class="field"><label>Shows on the calendar of</label><div style="display:flex;gap:12px;flex-wrap:wrap">${activeTeam().filter(m => m.department === "FINANCE" || dueWho(d).includes(m.id)).map(m => `<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="du-who" value="${m.id}" ${dueWho(d).includes(m.id) ? "checked" : ""}> ${esc(m.nickname || m.name)}</label>`).join("")}</div></div>
     ${id ? `<div style="font-size:12px;color:var(--muted)">Paid months: ${(d.paid || []).map(monthLabel).join(", ") || "none yet"}</div>` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-due" data-id="${id}">Delete</button></div>` : ""}
@@ -3991,6 +4058,7 @@ function openDueForm(id) {
     if (!val("du-name")) return sheetError("Enter a name.");
     const day = Math.round(numv("du-day")); if (day < 1 || day > 31) return sheetError("Day must be 1 to 31.");
     const data = { ...(id ? clean(d) : { paid: [] }), name: val("du-name"), kind: val("du-kind"), day, amount: numv("du-amt"), method: val("du-method"), account: val("du-acct").replace(/\D/g, "").slice(-4), holder: val("du-holder"), active: val("du-active") === "1", notes: val("du-notes"), updatedAt: Date.now() };
+    data.who = [...document.querySelectorAll("#sheet .du-who:checked")].map(x => x.value);
     await save("dues", id || uid("du"), data); closeSheet(); toast("Saved.");
   });
 }
@@ -4213,6 +4281,7 @@ async function vaultChange() {
   const upd = [];
   for (const l of S.logins) if (l.pw) upd.push([l.id, { pw: await vEnc(nk, await vDec(S.vaultKey, l.pw)) }]);
   for (const [id, d] of upd) await patch("logins", id, d);
+  for (const m of S.team) if (m.govIds) { try { await patch("team", m.id, { govIds: await vEnc(nk, await vDec(S.vaultKey, m.govIds)) }); } catch (e) {} }
   const v = { salt, iter, check: await vEnc(nk, VCHECK), setAt: Date.now() };
   if (S.db) await S.db.doc("config/vault").set(v); S.vault = v; S.vaultKey = nk; S.pwShown = {};
   render(); toast("Passphrase changed. Share the new one with your Admin team.");
@@ -4471,7 +4540,7 @@ async function exportCol(col) {
     rows = [["Date", "Team member", "Department", "Status", "Time in", "Time out", "Hours", "Note"]];
     for (let i = 1; i <= dim; i++) { const d = `${S.att.month}-${String(i).padStart(2, "0")}`; if (d > mToday()) break; for (const m of activeTeam()) { const r = attRec(d, m.id); rows.push([d, m.name, (dept(m.department) || {}).name || "", astat(attStatus(d, m.id)).name, mTime(r && r.in), mTime(r && r.out), Math.round(hoursOf(r) * 100) / 100, r && r.note || ""]); } }
   }
-  if (col === "team") rows = [["ID Number", "Nickname", "Full Name", "Phone", "Email", "Address", "Department", "Date Started", "Status"], ...S.team.map(m => [m.idNumber, m.nickname, m.name, m.phone || m.contact, m.email, m.address, m.role || (dept(m.department) || {}).name || "", m.started, m.status === "inactive" ? "Inactive" : "Active"])];
+  if (col === "team") rows = [["ID Number", "Nickname", "Full Name", "Phone", "Email", "Address", "Department", "Date Started", "Emergency contact", "Emergency relationship", "Emergency phone", "Status"], ...S.team.map(m => [m.idNumber, m.nickname, m.name, m.phone || m.contact, m.email, m.address, m.role || (dept(m.department) || {}).name || "", m.started, (m.emergency || {}).name || "", (m.emergency || {}).relation || "", (m.emergency || {}).phone || "", m.status === "inactive" ? "Inactive" : "Active"])];
   if (col === "payroll") { const per = payPeriod(); rows = [["Pay period", "ID Number", "Employee", "Position", "Rate / day", "Days worked", "Paid days", "Late days", "Late minutes", "Leave", "Absent", "Basic pay", ...ADD_FIELDS.map(f => f[1]), "Late deduction", ...DED_FIELDS.map(f => f[1]), "Net pay", "Status"], ...activeTeam().map(m => { const c = payCalc(m, per); return [per.label, m.idNumber, m.name, positionOf(m), c.rate, c.worked, c.paidDays, c.late, c.lateMin, c.leave, c.absent, c.basic, ...ADD_FIELDS.map(([k]) => Number(c.rec[k]) || 0), c.lateDed, ...DED_FIELDS.map(([k]) => Number(c.rec[k]) || 0), c.net, PAY_STATUS[c.status].name]; })]; }
   if (col === "investments") rows = [["Type", "Status", "INV Code", "Name", "FB Account", "Amount", "% Interest / Month", "Interest / Month", "Duration (Months)", "Total Interest", "Payment Start", "End Date", "Amount Due", "Status", "Payments Made", "Notes"], ...S.investments.map(v => [v.kind === "loan" ? "Loan" : "Investor", v.closed ? "Finished" : "Ongoing", v.code, v.name, v.fb, v.amount, v.rate, invMonthly(v), v.months, invTotalInterest(v), v.start, invEnd(v), v.kind === "loan" ? "" : invDue(v), invStatus(v).name, `${invSchedule(v).filter(p => p.paid).length}/${invSchedule(v).length}`, v.notes])];
   if (col === "products") rows = [["Name", "Brand", "Size", "Type", "Price", "Compare at", "Cost", "Stock", "SKU", "Barcode", "Category", "Status", "Description", "Website link", "Needs website sync"], ...S.products.map(p => [p.name, p.brand, p.size, p.ptype, p.price, p.compareAt, p.cost, p.stock, p.sku, p.barcode, p.category, (LIST_STATUS[p.status || "active"] || {}).name, p.description, p.url, p.webSync === "pending" ? "Yes" : "No"])];
@@ -4530,7 +4599,7 @@ document.addEventListener("click", guard(async ev => {
   const nb = ev.target.closest("[data-notes]");
   if (nb) { if ($("#ipop") && S.popFor === "n" + nb.dataset.notes) { closePop(); S.popFor = ""; return; } S.popFor = "n" + nb.dataset.notes; notesPop(nb); return; }
   const cof = ev.target.closest("[data-custof]");
-  if (cof) { const c = customerList().find(x => x.orderIds.includes(cof.dataset.custof)); if (c) openCustomer(custKey(c)); else toast("No customer profile for this order yet."); return; }
+  if (cof) { closePop(); const oo = findOrder(cof.dataset.custof), nm = ((oo && oo.customer) || "").trim().toLowerCase(), em = ((oo && oo.email) || "").toLowerCase(); const c = customerList().find(x => x.orderIds.includes(cof.dataset.custof)) || (oo && customerList().find(x => (em && (x.email || "").toLowerCase() === em) || (nm && (x.name || "").trim().toLowerCase() === nm))); if (c) openCustomer(custKey(c)); else toast("No customer profile for this order yet."); return; }
   if (ev.target.closest("tr") && ev.target.closest("select, input, label")) return;
   const lsrt = ev.target.closest("[data-lsort]");
   if (lsrt) { const k = lsrt.dataset.lsort, c = S.ls; S.ls = c.sort === k ? { sort: k, dir: c.dir === "asc" ? "desc" : "asc" } : { sort: k, dir: ["edited", "price", "stock"].includes(k) ? "desc" : "asc" }; S.lpage = 0; render(); return; }
@@ -4540,6 +4609,8 @@ document.addEventListener("click", guard(async ev => {
   if (lrow && !S.readOnly) return openProductForm(lrow.dataset.lrow);
   const sps = ev.target.closest("[data-spsup]");
   if (sps) { S.sp.sup = sps.dataset.spsup; render(); return; }
+  const spf = ev.target.closest("[data-spful]");
+  if (spf) { S.sp.ful = spf.dataset.spful; render(); return; }
   const itb = ev.target.closest("[data-items]");
   if (itb) { if ($("#ipop") && S.popFor === itb.dataset.items) { closePop(); S.popFor = ""; return; } S.popFor = itb.dataset.items; itemsPop(itb); return; }
   const psrt = ev.target.closest("[data-psort]");
@@ -4689,6 +4760,7 @@ document.addEventListener("click", guard(async ev => {
     case "edit-att": return openAttForm(b.dataset.mid);
     case "del-att": await remove("attendance", id); closeSheet(); toast("Attendance record cleared."); return;
     case "edit-member": return openMemberForm(id);
+    case "mv-unlock": { const pass = val("mv-pass"); try { const key = await vaultDerive(pass, S.vault.salt, S.vault.iter); if ((await vDec(key, S.vault.check)) !== VCHECK) throw 0; S.vaultKey = key; S.sheetNoPush = true; return openMemberForm(id || null); } catch (e) { toast("That passphrase isn't right."); } return; }
     case "del-task": await remove("tasks", id); closeSheet(); toast("Task deleted."); return;
     case "del-member": await remove("team", id); closeSheet(); toast("Removed from team."); return;
     case "import": return openImport();
@@ -4714,7 +4786,9 @@ document.addEventListener("click", guard(async ev => {
     case "jnt-export": return jntExport();
     case "jnt-file": return openJntFile();
     case "jnt-dl": return jntDownload();
-    case "of-clear": Object.assign(S.of, { q: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
+    case "of-clear": Object.assign(S.of, { q: "", view: "all", ful: "all", pay: "all", sup: "all", month: "" }); S.page = 0; render(); return;
+    case "item-inv": { const nm = (b.dataset.name || "").toLowerCase(); const p = S.products.find(x => x.id === b.dataset.pid) || S.products.find(x => (x.name || "").toLowerCase() === nm) || S.products.find(x => x.name && nm.includes(String(x.name).toLowerCase())); if (!p) return toast("This item isn't in the inventory yet. Add it in Inventory or Listings."); return openProductForm(p.id); }
+    case "viewas-stop": try { sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return;
     case "sp-clear": S.sp = { sup: "all", ful: "all", pay: "all", q: "" }; render(); return;
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lpage = 0; render(); return;
     case "log-out": S.unlocked.clear(); saveUnlocked(); S.loggedOut = true; try { localStorage.removeItem("rs-nav"); } catch (e) {} S.view = "home"; render(); toast("Logged out."); return;
@@ -4788,6 +4862,8 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "sp-pay") { S.sp.pay = t.value; render(); return; }
   if (t.classList.contains("jnt-f")) { jntField(t); return; }
   if (t.id === "of-ful") { S.of.ful = t.value; S.page = 0; render(); return; }
+  if (t.id === "dev-viewas") { try { t.value ? sessionStorage.setItem("rs-viewas", t.value) : sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return; }
+  if (t.id === "of-month") { S.of.month = t.value; S.page = 0; render(); return; }
   if (t.id === "of-pay") { S.of.pay = t.value; S.page = 0; render(); return; }
   if ((t.id === "bulk-pay" || t.id === "bulk-ful") && t.value) return bulkAction((t.id === "bulk-pay" ? "pay:" : "ful:") + t.value);
   if (t.id === "pack-courier") { S.courier = t.value; try { localStorage.setItem("rs-courier", t.value); } catch (e) {} return; }
@@ -4853,7 +4929,7 @@ document.addEventListener("keydown", ev => {
   if (ev.key === "Enter" && ev.target.id === "pack-scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handlePackScan(v); return; } if (ev.key === "Escape") closePop(); if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
 
 /* ---------- Shopify live sync (viewer's Shopify connector via mcp) ---------- */
-const SHOP_SERVER = "Shopify", SHOP_TOOL = "graphql_query", SHOP_EVERY = 60000;
+const SHOP_SERVER = "Shopify", SHOP_TOOL = "graphql_query", SHOP_EVERY = 30 * 60000;
 const SHOP_FIELDS = `id name createdAt cancelledAt displayFinancialStatus displayFulfillmentStatus note tags email phone
   customer { displayName email phone }
   shippingLine { title }
@@ -4903,7 +4979,7 @@ function shopToOrder(n) {
     customer: c.displayName || a.name || n.email || "", phone: cleanPhone(n.phone || a.phone || c.phone || ""), email: String(n.email || c.email || "").toLowerCase(),
     address: [a.address1, a.address2, a.city, a.province, a.zip, a.country].filter(Boolean).join(", "),
     ref: String(n.id || "").split("/").pop(), items, fees: 0, shipping: 0,
-    payment, fulfillment: fulFromTags(fulfillment, tags0), tags: tags0, note: n.note || "",
+    payment, fulfillment: fulFromTags(fulfillment, tags0), tags: stripStage(tags0), note: n.note || "",
     shopPay: payment, shopFul: fulfillment, shopTags: tags0, shopNote: n.note || "",
     ship: { name: a.name || c.displayName || "", phone: a.phone || n.phone || "", address1: a.address1 || "", address2: a.address2 || "", city: a.city || "", province: a.province || "", zip: a.zip || "", country: a.country || "" },
     shipTitle: (n.shippingLine && n.shippingLine.title) || "",
@@ -4922,12 +4998,13 @@ async function shopApply(o, isNew) {
   // 3-way merge: only what changed in Shopify since the last sync overrides edits made in the app
   const prevTags = ex.shopTags || ex.tags || [], shTags = o.shopTags || [];
   const added = shTags.filter(t => !prevTags.includes(t)), removed = prevTags.filter(t => !shTags.includes(t));
-  const tags = [...(ex.tags || []).filter(t => !removed.includes(t)), ...added.filter(t => !(ex.tags || []).includes(t))];
+  const tags = stripStage([...(ex.tags || []).filter(t => !removed.includes(t)), ...added.filter(t => !(ex.tags || []).includes(t))]);
+  const shopStageMoved = tagStage(shTags) !== tagStage(prevTags);
   const payment = ex.shopPay === undefined || o.shopPay !== ex.shopPay ? o.shopPay : ex.payment;
   const note = ex.shopNote === undefined || o.shopNote !== ex.shopNote ? (o.shopNote || ex.note || "") : ex.note || "";
   let fl = ex.shopFul === undefined || o.shopFul !== ex.shopFul ? o.shopFul : ex.fulfillment;
   if (!OPEN_FUL.has(ex.fulfillment) && OPEN_FUL.has(fl)) fl = ex.fulfillment;
-  fl = fulFromTags(fl, tags);
+  if (OPEN_FUL.has(fl)) { if (shopStageMoved) fl = tagStage(shTags) || (STAGE_IDS.has(fl) ? "unfulfilled" : fl); else if (STAGE_IDS.has(ex.fulfillment)) fl = ex.fulfillment; else fl = tagStage(shTags) || fl; }
   const ch = { payment, fulfillment: fl, tags, note, fulfilledAt: fl === "fulfilled" ? (ex.fulfilledAt || Date.now()) : (ex.fulfilledAt || 0), voidedAt: VOIDPAY.has(payment) ? (ex.voidedAt || o.voidedAt || Date.now()) : 0 };
   const changed = ["payment", "fulfillment", "note"].some(k => ch[k] !== ex[k]) || tags.join() !== (ex.tags || []).join();
   const marks = o.shopPay !== ex.shopPay || o.shopFul !== ex.shopFul || o.shopNote !== ex.shopNote || shTags.join() !== (ex.shopTags || []).join();
@@ -4940,7 +5017,7 @@ async function shopApply(o, isNew) {
   return 0;
 }
 async function shopSync(manual) {
-  if (!S.mcp || shopBusy || S.readOnly) return;
+  if (!S.mcp || shopBusy || S.readOnly || S.viewAs) return;
   if (!manual && document.hidden) return;
   shopBusy = true; S.shop.state = "syncing"; paintShop();
   try {
@@ -4971,7 +5048,7 @@ async function shopSync(manual) {
       : code === "not_in_manifest" ? "Shopify isn't allowed for this page. Open the artifact's Permissions menu and allow Shopify."
       : code === "blocked_by_policy" || code === "approval_required" ? "Your organization blocks Shopify for this page."
       : code === "selection_required" ? "Pick which Shopify connection to use in the prompt claude.ai showed."
-      : (e && e.message) ? "Shopify sync failed: " + e.message : "Shopify sync failed. It will try again in a minute.";
+      : (e && e.message) ? "Shopify sync failed: " + e.message : "Shopify sync failed. It will try again in 30 minutes, or press Sync now.";
     S.shop = { ...S.shop, state: ["needs_reauth", "server_not_connected", "not_in_manifest", "blocked_by_policy", "approval_required"].includes(code) ? "blocked" : "error", msg };
     if (manual) toast(msg);
   } finally { shopBusy = false; paintShop(); }
@@ -4985,11 +5062,13 @@ function shopChip() {
 }
 function paintShop() { document.querySelectorAll(".shop-slot").forEach(el => { el.innerHTML = shopChip(); }); }
 async function reconcileStages() {
-  if (S.readOnly) return;
+  if (S.readOnly || S.viewAs) return;
   const t0 = Date.now();
   while (S.db && !S.loaded.orders) { if (Date.now() - t0 > 20000) return; await new Promise(r => setTimeout(r, 300)); }
-  const fix = S.orders.filter(o => fulFromTags(o.fulfillment, o.tags) !== o.fulfillment);
-  for (let i = 0; i < fix.length; i += 8) await Promise.all(fix.slice(i, i + 8).map(o => patch("orders", o.id, { fulfillment: fulFromTags(o.fulfillment, o.tags) }).catch(() => {})));
+  // One-time clean-up: old stage tags become the Fulfillment Status and are removed from Tags.
+  const fix = [...S.orders, ...S.archived].filter(o => (o.tags || []).some(t => STAGE_TAGS.has(normTag(t))));
+  const upd = o => { const st = tagStage(o.tags), u = { tags: stripStage(o.tags) }; if (!o.archived && st && OPEN_FUL.has(o.fulfillment)) u.fulfillment = st; if (o.archived && st && o.archivedPrev && OPEN_FUL.has(o.archivedPrev.fulfillment)) u.archivedPrev = { ...o.archivedPrev, fulfillment: st }; return u; };
+  for (let i = 0; i < fix.length; i += 8) await Promise.all(fix.slice(i, i + 8).map(o => patch("orders", o.id, upd(o)).catch(() => {})));
 }
 async function startShopSync(c) {
   reconcileStages();
@@ -5017,9 +5096,12 @@ render();
     c?.use ? c.use("downloads").catch(() => null) : null,
   ]);
   S.db = db; S.dl = dl; S.user = user; S.dbChecked = true;
+  try { if (sessionStorage.getItem("rs-viewas") && db) S.db = roDb(db); } catch (e) {}
   if (user) {
     try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {}
     try { S.me = await user.me(); S.uid = S.me.id; S.isOwner = !!S.me.isOwner; S.canEdit = !!S.me.canEdit; } catch (e) {}
+    S.realOwner = S.isOwner;
+    try { const va = sessionStorage.getItem("rs-viewas"); if (va && S.isOwner) { S.viewAs = va; S.isOwner = false; S.canEdit = false; S.unlocked = new Set(); } } catch (e) {}
   }
   $("#sync").textContent = db ? "Saved to the cloud · syncs live" : "Not saving in this view";
   if (db) {
