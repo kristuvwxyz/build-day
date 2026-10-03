@@ -502,6 +502,7 @@ body.no-orders .gs { display: none !important; }
 .oactions .oassign { width: auto; max-width: 220px; padding: 6px 10px; font-size: 13px; }
 .item-link { text-align: left; font: inherit; font-weight: 600; color: inherit; }
 #viewas-bar { position: sticky; top: 0; z-index: 60; background: #7c3aed; color: #fff; font-size: 13px; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#viewas-bar select { width: auto; padding: 4px 8px; font-size: 13px; font-weight: 600; }
 #viewas-bar .btn { background: #fff; color: #4c1d95; border-color: #fff; }
 .oactions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .sheet-back { align-self: flex-start; margin-bottom: -4px; }
@@ -792,15 +793,15 @@ function nextNum() {
 
 /* ---------- data layer ---------- */
 async function save(col, id, data) {
-  if (S.db) { await S.db.collection(col).doc(id).set(data); }
+  if (S.db) { await wdb().collection(col).doc(id).set(data); }
   else { const arr = S[col]; const i = arr.findIndex(r => r.id === id); const row = { id, ...data }; i >= 0 ? arr.splice(i, 1, row) : arr.push(row); render(); }
 }
 async function patch(col, id, data) {
-  if (S.db) { await S.db.collection(col).doc(id).update(data); }
+  if (S.db) { await wdb().collection(col).doc(id).update(data); }
   else { const r = S[col].find(r => r.id === id); if (r) Object.assign(r, data); render(); }
 }
 async function remove(col, id) {
-  if (S.db) { await S.db.collection(col).doc(id).delete(); }
+  if (S.db) { await wdb().collection(col).doc(id).delete(); }
   else { S[col] = S[col].filter(r => r.id !== id); render(); }
 }
 const clean = r => { const { id, ...rest } = r; return rest; };
@@ -998,7 +999,7 @@ async function rvFlush() {
       await shopMut(RV_UPSERT, { h: { type: RV_TYPE, handle: "rs-reviews-" + c }, m: { fields: [{ key: "data", value: JSON.stringify(items) }] } });
     }
     S.rvSync = { at: Date.now() };
-    if (S.db && S.canEdit) S.db.doc("config/reviews").set({ ...rvCfg(), lastSync: Date.now() }).catch(() => {});
+    if (S.db && S.canEdit) wdb().doc("config/reviews").set({ ...rvCfg(), lastSync: Date.now() }).catch(() => {});
   } catch (e) {
     list.forEach(c => S.rvDirty.add(c));
     const m = e && e.code === "needs_reauth" ? "Shopify needs you to sign in again (claude.ai → Settings → Connectors)." : e && e.code === "not_in_manifest" ? "Allow Shopify for this page in its Permissions menu." : (e && e.message) || "couldn't reach Shopify.";
@@ -1020,7 +1021,7 @@ async function importWebsiteReviews() {
       S.rvImporting.done = i + 1; if (i % 25 === 0) render();
     }
     const cfg = { ...rvCfg(), imported: Date.now(), alias };
-    if (S.db) await S.db.doc("config/reviews").set(cfg); else S.rvCfg = cfg;
+    if (S.db) await wdb().doc("config/reviews").set(cfg); else S.rvCfg = cfg;
     S.rvImporting = null; toast(`Imported ${L.length} reviews from the website.`);
     setTimeout(() => rvQueue(rvAllChunks()), 1200);
   } catch (e) { S.rvImporting = null; toast("Couldn't import the website reviews: " + ((e && e.message) || e)); }
@@ -1087,7 +1088,7 @@ function openRvWebsite() {
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button><button class="btn" type="button" data-act="rv-copy">Copy website code</button><button class="btn primary" type="submit">Save key</button></div>`,
   async () => {
     const cfg2 = { ...rvCfg(), token: val("rvw-token") };
-    if (S.db) await S.db.doc("config/reviews").set(cfg2); else S.rvCfg = cfg2;
+    if (S.db) await wdb().doc("config/reviews").set(cfg2); else S.rvCfg = cfg2;
     openRvWebsite(); toast(cfg2.token ? "Key saved. Now copy the website code and paste it in WebCake." : "Key removed.");
   });
 }
@@ -1187,7 +1188,7 @@ const wsCfg = () => ({ ...WS_DEFAULT, ...((S.profile || {}).workStyle || {}) });
 async function setWorkStyle(chg) {
   const ws = { ...wsCfg(), ...chg };
   S.profile = { ...S.profile, workStyle: ws };
-  if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(S.profile);
+  if (S.db && S.uid) await wdb().doc("data/users/" + S.uid + "/profile").set(S.profile);
   if (chg.mode === "standard") pomoSave(null);
   if (chg.mode === "pomodoro" && !pomoState()) pomoSave({ phase: "focus", running: false, left: ws.focus * 6e4, count: 0, day: mToday(), done: 0 });
   render(); if (chg.mode) toast(chg.mode === "pomodoro" ? "Pomodoro on. Press ▶ on the timer to start a focus session." : "Standard work style.");
@@ -1394,7 +1395,7 @@ async function saveEomCfg() {
   if (!Object.values(weights).some(Boolean)) return toast("Give at least one criterion some points.");
   if (numv("ew-bonus") + numv("ew-pbonus") > EOM_BUDGET) return toast(`The two prizes add up to ${peso(numv("ew-bonus") + numv("ew-pbonus"))}. Keep them within ${peso(EOM_BUDGET)}.`);
   const data = { weights, bonus: numv("ew-bonus"), perfectBonus: numv("ew-pbonus"), rewards: val("ew-rewards") || EOM_DEFAULT.rewards, updatedAt: Date.now() };
-  if (S.db) await S.db.doc("config/eom").set(data); else S.eomSettings = data;
+  if (S.db) await wdb().doc("config/eom").set(data); else S.eomSettings = data;
   toast("Criteria and rewards saved."); render();
 }
 
@@ -1551,13 +1552,16 @@ function roRef(r) {
   for (const k of ["set", "update", "delete", "add"]) w[k] = async () => { throw VIEWAS_ERR; };
   return w;
 }
+// Every write goes through wdb(), which refuses while previewing as someone else.
+const wdb = () => { if (S.viewAs) throw VIEWAS_ERR; return S.db; };
 const roDb = db => ({ collection: c => roRef(db.collection(c)), doc: p => roRef(db.doc(p)) });
 function viewAsBar() {
   let el = document.getElementById("viewas-bar");
   if (!S.viewAs) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement("div"); el.id = "viewas-bar"; document.body.prepend(el); }
   const m = member(S.viewAs) || {};
-  const h = `👁 Viewing as <b>${esc(m.name || "team member")}</b> · ${esc((dept(m.department) || {}).name || "")}. Preview only: nothing is saved. <button type="button" class="btn sm" data-act="viewas-stop">Stop viewing as</button>`;
+  const opts = activeTeam().filter(x => x.id !== (ownerMember() || {}).id).map(x => `<option value="${x.id}" ${x.id === S.viewAs ? "selected" : ""}>${esc(x.name)} · ${esc((dept(x.department) || {}).name || "")}</option>`).join("");
+  const h = `👁 Viewing as <select id="viewas-pick" aria-label="View as">${opts || `<option>${esc(m.name || "Loading…")}</option>`}</select> Preview only: nothing is saved. <button type="button" class="btn sm" data-act="viewas-stop">Stop viewing as</button>`;
   if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
 }
 function devPanel() {
@@ -1575,7 +1579,7 @@ function boundMember() {
   return act.find(m => m.uid === S.uid) || (em ? act.find(m => emailsOf(m).includes(em)) : null) || null;
 }
 const myMemberId = () => (boundMember() || {}).id || "";
-const gated = () => !!S.uid && !S.isOwner && S.loaded.team && !boundMember();
+const gated = () => !!S.uid && !S.isOwner && !S.realOwner && S.loaded.team && !boundMember();
 const canOrders = () => myDept() !== "MARKETING";
 const scentOf = id => ((S.scents.find(s => s.id === id) || {}).scent || "");
 const BOTTLE = '<svg viewBox="0 0 16 20" aria-hidden="true"><rect x="6" y="1" width="4" height="3" rx="1" fill="var(--gold)"/><rect x="5" y="4" width="6" height="2" fill="currentColor" opacity=".55"/><rect x="2.5" y="6" width="11" height="12.5" rx="3" fill="var(--gold)"/><rect x="4.5" y="9.5" width="7" height="4.5" rx="1" fill="#fff" opacity=".75"/></svg>';
@@ -1645,7 +1649,7 @@ function openScentForm(mid) {
     const data = { ...clean(extraOf(mid)), scent, memberId: mid, updatedAt: Date.now(), updatedBy: (S.me && S.me.name) || "" };
     if (scentDraftImg) data.scentImg = scentDraftImg;
     else if (scent.toLowerCase() !== (extraOf(mid).scent || "").toLowerCase()) data.scentImg = "";
-    if (S.db) await S.db.doc("scents/" + mid).set(data); else { S.scents = S.scents.filter(s => s.id !== mid).concat({ id: mid, ...data }); }
+    if (S.db) await wdb().doc("scents/" + mid).set(data); else { S.scents = S.scents.filter(s => s.id !== mid).concat({ id: mid, ...data }); }
     closeSheet(); toast(scent ? `Saved: ${scent}.` : "Scent cleared.");
   });
   S.scentFor = mid;
@@ -1658,7 +1662,7 @@ async function myPhoto(file) {
   const mid = myMemberId(); if (!mid) return;
   const photo = await resizeImage(file, 256, true);
   const data = { ...clean(extraOf(mid)), memberId: mid, photo, updatedAt: Date.now() };
-  if (S.db) await S.db.doc("scents/" + mid).set(data); else { S.scents = S.scents.filter(s => s.id !== mid).concat({ id: mid, ...data }); render(); }
+  if (S.db) await wdb().doc("scents/" + mid).set(data); else { S.scents = S.scents.filter(s => s.id !== mid).concat({ id: mid, ...data }); render(); }
   toast("Photo updated.");
 }
 function birthdayBanner() {
@@ -2014,7 +2018,7 @@ async function setPassword(d, clear) {
     const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
     next[d] = { salt, hash: await sha(salt + ":" + pw), setAt: Date.now() };
   }
-  await S.db?.doc("config/security").set(next);
+  await wdb()?.doc("config/security").set(next);
   if (!S.db) S.security = next;
   render(); toast(clear ? `${dept(d).name} password removed.` : `${dept(d).name} password saved. Share it with that team.`);
 }
@@ -2537,7 +2541,7 @@ async function restoreOrder(o) {
   const pv = o.archivedPrev || {};
   const payment = pv.payment || o.shopPay || "pending", fulfillment = pv.fulfillment || o.shopFul || "unfulfilled";
   const upd = { archived: false, archivedAt: 0, archivedReason: "", mergedInto: "", payment, fulfillment, log: logAdd(o, [`unarchived the order (back to ${pay(payment).name} · ${ful(fulfillment).name})`]) };
-  if (S.db) await S.db.collection("orders").doc(o.id).update(upd);
+  if (S.db) await wdb().collection("orders").doc(o.id).update(upd);
   else { S.archived = S.archived.filter(x => x.id !== o.id); S.orders.push(Object.assign(o, upd)); render(); }
 }
 function openMergePick(id) {
@@ -4268,7 +4272,7 @@ async function vaultSubmit() {
     const salt = b64(crypto.getRandomValues(new Uint8Array(16))), iter = 210000;
     const key = await vaultDerive(pass, salt, iter);
     const v = { salt, iter, check: await vEnc(key, VCHECK), setAt: Date.now() };
-    if (S.db) await S.db.doc("config/vault").set(v); S.vault = v; S.vaultKey = key; render(); toast("Logins vault created."); return;
+    if (S.db) await wdb().doc("config/vault").set(v); S.vault = v; S.vaultKey = key; render(); toast("Logins vault created."); return;
   }
   try { const key = await vaultDerive(pass, S.vault.salt, S.vault.iter); if ((await vDec(key, S.vault.check)) !== VCHECK) throw 0; S.vaultKey = key; S.pwShown = {}; render(); }
   catch (e) { err("That passphrase isn't right."); const el = $("#v-pass"); if (el) { el.value = ""; el.focus(); } }
@@ -4283,7 +4287,7 @@ async function vaultChange() {
   for (const [id, d] of upd) await patch("logins", id, d);
   for (const m of S.team) if (m.govIds) { try { await patch("team", m.id, { govIds: await vEnc(nk, await vDec(S.vaultKey, m.govIds)) }); } catch (e) {} }
   const v = { salt, iter, check: await vEnc(nk, VCHECK), setAt: Date.now() };
-  if (S.db) await S.db.doc("config/vault").set(v); S.vault = v; S.vaultKey = nk; S.pwShown = {};
+  if (S.db) await wdb().doc("config/vault").set(v); S.vault = v; S.vaultKey = nk; S.pwShown = {};
   render(); toast("Passphrase changed. Share the new one with your Admin team.");
 }
 async function loginPwAction(id, act) {
@@ -4446,7 +4450,7 @@ async function savePayCfg() {
   const positions = val("pc-pos").split("\n").map(l => { const m = /^(.+?)\s*[:=\-]\s*₱?\s*([\d,.]+)/.exec(l.trim()); return m ? { name: m[1].trim(), rate: Number(m[2].replace(/,/g, "")) } : null; }).filter(Boolean);
   if (!positions.length) { toast("Add at least one position with a rate, like “Packer: 550”."); return; }
   const data = { positions, deductLate: $("#pc-late").checked, paidLeave: $("#pc-leave").checked, paidHoliday: $("#pc-hol").checked };
-  if (S.db) await S.db.doc("config/payroll").set(data); else S.paySettings = data;
+  if (S.db) await wdb().doc("config/payroll").set(data); else S.paySettings = data;
   for (const sel of document.querySelectorAll("[data-ppos]")) {
     const m = member(sel.dataset.ppos), rateIn = document.querySelector(`[data-prate="${sel.dataset.ppos}"]`);
     const upd = { payPosition: sel.value, dailyRate: rateIn.value === "" ? 0 : Number(rateIn.value) };
@@ -4695,7 +4699,7 @@ document.addEventListener("click", guard(async ev => {
     case "edit-review": return openReviewForm(id);
     case "rv-toggle": { const r = S.reviews.find(x => x.id === id); if (!r) return; const was = r.status; await patch("reviews", id, { status: was === "hidden" ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); toast(was === "hidden" ? "Review shown on the website." : "Review hidden from the website."); rvQueue([r.chunk]); return; }
     case "del-review": { const r = S.reviews.find(x => x.id === id); await remove("reviews", id); closeSheet(); toast("Review deleted."); if (r) rvQueue([r.chunk]); return; }
-    case "req-access": if (S.db && S.uid) { await S.db.collection("accessreq").doc(S.uid).set({ at: Date.now() }); toast("Request sent to the owner."); } return;
+    case "req-access": if (S.db && S.uid) { await wdb().collection("accessreq").doc(S.uid).set({ at: Date.now() }); toast("Request sent to the owner."); } return;
     case "ar-link": { const mid = val("ar-" + id); if (!mid) return toast("Choose who this is first."); await patch("team", mid, { uid: id }); await remove("accessreq", id); toast(`Linked to ${memberName(mid)}.`); return; }
     case "ar-del": await remove("accessreq", id); toast("Request removed."); return;
     case "rv-sync": return rvFlush();
@@ -4849,7 +4853,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.eomrate) return eomRate(t.dataset.eomrate, Number(t.value));
   if (t.matches(".ws-num")) return setWorkStyle({ [t.dataset.k]: Math.max(1, Math.round(Number(t.value) || 1)) });
   if (t.id === "k-who" && t.value) { const m = member(t.value), d = $("#k-dept"); if (m && m.department && d && [...d.options].some(o => o.value === m.department)) d.value = m.department; return; }
-  if (false && t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
+  if (false && t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await wdb().doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
   if (t.id === "ei-dtype") return eiTotal();
   if (t.dataset.asel) { t.checked ? S.asel.add(t.dataset.asel) : S.asel.delete(t.dataset.asel); render(); return; }
@@ -4862,7 +4866,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "sp-pay") { S.sp.pay = t.value; render(); return; }
   if (t.classList.contains("jnt-f")) { jntField(t); return; }
   if (t.id === "of-ful") { S.of.ful = t.value; S.page = 0; render(); return; }
-  if (t.id === "dev-viewas") { try { t.value ? sessionStorage.setItem("rs-viewas", t.value) : sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return; }
+  if (t.id === "dev-viewas" || t.id === "viewas-pick") { try { t.value ? sessionStorage.setItem("rs-viewas", t.value) : sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return; }
   if (t.id === "of-month") { S.of.month = t.value; S.page = 0; render(); return; }
   if (t.id === "of-pay") { S.of.pay = t.value; S.page = 0; render(); return; }
   if ((t.id === "bulk-pay" || t.id === "bulk-ful") && t.value) return bulkAction((t.id === "bulk-pay" ? "pay:" : "ful:") + t.value);
@@ -4908,13 +4912,13 @@ document.addEventListener("submit", guard(async ev => {
   if (ev.target.id === "att-cfg") {
     ev.preventDefault();
     const data = { start: val("ac-start") || "09:00", end: val("ac-end") || "18:00", grace: Math.max(0, Math.round(numv("ac-grace"))), breakMin: Math.max(0, Math.round(numv("ac-break"))), workdays: [...document.querySelectorAll('input[name="ac-wd"]:checked')].map(x => Number(x.value)) };
-    if (S.db) await S.db.doc("config/attendance").set(data); else S.attSettings = data;
+    if (S.db) await wdb().doc("config/attendance").set(data); else S.attSettings = data;
     toast("Attendance settings saved."); render(); return;
   }
   if (ev.target.id === "home-form") {
     ev.preventDefault();
     const data = { ...(S.home || {}), quotes: val("h-quotes"), goals: val("h-goals"), updatedAt: Date.now() };
-    if (S.db) await S.db.doc("config/home").set(data); else S.home = data;
+    if (S.db) await wdb().doc("config/home").set(data); else S.home = data;
     toast("Home page saved."); render();
   }
 }));
@@ -5096,7 +5100,6 @@ render();
     c?.use ? c.use("downloads").catch(() => null) : null,
   ]);
   S.db = db; S.dl = dl; S.user = user; S.dbChecked = true;
-  try { if (sessionStorage.getItem("rs-viewas") && db) S.db = roDb(db); } catch (e) {}
   if (user) {
     try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {}
     try { S.me = await user.me(); S.uid = S.me.id; S.isOwner = !!S.me.isOwner; S.canEdit = !!S.me.canEdit; } catch (e) {}
