@@ -1,4 +1,4 @@
-# Regal Spritz Business OS
+# Regal Spritz PH Business OS
 
 Live app: https://claude.ai/artifact/RbUQpD5J8M2dKELDEEKoyp (private to you until shared)
 
@@ -101,6 +101,20 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 ## Packing list + J&T VIP booking
 - To pack is now a table like Orders, with a waybill scan box on each row.
 - **Copy for J&T** copies the selected orders (or all J&T orders in the list) to paste into the J&T VIP Excel template. **J&T VIP booking file** downloads a CSV. Columns: receiver, phone, province, city, barangay, street, zip, items, qty, COD, declared value.
+
+## J&T VIP booking file (Packing)
+- Packing → Orders → **J&T VIP booking file**. It uses the selected orders, or every J&T order that's To ship in the current filter.
+- The file is built on J&T's template (ORDER LIST V20200721, sheet "List", 13 columns). Province, city and barangay are auto-matched to J&T's address list (`jnt-address.json`, taken from the template's "Addressing guide" tab). Anything unmatched is highlighted in red so you can pick it from dropdowns.
+- COD is 0 for Fully paid and the total for Unpaid; type the balance for Partially paid. Express type, parcel name and default weight are remembered.
+- Downloads as `.xls`; upload it in J&T VIP → Batch order.
+
+## Navigation
+- **Orders** is in the main menu. **Search orders…** in the menu finds any order by #, name, phone or tracking.
+- **Sales → Suppliers** (CEO and Eve only): supplier chips, filters, Clear filters, a combined order list, and the matching orders.
+- **Archived orders** is under Sales and Admin.
+- Packing's "To pack" tab is gone; Packing → Orders has the scan bar, waybill column and J&T file.
+- **My account → Log out** locks all departments on the device. **Sign out of Claude** switches accounts.
+- Shopify order notes and timeline comments show as icons in the Orders list (hover or click to read) and in the order.
 
 ## Look and feel
 - Each department has its own colour, used in the menu, page title, tabs, cards and task rows.

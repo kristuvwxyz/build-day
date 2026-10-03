@@ -1,4 +1,4 @@
-<title>Regal Spritz OS</title>
+<title>Regal Spritz PH OS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
@@ -421,6 +421,38 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
 .colrow label { display: flex; gap: 8px; align-items: center; font-weight: 600; }
 .radio-line { display: flex; gap: 8px; align-items: center; font-size: 13.5px; padding: 4px 0; font-weight: 400; }
 .wb-cell .wb-row { flex-wrap: nowrap; } .wb-cell .wb-in { min-width: 130px; }
+.bigsearch { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 4px 14px; position: relative; }
+.bigsearch:focus-within { border-color: var(--fg); }
+.bigsearch svg { width: 20px; height: 20px; color: var(--muted); flex: none; }
+.bigsearch input { border: 0; background: none; font-size: 16px; padding: 10px 0; flex: 1; min-width: 0; outline: none; }
+.sx { border: 0; background: var(--surface-2); color: var(--fg); border-radius: 999px; width: 26px; height: 26px; font-size: 12px; cursor: pointer; flex: none; margin-left: -4px; }
+.toolbar .sx { align-self: center; }
+.cust-link { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.cust-link:hover { text-decoration-color: currentColor; }
+.nicons { border: 0; background: none; padding: 0 0 0 6px; cursor: pointer; color: var(--muted); display: inline-flex; gap: 4px; vertical-align: middle; }
+.nicons .ni { display: inline-flex; align-items: center; gap: 1px; } .nicons svg { width: 15px; height: 15px; } .nicons b { font-size: 10px; }
+.nicons:hover { color: var(--fg); }
+.nprev { font-size: 11px; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+.ipop-n { border-top: 1px solid var(--line); padding-top: 6px; }
+.notebox { display: flex; flex-direction: column; gap: 8px; background: var(--warn-bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.sheet-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.list.costs .li { font-size: 12.5px; padding-top: 5px; padding-bottom: 5px; }
+.ltable td { vertical-align: middle; } .lthumb { width: 52px; } .lthumb img, .lthumb svg { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: var(--surface-2); display: block; } .lthumb svg { padding: 8px; color: var(--gold); }
+tr[data-lrow] { cursor: pointer; } tr[data-lrow]:hover td { background: var(--surface-2); }
+.gs { position: relative; display: flex; align-items: center; }
+.gs .gs-in { width: 100%; border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 9px 10px 9px 32px; font-size: 14px; }
+.gs .gs-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; border: 2px solid var(--muted); border-radius: 50%; pointer-events: none; }
+.gs .gs-ico::after { content: ""; position: absolute; width: 6px; height: 2px; background: var(--muted); right: -6px; bottom: -3px; transform: rotate(45deg); }
+.gs-res { position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 260px; z-index: 45; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 4px; display: flex; flex-direction: column; }
+.gs-res[hidden] { display: none; }
+.gs-res button { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; text-align: left; border: 0; background: none; padding: 8px; border-radius: 8px; font: inherit; color: inherit; cursor: pointer; }
+.gs-res button:hover { background: var(--surface-2); } .gs-res small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; } .gs-res span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.gs-empty { padding: 10px; font-size: 13px; color: var(--muted); }
+main > .gs.mobile-only { margin-bottom: 12px; }
+.sheet.wide { width: min(1180px, 100vw); max-width: 100vw; }
+.jnt-t input, .jnt-t select { border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; background: var(--surface); font-size: 12.5px; max-width: 190px; }
+.jnt-t td { padding: 6px; vertical-align: top; } .jnt-t td.need select, .jnt-t td.need input { border-color: var(--bad); background: var(--bad-bg); }
+.jnt-wrap { max-height: 55vh; overflow: auto; }
 @media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -447,7 +479,8 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
 
 <div class="app">
   <aside class="rail">
-    <div class="mark">Regal Spritz<small>Business OS</small></div>
+    <div class="mark">Regal Spritz PH<small>Business OS</small></div>
+    <div class="gs desktop-only"><span class="gs-ico"></span><input class="gs-in" type="search" placeholder="Search orders…" aria-label="Search orders" autocomplete="off"><div class="gs-res" hidden></div></div>
     <nav class="nav" id="nav"></nav>
     <div class="rail-foot"><div id="theme-slot"></div><div id="sync">Connecting…</div></div>
   </aside>
@@ -456,6 +489,7 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
       <h1 id="view-title">Home</h1>
       <div class="actions" id="head-actions"></div>
     </div>
+    <div class="gs mobile-only"><span class="gs-ico"></span><input class="gs-in" type="search" placeholder="Search orders by #, name, phone or tracking" aria-label="Search orders" autocomplete="off"><div class="gs-res" hidden></div></div>
     <div id="notice"></div>
     <div id="view" style="display:flex;flex-direction:column;gap:20px;min-width:0"></div>
   </main>
@@ -524,6 +558,10 @@ const canShip = () => ["all", "pack"].includes(orderRole());
 const actor = () => { const m = member(myMemberId()); if (m) return `${m.nickname || m.name}, the ${m.role || (dept(m.department) || {}).name || "team"}`; return ((S.me && S.me.name) || "Owner") + (S.isOwner ? ", the owner" : ""); };
 const logAdd = (o, msgs, by) => [...(o.log || []), ...msgs.map(msg => ({ at: Date.now(), by: by || actor(), msg }))].slice(-80);
 const salesTeam = () => activeTeam().filter(m => m.department === "SALES");
+const canSuppliers = () => S.isOwner || myDept() === "CEO" || myMemberId() === "m-000005";
+const tabAllowed = t => t === "suppliers" ? canSuppliers() : t === "archived" ? canAll() : true;
+const ctxDept = () => S.view === "dept" ? S.dept : (myDept() || "SALES");
+const COURIER_LABEL = { "J&T": "J&T", SDD: "SDD / Pickup" };
 const clsKey = st => String(st.cls || "").split(" ")[0] || "grey";
 const ORDER_VIEWS = [
   { id: "all", name: "All" },
@@ -550,6 +588,9 @@ const fmtDate = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
 const exChip = r => r.example ? ' <span class="chip ex">Example</span>' : "";
 const isVoid = o => VOIDPAY.has(o.payment);
 const ICONS = {
+  comment: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  orders: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   tasks: '<path d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8.5 15l2 2 4-4"/>',
   depts: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>',
@@ -563,13 +604,13 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "orders", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "listings", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
-  { id: "FINANCE", name: "Finance", tabs: ["dashboard", "orders", "fixed", "dues", "checks", "payroll", "payrecords", "bir", "investors", "expenses", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
-  { id: "SALES", name: "Sales", tabs: ["orders", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "archived", "listings", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
+  { id: "FINANCE", name: "Finance", tabs: ["orders", "dues", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
+  { id: "SALES", name: "Sales", tabs: ["orders", "suppliers", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "orders", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
-  { id: "PACKING", name: "Packing", tabs: ["packing", "orders", "inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
+  { id: "PACKING", name: "Packing", tabs: ["orders", "inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", archived: "Archived orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -597,7 +638,7 @@ const S = {
   unlocked: new Set(),
   db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
 };
-try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
 try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
 const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account"].includes(hv)) S.view = hv;
 const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
@@ -735,6 +776,7 @@ function renderNav() {
   $("#nav").innerHTML =
     item('data-nav="home"', "home", "Home", S.view === "home") +
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
+    item('data-nav="orders"', "orders", "Orders", S.view === "orders") +
     item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
@@ -742,14 +784,16 @@ function renderNav() {
     item('data-nav="account"', "account", "My account", S.view === "account", "", "account-item");
 }
 
-function moduleKey() { return S.view === "dept" ? S.tab : S.view; }
+function moduleKey() { return S.view === "dept" ? S.tab : S.view === "orders" ? "ordersMain" : S.view; }
 
 function headActions() {
   const can = !S.readOnly;
   const ex = col => S.dl ? `<button class="btn" type="button" data-act="export" data-col="${col}">Export</button>` : "";
   if (S.view === "dept" && !isUnlocked(S.dept)) return "";
+  if (S.loggedOut) return "";
   const lockBtn = S.view === "dept" && !S.isOwner ? `<button class="btn ghost" type="button" data-act="lock-dept">${svg("lock", "btn-ico")} Lock</button>` : "";
   const map = {
+    ordersMain: S.view === "orders" ? (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + (S.dl ? `<button class="btn" type="button" data-act="export" data-col="orders">Export</button>` : "") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "") : null,
     home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
     tasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
     attendance: ex("attendance"),
@@ -763,7 +807,8 @@ function headActions() {
     payrecords: ex("payrecords") + (can ? `<button class="btn primary" type="button" data-act="new-pr">Add record</button>` : ""),
     bir: ex("bir") + (can ? `<button class="btn primary" type="button" data-act="new-bir">Add sale</button>` : ""),
     investors: ex("investments") + (can ? `<button class="btn primary" type="button" data-act="new-inv">Add investment</button>` : ""),
-    orders: (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
+    orders: (ctxDept() === "PACKING" && canShip() ? `<button class="btn" type="button" data-act="jnt-file">J&T VIP booking file</button>` : "") + (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
+    suppliers: "",
     archived: "",
     packing: (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
@@ -782,11 +827,26 @@ function periodSeg() {
   return `<div class="seg" role="group" aria-label="Period">${[["month", "This month"], ["last", "Last month"], ["all", "All time"]].map(([k, l]) => `<button type="button" data-period="${k}" aria-pressed="${S.period === k}">${l}</button>`).join("")}</div>`;
 }
 
-function render() { renderInner(); enhanceTables(); }
+function render() { renderInner(); enhanceTables(); enhanceSearch(); }
+function enhanceSearch() {
+  document.querySelectorAll("#view input[type=search], #sheet input[type=search]").forEach(inp => {
+    if (!inp.id || (inp.nextElementSibling && inp.nextElementSibling.dataset && inp.nextElementSibling.dataset.clear)) return;
+    if (!inp.value) return;
+    inp.insertAdjacentHTML("afterend", `<button type="button" class="sx" data-clear="${inp.id}" aria-label="Clear search">✕</button>`);
+  });
+}
+/* ---------- search orders from the main menu ---------- */
+function globalSearch(inp) {
+  const res = inp.parentElement.querySelector(".gs-res"); const q = inp.value.trim().toLowerCase().replace(/^#/, "");
+  if (!q) { res.hidden = true; return; }
+  const list = [...S.orders, ...S.archived].filter(o => [o.num, ...(o.merged || []), o.customer, o.email, o.phone, o.tracking, o.ref].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 8);
+  res.innerHTML = list.length ? list.map(o => `<button type="button" data-gso="${o.id}"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span><small>${o.archived ? "Archived" : esc(ful(o.fulfillment).name)} · ${peso(total(o))}</small></button>`).join("") : `<div class="gs-empty">No orders match “${esc(inp.value)}”.</div>`;
+  res.hidden = false;
+}
 function renderInner() {
   renderNav();
   const d = dept(S.dept);
-  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments" }[S.view] || d.name;
+  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments", orders: "Orders" }[S.view] || d.name;
   $("#view-title").textContent = title;
   const dc = S.view === "dept" ? DEPT_COLORS[S.dept] : "";
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
@@ -798,18 +858,21 @@ function renderInner() {
   const v = $("#view");
   const loading = S.db && !Object.values(S.loaded).every(Boolean);
   if (loading) { v.innerHTML = `<div class="panel"><div class="empty">Loading your records…</div></div>`; return; }
+  if (S.loggedOut) { v.innerHTML = viewLoggedOut(); return; }
   if (S.view === "home") { v.innerHTML = viewHome(); applySlide(); return; }
   if (S.view === "tasks") { v.innerHTML = viewTasks(null); return; }
   if (S.view === "account") { v.innerHTML = viewAccount(); return; }
   if (S.view === "attendance") { v.innerHTML = viewAttendance(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
+  if (S.view === "orders") { v.innerHTML = viewOrders(); return; }
   if (!canSee(S.dept)) { v.innerHTML = `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} isn't part of your access</h2><div class="empty">${myMemberId() ? "Your department decides what you can open. Ask the owner if you need this one." : `Link your name in <button type="button" class="linkish" data-nav="account">My account</button> first.`}</div></div>`; return; }
   if (!isUnlocked(S.dept)) { v.innerHTML = viewLock(d); const pw = $("#unlock-pw"); if (pw) pw.focus(); return; }
-  if (!d.tabs.includes(S.tab)) S.tab = d.tabs[0];
-  const tabs = `<div class="tabs" role="tablist">${d.tabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
+  const dtabs = d.tabs.filter(tabAllowed);
+  if (!dtabs.includes(S.tab)) S.tab = dtabs[0];
+  const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent,
-    dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, archived: viewArchived, customers: viewCustomers, channels: viewChannels,
+    dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
   v.innerHTML = tabs + body;
@@ -910,7 +973,7 @@ function birthdayBanner() {
   const names = list.map(m => esc(m.nickname || m.name.split(" ")[0]));
   const joined = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names.at(-1) : names[0];
   return `<section class="bday" role="status"><div class="bday-avs">${list.map(m => avatar(m, 56)).join("")}</div>
-    <div><div class="slide-eyebrow" style="color:var(--brand)">Today is a special day</div><div class="bday-title">Happy Birthday ${joined}!</div><div style="font-size:13px;color:var(--muted)">From all of us at Regal Spritz 🎉</div></div>
+    <div><div class="slide-eyebrow" style="color:var(--brand)">Today is a special day</div><div class="bday-title">Happy Birthday ${joined}!</div><div style="font-size:13px;color:var(--muted)">From all of us at Regal Spritz PH 🎉</div></div>
     <span class="bday-cake" aria-hidden="true">🎂</span></section>`;
 }
 function teamStrip() {
@@ -1086,7 +1149,7 @@ function slides() {
   const toPack = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
   const placeholder = what => `<p class="slide-ph">${S.canEdit ? `Add your ${what} in <button type="button" class="linkish" data-act="edit-home">Admin → Home page</button>.` : `Your Admin hasn't added the ${what} yet.`}</p>`;
   return [
-    { eyebrow: longDate(today()), title: `${greeting()}${fn ? ", " + esc(fn) : ""}`, body: `<p>${esc(h.welcome || "Welcome to Regal Spritz HQ. Here's what's happening today.")}</p>
+    { eyebrow: longDate(today()), title: `${greeting()}${fn ? ", " + esc(fn) : ""}`, body: `<p>${esc(h.welcome || "Welcome to Regal Spritz PH HQ. Here's what's happening today.")}</p>
       <div class="slide-stats"><span><b class="num">${mine.length}</b> open task${mine.length === 1 ? "" : "s"} for you</span><span><b class="num">${S.tasks.filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length}</b> due today across the team</span><button type="button" class="slide-link" data-goorders="unfulfilled"><b class="num">${toPack}</b> order${toPack === 1 ? "" : "s"} to ship →</button></div>` },
     { eyebrow: "RS Mission", title: "Our mission", body: h.mission ? `<p class="slide-quote">${esc(h.mission)}</p>` : placeholder("mission statement") },
     { eyebrow: "RS Vision", title: "Our vision", body: h.vision ? `<p class="slide-quote">${esc(h.vision)}</p>` : placeholder("vision statement") },
@@ -1148,11 +1211,8 @@ function homeOrders() {
   </section>`;
 }
 function goOrders(view) {
-  if (canSee("SALES") && !(view === "unfulfilled" && !canSee("SALES"))) {
-    S.view = "dept"; S.dept = "SALES"; S.tab = "orders"; S.page = 0;
-    if (view === "today") { S.of.view = "all"; S.of.range = "today"; } else S.of.view = view;
-  } else if (canSee("PACKING")) { S.view = "dept"; S.dept = "PACKING"; S.tab = "packing"; }
-  else if (visDepts()[0]) { S.view = "dept"; S.dept = visDepts()[0].id; S.tab = "orders"; S.of.view = view === "today" ? "all" : view; }
+  S.view = "orders"; S.page = 0;
+  if (view === "today") { S.of.view = "all"; S.of.range = "today"; } else if (view === "all") { S.of.view = "all"; } else S.of.view = view;
   saveNav(); render(); window.scrollTo(0, 0);
 }
 
@@ -1160,7 +1220,7 @@ function viewHomeContent() {
   const h = S.home || {};
   if (!S.canEdit) return `<div class="panel"><div class="empty">Only the owner or an Editor can change the Home page.</div></div>`;
   return `<form class="panel" id="home-form">
-    <div class="field"><label for="h-welcome">Welcome message (first slide)</label><textarea id="h-welcome" rows="2" placeholder="Welcome to Regal Spritz HQ. Here's what's happening today.">${esc(h.welcome || "")}</textarea></div>
+    <div class="field"><label for="h-welcome">Welcome message (first slide)</label><textarea id="h-welcome" rows="2" placeholder="Welcome to Regal Spritz PH HQ. Here's what's happening today.">${esc(h.welcome || "")}</textarea></div>
     <div class="field"><label for="h-mission">RS Mission</label><textarea id="h-mission" rows="3">${esc(h.mission || "")}</textarea></div>
     <div class="field"><label for="h-vision">RS Vision</label><textarea id="h-vision" rows="3">${esc(h.vision || "")}</textarea></div>
     <div class="field"><label for="h-goals">RS Goals (one per line)</label><textarea id="h-goals" rows="5">${esc(h.goals || "")}</textarea></div>
@@ -1193,7 +1253,9 @@ function viewAccount() {
     <div style="font-size:13px;color:var(--muted)">${visDepts().length ? `You can open: ${visDepts().map(d => d.name).join(", ")}.` : "Link your name above to see your departments."}</div>
     <div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${isUnlocked(d.id) ? "Unlocked on this device" : "Locked"}</span></button>`).join("")}</div>
     ${S.unlocked.size ? `<div><button class="btn" type="button" data-act="lock-all">Lock all departments</button></div>` : ""}`}
-  </section>`;
+  </section>
+  <section class="panel"><h2>Log out</h2><div style="font-size:13px;color:var(--muted)">Locks every department on this device and leaves the app. To switch to another Claude account, use “Sign out of Claude”.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn danger" type="button" data-act="log-out">Log out</button><a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign out of Claude</a></div></section>`;
 }
 
 /* ---------- departments ---------- */
@@ -1510,13 +1572,15 @@ const ORDER_COLS = {
   tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
 const TABLE_COLS = {
-  orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "phone", "address"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags"] },
+  orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "phone", "address", "actions"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags"],
+    byDept: { PACKING: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
-const colPref = table => S.colprefs.find(p => p.id === `${S.dept}_${table}`);
+const colPref = table => S.colprefs.find(p => p.id === `${ctxDept()}_${table}`);
 function colOrder(table) {
   const T = TABLE_COLS[table], pr = colPref(table);
-  if (!pr) return { order: T.all.slice(), hidden: T.all.filter(k => !T.show.includes(k)) };
+  const show = (T.byDept && T.byDept[ctxDept()]) || T.show;
+  if (!pr) return { order: [...show, ...T.all.filter(k => !show.includes(k))], hidden: T.all.filter(k => !show.includes(k)) };
   const order = [...(pr.order || []).filter(k => T.all.includes(k)), ...T.all.filter(k => !(pr.order || []).includes(k))];
   return { order, hidden: (pr.hidden || []).filter(k => T.all.includes(k)) };
 }
@@ -1525,18 +1589,18 @@ function openColumns(table) {
   const c = colOrder(table), pr = colPref(table);
   const row = k => `<div class="colrow" data-ck="${k}"><label><input type="checkbox" ${c.hidden.includes(k) ? "" : "checked"}> ${esc(ORDER_COLS[k].label)}</label><span><button class="btn ghost sm" type="button" data-act="col-up" aria-label="Move up">↑</button><button class="btn ghost sm" type="button" data-act="col-down" aria-label="Move down">↓</button></span></div>`;
   openSheet(`
-    <h3>Arrange columns · ${esc(dept(S.dept).name)}</h3>
-    <div style="font-size:13px;color:var(--muted)">Tick to show, use the arrows to move. Saved for everyone in ${esc(dept(S.dept).name)}.${pr && pr.by ? ` Last arranged by ${esc(pr.by)}.` : ""}</div>
+    <h3>Arrange columns · ${esc(dept(ctxDept()).name)}</h3>
+    <div style="font-size:13px;color:var(--muted)">Tick to show, use the arrows to move. Saved for everyone in ${esc(dept(ctxDept()).name)}.${pr && pr.by ? ` Last arranged by ${esc(pr.by)}.` : ""}</div>
     <div id="colrows" class="colrows">${c.order.map(row).join("")}</div>
     <button class="btn ghost sm" type="button" data-act="col-reset" data-table="${table}" style="align-self:flex-start">Reset to default</button>
     <div id="sheet-err" class="confirm" hidden></div>
-    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save for ${esc(dept(S.dept).name)}</button></div>`,
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save for ${esc(dept(ctxDept()).name)}</button></div>`,
   async () => {
     const rows = [...document.querySelectorAll("#colrows .colrow")];
     const order = rows.map(r => r.dataset.ck), hidden = rows.filter(r => !r.querySelector("input").checked).map(r => r.dataset.ck);
     if (hidden.length === order.length) return sheetError("Keep at least one column.");
-    await save("colprefs", `${S.dept}_${table}`, { dept: S.dept, table, order, hidden, by: actor(), at: Date.now() });
-    closeSheet(); toast("Columns saved for " + dept(S.dept).name + ".");
+    await save("colprefs", `${ctxDept()}_${table}`, { dept: ctxDept(), table, order, hidden, by: actor(), at: Date.now() });
+    closeSheet(); toast("Columns saved for " + dept(ctxDept()).name + ".");
   });
 }
 
@@ -1544,16 +1608,16 @@ const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "
 function orderCell(k, o, table) {
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
-    case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}${o.note ? NOTE_ICON : ""}</span>${exChip(o)}</td>`;
+    case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span>${noteIcons(o)}${exChip(o)}</td>`;
     case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
     case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
-    case "customer": return `<td class="strike">${esc(o.customer || "No customer")}</td>`;
+    case "customer": return `<td class="strike">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
     case "assigned": { const team = salesTeam(); const cur = o.assignee && !team.some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [];
       return canAll() ? `<td><select class="status st-grey" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "total": return `<td class="r num strike nowrap">${peso2(total(o))}</td>`;
     case "payment": return `<td>${canPay() ? st(pay(o.payment), "payment", opts(PAYMENTS, o.payment)) : badge(pay(o.payment))}</td>`;
     case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(FULFILLMENTS, o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
-    case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option ${courierOf(o) === c ? "selected" : ""}>${c}</option>`).join("")}</select>` : esc(courierOf(o))}</td>`;
+    case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
     case "tags": return `<td>${tagCell(o.tags)}</td>`;
@@ -1562,6 +1626,21 @@ function orderCell(k, o, table) {
     case "actions": return `<td class="nowrap">${canShip() && o.fulfillment !== "fulfilled" ? `<button class="btn primary sm" type="button" data-ful="${o.id}" data-to="fulfilled">Shipped</button>` : ""} <button class="btn ghost sm" type="button" data-open="${o.id}">Details</button></td>`;
   }
   return "<td></td>";
+}
+function noteIcons(o) {
+  const cm = o.comments || [];
+  if (!o.note && !cm.length) return "";
+  return `<button type="button" class="nicons" data-notes="${o.id}" title="${esc([o.note ? "Note: " + o.note : "", ...cm.map(c => "Comment: " + c.text)].filter(Boolean).join("\n").slice(0, 400))}">${o.note ? `<span class="ni">${NOTE_ICON}</span>` : ""}${cm.length ? `<span class="ni">${svg("comment")}${cm.length > 1 ? `<b>${cm.length}</b>` : ""}</span>` : ""}</button>${S.showNotes !== false && (o.note || cm[0]) ? `<div class="nprev">${esc(((cm[0] && cm[0].text) || o.note || "").split("\n")[0].slice(0, 60))}</div>` : ""}`;
+}
+function notesPop(btn) {
+  closePop(); const o = findOrder(btn.dataset.notes); if (!o) return;
+  const r = btn.getBoundingClientRect();
+  const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop";
+  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span></div>${o.note ? `<div class="ipop-n"><div class="olog-h">Order note</div><div style="white-space:pre-wrap">${esc(o.note)}</div></div>` : ""}${(o.comments || []).map(c => `<div class="ipop-n"><div class="olog-h">Shopify comment · ${relTime(c.at)}</div><div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join("")}<button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
+  document.body.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
+  el.style.top = (r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px";
 }
 function ordersTable(rows, table, st, attr, selAllId) {
   const cols = visCols(table), selectable = canPay() || canShip();
@@ -1592,6 +1671,20 @@ function openSupplierList() {
     <div style="font-size:12px;color:var(--muted)">Supplier invoices will link here next.</div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button>${S.dl ? `<button class="btn" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn primary" type="button" data-act="sup-copy">Copy list</button></div>`, null);
 }
+const ofActive = () => !!(S.of.q || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all" || (S.of.sup && S.of.sup !== "all"));
+function packTools() {
+  const open = S.orders.filter(o => !isVoid(o) && PACK_SHOW.includes(o.fulfillment)), toShip = open.filter(o => o.fulfillment === "unfulfilled");
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">To ship</span><span class="value">${toShip.length}</span><span class="sub">J&T ${toShip.filter(o => courierOf(o) === "J&T").length} · SDD / Pickup ${toShip.filter(o => courierOf(o) === "SDD").length}</span></div>
+      <div class="kpi"><span class="label">Arrived / sorted</span><span class="value">${open.filter(o => ["sorted", "arrived", "arrived_hold"].includes(o.fulfillment)).length}</span></div>
+      <div class="kpi"><span class="label">Items to pick</span><span class="value">${toShip.reduce((a, o) => a + itemCount(o), 0)}</span></div>
+      <div class="kpi"><span class="label">Shipped today</span><span class="value">${S.orders.filter(o => o.fulfilledAt && dstr(o.fulfilledAt) === today()).length}</span></div>
+    </div>
+    <section class="panel scanbar" style="--dc:${DEPT_COLORS.PACKING}"><div class="scanrow"><input id="pack-scan" autocomplete="off" placeholder="Scan or type an order # (e.g. RS9978) to open it" aria-label="Order number">
+      <label class="btn" for="pack-cam" style="cursor:pointer">📷 Camera</label><input id="pack-cam" type="file" accept="image/*" capture="environment" hidden></div>
+      <div class="wb-set"><label><input type="checkbox" id="pack-ship" ${S.wbShip !== false ? "checked" : ""}> After scanning a waybill, mark <strong>Shipped</strong> and send the tracking # to Shopify (buyer sees it in their Order History)</label>
+      ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file">J&T VIP booking file</button>` : ""}</div></section>`;
+}
 function viewOrders() {
   const all = filteredOrders();
   const pages = Math.max(1, Math.ceil(all.length / PAGE));
@@ -1601,6 +1694,7 @@ function viewOrders() {
   const bulk = S.sel.size && (canPay() || canShip()) ? `<div class="bulk"><strong>${S.sel.size} selected</strong>
       ${canPay() ? `<select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
       ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
+      ${canShip() ? `<button class="btn sm" type="button" data-act="jnt-file">J&T booking file</button>` : ""}
       ${canAll() ? `<button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>
       <input id="bulk-tag" placeholder="Tag e.g. 8.FWD" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
@@ -1608,14 +1702,15 @@ function viewOrders() {
   return `
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${statsStrip()}
+  ${ctxDept() === "PACKING" ? packTools() : ""}
+  <div class="bigsearch">${svg("search")}<input id="of-q" type="search" placeholder="Search order #, customer, phone, product, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
   <div class="toolbar">
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
-    <input id="of-q" type="search" placeholder="Search and filter: order #, customer, tag, product, tracking" value="${esc(S.of.q)}" aria-label="Search orders">
     <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
     <select id="of-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${S.of.pay === f.id ? "selected" : ""}>${f.name} (${S.orders.filter(o => o.payment === f.id).length})</option>`).join("")}</select>
+    ${ofActive() ? `<button class="btn ghost" type="button" data-act="of-clear">✕ Clear filters</button>` : ""}
     <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
   </div>
-  ${supplierBar(S.orders)}
   ${bulk}
   ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
   <div class="head"><div class="pager">
@@ -1625,6 +1720,39 @@ function viewOrders() {
   </div><span style="font-size:12px;color:var(--muted)">${orderRole() === "status" ? "Finance can change payment and fulfillment status." : orderRole() === "pack" ? "Packing can change fulfillment, courier and tracking." : orderRole() === "view" ? "View only." : ""}</span></div>`;
 }
 
+function viewSuppliers() {
+  if (!canSuppliers()) return `<div class="panel"><div class="empty">Suppliers is only for the CEO and Senior Sales (Eve).</div></div>`;
+  const sp = S.sp || (S.sp = { sup: "all", ful: "all", pay: "all", q: "" });
+  const m = new Map(); for (const o of S.orders) for (const t of o.tags || []) if (/^S-/i.test(t)) m.set(t.toUpperCase(), (m.get(t.toUpperCase()) || 0) + 1);
+  const q = sp.q.trim().toLowerCase();
+  const os = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)) && (sp.ful === "all" || o.fulfillment === sp.ful) && (sp.pay === "all" || o.payment === sp.pay)
+    && (!q || [o.num, ...(o.merged || []), o.customer, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q))).sort(orderSorter());
+  const agg = new Map();
+  for (const o of os) for (const i of o.items || []) { const k = i.name || "?"; const a = agg.get(k) || { name: k, qty: 0, orders: [] }; a.qty += Number(i.qty) || 0; a.orders.push(i.from || o.num); agg.set(k, a); }
+  const rows = [...agg.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const label = sp.sup === "all" ? "all suppliers" : sp.sup;
+  S.supText = `ORDER LIST · ${label} · ${mToday()}\n` + rows.map(r => `${r.qty}x ${r.name}  (${[...new Set(r.orders)].map(n => "#" + n).join(", ")})`).join("\n") + `\n\nTotal pcs: ${rows.reduce((a, r) => a + r.qty, 0)}`;
+  S.supRows = [["Qty", "Item", "Orders"], ...rows.map(r => [r.qty, r.name, [...new Set(r.orders)].map(n => "#" + n).join(" ")])];
+  S.supLabel = label;
+  const active = sp.sup !== "all" || sp.ful !== "all" || sp.pay !== "all" || sp.q;
+  return `<div class="supbar"><span class="lab">Supplier</span><button type="button" data-spsup="all" aria-pressed="${sp.sup === "all"}">All <span>${S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t))).length}</span></button>${[...m].sort().map(([t, n]) => `<button type="button" data-spsup="${esc(t)}" aria-pressed="${sp.sup === t}">${esc(t)} <span>${n}</span></button>`).join("")}</div>
+  <div class="bigsearch">${svg("search")}<input id="spq" type="search" placeholder="Search item, order # or customer" value="${esc(sp.q)}" aria-label="Search supplier orders" autocomplete="off"></div>
+  <div class="toolbar">
+    <select id="sp-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${sp.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""}</option>`).join("")}</select>
+    <select id="sp-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${sp.pay === f.id ? "selected" : ""}>${f.name}</option>`).join("")}</select>
+    ${active ? `<button class="btn ghost" type="button" data-act="sp-clear">✕ Clear filters</button>` : ""}
+  </div>
+  <section class="panel"><div class="head"><h2>Order list · ${esc(label)} · ${rows.reduce((a, r) => a + r.qty, 0)} pcs from ${os.length} order${os.length === 1 ? "" : "s"}</h2><div style="display:flex;gap:6px">${S.dl ? `<button class="btn sm" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn sm primary" type="button" data-act="sup-copy">Copy list</button></div></div>
+    <div class="table-wrap"><table><thead><tr><th class="r">Qty</th><th>Item</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr><td class="r num" style="font-weight:700">${r.qty}</td><td>${esc(r.name)}</td><td style="font-size:12px">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody></table>${rows.length ? "" : `<div class="empty" style="padding:16px">No orders match. Supplier tags look like S-JEFF, S-GAL, S-MEI.</div>`}</div>
+    <div style="font-size:12px;color:var(--muted)">Supplier invoices will link here next.</div></section>
+  <h2 style="margin:4px 0 -8px">Orders</h2>
+  ${ordersTable(os.slice(0, 200), "orders", S.of, "osort", "sel-all")}`;
+}
+function viewLoggedOut() {
+  return `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:16px;color:var(--fg);text-transform:none;letter-spacing:0">You're logged out of Regal Spritz PH OS</h2>
+    <div class="empty">All departments are locked on this device. Log back in to continue, or sign out of Claude completely to switch accounts.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn primary" type="button" data-act="log-in">Log back in</button><a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign out of Claude</a></div></div>`;
+}
 function viewArchived() {
   const q = (S.aq || "").trim().toLowerCase();
   const rows = S.archived.filter(o => !q || [o.num, ...(o.merged || []), o.customer, o.archivedReason, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
@@ -1709,7 +1837,112 @@ function itemsPop(btn) {
 const closePop = () => { const p = $("#ipop"); if (p) p.remove(); };
 window.addEventListener("scroll", closePop, { passive: true });
 
-/* ---------- J&T VIP booking export ---------- */
+/* ---------- J&T VIP booking file (matches the J&T "ORDER LIST" template V20200721) ---------- */
+let JNT_ADDR = null;
+async function jntAddr() {
+  if (JNT_ADDR) return JNT_ADDR;
+  const r = await fetch("jnt-address.json"); if (!r.ok) throw new Error("Couldn't load the J&T address list.");
+  const raw = await r.json(); JNT_ADDR = {};
+  for (const [p, cities] of Object.entries(raw)) { JNT_ADDR[p] = {}; for (const [c, b] of Object.entries(cities)) JNT_ADDR[p][c] = b.split("|"); }
+  return JNT_ADDR;
+}
+const jn = s => String(s || "").toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\bSTA\.?\s+/g, "SANTA ").replace(/\bSTO\.?\s+/g, "SANTO ").replace(/[^A-Z0-9]+/g, " ").trim();
+const PROV_ALIAS = { "NCR": "METRO-MANILA", "NATIONAL CAPITAL REGION": "METRO-MANILA", "METRO MANILA": "METRO-MANILA", "MANILA": "METRO-MANILA", "COMPOSTELA VALLEY": "DAVAO-DE-ORO", "SAMAR": "WESTERN-SAMAR", "NORTH COTABATO": "COTABATO", "COTABATO NORTH COTABATO": "COTABATO", "DAVAO": "DAVAO-DEL-SUR", "MT PROVINCE": "MOUNTAIN-PROVINCE" };
+const cityKey = (prov, c) => { let k = jn(c); const pk = jn(prov); if (k.startsWith(pk + " ")) k = k.slice(pk.length + 1); if (k.startsWith("METRO MANILA ")) k = k.slice(13); return k.replace(/^CITY OF /, "").replace(/ CITY$/, "").replace(/ CITY OF$/, "").trim(); };
+const brgyKey = b => jn(b).replace(/^(BRGY|BGY|BARANGAY) (?=[A-Z])/, "").replace(/ POB$/, " POBLACION").trim();
+function jntMatch(A, sh) {
+  const out = { prov: "", city: "", brgy: "" };
+  const text = " " + jn([sh.address1, sh.address2, sh.city].join(" ")) + " ";
+  let P = PROV_ALIAS[jn(sh.province)] || Object.keys(A).find(p => jn(p) === jn(sh.province)) || "";
+  const findCity = (p, name) => { const k = cityKey(p, name); if (!k) return ""; const cs = Object.keys(A[p]); return cs.find(c => cityKey(p, c) === k) || cs.find(c => cityKey(p, c).replace(/ /g, "") === k.replace(/ /g, "")) || ""; };
+  let C = P ? findCity(P, sh.city) : "";
+  if (!P && sh.city) { for (const p of Object.keys(A)) { const c = findCity(p, sh.city); if (c) { P = p; C = c; break; } } }
+  if (P && !C) { // e.g. "Manila" → district (Santa Cruz, Tondo, Sampaloc…) found in the address
+    const cs = Object.keys(A[P]).map(c => [c, cityKey(P, c)]).filter(([, k]) => k.length > 3 && text.includes(" " + k + " ")).sort((a, b) => b[1].length - a[1].length);
+    if (cs[0]) C = cs[0][0];
+  }
+  out.prov = P; out.city = C;
+  if (P && C) {
+    const bs = A[P][C];
+    const a2 = brgyKey(sh.address2), num = (text.match(/ (?:BRGY|BGY|BARANGAY) (\d+[A-Z]?) /) || [])[1];
+    out.brgy = (a2 && bs.find(b => brgyKey(b) === a2)) || (num && bs.find(b => jn(b) === "BARANGAY " + num)) || "";
+    if (!out.brgy) { const hit = bs.map(b => [b, brgyKey(b)]).filter(([, k]) => k.length > 2 && text.includes(" " + k + " ")).sort((a, b) => b[1].length - a[1].length)[0]; if (hit) out.brgy = hit[0]; }
+  }
+  return out;
+}
+const jntPhone = p => { const d = String(p || "").replace(/\D/g, ""); if (d.startsWith("63") && d.length === 12) return "+" + d; if (d.startsWith("09") && d.length === 11) return "+63" + d.slice(1); if (d.startsWith("9") && d.length === 10) return "+63" + d; return p ? String(p) : ""; };
+const JNT_HEAD = ["Receiver(*)", "Receiver Telephone (*)", "Receiver Address (*)", "Receiver Province (*)", "Receiver City (*)", "Receiver Region (*)", "Express Type (*)", "Parcel Name (*)", "Weight (kg)  (*)", "Total parcels(*)", "Parcel Value (Insurance Fee) (*)", "COD (PHP) (*)", "Remarks"];
+function jntOrders() {
+  const sel = S.orders.filter(o => S.sel.has(o.id));
+  return sel.length ? sel : filteredOrders().filter(o => courierOf(o) === "J&T" && o.fulfillment === "unfulfilled");
+}
+async function openJntFile() {
+  const os = jntOrders();
+  if (!os.length) { toast("No J&T orders to book. Select orders, or filter to To ship."); return; }
+  let A; try { A = await jntAddr(); } catch (e) { toast(e.message); return; }
+  let d = {}; try { d = JSON.parse(localStorage.getItem("rs-jnt") || "{}"); } catch (e) {}
+  S.jnt = { express: d.express || "EZ", parcel: d.parcel || "PERFUME", weight: d.weight || "0.5", rows: os.map(o => { const sh = shipOf(o), m = jntMatch(A, sh); return { id: o.id, num: onum(o), name: sh.name || o.customer || "", phone: jntPhone(sh.phone || o.phone), addr: [sh.address1, sh.address2].filter(Boolean).join(", "), ...m, weight: "", parcels: 1, value: Math.round(total(o)), cod: o.payment === "paid" ? 0 : o.payment === "pending" ? Math.round(total(o)) : "", remarks: onum(o) }; }) };
+  renderJnt();
+}
+function jntRowHTML(r, i) {
+  const A = JNT_ADDR, cities = r.prov ? Object.keys(A[r.prov]) : [], bs = r.prov && r.city ? A[r.prov][r.city] : [];
+  const okAll = r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== "";
+  const sel = (f, list, v) => `<select class="jnt-f" data-i="${i}" data-f="${f}"><option value="">Choose…</option>${list.map(x => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+  return `<tr class="${okAll ? "" : "warnrow"}"><td class="nowrap"><b>${esc(r.num)}</b><div style="font-size:11px">${okAll ? `<span style="color:var(--good)">✓ ready</span>` : `<span style="color:var(--bad)">fix highlighted</span>`}</div></td>
+    <td><input class="jnt-f" data-i="${i}" data-f="name" value="${esc(r.name)}"></td><td><input class="jnt-f" data-i="${i}" data-f="phone" value="${esc(r.phone)}" style="width:130px"></td>
+    <td><input class="jnt-f" data-i="${i}" data-f="addr" value="${esc(r.addr)}" style="min-width:200px"></td>
+    <td class="${r.prov ? "" : "need"}">${sel("prov", Object.keys(A).sort(), r.prov)}</td><td class="${r.city ? "" : "need"}">${sel("city", cities.slice().sort(), r.city)}</td><td class="${r.brgy ? "" : "need"}">${sel("brgy", bs.slice().sort(), r.brgy)}</td>
+    <td><input class="jnt-f num" data-i="${i}" data-f="weight" value="${esc(r.weight)}" placeholder="${esc(S.jnt.weight)}" style="width:60px"></td>
+    <td class="${r.cod === "" ? "need" : ""}"><input class="jnt-f num" data-i="${i}" data-f="cod" value="${esc(r.cod)}" placeholder="COD" style="width:80px"></td>
+    <td><input class="jnt-f num" data-i="${i}" data-f="value" value="${esc(r.value)}" style="width:80px"></td></tr>`;
+}
+function renderJnt() {
+  const J = S.jnt, ready = J.rows.filter(r => r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== "").length;
+  openSheet(`<h3>J&T VIP booking file · ${J.rows.length} order${J.rows.length === 1 ? "" : "s"}</h3>
+    <div style="font-size:13px;color:var(--muted)">Built on your J&T template (ORDER LIST V20200721). Province, city and barangay are matched to J&T's address list. Fix anything highlighted, then download and upload it in the J&T VIP Dashboard → Batch order.</div>
+    <div class="row"><div class="field"><label>Express type</label><select class="jnt-f" data-f="express"><option ${J.express === "EZ" ? "selected" : ""}>EZ</option><option ${J.express === "SP" ? "selected" : ""}>SP</option></select></div>
+      <div class="field"><label>Parcel name</label><input class="jnt-f" data-f="parcel" value="${esc(J.parcel)}"></div>
+      <div class="field"><label>Default weight (kg)</label><input class="jnt-f num" data-f="weight" value="${esc(J.weight)}"></div></div>
+    <div class="table-wrap jnt-wrap"><table class="jnt-t" data-own="1"><thead><tr><th>Order</th><th>Receiver</th><th>Phone</th><th>Street address</th><th>Province</th><th>City</th><th>Barangay</th><th>Kg</th><th>COD ₱</th><th>Value ₱</th></tr></thead><tbody id="jnt-body">${J.rows.map(jntRowHTML).join("")}</tbody></table></div>
+    <div id="jnt-sum" style="font-size:13px"><b>${ready}</b> of ${J.rows.length} ready. COD is the amount J&T collects: 0 for Fully paid, the total for Unpaid. Type the balance for Partially paid.</div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button><button class="btn primary" type="button" data-act="jnt-dl">Download J&T file (.xls)</button></div>`, null);
+  $("#sheet").classList.add("wide");
+}
+function jntField(t, typing) {
+  const J = S.jnt, f = t.dataset.f;
+  if (t.dataset.i === undefined) { J[f] = t.value; try { localStorage.setItem("rs-jnt", JSON.stringify({ express: J.express, parcel: J.parcel, weight: J.weight })); } catch (e) {} return; }
+  const r = J.rows[Number(t.dataset.i)]; r[f] = t.value;
+  if (f === "prov") { r.city = ""; r.brgy = ""; } if (f === "city") r.brgy = "";
+  if (typing) { const ready = J.rows.filter(x => x.name && x.phone && x.addr && x.prov && x.city && x.brgy && x.cod !== "").length; const s2 = $("#jnt-sum b"); if (s2) s2.textContent = ready; return; }
+  const body = $("#jnt-body"); if (body) body.innerHTML = J.rows.map(jntRowHTML).join("");
+  const s2 = $("#jnt-sum b"); if (s2) s2.textContent = J.rows.filter(x => x.name && x.phone && x.addr && x.prov && x.city && x.brgy && x.cod !== "").length;
+}
+let XLSX_LIB = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (XLSX_LIB) return XLSX_LIB;
+  const tryLoad = src => new Promise((ok, no) => { const sc = document.createElement("script"); sc.src = src; sc.onload = () => window.XLSX ? ok(window.XLSX) : no(new Error("x")); sc.onerror = () => no(new Error("x")); document.head.appendChild(sc); });
+  XLSX_LIB = tryLoad("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js").catch(() => tryLoad("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js")).catch(e => { XLSX_LIB = null; throw new Error("Couldn't load the Excel writer. Check your connection and try again."); });
+  return XLSX_LIB;
+}
+async function jntDownload() {
+  const J = S.jnt; if (!J) return;
+  const bad = J.rows.filter(r => !(r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== ""));
+  if (bad.length) return sheetError(`${bad.length} order${bad.length === 1 ? "" : "s"} still need${bad.length === 1 ? "s" : ""} details: ${bad.slice(0, 6).map(r => r.num).join(", ")}${bad.length > 6 ? "…" : ""}`);
+  let X; try { X = await loadXLSX(); } catch (e) { return sheetError(e.message); }
+  const blank = () => Array(13).fill("");
+  const aoa = [blank(), blank(), ["", "", "PH GLOBAL JET EXPRESS INC.", ...Array(10).fill("")], blank(), blank(), ["V20200721", "", "", "", "ORDER LIST", ...Array(8).fill("")], ["(*) Information that must be filled out", ...Array(12).fill("")], JNT_HEAD,
+    ...J.rows.map(r => [r.name, r.phone, r.addr, r.prov, r.city, r.brgy, J.express, J.parcel, Number(r.weight || J.weight) || 0.5, Number(r.parcels) || 1, Number(r.value) || 0, Number(r.cod) || 0, r.remarks])];
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), "List");
+  const data = X.write(wb, { bookType: "biff8", type: "array" });
+  const filename = `JNT_BOOKING_${mToday()}.xls`;
+  if (!S.dl) return sheetError("Downloads aren't available in this view. Open the app in claude.ai.");
+  try { await S.dl.save({ filename, data: new Uint8Array(data) }); closeSheet(); toast(`${filename} ready · ${J.rows.length} parcel${J.rows.length === 1 ? "" : "s"}. Upload it in J&T VIP → Batch order.`); }
+  catch (e) { if (e && e.code === "declined") return; try { const d2 = X.write(wb, { bookType: "xlsx", type: "array" }); await S.dl.save({ filename: filename.replace(/\.xls$/, ".xlsx"), data: new Uint8Array(d2) }); toast("Saved as .xlsx."); } catch (e2) { sheetError("Couldn't download the file."); } }
+}
+
+/* ---------- J&T VIP booking export (simple CSV / copy) ---------- */
 function shipOf(o) {
   if (o.ship && (o.ship.address1 || o.ship.city)) return { name: o.ship.name || o.customer || "", phone: o.ship.phone || o.phone || "", ...o.ship };
   const parts = (o.address || "").split(",").map(x => x.trim()).filter(Boolean);
@@ -1920,7 +2153,8 @@ function openSheet(html, onSubmit) {
   $("#scrim").hidden = false;
   const f = $("#sheet").querySelector("input:not([type=file]), select, textarea"); if (f) f.focus();
 }
-function closeSheet() { $("#scrim").hidden = true; $("#sheet").innerHTML = ""; sheetSubmit = null; render(); }
+function closeSheet() {
+  const sh0 = $("#sheet"); if (sh0) sh0.classList.remove("wide"); $("#scrim").hidden = true; $("#sheet").innerHTML = ""; sheetSubmit = null; render(); }
 const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
 const numv = id => Number(val(id)) || 0;
 function sheetError(msg) { const el = $("#sheet-err"); if (el) { el.textContent = msg; el.hidden = false; } }
@@ -2003,13 +2237,14 @@ function openOrderDetails(id) {
   const multi = (onum(o).match(/[A-Z]{1,4}\d{3,}/gi) || []).length > 1;
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
-    <h3>${esc(onum(o))}</h3>
+    <div class="sheet-title"><h3>${esc(onum(o))}</h3>${all ? `<button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit</button>` : ""}</div>
     <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
-    ${arch ? `<div class="notice">Archived ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Make active again</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(courierOf(o))}</span></div>`}
-    <div><div style="font-weight:700">${esc(o.customer || "No customer")}</div><div style="color:var(--muted);font-size:13px;user-select:all">${[o.email, o.phone].filter(Boolean).map(esc).join(" · ")}</div>${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : o.pickup ? `<div style="color:var(--muted);font-size:13px">Pickup${o.shipTitle ? " · " + esc(o.shipTitle) : ""}</div>` : ""}</div>
+    ${arch ? `<div class="notice">Archived ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Make active again</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(COURIER_LABEL[courierOf(o)])}</span></div>`}
+    <div><div style="font-weight:700">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</div><div style="color:var(--muted);font-size:13px;user-select:all">${[o.email, o.phone].filter(Boolean).map(esc).join(" · ")}</div>${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : o.pickup ? `<div style="color:var(--muted);font-size:13px">Pickup${o.shipTitle ? " · " + esc(o.shipTitle) : ""}</div>` : ""}</div>
     <div class="list">${(o.items || []).map(i => `<div class="li"><div class="main"><div class="t">${esc(i.qty)}× ${esc(i.name)}</div><div class="s num">${showFrom ? `<span class="from">${i.from ? "from #" + esc(i.from) : "order # unknown"}</span> ` : ""}${peso2(i.price)} each${i.cost ? " · cost " + peso2(i.cost) : ""}${i.sku ? " · " + esc(i.sku) : ""}</div></div><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("")}</div>
     ${multi && (o.items || []).some(i => !i.from) && all ? `<button class="btn sm" type="button" data-act="trace-items" data-id="${o.id}" style="align-self:flex-start">Find which order # each item came from (Shopify)</button>` : ""}
-    <div class="list">
+    ${o.note || (o.comments || []).length ? `<div class="notebox">${o.note ? `<div><div class="olog-h">Order note</div><div style="white-space:pre-wrap">${esc(o.note)}</div></div>` : ""}${(o.comments || []).map(c => `<div><div class="olog-h">Shopify comment · ${relTime(c.at)}</div><div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join("")}</div>` : ""}
+    <div class="list costs">
       ${o.adjust ? `<div class="li"><span>Shipping fee & other charges</span><span class="num">${peso2(o.adjust)}</span></div>` : ""}
       ${o.discount ? `<div class="li"><span>Discount${o.discountNote ? " · " + esc(o.discountNote) : ""}</span><span class="num">−${peso2(o.discount)}</span></div>` : ""}
       <div class="li"><span style="font-weight:700">Total</span><span class="num" style="font-weight:700">${peso2(total(o))}</span></div>
@@ -2019,12 +2254,12 @@ function openOrderDetails(id) {
       <div class="li"><span style="font-weight:700">Profit</span><span class="num" style="font-weight:700;color:${profit(o) < 0 ? "var(--bad)" : "var(--good)"}">${isVoid(o) || arch ? "–" : peso2(profit(o))}</span></div>
     </div>
     ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
-    ${all ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items, prices & discount</button>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}</div>` : ""}
+    ${all && (o.mergedParts || []).length ? `<div><button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button></div>` : ""}
     ${cs ? `<div class="row">
       <div class="field"><label for="d-track">Tracking # (waybill)</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
-      <div class="field"><label for="d-courier">Courier</label><select id="d-courier">${COURIERS.map(c => `<option ${c === courierOf(o) ? "selected" : ""}>${c}</option>`).join("")}</select></div>
+      <div class="field"><label for="d-courier">Courier</label><select id="d-courier">${COURIERS.map(c => `<option value="${c}" ${c === courierOf(o) ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select></div>
     </div>
-    ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}` : o.tracking ? `<div>🚚 ${esc(courierOf(o))} ${esc(o.tracking)}</div>` : ""}
+    ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}` : o.tracking ? `<div>🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}
     ${cp || cf || all ? `<div class="row">
       ${cp ? `<div class="field"><label for="d-pay">Payment status</label><select id="d-pay">${opts(PAYMENTS, o.payment)}</select></div>` : ""}
       ${cf ? `<div class="field"><label for="d-ful">Fulfillment status</label><select id="d-ful">${opts(FULFILLMENTS, o.fulfillment)}</select></div>` : ""}
@@ -2149,7 +2384,7 @@ async function shopifyShip(o, manual) {
 const LIST_TYPES = ["Sealed", "Tester", "Partial", "Unsealed, New", "Boxed, New", "Set", "Mini", "Vial", "Decant", "Other"];
 const WEB_CATS = [["her", "For her"], ["him", "For him"], ["unisex", "Unisex"], ["arabian", "Arabian"], ["beauty", "Beauty"]];
 const SITE = "https://regal.famcoventures.com/";
-const LIST_STATUS = { active: { name: "Active", cls: "good" }, draft: { name: "Draft", cls: "" }, hidden: { name: "Hidden", cls: "warn" } };
+const LIST_STATUS = { active: { name: "Active", cls: "good" }, draft: { name: "Draft", cls: "" }, hidden: { name: "Inactive", cls: "warn" } };
 function openProductForm(id, preset = {}) {
   const p = id ? S.products.find(x => x.id === id) : { status: "active", reorder: 1, stock: 0, ...preset };
   openSheet(`
@@ -2209,23 +2444,40 @@ function openProductForm(id, preset = {}) {
   });
 }
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
-  const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter || "all";
-  const all = [...S.products].sort((a, b) => (b.editedAt || b.createdAt || 0) - (a.editedAt || a.createdAt || 0));
-  const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, out: all.filter(p => p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
+  const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter || "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
+  const all = S.products;
+  const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(p => p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
+  const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
   const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? p.kind !== "preorder" && (Number(p.stock) || 0) <= 0 : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
-    && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId].join(" ").toLowerCase().includes(q)));
+    && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
+  const page = rows.slice(S.lpage * PAGE, S.lpage * PAGE + PAGE);
   const can = !S.readOnly;
+  const th = (k, l, c) => sortTh(k, l, c || "", ls, "lsort");
+  const etaOpts = p => { const opts2 = [...new Set([...MONTHS, p.eta].filter(Boolean))]; return `<option value="">–</option>${opts2.map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}`; };
   return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending ? `${counts.pending} change${counts.pending === 1 ? "" : "s"} not on <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet. Click <strong>Website code</strong>, then paste it into WebCake and publish.` : `Everything here matches <a href="${SITE}" target="_blank" rel="noopener">your website</a>.`}</span></div>
-    <div class="toolbar"><input id="liq" type="search" placeholder="Search name, brand, SKU, barcode" value="${esc(S.liq || "")}" aria-label="Search listings">
-      <div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["draft", "Draft"], ["pending", "To sync"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div></div>
-    <div class="lgrid">${rows.map(p => { const st = LIST_STATUS[p.status || "active"], out = (Number(p.stock) || 0) <= 0; return `<button type="button" class="lcard" ${can ? `data-act="edit-product" data-id="${p.id}"` : "disabled"}>
-      <div class="lphoto">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : `<span>${BOTTLE}</span>`}</div>
-      <div class="lbody"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div class="lname">${esc(p.name)}</div><div class="s">${esc([p.size, p.ptype].filter(Boolean).join(" · "))}</div>
-        <div class="lprice"><b class="num">${peso(p.price)}</b>${p.compareAt > p.price ? ` <s class="num">${peso(p.compareAt)}</s>` : ""}</div>
-        <div class="lchips"><span class="chip ${st.cls}">${st.name}</span>${p.kind === "preorder" ? `<span class="chip info">Pre-order${p.eta ? " · " + esc(p.eta) : ""}</span>` : `<span class="chip ${out ? "bad" : stockState(p).cls}">${out ? "Sold out" : (Number(p.stock) || 0) + " in stock"}</span>`}${p.isNew ? `<span class="chip warn">New</span>` : ""}${p.webSync === "pending" ? `<span class="chip info">To sync</span>` : ""}</div></div></button>`; }).join("")}</div>
-    ${rows.length ? "" : `<div class="panel"><div class="empty">${all.length ? "No listings match." : "No listings yet. Click “Add listing”, or “Import CSV” if you have a product file from the website."}</div></div>`}`;
+    <div class="bigsearch">${svg("search")}<input id="liq" type="search" placeholder="Search name, brand, SKU, barcode or ETA" value="${esc(S.liq || "")}" aria-label="Search listings" autocomplete="off"></div>
+    <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"], ["pending", "To sync"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
+      ${f !== "all" || q ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}</div>
+    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${th("size", "Size")}${th("type", "Type")}${th("kind", "On hand / Pre-order")}${th("eta", "ETA")}${th("price", "Price", "r")}${th("stock", "Stock", "r")}${th("status", "Status")}${th("web", "Website")}</tr></thead>
+    <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}">
+      <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
+      <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${p.isNew ? `<span class="chip warn">New</span>` : ""}</td>
+      <td class="nowrap">${esc(p.size || "")}</td><td class="nowrap">${esc(p.ptype || "")}</td>
+      <td class="nowrap">${p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>
+      <td>${p.kind === "preorder" ? (can ? `<select class="status st-blue" data-lset="eta" data-id="${p.id}" aria-label="ETA">${etaOpts(p)}</select>` : esc(p.eta || "–")) : `<span style="color:var(--muted)">–</span>`}</td>
+      <td class="r num nowrap">${peso(p.price)}${p.compareAt > p.price ? `<div><s class="num" style="font-size:11px;color:var(--muted)">${peso(p.compareAt)}</s></div>` : ""}</td>
+      <td class="r num nowrap">${p.kind === "preorder" ? "–" : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>
+      <td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>
+      <td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">To sync</span>` : `<span style="color:var(--muted);font-size:12px">On site</span>`}</td></tr>`; }).join("")}</tbody></table>
+    ${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No listings match." : "No listings yet. Click “Add listing”."}</div>`}</div>
+    <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${rows.length ? `${S.lpage * PAGE + 1}–${Math.min(rows.length, S.lpage * PAGE + PAGE)} of ${rows.length}` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
 }
+
 let pendingListings = null;
 function openListingImport() {
   pendingListings = null;
@@ -3384,7 +3636,7 @@ function payslipHTML(c, per) {
   const e = esc, rowsA = ADD_FIELDS.filter(([k]) => Number(c.rec[k])).map(([k, n]) => `<tr><td>${n}</td><td class="r">${peso2(c.rec[k])}</td></tr>`).join("");
   const rowsD = (c.lateDed ? `<tr><td>Late (${c.lateMin} min)</td><td class="r">${peso2(c.lateDed)}</td></tr>` : "") + DED_FIELDS.filter(([k]) => Number(c.rec[k])).map(([k, n]) => `<tr><td>${n}</td><td class="r">${peso2(c.rec[k])}</td></tr>`).join("");
   return `<!doctype html><html><head><meta charset="utf-8"><title>Payslip ${e(c.m.name)} ${e(per.label)}</title><style>body{font-family:Arial,sans-serif;color:#231A23;max-width:640px;margin:32px auto;padding:0 16px}h1{font-family:Georgia,serif;font-weight:400;color:#4A2545;margin:0}table{width:100%;border-collapse:collapse;margin:8px 0 18px}td,th{padding:6px 8px;border-bottom:1px solid #E2DCE2;font-size:14px;text-align:left}.r{text-align:right}.net{font-size:20px;font-weight:700;background:#F0ECF0}.muted{color:#6E636D;font-size:13px}h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#A9814A;margin:18px 0 0}</style></head><body>
-  <h1>Regal Spritz</h1><div class="muted">Payslip · ${e(per.label)}</div>
+  <h1>Regal Spritz PH</h1><div class="muted">Payslip · ${e(per.label)}</div>
   <table><tr><td>Employee</td><td>${e(c.m.name)}</td></tr><tr><td>ID number</td><td>${e(c.m.idNumber || "")}</td></tr><tr><td>Position</td><td>${e(positionOf(c.m))}</td></tr><tr><td>Daily rate</td><td>${peso2(c.rate)}</td></tr></table>
   <h2>Earnings</h2><table><tr><td>Basic pay (${c.paidDays} day${c.paidDays === 1 ? "" : "s"} × ${peso2(c.rate)})</td><td class="r">${peso2(c.basic)}</td></tr>${rowsA}</table>
   ${rowsD ? `<h2>Deductions</h2><table>${rowsD}</table>` : ""}
@@ -3505,7 +3757,25 @@ document.addEventListener("click", guard(async ev => {
   if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
   const dy = ev.target.closest("[data-day]");
   if (dy) { S.t.day = dy.dataset.day; render(); return; }
-  if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]")) closePop();
+  if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]") && !ev.target.closest("[data-notes]")) closePop();
+  if (!ev.target.closest(".gs")) document.querySelectorAll(".gs-res").forEach(r => r.hidden = true);
+  const gsr = ev.target.closest("[data-gso]");
+  if (gsr) { document.querySelectorAll(".gs-res").forEach(r => r.hidden = true); document.querySelectorAll(".gs-in").forEach(i => i.value = ""); return openOrderDetails(gsr.dataset.gso); }
+  const clr = ev.target.closest("[data-clear]");
+  if (clr) { const inp = document.getElementById(clr.dataset.clear); if (inp) { inp.value = ""; inp.dispatchEvent(new Event("input", { bubbles: true })); } return; }
+  const nb = ev.target.closest("[data-notes]");
+  if (nb) { if ($("#ipop") && S.popFor === "n" + nb.dataset.notes) { closePop(); S.popFor = ""; return; } S.popFor = "n" + nb.dataset.notes; notesPop(nb); return; }
+  const cof = ev.target.closest("[data-custof]");
+  if (cof) { const c = customerList().find(x => x.orderIds.includes(cof.dataset.custof)); if (c) { closeSheet(); openCustomer(custKey(c)); } else toast("No customer profile for this order yet."); return; }
+  if (ev.target.closest("tr") && ev.target.closest("select, input, label")) return;
+  const lsrt = ev.target.closest("[data-lsort]");
+  if (lsrt) { const k = lsrt.dataset.lsort, c = S.ls; S.ls = c.sort === k ? { sort: k, dir: c.dir === "asc" ? "desc" : "asc" } : { sort: k, dir: ["edited", "price", "stock"].includes(k) ? "desc" : "asc" }; S.lpage = 0; render(); return; }
+  const lpg = ev.target.closest("[data-lpage]");
+  if (lpg) { S.lpage = Math.max(0, (S.lpage || 0) + Number(lpg.dataset.lpage)); render(); window.scrollTo(0, 0); return; }
+  const lrow = ev.target.closest("tr[data-lrow]");
+  if (lrow && !S.readOnly) return openProductForm(lrow.dataset.lrow);
+  const sps = ev.target.closest("[data-spsup]");
+  if (sps) { S.sp.sup = sps.dataset.spsup; render(); return; }
   const itb = ev.target.closest("[data-items]");
   if (itb) { if ($("#ipop") && S.popFor === itb.dataset.items) { closePop(); S.popFor = ""; return; } S.popFor = itb.dataset.items; itemsPop(itb); return; }
   const psrt = ev.target.closest("[data-psort]");
@@ -3641,8 +3911,15 @@ document.addEventListener("click", guard(async ev => {
     case "ask-del-forever": { const o = findOrder(id); if (!o) return; if (b.dataset.sure) { await remove("orders", id); if (!S.db) { S.archived = S.archived.filter(x => x.id !== id); render(); } toast(`${onum(o)} deleted for good.`); } else { b.dataset.sure = "1"; b.textContent = "Tap again to delete forever"; b.classList.add("danger"); } return; }
     case "sup-list": return openSupplierList();
     case "sup-copy": try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
-    case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${(S.of.sup || "").toLowerCase()}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
+    case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${String(S.supLabel || S.of.sup || "all").toLowerCase().replace(/\s+/g, "-")}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
     case "jnt-export": return jntExport();
+    case "jnt-file": return openJntFile();
+    case "jnt-dl": return jntDownload();
+    case "of-clear": Object.assign(S.of, { q: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
+    case "sp-clear": S.sp = { sup: "all", ful: "all", pay: "all", q: "" }; render(); return;
+    case "l-clear": S.lfilter = "all"; S.liq = ""; S.lpage = 0; render(); return;
+    case "log-out": S.unlocked.clear(); saveUnlocked(); S.loggedOut = true; try { localStorage.removeItem("rs-nav"); } catch (e) {} S.view = "home"; render(); toast("Logged out."); return;
+    case "log-in": S.loggedOut = false; render(); return;
     case "jnt-copy": return jntCopy();
     case "ei-add": $("#ei-items").insertAdjacentHTML("beforeend", editItemRow()); return;
     case "ei-rm": ev.target.closest(".ei-row").remove(); eiTotal(); return;
@@ -3701,6 +3978,10 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.oset) { const o = findOrder(t.dataset.id); if (!o) return; const f = t.dataset.oset; await updateOrder(o, { [f]: t.value }); const lab = { payment: pay(t.value).name, fulfillment: ful(t.value).name, courier: t.value, assignee: t.value ? memberName(t.value) : "Unassigned" }[f]; toast(`${onum(o)} → ${lab}`); if (!S.db) render(); return; }
   if (t.dataset.cassign !== undefined) { const c = customerList().find(x => custKey(x) === t.dataset.cassign); if (!c) return; const os = c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(o => o && OPEN_FUL.has(o.fulfillment)); for (const o of os) await updateOrder(o, { assignee: t.value }); toast(`${c.name} → ${t.value ? memberName(t.value) : "Unassigned"} (${os.length} open order${os.length === 1 ? "" : "s"}; new orders follow).`); render(); return; }
   if (t.id === "psel-all") { packList().forEach(o => t.checked ? S.sel.add(o.id) : S.sel.delete(o.id)); render(); return; }
+  if (t.dataset.lset) { const pr = S.products.find(x => x.id === t.dataset.id); if (!pr) return; const f = t.dataset.lset; await patch("products", pr.id, { [f]: t.value, webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" }); toast(`${pr.name}: ${f === "eta" ? "ETA → " + (t.value || "none") : "status → " + (t.value === "hidden" ? "Inactive" : LIST_STATUS[t.value].name)} · marked To sync`); if (!S.db) render(); return; }
+  if (t.id === "sp-ful") { S.sp.ful = t.value; render(); return; }
+  if (t.id === "sp-pay") { S.sp.pay = t.value; render(); return; }
+  if (t.classList.contains("jnt-f")) { jntField(t); return; }
   if (t.id === "of-ful") { S.of.ful = t.value; S.page = 0; render(); return; }
   if (t.id === "of-pay") { S.of.pay = t.value; S.page = 0; render(); return; }
   if ((t.id === "bulk-pay" || t.id === "bulk-ful") && t.value) return bulkAction((t.id === "bulk-pay" ? "pay:" : "ful:") + t.value);
@@ -3718,10 +3999,13 @@ document.addEventListener("input", ev => {
   if (t.matches(".it-q, .it-price")) return updateOrderTotal();
   if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-disc")) return eiTotal();
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
+  if (t.classList.contains("gs-in")) return globalSearch(t);
+  if (t.classList.contains("jnt-f") && t.tagName === "INPUT") { jntField(t, true); return; }
+  if (t.id === "spq") { S.sp.q = t.value; const pos = t.selectionStart; render(); const el = $("#spq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } return; }
   if (t.id === "aq") { S.aq = t.value; const pos = t.selectionStart; render(); const el = $("#aq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } return; }
   const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq" }[t.id];
   if (!key) return;
-  if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; }
+  if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; if (key === "liq") S.lpage = 0; }
   const pos = t.selectionStart; render();
   const el = document.getElementById(t.id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} }
 });
@@ -3765,6 +4049,7 @@ const SHOP_SERVER = "Shopify", SHOP_TOOL = "graphql_query", SHOP_EVERY = 60000;
 const SHOP_FIELDS = `id name createdAt cancelledAt displayFinancialStatus displayFulfillmentStatus note tags email phone
   customer { displayName email phone }
   shippingLine { title }
+  events(first: 25, sortKey: CREATED_AT, reverse: true) { nodes { __typename ... on CommentEvent { id createdAt rawMessage } } }
   shippingAddress { name phone address1 address2 city province zip country }
   totalPriceSet { shopMoney { amount } }
   lineItems(first: 50) { nodes { name sku quantity originalUnitPriceSet { shopMoney { amount } } } }`;
@@ -3813,7 +4098,8 @@ function shopToOrder(n) {
     payment, fulfillment: fulFromTags(fulfillment, tags0), tags: tags0, note: n.note || "",
     shopPay: payment, shopFul: fulfillment, shopTags: tags0, shopNote: n.note || "",
     ship: { name: a.name || c.displayName || "", phone: a.phone || n.phone || "", address1: a.address1 || "", address2: a.address2 || "", city: a.city || "", province: a.province || "", zip: a.zip || "", country: a.country || "" },
-    shipTitle: (n.shippingLine && n.shippingLine.title) || "", pickup: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress) === "SDD", courier: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress),
+    shipTitle: (n.shippingLine && n.shippingLine.title) || "",
+    comments: (((n.events || {}).nodes) || []).filter(e => e && e.__typename === "CommentEvent" && e.rawMessage).map(e => ({ id: String(e.id || "").split("/").pop(), at: Date.parse(e.createdAt) || 0, text: String(e.rawMessage).slice(0, 2000) })), pickup: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress) === "SDD", courier: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress),
     imported: true, noStock: true, restocked: false, source: "shopify-live",
     fulfilledAt: fulfillment === "fulfilled" ? Date.now() : 0, deliveredAt: 0,
     voidedAt: VOIDPAY.has(payment) || n.cancelledAt ? (Date.parse(n.cancelledAt) || createdAt) : 0,
@@ -3840,6 +4126,7 @@ async function shopApply(o, isNew) {
   const backfill = {};
   if (!ex.ship && o.ship) backfill.ship = o.ship;
   if (ex.courier === undefined) Object.assign(backfill, { courier: o.courier, pickup: o.pickup, shipTitle: o.shipTitle });
+  if (o.comments && JSON.stringify(o.comments) !== JSON.stringify(ex.comments || [])) backfill.comments = o.comments;
   if (changed) { const ms = []; if (ch.payment !== ex.payment) ms.push(`changed Payment Status → ${pay(ch.payment).name}`); if (ch.fulfillment !== ex.fulfillment) ms.push(`changed Fulfillment Status → ${ful(ch.fulfillment).name}`); if (tags.join() !== (ex.tags || []).join()) ms.push("updated tags"); if (ms.length) ch.log = logAdd(ex, ms, "Shopify"); }
   if (changed || marks || Object.keys(backfill).length) { await patch("orders", id, { ...(changed ? ch : {}), ...backfill, shopPay: o.shopPay, shopFul: o.shopFul, shopTags: shTags, shopNote: o.shopNote }); return changed ? 1 : 0; }
   return 0;
