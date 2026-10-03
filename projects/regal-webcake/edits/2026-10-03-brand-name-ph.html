@@ -1,0 +1,58 @@
+<!-- Regal Spritz PH: rename the brand on every page (2026-10-03)
+     Where: Webcake → Edit → General → </> HTML/JavaScript → "Before </body>" → paste → Save → Publish
+     What: every "Regal Spritz" / "REGAL SPRITZ" on the site (header, text, buttons, page title) becomes
+           "Regal Spritz PH" / "REGAL SPRITZ PH". Never adds a second "PH". -->
+<script>
+(function () {
+  var FIND = /\bregal(\s+)spritz\b(?!\s*ph\b)/gi;
+  function rename(match, space) {
+    var ph = match === match.toLowerCase() ? "ph" : "PH";
+    return match + " " + ph;
+  }
+  function fixText(node) {
+    if (node.nodeValue && FIND.test(node.nodeValue)) {
+      FIND.lastIndex = 0;
+      node.nodeValue = node.nodeValue.replace(FIND, rename);
+    }
+    FIND.lastIndex = 0;
+  }
+  function fixAttrs(el) {
+    ["alt", "title", "aria-label", "placeholder", "content"].forEach(function (a) {
+      var v = el.getAttribute && el.getAttribute(a);
+      if (v && FIND.test(v)) { FIND.lastIndex = 0; el.setAttribute(a, v.replace(FIND, rename)); }
+      FIND.lastIndex = 0;
+    });
+  }
+  function walk(root) {
+    if (root.nodeType === 3) return fixText(root);
+    if (root.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA)$/.test(root.tagName)) return;
+    fixAttrs(root);
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+      acceptNode: function (n) {
+        return n.nodeType === 1 && /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA)$/.test(n.tagName)
+          ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var n;
+    while ((n = w.nextNode())) n.nodeType === 3 ? fixText(n) : fixAttrs(n);
+  }
+  function fixTitle() {
+    if (FIND.test(document.title)) { FIND.lastIndex = 0; document.title = document.title.replace(FIND, rename); }
+    FIND.lastIndex = 0;
+    document.querySelectorAll('meta[property="og:title"], meta[name="twitter:title"], meta[property="og:site_name"]').forEach(fixAttrs);
+  }
+  function run() {
+    walk(document.body);
+    fixTitle();
+    // Webcake can add content after the page loads (popups, sliders, product sections): rename those too.
+    new MutationObserver(function (list) {
+      list.forEach(function (m) {
+        if (m.type === "characterData") fixText(m.target);
+        else m.addedNodes.forEach(walk);
+      });
+      fixTitle();
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+  if (document.body) run(); else document.addEventListener("DOMContentLoaded", run);
+})();
+</script>

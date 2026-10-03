@@ -8,6 +8,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - **Timezone:** Asia/Manila (PHT, UTC+8). Use it for anything time-based: schedules, cron jobs, deadlines.
 - **Main uses:** building apps and websites, writing and docs, automation and workflows.
 - **No developer:** I build and edit my sites myself (the online shop in `projects/shop`, Webcake pages). Write guides for me, not for a developer: click-by-click, in order.
+- **Webcake edits:** for every website edit, write the change as an .html snippet (saved in `projects/regal-webcake/edits/`), then in Webcake: Edit → General → </> HTML/JavaScript → paste in Before </head> or Before </body> → Save → Publish → check the live site to confirm it worked. Do it in my Chrome (Claude in Chrome) when connected.
 - **Live store:** my current shop runs on Shopify. Never suggest changes that could take it offline without warning me first.
 
 ## Communication
