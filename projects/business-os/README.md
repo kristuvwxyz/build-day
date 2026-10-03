@@ -164,3 +164,8 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - My account → Developer options → View as (owner only; preview, nothing saves).
 - Customer names open their order history (orders, archived, disputes, popups).
 - Suppliers: no payment filter, status chips like the supplier bar, search on top.
+
+## Batch 7: orders on the calendar
+- Add task: optional Linked order (type # or customer) and Linked item (from inventory), with Open links.
+- Order screen: "Add to calendar" after Merge creates a follow-up task linked to the order; the order lists its calendar entries.
+- Calendar entries for linked orders show 📦 #order and open the order.

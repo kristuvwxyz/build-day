@@ -499,7 +499,8 @@ tr[data-lrow] { cursor: pointer; } tr[data-lrow]:hover td { background: var(--su
 .gs { position: relative; display: flex; align-items: center; }
 body.no-orders .gs { display: none !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-.oactions .oassign { width: auto; max-width: 220px; padding: 6px 10px; font-size: 13px; }
+.oactions .oassign { width: auto; max-width: 220px; padding: 6px 10px; font-size: 13px; background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; }
+.oactions .chip { cursor: pointer; border: 0; font: inherit; font-size: 12px; }
 .item-link { text-align: left; font: inherit; font-weight: 600; color: inherit; }
 #viewas-bar { position: sticky; top: 0; z-index: 60; background: #7c3aed; color: #fff; font-size: 13px; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 #viewas-bar select { width: auto; padding: 4px 8px; font-size: 13px; font-weight: 600; }
@@ -1740,12 +1741,12 @@ function workload(list, by) {
     </table></div></section>`;
 }
 function taskPill(t) {
-  const a = t.assigneeId ? member(t.assigneeId) : null;
-  return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}" data-task="${t.id}" title="${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${esc(t.title)}</span></button>`;
+  const a = t.assigneeId ? member(t.assigneeId) : null, o = t.orderId ? findOrder(t.orderId) : null;
+  return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}" ${o ? `data-open="${o.id}"` : `data-task="${t.id}"`} title="${o ? esc(onum(o)) + " · " : ""}${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${o ? `<span class="ini">📦</span>` : a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${o ? "#" + esc(o.num) + " " : ""}${esc(t.title)}</span></button>`;
 }
 function taskRow(t) {
   return `<tr data-task="${t.id}" style="cursor:pointer">
-    <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
+    <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}${t.orderId && findOrder(t.orderId) ? ` <button type="button" class="chip" data-open="${t.orderId}">📦 #${esc(findOrder(t.orderId).num)}</button>` : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
     <td class="nowrap">${esc(memberName(t.assigneeId))}</td>
     <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc((dept(t.department) || { name: "–" }).name)}</span>` : "–"}</td>
     <td class="nowrap" style="color:${isOverdue(t) ? "var(--bad)" : "inherit"}">${t.due ? fmtDate(t.due) : "No date"}${isOverdue(t) ? " · overdue" : ""}</td>
@@ -1810,11 +1811,12 @@ function viewTasks(forceDept) {
     ${extra}`;
 }
 
-function openTaskForm(id, date, forceDept) {
+function openTaskForm(id, date, forceDept, preset = {}) {
   const meM = member(myMemberId()) || {};
-  const t = id ? S.tasks.find(x => x.id === id) : { due: date || S.t.day, department: forceDept || meM.department || (S.t.scope === "dept" ? S.t.dept : "") || "", assigneeId: myMemberId() || (S.t.scope === "person" ? S.t.person : ""), status: "todo", progress: 0, priority: "normal" };
+  const t = id ? S.tasks.find(x => x.id === id) : { ...preset, due: date || S.t.day, department: forceDept || meM.department || (S.t.scope === "dept" ? S.t.dept : "") || "", assigneeId: myMemberId() || (S.t.scope === "person" ? S.t.person : ""), status: "todo", progress: 0, priority: "normal" };
   if (!t) return;
-  const ro = S.readOnly;
+  const ro = S.readOnly, lo = t.orderId ? findOrder(t.orderId) : null, lp = t.productId ? S.products.find(p => p.id === t.productId) : null;
+  S.sheetReopen = id ? () => openTaskForm(id) : null;
   openSheet(`
     <h3>${id ? "Edit task" : "Add task"}</h3>
     <div class="field"><label for="k-title">Task</label><input id="k-title" value="${esc(t.title || "")}" placeholder="e.g. Pack Shopee orders for pickup" ${ro ? "disabled" : ""}></div>
@@ -1822,6 +1824,14 @@ function openTaskForm(id, date, forceDept) {
     <div class="row">
       <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option>${DEPTS.filter(d => taskDepts().includes(d.id) || d.id === t.department).map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
       <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.filter(m => (m.status !== "inactive" && (fullTaskView() || taskDepts().includes(m.department) || m.id === myMemberId())) || m.id === t.assigneeId).map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="k-order">Linked order <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input id="k-order" list="k-orders" value="${lo ? esc("#" + lo.num) : ""}" placeholder="Type order # or customer" autocomplete="off" ${ro ? "disabled" : ""}>
+        <datalist id="k-orders">${[...S.orders].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 400).map(o => `<option value="#${esc(o.num)}">${esc(o.customer || "")} · ${esc(ful(o.fulfillment).name)}</option>`).join("")}</datalist>
+        ${lo ? `<button type="button" class="linkish" data-open="${lo.id}" style="align-self:flex-start;font-size:13px">Open ${esc(onum(lo))} →</button>` : ""}</div>
+      <div class="field"><label for="k-item">Linked item <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input id="k-item" list="k-items" value="${lp ? esc(lp.name) : ""}" placeholder="Pick from inventory" autocomplete="off" ${ro ? "disabled" : ""}>
+        <datalist id="k-items">${[...S.products].sort((a, b) => (a.name || "").localeCompare(b.name || "")).map(p => `<option value="${esc(p.name)}">${Number(p.stock) || 0} in stock</option>`).join("")}</datalist>
+        ${lp ? `<button type="button" class="linkish" data-act="item-inv" data-pid="${lp.id}" data-name="${esc(lp.name)}" style="align-self:flex-start;font-size:13px">Open item →</button>` : ""}</div>
     </div>
     <div class="field"><label for="k-due">Due date</label><input id="k-due" type="date" value="${esc(t.due || "")}" ${ro ? "disabled" : ""}></div>
     <div class="row">
@@ -1839,7 +1849,12 @@ function openTaskForm(id, date, forceDept) {
     const status = val("k-status");
     let progress = Math.round(numv("k-prog"));
     if (status === "done") progress = 100;
-    const data = { ...(id ? clean(t) : {}), title: val("k-title"), notes: val("k-notes"), department: val("k-dept"), assigneeId: val("k-who"), start: start && start !== due ? start : "", due, status, progress, priority: val("k-pri"), updatedAt: Date.now() };
+    const oq = val("k-order").replace(/^#/, "").trim().toUpperCase(), iq = val("k-item").trim().toLowerCase();
+    const ord = oq ? [...S.orders, ...S.archived].find(o => String(o.num).toUpperCase() === oq || (o.merged || []).map(x => String(x).toUpperCase()).includes(oq)) : null;
+    if (oq && !ord) return sheetError(`Order #${oq} wasn't found. Pick one from the list or leave it blank.`);
+    const prod = iq ? S.products.find(p => (p.name || "").toLowerCase() === iq) : null;
+    if (iq && !prod) return sheetError("That item isn't in the inventory. Pick one from the list or leave it blank.");
+    const data = { ...(id ? clean(t) : {}), orderId: ord ? ord.id : "", productId: prod ? prod.id : "", title: val("k-title"), notes: val("k-notes"), department: val("k-dept"), assigneeId: val("k-who"), start: start && start !== due ? start : "", due, status, progress, priority: val("k-pri"), updatedAt: Date.now() };
     if (!id) { data.createdAt = Date.now(); data.createdByName = (member(myMemberId()) || {}).name || (S.me && S.me.name) || ""; }
     await save("tasks", id || uid("t"), data);
     if (due) { S.t.day = due; S.t.month = due.slice(0, 7); }
@@ -3040,7 +3055,9 @@ function openOrderDetails(id) {
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
     <div class="sheet-title"><h3>${esc(onum(o))}</h3></div>
-    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
+    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
+    ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button></div>` : ""}
+    ${(() => { const ts = S.tasks.filter(t => t.orderId === o.id).sort((a, b) => (a.due || "").localeCompare(b.due || "")); return ts.length ? `<div class="oactions" style="font-size:13px">📅 On the calendar: ${ts.map(t => `<button type="button" class="chip" data-task="${t.id}">${t.due ? fmtDate(t.due) : "No date"} · ${esc(t.title.slice(0, 40))} · ${esc(tstat(t.status).name)}</button>`).join("")}</div>` : ""; })()}
     ${isDispute(o) ? `<div class="notice" style="border-color:var(--bad);color:var(--bad)">⚠️ <b>Dispute.</b> Check that this is resolved before dispatch. Remove the DISPUTE tag once it is.</div>` : ""}
     <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
     ${arch ? `<div class="notice">Archived ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(COURIER_LABEL[courierOf(o)])}</span></div>`}
@@ -4568,6 +4585,8 @@ function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = fal
 function guard(fn) { return async (...a) => { try { await fn(...a); } catch (e) { writeErr(e); } }; }
 
 document.addEventListener("click", guard(async ev => {
+  const tpo = ev.target.closest(".tpill[data-open]");
+  if (tpo) return openOrderDetails(tpo.dataset.open);
   const nav = ev.target.closest("[data-nav]");
   if (nav) { if ($("#scrim").hidden === false) closeSheet(); S.view = nav.dataset.nav; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); return; }
   const dp = ev.target.closest("[data-dept]");
@@ -4588,7 +4607,8 @@ document.addEventListener("click", guard(async ev => {
   if (wp) { if (S.view === "dept") { S.view = "tasks"; saveNav(); } S.t.scope = "person"; S.t.person = wp.dataset.wperson; render(); return; }
   const wd = ev.target.closest("[data-wdept]");
   if (wd) { if (S.view === "dept") { S.view = "tasks"; saveNav(); } S.t.scope = "dept"; S.t.dept = wd.dataset.wdept; render(); return; }
-  const tk = ev.target.closest("[data-task]");
+  const opk = ev.target.closest("[data-open]"), tk = ev.target.closest("[data-task]");
+  if (opk && tk && tk.contains(opk)) return openOrderDetails(opk.dataset.open);
   if (tk) return openTaskForm(tk.dataset.task);
   const nt = ev.target.closest('[data-act="new-task"]');
   if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
@@ -4774,6 +4794,7 @@ document.addEventListener("click", guard(async ev => {
     case "col-reset": { const pr = colPref(b.dataset.table); if (pr) await remove("colprefs", pr.id); closeSheet(); toast("Columns reset to default."); return; }
     case "merge": return openMerge();
     case "merge-pick": return openMergePick(id);
+    case "order-cal": { const o = findOrder(id); if (!o) return; return openTaskForm(null, today(), null, { orderId: o.id, title: `Follow up ${onum(o)}${o.customer ? " · " + o.customer : ""}`, department: myDept() || "" }); }
     case "sheet-back": { const f = S.sheetStack.pop(); if (f) { S.sheetNoPush = true; f(); } return; }
     case "unmerge": { const o = findOrder(id); if (o) { closeSheet(); await unmergeOrder(o); } return; }
     case "trace-items": { const o = findOrder(id); if (o) await traceItems(o); return; }
