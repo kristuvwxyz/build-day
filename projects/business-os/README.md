@@ -169,3 +169,7 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - Add task: optional Linked order (type # or customer) and Linked item (from inventory), with Open links.
 - Order screen: "Add to calendar" after Merge creates a follow-up task linked to the order; the order lists its calendar entries.
 - Calendar entries for linked orders show 📦 #order and open the order.
+
+## Batch 8: premium account and sidebar
+- Sidebar: Workspace / Departments sections, soft highlight with gold marker, lock icons only when locked, profile card at the bottom.
+- My account: profile header (photo, name, role, department, access), quick stats (open, due this week, overdue, today), tabs Overview / Pay / Preferences / Access & security.
