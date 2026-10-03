@@ -291,6 +291,32 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .clock-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .clock-big { font-family: var(--font-display); font-size: 30px; line-height: 1; }
 
+.av { position: relative; width: var(--sz); height: var(--sz); flex: none; display: inline-grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--avc) 18%, var(--surface)); color: var(--avc); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--avc) 45%, transparent); font-weight: 700; font-size: calc(var(--sz) * .36); }
+.av > img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.av .bottle { position: absolute; right: calc(var(--sz) * -.12); bottom: calc(var(--sz) * -.08); width: max(16px, calc(var(--sz) * .42)); height: max(20px, calc(var(--sz) * .52)); padding: 2px 3px; border: 0; border-radius: 6px; background: var(--surface); box-shadow: 0 0 0 1.5px var(--line); color: var(--fg); display: grid; place-items: center; cursor: pointer; }
+.av .bottle svg { width: 100%; height: 100%; }
+.av .bottle.empty { opacity: .5; }
+.av .bottle:hover { box-shadow: 0 0 0 1.5px var(--gold); opacity: 1; }
+.av .bottle:disabled { cursor: default; }
+.team-strip { display: flex; gap: 18px; overflow-x: auto; padding: 4px 2px 6px; }
+.tm { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 76px; max-width: 96px; text-align: center; }
+.tm strong { font-size: 13px; margin-top: 4px; }
+.tm span { font-size: 11.5px; color: var(--muted); line-height: 1.25; }
+.bday { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 14px; background: linear-gradient(120deg, color-mix(in srgb, var(--gold) 26%, var(--surface)), var(--surface)); border: 1px solid color-mix(in srgb, var(--gold) 50%, var(--line)); }
+.bday-avs { display: flex; gap: 8px; }
+.bday-title { font-family: var(--font-display); font-size: clamp(22px, 3.4vw, 30px); line-height: 1.15; }
+.bday-cake { margin-left: auto; font-size: 34px; }
+.otable tr.grp td { background: var(--surface-2); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: default; }
+code.pw { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 2px 6px; border-radius: 5px; }
+html, body { overflow-x: clip; }
+.av .bottle img { width: 100%; height: 100%; object-fit: contain; border-radius: 3px; }
+.scent-prev { width: 56px; height: 68px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 6px; color: var(--fg); }
+.scent-prev img, .scent-prev svg { width: 100%; height: 100%; object-fit: contain; }
+.s-money { --c: var(--gold); --cb: color-mix(in srgb, var(--gold) 16%, var(--surface)); }
+.tpill.s-money.paid .tt { text-decoration: line-through; color: var(--muted); }
+.cal-dots i.s-money { background: var(--gold); }
+
+
 @media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -396,13 +422,13 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "passwords", "homecontent", "dtasks"], blurb: "Directory, passwords, Home page" },
-  { id: "FINANCE", name: "Finance", tabs: ["dashboard", "payroll", "investors", "expenses", "dtasks"], blurb: "Profit, payroll, investors, expenses" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
+  { id: "FINANCE", name: "Finance", tabs: ["dashboard", "fixed", "dues", "checks", "payroll", "payrecords", "bir", "investors", "expenses", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["orders", "customers", "dtasks"], blurb: "Orders and customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "dtasks"], blurb: "Channels and audience" },
   { id: "PACKING", name: "Packing", tabs: ["packing", "inventory", "dtasks"], blurb: "Packing queue and stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", investors: "Investors", payroll: "Payroll", expenses: "Expenses", orders: "Orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", logins: "Logins", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -414,10 +440,12 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
-  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [],
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [],
+  birMonth: "", prPerson: "",
+  vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
   att: { mode: "day", date: "", month: "", dept: "" },
-  loaded: { products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false },
+  loaded: { products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false },
   pay: { month: "", half: 1 }, paySettings: {},
   view: "home", dept: "SALES", tab: "orders", period: "month",
   of: { view: "all", platform: "all", q: "", range: "today" },
@@ -433,7 +461,20 @@ try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.u
 const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account"].includes(hv)) S.view = hv;
 const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
 const saveUnlocked = () => { try { sessionStorage.setItem("rs-unlocked", JSON.stringify([...S.unlocked])); } catch (e) {} };
-const isUnlocked = d => S.isOwner || S.unlocked.has(d);
+const isUnlocked = d => S.isOwner || S.unlocked.has(d) || S.unlocked.has("CEO") || (S.unlocked.has("ADMIN") && d !== "FINANCE");
+// Who sees which department: CEO all, ADMIN all except Finance, everyone else only their own.
+function allowedDepts() {
+  const all = DEPTS.map(d => d.id);
+  if (S.isOwner) return all;
+  const m = S.team.find(x => x.id === (S.profile || {}).memberId);
+  if (!m || !m.department) return [];
+  if (m.department === "CEO") return all;
+  if (m.department === "ADMIN") return all.filter(x => x !== "FINANCE");
+  return [m.department];
+}
+const canSee = d => allowedDepts().includes(d);
+const visDepts = () => DEPTS.filter(d => canSee(d.id));
+const finOpen = () => canSee("FINANCE") && isUnlocked("FINANCE");
 
 function relTime(t) {
   if (!t) return "";
@@ -546,7 +587,7 @@ function renderNav() {
     item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
-    DEPTS.map(d => item(`data-dept="${d.id}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico"), "desktop-only dept-item")).join("") +
+    visDepts().map(d => item(`data-dept="${d.id}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico"), "desktop-only dept-item")).join("") +
     item('data-nav="account"', "account", "My account", S.view === "account", "", "account-item");
 }
 
@@ -565,6 +606,11 @@ function headActions() {
     overview: can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "",
     dashboard: ex("orders"),
     payroll: ex("payroll"),
+    fixed: can ? `<button class="btn primary" type="button" data-act="new-fixed">Add expense line</button>` : "",
+    dues: can ? `<button class="btn primary" type="button" data-act="new-due">Add due date</button>` : "",
+    checks: ex("checks") + (can ? `<button class="btn primary" type="button" data-act="new-check">Add check</button>` : ""),
+    payrecords: ex("payrecords") + (can ? `<button class="btn primary" type="button" data-act="new-pr">Add record</button>` : ""),
+    bir: ex("bir") + (can ? `<button class="btn primary" type="button" data-act="new-bir">Add sale</button>` : ""),
     investors: ex("investments") + (can ? `<button class="btn primary" type="button" data-act="new-inv">Add investment</button>` : ""),
     orders: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
     packing: "",
@@ -573,6 +619,7 @@ function headActions() {
     channels: ex("customers"),
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
+    logins: S.vaultKey && can ? `<button class="btn ghost" type="button" data-act="vault-lock">${svg("lock", "btn-ico")} Lock logins</button><button class="btn primary" type="button" data-act="new-login">Add login</button>` : "",
     passwords: "", homecontent: "", account: "", depts: "",
   };
   return lockBtn + (map[moduleKey()] || "");
@@ -599,12 +646,13 @@ function render() {
   if (S.view === "account") { v.innerHTML = viewAccount(); return; }
   if (S.view === "attendance") { v.innerHTML = viewAttendance(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
+  if (!canSee(S.dept)) { v.innerHTML = `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} isn't part of your access</h2><div class="empty">${myMemberId() ? "Your department decides what you can open. Ask the owner if you need this one." : `Link your name in <button type="button" class="linkish" data-nav="account">My account</button> first.`}</div></div>`; return; }
   if (!isUnlocked(S.dept)) { v.innerHTML = viewLock(d); const pw = $("#unlock-pw"); if (pw) pw.focus(); return; }
   if (!d.tabs.includes(S.tab)) S.tab = d.tabs[0];
   const tabs = `<div class="tabs" role="tablist">${d.tabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
   const body = ({
-    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, passwords: viewPasswords, homecontent: viewHomeContent,
-    dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, expenses: viewExpenses, orders: viewOrders, customers: viewCustomers, channels: viewChannels,
+    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent,
+    dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
   v.innerHTML = tabs + body;
@@ -616,6 +664,106 @@ const memberName = id => { const m = member(id); return m ? (m.nickname || m.nam
 const activeTeam = () => S.team.filter(m => m.status !== "inactive");
 const initials = n => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
 const myMemberId = () => S.profile.memberId || "";
+const scentOf = id => ((S.scents.find(s => s.id === id) || {}).scent || "");
+const BOTTLE = '<svg viewBox="0 0 16 20" aria-hidden="true"><rect x="6" y="1" width="4" height="3" rx="1" fill="var(--gold)"/><rect x="5" y="4" width="6" height="2" fill="currentColor" opacity=".55"/><rect x="2.5" y="6" width="11" height="12.5" rx="3" fill="var(--gold)"/><rect x="4.5" y="9.5" width="7" height="4.5" rx="1" fill="#fff" opacity=".75"/></svg>';
+const extraOf = id => S.scents.find(s => s.id === id) || {};
+const photoOf = m => extraOf(m.id).photo || m.photo || "";
+const scentImgOf = id => { const x = extraOf(id); if (x.scentImg) return x.scentImg; const same = x.scent && S.scents.find(s => s.scentImg && (s.scent || "").toLowerCase() === x.scent.toLowerCase()); return same ? same.scentImg : ""; };
+function resizeImage(file, max = 256, square = true) {
+  return new Promise((ok, bad) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      let sw = img.width, sh = img.height, sx = 0, sy = 0;
+      if (square) { const s = Math.min(sw, sh); sx = (sw - s) / 2; sy = (sh - s) / 2; sw = sh = s; }
+      const k = Math.min(1, max / Math.max(sw, sh)), c = document.createElement("canvas");
+      c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); ok(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error("That file isn't a picture we can read.")); };
+    img.src = url;
+  });
+}
+function perfumeCatalog() {
+  const set = new Map();
+  const add = n => { n = String(n || "").replace(/\s+/g, " ").trim(); if (n.length > 2 && !set.has(n.toLowerCase())) set.set(n.toLowerCase(), n); };
+  S.scents.forEach(s => add(s.scent));
+  S.bir.forEach(b => (b.rows || []).forEach(r => String(r.item || "").split(" / ").forEach(add)));
+  S.orders.forEach(o => (o.items || []).forEach(i => add(i.name)));
+  S.products.forEach(p => add(p.name));
+  return [...set.values()].sort((a, b) => a.localeCompare(b));
+}
+function avatar(m, size = 40, bottle = true) {
+  const sc = scentOf(m.id), canSet = !S.readOnly, simg = scentImgOf(m.id), ph = photoOf(m);
+  const face = ph ? `<img src="${esc(ph)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : m.photo ? `<img src="${esc(m.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span>${esc(initials(m.nickname || m.name))}</span>`;
+  const b = bottle ? `<button type="button" class="bottle${sc ? "" : " empty"}" ${canSet ? `data-scent="${m.id}"` : "disabled"} title="${sc ? "Favorite scent: " + esc(sc) : "Add favorite scent"}" aria-label="${esc(memberName(m.id))}'s favorite scent${sc ? ": " + esc(sc) : ""}">${simg ? `<img src="${esc(simg)}" alt="">` : BOTTLE}</button>` : "";
+  return `<span class="av" style="--sz:${size}px;--avc:${DEPT_COLORS[m.department] || "var(--brand)"}">${face}${b}</span>`;
+}
+const isBirthday = (m, d = mToday()) => m.birthday && m.birthday.slice(5) === d.slice(5);
+const birthdaysToday = () => activeTeam().filter(m => isBirthday(m));
+function nextBirthday(m) {
+  if (!m.birthday) return null;
+  const t = mToday(), y = Number(t.slice(0, 4)); let d = y + m.birthday.slice(4);
+  if (d < t) d = (y + 1) + m.birthday.slice(4);
+  return { date: d, days: Math.round((new Date(d + "T12:00:00") - new Date(t + "T12:00:00")) / 864e5) };
+}
+const fmtBday = b => b ? new Date("2000" + b.slice(4) + "T12:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "";
+let scentDraftImg = null;
+function openScentForm(mid) {
+  const m = member(mid); if (!m) return;
+  const cat = perfumeCatalog(); scentDraftImg = null;
+  const cur = scentImgOf(mid);
+  openSheet(`<h3>${esc(m.nickname || m.name)}'s favorite scent</h3>
+    <div style="display:flex;gap:14px;align-items:center">${avatar(m, 64, false)}<div style="font-size:13px;color:var(--muted)">Shows as the little bottle on ${esc(m.nickname || m.name)}'s photo. Change it anytime.</div></div>
+    <div class="field"><label for="sc-name">Search perfume</label><input id="sc-name" list="sc-list" value="${esc(scentOf(mid))}" placeholder="Type a brand or name, e.g. Good Girl, Sauvage" autocomplete="off"><datalist id="sc-list">${cat.map(s => `<option value="${esc(s)}">`).join("")}</datalist>
+      <div style="font-size:12px;color:var(--muted)">${cat.length.toLocaleString("en-PH")} perfumes from your sales records. You can also type any name.</div></div>
+    <div class="field"><label>Bottle picture</label>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span class="scent-prev" id="sc-prev">${cur ? `<img src="${esc(cur)}" alt="">` : BOTTLE}</span>
+        <button class="btn sm" type="button" data-act="scent-web">Find picture online ↗</button>
+        <label class="btn sm" for="sc-file" style="cursor:pointer">Upload picture</label><input id="sc-file" type="file" accept="image/*" hidden>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">“Find picture online” opens an image search in a new tab. Save or copy the bottle picture there, then click Upload, or paste it here with Ctrl+V / ⌘V.</div></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    const scent = val("sc-name");
+    const data = { ...clean(extraOf(mid)), scent, memberId: mid, updatedAt: Date.now(), updatedBy: (S.me && S.me.name) || "" };
+    if (scentDraftImg) data.scentImg = scentDraftImg;
+    else if (scent.toLowerCase() !== (extraOf(mid).scent || "").toLowerCase()) data.scentImg = "";
+    if (S.db) await S.db.doc("scents/" + mid).set(data); else { S.scents = S.scents.filter(s => s.id !== mid).concat({ id: mid, ...data }); }
+    closeSheet(); toast(scent ? `Saved: ${scent}.` : "Scent cleared.");
+  });
+  S.scentFor = mid;
+}
+async function setScentDraft(file) {
+  try { scentDraftImg = await resizeImage(file, 200, false); const p = $("#sc-prev"); if (p) p.innerHTML = `<img src="${scentDraftImg}" alt="">`; }
+  catch (e) { sheetError(e.message); }
+}
+async function myPhoto(file) {
+  const mid = myMemberId(); if (!mid) return;
+  const photo = await resizeImage(file, 256, true);
+  const data = { ...clean(extraOf(mid)), memberId: mid, photo, updatedAt: Date.now() };
+  if (S.db) await S.db.doc("scents/" + mid).set(data); else { S.scents = S.scents.filter(s => s.id !== mid).concat({ id: mid, ...data }); render(); }
+  toast("Photo updated.");
+}
+function birthdayBanner() {
+  const list = birthdaysToday(); if (!list.length) return "";
+  const names = list.map(m => esc(m.nickname || m.name.split(" ")[0]));
+  const joined = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names.at(-1) : names[0];
+  return `<section class="bday" role="status"><div class="bday-avs">${list.map(m => avatar(m, 56)).join("")}</div>
+    <div><div class="slide-eyebrow" style="color:var(--brand)">Today is a special day</div><div class="bday-title">Happy Birthday ${joined}!</div><div style="font-size:13px;color:var(--muted)">From all of us at Regal Spritz 🎉</div></div>
+    <span class="bday-cake" aria-hidden="true">🎂</span></section>`;
+}
+function teamStrip() {
+  const team = activeTeam().slice().sort((a, b) => String(a.idNumber || "zzz").localeCompare(String(b.idNumber || "zzz")));
+  if (!team.length) return "";
+  const soon = team.map(m => ({ m, n: nextBirthday(m) })).filter(x => x.n && x.n.days > 0 && x.n.days <= 30).sort((a, b) => a.n.days - b.n.days);
+  return `<section class="panel"><div class="head"><h2>Our team</h2><span style="font-size:12px;color:var(--muted)">Tap a bottle to set a favorite scent</span></div>
+    <div class="team-strip">${team.map(m => `<div class="tm">${avatar(m, 56)}<strong>${esc(m.nickname || m.name)}${isBirthday(m) ? " 🎂" : ""}</strong><span>${esc(scentOf(m.id) || (dept(m.department) || {}).name || "")}</span></div>`).join("")}</div>
+    ${soon.length ? `<div style="font-size:13px;color:var(--muted)">Upcoming birthdays: ${soon.map(x => `<strong style="color:var(--fg)">${esc(x.m.nickname || x.m.name)}</strong> ${fmtBday(x.m.birthday)}${x.n.days === 1 ? " (tomorrow)" : ""}`).join(" · ")}</div>` : ""}
+  </section>`;
+}
 const firstName = () => (member(myMemberId()) || {}).name?.split(" ")[0] || (S.me && S.me.name ? S.me.name.split(" ")[0] : "");
 function manilaHour() { try { return Number(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila", hour: "numeric", hour12: false })) % 24; } catch (e) { return new Date().getHours(); } }
 const greeting = () => { const h = manilaHour(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
@@ -698,17 +846,23 @@ function viewTasks(forceDept) {
     const cells = [];
     for (let i = 0; i < weeks * 7; i++) { const d = new Date(y, m - 1, 1 - first.getDay() + i); cells.push(dstr(d.getTime())); }
     const dayTasks = scoped.filter(t => onDay(t, S.t.day));
+    const showMoney = finOpen() && (!forceDept || forceDept === "FINANCE");
+    const money = showMoney ? moneyEvents(cells[0], cells[cells.length - 1]) : [];
+    const moneyOn = d => money.filter(e => e.date === d);
+    const dayMoney = moneyOn(S.t.day);
     main = `<div class="cal">
       ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => `<div class="cal-h">${d}</div>`).join("")}
       ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)); const out = d.slice(0, 7) !== ym; return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
         <div class="cal-n"><span>${Number(d.slice(8))}</span>${S.readOnly ? "" : `<button type="button" class="cal-add" data-act="new-task" data-date="${d}" aria-label="Add task on ${fmtDate(d)}">+</button>`}</div>
-        <div class="cal-items">${ts.slice(0, 3).map(taskPill).join("")}${ts.length > 3 ? `<span class="cal-more">+${ts.length - 3} more</span>` : ""}</div>
-        ${ts.length ? `<div class="cal-dots" aria-hidden="true">${ts.slice(0, 5).map(t => `<i class="s-${t.status}"></i>`).join("")}</div>` : ""}
+        <div class="cal-items">${moneyOn(d).slice(0, 2).map(moneyPill).join("")}${moneyOn(d).length > 2 ? `<span class="cal-more">+${moneyOn(d).length - 2} payments</span>` : ""}${ts.slice(0, 3).map(taskPill).join("")}${ts.length > 3 ? `<span class="cal-more">+${ts.length - 3} more</span>` : ""}</div>
+        ${ts.length || moneyOn(d).length ? `<div class="cal-dots" aria-hidden="true">${moneyOn(d).slice(0, 2).map(() => `<i class="s-money"></i>`).join("")}${ts.slice(0, 4).map(t => `<i class="s-${t.status}"></i>`).join("")}</div>` : ""}
       </div>`; }).join("")}
     </div>
     <section class="panel"><div class="head"><h2>${longDate(S.t.day)}</h2>${S.readOnly ? "" : `<button class="btn sm" type="button" data-act="new-task" data-date="${S.t.day}">+ Add task for this day</button>`}</div>
-      ${dayTasks.length ? `<div class="table-wrap" style="border:0"><table><tbody>${dayTasks.map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">Nothing due this day.</div>`}
-    </section>`;
+      ${dayTasks.length ? `<div class="table-wrap" style="border:0"><table><tbody>${dayTasks.map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">No tasks due this day.</div>`}
+      ${dayMoney.length ? `<h2 style="margin-top:6px">Payments due · ${peso(dayMoney.reduce((a, e) => a + e.amount, 0))}</h2><div class="table-wrap" style="border:0"><table><tbody>${dayMoney.map(e => `<tr><td style="font-weight:600">${esc(e.title)}</td><td class="nowrap">${esc(e.sub)}</td><td class="r num nowrap">${peso(e.amount)}</td><td class="r">${e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">${CHECK_STATUS[e.status].name}</button>` : `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">${e.paid ? "Paid ✓" : "Mark paid"}</button>`}</td></tr>`).join("")}</tbody></table></div>` : ""}
+    </section>
+    ${showMoney ? "" : canSee("FINANCE") ? `<div style="font-size:12px;color:var(--muted)">Unlock Finance to see investor, credit card and check due dates on this calendar.</div>` : ""}`;
   } else {
     const sorted = [...monthTasks].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
     main = `<div class="table-wrap"><table>
@@ -786,7 +940,7 @@ function viewHome() {
   S.slide = S.slide % sl.length;
   const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === myMemberId() && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
   const monthTasks = S.tasks.filter(t => inMonth(t, today().slice(0, 7)));
-  return `
+  return `${birthdayBanner()}
   <section class="carousel" id="carousel" aria-roledescription="carousel" aria-label="Welcome">
     <div class="car-track" id="car-track">${sl.map((s, i) => `<div class="slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${sl.length}" ${i !== S.slide ? 'aria-hidden="true"' : ""}>
       <div class="slide-eyebrow">${s.eyebrow}</div><h2 class="slide-title">${s.title}</h2><div class="slide-body">${s.body}</div></div>`).join("")}</div>
@@ -797,6 +951,7 @@ function viewHome() {
     </div>
   </section>
   ${myClockCard()}
+  ${teamStrip()}
   <div class="grid-2">
     <section class="panel"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
       ${myMemberId() ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
@@ -804,9 +959,9 @@ function viewHome() {
     </section>
     <section class="panel"><h2>Team this month</h2>${taskSummary(monthTasks, monthLabel(today().slice(0, 7)))}</section>
   </div>
-  <section class="panel"><h2>Departments</h2>
-    <div class="dept-grid">${DEPTS.map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>
-  </section>`;
+  ${visDepts().length ? "" : "<!--"}<section class="panel"><h2>Departments</h2>
+    <div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>
+  </section>${visDepts().length ? "" : "-->"}`;
 }
 function applySlide() {
   const tr = $("#car-track"); if (!tr) return;
@@ -838,8 +993,9 @@ function viewAccount() {
   const mine = m ? S.tasks.filter(t => t.assigneeId === m.id) : [];
   return `<div class="grid-2">
     <section class="panel"><h2>Profile</h2>
-      <div style="display:flex;gap:12px;align-items:center">${S.me && S.me.avatarUrl ? `<img src="${esc(S.me.avatarUrl)}" alt="" width="48" height="48" style="border-radius:50%">` : ""}
+      <div style="display:flex;gap:12px;align-items:center">${m ? avatar(m, 52) : S.me && S.me.avatarUrl ? `<img src="${esc(S.me.avatarUrl)}" alt="" width="48" height="48" style="border-radius:50%">` : ""}
         <div><div style="font-weight:700;font-size:16px">${esc((S.me && S.me.name) || (m && m.name) || "Signed-in user")}</div><div style="color:var(--muted);font-size:13px">Access: ${lvl}${m ? " · " + esc((dept(m.department) || {}).name || "") + (m.role ? " · " + esc(m.role) : "") : ""}</div></div></div>
+      ${m && !S.readOnly ? `<div><label class="btn sm" for="my-photo" style="cursor:pointer">Upload my photo</label><input id="my-photo" type="file" accept="image/*" hidden></div>` : ""}
       ${S.uid ? `<div class="field"><label for="my-member">Which team member are you?</label><select id="my-member"><option value="">Choose your name…</option>${S.team.map(x => `<option value="${x.id}" ${myMemberId() === x.id ? "selected" : ""}>${esc(x.name)}${x.department ? " · " + esc((dept(x.department) || {}).name || "") : ""}</option>`).join("")}</select>
         <div style="font-size:12px;color:var(--muted)">${S.team.length ? "This shows your tasks on Home and pre-fills your department on new tasks." : "Ask Admin to add you in Admin → Team first."}</div></div>`
         : `<div class="empty">Sign in on claude.ai to link your account.</div>`}
@@ -852,14 +1008,16 @@ function viewAccount() {
   <section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div style="font-size:12px;color:var(--muted)">System follows your device's light or dark setting. Saved on this device.</div></section>
   <section class="panel"><h2>Department access</h2>
     ${S.isOwner ? `<div class="empty">You own this app, so every department opens without a password.</div>` : `
-    <div class="dept-grid">${DEPTS.map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${isUnlocked(d.id) ? "Unlocked on this device" : "Locked"}</span></button>`).join("")}</div>
+    <div style="font-size:13px;color:var(--muted)">${visDepts().length ? `You can open: ${visDepts().map(d => d.name).join(", ")}.` : "Link your name above to see your departments."}</div>
+    <div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${isUnlocked(d.id) ? "Unlocked on this device" : "Locked"}</span></button>`).join("")}</div>
     ${S.unlocked.size ? `<div><button class="btn" type="button" data-act="lock-all">Lock all departments</button></div>` : ""}`}
   </section>`;
 }
 
 /* ---------- departments ---------- */
 function viewDeptPicker() {
-  return `<div class="dept-grid">${DEPTS.map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>`;
+  if (!visDepts().length) return `<div class="panel"><div class="empty">Link your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your department.</div></div>`;
+  return `<div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>`;
 }
 function viewLock(d) {
   const has = S.security && S.security[d.id] && S.security[d.id].hash;
@@ -880,7 +1038,7 @@ async function sha(text) {
 async function tryUnlock() {
   const d = S.dept, rec = S.security[d], pw = val("unlock-pw");
   if (!rec || !pw) return;
-  if ((await sha(rec.salt + ":" + pw)) === rec.hash) { S.unlocked.add(d); saveUnlocked(); render(); toast(`${dept(d).name} unlocked.`); }
+  if ((await sha(rec.salt + ":" + pw)) === rec.hash) { S.unlocked.add(d); saveUnlocked(); render(); toast(d === "CEO" ? "CEO unlocked: every department is open." : d === "ADMIN" ? "Admin unlocked: every department except Finance is open." : `${dept(d).name} unlocked.`); }
   else { const e = $("#unlock-err"); if (e) e.hidden = false; $("#unlock-pw").value = ""; $("#unlock-pw").focus(); }
 }
 function viewPasswords() {
@@ -891,6 +1049,7 @@ function viewPasswords() {
       <td><span class="chip ${has ? "good" : "warn"}">${has ? "Password set" : "No password"}</span></td>
       <td><input id="pw-${d.id}" type="password" autocomplete="new-password" placeholder="New password" style="border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;width:100%;min-width:140px"></td>
       <td class="r nowrap"><button class="btn sm primary" type="button" data-setpw="${d.id}">${has ? "Change" : "Set"}</button>${has ? ` <button class="btn sm ghost danger" type="button" data-clearpw="${d.id}">Remove</button>` : ""}</td></tr>`; }).join("")}</tbody></table></div>
+    <div style="font-size:13px;color:var(--muted)">Who sees what: <strong>CEO</strong> sees every department, <strong>Admin</strong> sees all except Finance, everyone else sees only their own department (from Directory). The CEO password opens everything; the Admin password opens everything except Finance.</div>
     <div class="notice" style="background:var(--surface-2);color:var(--muted);font-weight:500">These passwords keep each department's pages out of view for staff who don't need them. They aren't bank-level security: anyone you share this app with can technically reach its data. Share the app only with your team, and change a password when someone leaves.</div>
   </section>`;
 }
@@ -911,7 +1070,7 @@ async function setPassword(d, clear) {
 const DEPT_COLORS = { CEO: "#8B5CF6", ADMIN: "#EC4899", FINANCE: "#DC2626", SALES: "#F59E0B", MARKETING: "#10B981", PACKING: "#3B82F6" };
 function viewTeam() {
   const q = (S.tq || "").trim().toLowerCase(), sf = S.tstatus || "active";
-  const rows = [...S.team].filter(m => (sf === "all" || (sf === "active" ? m.status !== "inactive" : m.status === "inactive")) && (!q || [m.idNumber, m.nickname, m.name, m.phone, m.email, m.address, m.role, (dept(m.department) || {}).name].join(" ").toLowerCase().includes(q)))
+  const rows = [...S.team].filter(m => (sf === "all" || (sf === "active" ? m.status !== "inactive" : m.status === "inactive")) && (!q || [m.idNumber, m.nickname, m.name, m.phone, m.email, m.address, m.role, scentOf(m.id), (dept(m.department) || {}).name].join(" ").toLowerCase().includes(q)))
     .sort((a, b) => String(a.idNumber || "zzz").localeCompare(String(b.idNumber || "zzz")) || (a.name || "").localeCompare(b.name || ""));
   const active = S.team.filter(m => m.status !== "inactive").length;
   return `<div class="kpis">
@@ -923,15 +1082,17 @@ function viewTeam() {
     <div class="toolbar"><input id="tq" type="search" placeholder="Search ID, name, phone, email, address" value="${esc(S.tq || "")}" aria-label="Search directory">
       <select id="tstatus" aria-label="Status">${[["active", "Active"], ["inactive", "Inactive"], ["all", "All"]].map(([k, l]) => `<option value="${k}" ${sf === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     <div class="table-wrap"><table class="otable dir">
-    <thead><tr><th>ID Number</th><th>Nickname</th><th>Full Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Department</th><th>Date Started</th><th>Status</th></tr></thead>
+    <thead><tr><th>ID Number</th><th>Nickname</th><th>Full Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Department</th><th>Birthday</th><th>Favorite scent</th><th>Date Started</th><th>Status</th></tr></thead>
     <tbody>${rows.map(m => `<tr ${S.canEdit ? `data-act="edit-member" data-id="${m.id}"` : ""} style="${S.canEdit ? "" : "cursor:default"}">
       <td class="nowrap num" style="box-shadow:inset 4px 0 0 ${DEPT_COLORS[m.department] || "var(--line)"}">${esc(m.idNumber || "")}</td>
-      <td style="font-weight:600">${esc(m.nickname || "")}</td>
+      <td style="font-weight:600"><span style="display:inline-flex;gap:10px;align-items:center">${avatar(m, 34)}${esc(m.nickname || "")}</span></td>
       <td class="nowrap">${esc(m.name)}</td>
       <td class="nowrap num" style="user-select:all">${esc(m.phone || m.contact || "")}</td>
       <td style="user-select:all">${esc(m.email || "")}</td>
       <td style="min-width:200px">${esc(m.address || "")}</td>
       <td class="nowrap">${esc(m.role || (dept(m.department) || { name: "–" }).name)}</td>
+      <td class="nowrap">${m.birthday ? fmtBday(m.birthday) + (isBirthday(m) ? " 🎂" : "") : ""}</td>
+      <td>${esc(scentOf(m.id))}</td>
       <td class="nowrap">${m.started ? new Date(m.started + "T12:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : ""}</td>
       <td><span class="chip ${m.status === "inactive" ? "" : "good"}">${m.status === "inactive" ? "Inactive" : "Active"}</span></td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.team.length ? "No one matches." : S.canEdit ? "No team members yet. Click “Add team member”, including staff without a Claude account." : "Ask the owner to add the team."}</div>`}</div>`;
@@ -957,6 +1118,15 @@ function openMemberForm(id) {
     </div>
     <div class="row">
       <div class="field"><label for="m-start">Date started</label><input id="m-start" type="date" value="${esc(m.started || "")}"></div>
+      <div class="field"><label for="m-bday">Birthday</label><input id="m-bday" type="date" value="${esc(m.birthday || "")}"></div>
+    </div>
+    <div class="field"><label>Photo</label><div style="display:flex;gap:12px;align-items:center">
+      <span class="av" style="--sz:56px;--avc:var(--brand)" id="m-photo-prev">${m.photo ? `<img src="${esc(m.photo)}" alt="">` : `<span>${esc(initials(m.nickname || m.name || "?"))}</span>`}</span>
+      <label class="btn sm" for="m-photo-file" style="cursor:pointer">Upload photo</label><input id="m-photo-file" type="file" accept="image/*" hidden>
+      ${m.photo ? `<button class="btn sm ghost" type="button" data-act="m-photo-clear">Remove</button>` : ""}
+      <input type="hidden" id="m-photo" value="${esc(m.photo || "")}"></div>
+      <div style="font-size:12px;color:var(--muted)">Cropped to a square and made small automatically.</div></div>
+    <div class="row">
       <div class="field"><label for="m-status">Status</label><select id="m-status"><option value="active" ${m.status !== "inactive" ? "selected" : ""}>Active</option><option value="inactive" ${m.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
     </div>
     <div style="font-size:12px;color:var(--muted)">Inactive members drop off attendance and can't be assigned new tasks, but their history stays.</div>
@@ -965,7 +1135,7 @@ function openMemberForm(id) {
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
     if (!val("m-name")) return sheetError("Enter the full name.");
-    const data = { ...(id ? clean(m) : {}), idNumber: val("m-idn"), nickname: val("m-nick"), name: val("m-name"), phone: val("m-phone"), email: val("m-email").toLowerCase(), address: val("m-addr"), department: val("m-dept"), role: val("m-role"), started: val("m-start"), status: val("m-status") };
+    const data = { ...(id ? clean(m) : {}), idNumber: val("m-idn"), nickname: val("m-nick"), name: val("m-name"), phone: val("m-phone"), email: val("m-email").toLowerCase(), address: val("m-addr"), department: val("m-dept"), role: val("m-role"), started: val("m-start"), birthday: val("m-bday"), photo: document.getElementById("m-photo").value, status: val("m-status") };
     delete data.contact;
     await save("team", id || uid("m"), data);
     closeSheet(); toast(id ? "Team member updated." : "Team member added.");
@@ -1628,6 +1798,7 @@ function openImport() {
       <span style="font-size:12px">Order IDs (like #RS9978) stay exactly the same. Importing a newer export later updates payment status, fulfillment status, tags and notes.</span>
       <input id="imp-file" type="file" accept=".csv,text/csv">
     </label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="imp-open" ${S.impOpenOnly !== false ? "checked" : ""}> Orders: only bring in <strong>unfulfilled / on hold</strong> orders (orders already in the app still get their status updated)</label>
     <div id="imp-preview"></div>
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit" id="imp-go" disabled>Import</button></div>`,
@@ -1639,10 +1810,13 @@ function openImport() {
       if (btn) btn.textContent = `Importing ${Math.min(writes.length, i + 8)} of ${writes.length}…`;
     }
     const n = writes.length; pendingImport = null;
+    if (kind === "orders" && S.impOpenOnly !== false) { S.of.view = "unfulfilled"; S.page = 0; }
     closeSheet(); toast(`Imported ${n.toLocaleString("en-PH")} ${kind} from Shopify.`);
   });
 }
+let lastImportFile = null;
 async function readImportFile(file) {
+  lastImportFile = file;
   const prev = $("#imp-preview"), go = $("#imp-go");
   try {
     const text = await file.text();
@@ -1650,8 +1824,9 @@ async function readImportFile(file) {
     if (!kind) throw new Error("This doesn't look like a Shopify orders or customers export. Export it from Shopify as CSV and try again.");
     const writes = []; let fresh = 0, updated = 0, sample = [], warn = "";
     if (kind === "orders") {
-      const parsed = shopifyOrders(text);
+      const openOnly = S.impOpenOnly !== false;
       const have = new Map(S.orders.map(o => [o.id, o]));
+      const parsed = shopifyOrders(text).filter(o => !openOnly || have.has(orderDocId(o)) || (OPEN_FUL.has(o.fulfillment) && !isVoid(o)));
       for (const o of parsed) {
         const id = orderDocId(o), ex = have.get(id);
         if (!ex) { writes.push({ col: "orders", id, data: o }); fresh++; }
@@ -2011,6 +2186,384 @@ async function markPastPaid() {
 }
 
 /* ---------- payroll (Finance) ---------- */
+/* ---------- finance: fixed expenses, due dates, checks, payroll records, BIR ---------- */
+const DUE_KINDS = [["investor", "Investor payout"], ["card", "Credit card"], ["bill", "Bill"], ["loan", "Loan"], ["other", "Other"]];
+const dueKind = k => (DUE_KINDS.find(x => x[0] === k) || DUE_KINDS[4])[1];
+const CHECK_STATUS = { pending: { name: "Pending", cls: "warn" }, cleared: { name: "Cleared", cls: "good" }, bounced: { name: "Bounced", cls: "bad" }, cancelled: { name: "Cancelled", cls: "" } };
+const dueDateIn = (due, ym) => { const [y, m] = ym.split("-").map(Number), dim = new Date(y, m, 0).getDate(); return `${ym}-${String(Math.min(Number(due.day) || 1, dim)).padStart(2, "0")}`; };
+function moneyEvents(from, to) {
+  const out = [];
+  const months = new Set([from.slice(0, 7), to.slice(0, 7)]); { const [y, m] = from.slice(0, 7).split("-").map(Number); months.add(dstr(new Date(y, m, 1).getTime()).slice(0, 7)); }
+  for (const d of S.dues) if (d.active !== false) for (const ym of months) { const date = dueDateIn(d, ym); if (date >= from && date <= to) out.push({ kind: d.kind, id: d.id, date, title: d.name, sub: dueKind(d.kind) + (d.method ? " · " + d.method : ""), amount: Number(d.amount) || 0, paid: (d.paid || []).includes(ym) }); }
+  for (const c of S.checks) if (c.checkDate && c.checkDate >= from && c.checkDate <= to && c.status !== "cancelled") out.push({ kind: "check", id: c.id, date: c.checkDate, title: `Check #${c.checkNo || "–"} · ${c.payee || ""}`, sub: c.bank || "Check", amount: Number(c.amount) || 0, status: c.status || "pending", paid: c.status === "cleared" });
+  return out;
+}
+const moneyPill = e => `<button type="button" class="tpill s-money${e.paid ? " paid" : ""}" data-act="${e.kind === "check" ? "edit-check" : "edit-due"}" data-id="${e.id}" title="${esc(e.title)} · ${peso(e.amount)}"><span class="ini">₱</span><span class="tt">${esc(e.title)}</span></button>`;
+
+function viewFixed() {
+  const list = [...S.fixedexp].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  const tot = list.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  const can = !S.readOnly;
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">Monthly fixed expenses</span><span class="value">${peso(tot)}</span><span class="sub">${list.length} lines</span></div>
+      <div class="kpi"><span class="label">Per day</span><span class="value">${peso(Math.round(tot / 30))}</span><span class="sub">÷ 30 days</span></div>
+      <div class="kpi"><span class="label">Sales needed per day</span><span class="value">${peso(Math.round(tot / 26))}</span><span class="sub">to cover fixed costs over 26 work days</span></div>
+      <div class="kpi"><span class="label">Investors' interest (live)</span><span class="value">${peso(S.investments.filter(v => !v.closed && v.kind !== "loan").reduce((a, v) => a + invMonthly(v), 0))}</span><span class="sub">from Finance → Investors</span></div>
+    </div>
+    <div class="table-wrap"><table class="otable fixed"><thead><tr><th>Description</th><th class="r">Amount</th><th>Notes</th></tr></thead>
+    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td><div style="font-weight:600">${esc(x.desc)}</div>${x.breakdown ? `<div class="s" style="white-space:pre-line">${esc(x.breakdown)}</div>` : ""}</td><td class="r num nowrap">${x.amount ? peso(x.amount) : "–"}</td><td>${esc(x.notes || "")}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td style="font-weight:800">TOTAL</td><td class="r num" style="font-weight:800">${peso(tot)}</td><td></td></tr></tfoot></table>
+    ${list.length ? "" : `<div class="empty" style="padding:16px">No fixed expenses yet. Click “Add expense line”.</div>`}</div>`;
+}
+function openFixedForm(id) {
+  const x = id ? S.fixedexp.find(r => r.id === id) : {};
+  openSheet(`<h3>${id ? "Edit expense line" : "Add expense line"}</h3>
+    <div class="field"><label for="fx-desc">Description</label><input id="fx-desc" value="${esc(x.desc || "")}" placeholder="e.g. Bill - Water"></div>
+    <div class="row"><div class="field"><label for="fx-amt">Amount per month (₱)</label><input id="fx-amt" type="number" step="0.01" min="0" value="${esc(x.amount ?? "")}"></div>
+      <div class="field"><label for="fx-notes">Notes</label><input id="fx-notes" value="${esc(x.notes || "")}" placeholder="monthly, yearly / 12 mos."></div></div>
+    <div class="field"><label for="fx-bd">Breakdown (optional, one per line)</label><textarea id="fx-bd" rows="3">${esc(x.breakdown || "")}</textarea></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-fixed" data-id="${id}">Delete line</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("fx-desc")) return sheetError("Enter a description.");
+    const data = { ...(id ? clean(x) : { order: S.fixedexp.length + 1 }), desc: val("fx-desc"), amount: numv("fx-amt"), notes: val("fx-notes"), breakdown: val("fx-bd"), updatedAt: Date.now() };
+    await save("fixedexp", id || uid("fx"), data); closeSheet(); toast("Saved.");
+  });
+}
+
+function viewDues() {
+  const ym = mToday().slice(0, 7), can = !S.readOnly;
+  const list = [...S.dues].sort((a, b) => DUE_KINDS.findIndex(k => k[0] === a.kind) - DUE_KINDS.findIndex(k => k[0] === b.kind) || (Number(a.day) || 0) - (Number(b.day) || 0));
+  const act = list.filter(d => d.active !== false);
+  const tot = act.reduce((a, d) => a + (Number(d.amount) || 0), 0), paid = act.filter(d => (d.paid || []).includes(ym));
+  const next = act.filter(d => !(d.paid || []).includes(ym) && dueDateIn(d, ym) >= mToday()).sort((a, b) => dueDateIn(a, ym).localeCompare(dueDateIn(b, ym)))[0];
+  const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="7">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">
+      <td style="font-weight:600">${esc(d.name)}</td><td class="nowrap">${ordinal(d.day)} of the month</td><td class="r num nowrap">${peso(d.amount)}</td><td>${esc(d.method || "")}</td><td class="nowrap num">${d.account ? "•••• " + esc(d.account) : ""}</td><td>${esc(d.holder || "")}</td>
+      <td class="nowrap">${d.active === false ? "Stopped" : `<button class="btn sm ${isPaid ? "" : late ? "danger" : "primary"}" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${ym}">${isPaid ? "Paid ✓" : late ? "Overdue · Mark paid" : "Mark paid"}</button>`}</td></tr>`; }).join(""); };
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">Due in ${monthLabel(ym)}</span><span class="value">${peso(tot)}</span><span class="sub">${act.length} payments</span></div>
+      <div class="kpi"><span class="label">Paid so far</span><span class="value">${paid.length}/${act.length}</span><span class="sub">${peso(paid.reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></div>
+      <div class="kpi"><span class="label">Next due</span><span class="value" style="font-size:18px">${next ? esc(next.name) : "–"}</span><span class="sub">${next ? fmtDate(dueDateIn(next, ym)) + " · " + peso(next.amount) : "All paid for this month"}</span></div>
+      <div class="kpi"><span class="label">Calendar</span><span class="value" style="font-size:16px">On the Tasks calendar</span><span class="sub">Visible to people with Finance unlocked</span></div>
+    </div>
+    <div class="table-wrap"><table class="otable"><thead><tr><th>Name</th><th>Due date</th><th class="r">Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th></tr></thead>
+      <tbody>${DUE_KINDS.map(k => group(k[0])).join("")}</tbody></table>${list.length ? "" : `<div class="empty" style="padding:16px">No due dates yet.</div>`}</div>
+    <div style="font-size:12px;color:var(--muted)">Only the last 4 digits of account and card numbers are kept here, for safety. A due date of the 30th falls on the last day in shorter months.</div>`;
+}
+const ordinal = n => { n = Number(n) || 0; const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+function openDueForm(id) {
+  const d = id ? S.dues.find(r => r.id === id) : { kind: "investor", active: true };
+  openSheet(`<h3>${id ? "Edit due date" : "Add due date"}</h3>
+    <div class="row"><div class="field"><label for="du-name">Name</label><input id="du-name" value="${esc(d.name || "")}" placeholder="e.g. Lorelie Tacio, BPI credit card"></div>
+      <div class="field"><label for="du-kind">Type</label><select id="du-kind">${DUE_KINDS.map(([k, l]) => `<option value="${k}" ${d.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>
+    <div class="row"><div class="field"><label for="du-day">Day of the month</label><input id="du-day" type="number" min="1" max="31" value="${esc(d.day ?? 15)}"></div>
+      <div class="field"><label for="du-amt">Amount (₱)</label><input id="du-amt" type="number" step="0.01" min="0" value="${esc(d.amount ?? "")}"></div></div>
+    <div class="row"><div class="field"><label for="du-method">Paid via / bank</label><input id="du-method" value="${esc(d.method || "")}" placeholder="Maribank, BPI QR code"></div>
+      <div class="field"><label for="du-acct">Account (last 4 digits)</label><input id="du-acct" inputmode="numeric" maxlength="4" value="${esc(d.account || "")}"></div></div>
+    <div class="row"><div class="field"><label for="du-holder">Holder</label><input id="du-holder" value="${esc(d.holder || "")}"></div>
+      <div class="field"><label for="du-active">Status</label><select id="du-active"><option value="1" ${d.active !== false ? "selected" : ""}>Active</option><option value="0" ${d.active === false ? "selected" : ""}>Stopped</option></select></div></div>
+    <div class="field"><label for="du-notes">Notes</label><input id="du-notes" value="${esc(d.notes || "")}"></div>
+    ${id ? `<div style="font-size:12px;color:var(--muted)">Paid months: ${(d.paid || []).map(monthLabel).join(", ") || "none yet"}</div>` : ""}
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-due" data-id="${id}">Delete</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("du-name")) return sheetError("Enter a name.");
+    const day = Math.round(numv("du-day")); if (day < 1 || day > 31) return sheetError("Day must be 1 to 31.");
+    const data = { ...(id ? clean(d) : { paid: [] }), name: val("du-name"), kind: val("du-kind"), day, amount: numv("du-amt"), method: val("du-method"), account: val("du-acct").replace(/\D/g, "").slice(-4), holder: val("du-holder"), active: val("du-active") === "1", notes: val("du-notes"), updatedAt: Date.now() };
+    await save("dues", id || uid("du"), data); closeSheet(); toast("Saved.");
+  });
+}
+async function toggleDuePaid(id, ym) {
+  const d = S.dues.find(r => r.id === id); if (!d) return;
+  const set = new Set(d.paid || []); const was = set.has(ym); was ? set.delete(ym) : set.add(ym);
+  await patch("dues", id, { paid: [...set].sort() }); toast(was ? `${d.name}: marked unpaid.` : `${d.name}: paid for ${monthLabel(ym)}.`);
+}
+
+function viewChecks() {
+  const can = !S.readOnly, t = mToday(), in7 = dstr(new Date(t + "T12:00:00").getTime() + 7 * 864e5);
+  const list = [...S.checks].sort((a, b) => (b.checkDate || "").localeCompare(a.checkDate || ""));
+  const pend = list.filter(c => (c.status || "pending") === "pending");
+  const soon = pend.filter(c => c.checkDate && c.checkDate <= in7);
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">Outstanding checks</span><span class="value">${peso(pend.reduce((a, c) => a + (Number(c.amount) || 0), 0))}</span><span class="sub">${pend.length} not yet cleared</span></div>
+      <div class="kpi"><span class="label">Due in 7 days</span><span class="value">${peso(soon.reduce((a, c) => a + (Number(c.amount) || 0), 0))}</span><span class="sub">${soon.length} check${soon.length === 1 ? "" : "s"}. Make sure the account is funded</span></div>
+      <div class="kpi"><span class="label">Cleared</span><span class="value">${list.filter(c => c.status === "cleared").length}</span></div>
+      <div class="kpi"><span class="label">Bounced</span><span class="value" style="color:${list.some(c => c.status === "bounced") ? "var(--bad)" : "inherit"}">${list.filter(c => c.status === "bounced").length}</span></div>
+    </div>
+    <div class="table-wrap"><table class="otable"><thead><tr><th>Check date</th><th>Check no.</th><th>Bank / account</th><th>Payee</th><th class="r">Amount</th><th>Purpose</th><th>Status</th></tr></thead>
+    <tbody>${list.map(c => { const st = CHECK_STATUS[c.status || "pending"], over = st === CHECK_STATUS.pending && c.checkDate && c.checkDate < t; return `<tr ${can ? `data-act="edit-check" data-id="${c.id}"` : 'style="cursor:default"'}>
+      <td class="nowrap" style="color:${over ? "var(--bad)" : "inherit"}">${c.checkDate ? fmtLong(c.checkDate) : "–"}${over ? " · past date" : ""}</td><td class="num">${esc(c.checkNo || "")}</td><td>${esc(c.bank || "")}</td><td style="font-weight:600">${esc(c.payee || "")}</td>
+      <td class="r num nowrap">${peso2(c.amount)}</td><td>${esc(c.purpose || "")}</td><td><span class="chip ${st.cls}">${st.name}</span></td></tr>`; }).join("")}</tbody></table>
+    ${list.length ? "" : `<div class="empty" style="padding:16px">No checks yet. Click “Add check” each time you issue one. Pending checks show on the Tasks calendar on their date.</div>`}</div>`;
+}
+function openCheckForm(id, date) {
+  const c = id ? S.checks.find(r => r.id === id) : { status: "pending", checkDate: date || "", bank: "China Bank Checking ••1230", issued: mToday() };
+  openSheet(`<h3>${id ? "Edit check" : "Add check"}</h3>
+    <div class="row"><div class="field"><label for="ck-no">Check no.</label><input id="ck-no" value="${esc(c.checkNo || "")}"></div>
+      <div class="field"><label for="ck-date">Check date</label><input id="ck-date" type="date" value="${esc(c.checkDate || "")}"></div></div>
+    <div class="row"><div class="field"><label for="ck-payee">Payee</label><input id="ck-payee" value="${esc(c.payee || "")}"></div>
+      <div class="field"><label for="ck-amt">Amount (₱)</label><input id="ck-amt" type="number" step="0.01" min="0" value="${esc(c.amount ?? "")}"></div></div>
+    <div class="row"><div class="field"><label for="ck-bank">Bank / account</label><input id="ck-bank" value="${esc(c.bank || "")}"></div>
+      <div class="field"><label for="ck-issued">Date issued</label><input id="ck-issued" type="date" value="${esc(c.issued || "")}"></div></div>
+    <div class="row"><div class="field"><label for="ck-purpose">Purpose</label><input id="ck-purpose" value="${esc(c.purpose || "")}" placeholder="e.g. Rent, supplier, investor"></div>
+      <div class="field"><label for="ck-status">Status</label><select id="ck-status">${Object.entries(CHECK_STATUS).map(([k, s]) => `<option value="${k}" ${(c.status || "pending") === k ? "selected" : ""}>${s.name}</option>`).join("")}</select></div></div>
+    <div class="field"><label for="ck-notes">Notes</label><input id="ck-notes" value="${esc(c.notes || "")}"></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-check" data-id="${id}">Delete check</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("ck-payee") || !numv("ck-amt")) return sheetError("Enter the payee and amount.");
+    const data = { ...(id ? clean(c) : {}), checkNo: val("ck-no"), checkDate: val("ck-date"), payee: val("ck-payee"), amount: numv("ck-amt"), bank: val("ck-bank"), issued: val("ck-issued"), purpose: val("ck-purpose"), status: val("ck-status"), notes: val("ck-notes"), updatedAt: Date.now() };
+    await save("checks", id || uid("ck"), data); closeSheet(); toast("Check saved.");
+  });
+}
+
+function payRecRows() {
+  const out = [];
+  for (const d of S.payrecords) (d.rows || []).forEach((r, i) => out.push({ ...r, payDate: d.id, doc: d.id, i }));
+  for (const p of S.payroll) if (p.status === "paid" && p.snapshot) {
+    const [key, mid] = [p.id.slice(0, p.id.indexOf("_")), p.id.slice(p.id.indexOf("_") + 1)];
+    const [y, mo, h] = key.split("-"); const dim = new Date(Number(y), Number(mo), 0).getDate();
+    const m = member(mid) || {};
+    out.push({ payDate: `${y}-${mo}-${h === "A" ? "15" : String(dim)}`, idNumber: m.idNumber || "", name: m.name || mid, memberId: mid, position: positionOf(m), rate: p.snapshot.rate, net: p.snapshot.net, note: "From Payroll", fromApp: true });
+  }
+  return out;
+}
+function viewPayRecords() {
+  const all = payRecRows();
+  const people = [...new Set(all.map(r => r.name))].sort();
+  const rows = all.filter(r => !S.prPerson || r.name === S.prPerson);
+  const dates = [...new Set(rows.map(r => r.payDate))].sort().reverse();
+  const tot = rows.reduce((a, r) => a + (Number(r.net) || 0), 0);
+  const per = new Map(); for (const r of rows) { const x = per.get(r.name) || { n: 0, net: 0, pos: r.position }; x.n++; x.net += Number(r.net) || 0; per.set(r.name, x); }
+  const can = !S.readOnly;
+  return `<div class="toolbar"><select id="pr-person" aria-label="Person"><option value="">Everyone</option>${people.map(p => `<option ${S.prPerson === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></div>
+    <div class="kpis">
+      <div class="kpi"><span class="label">Total net paid</span><span class="value">${peso(tot)}</span><span class="sub">${dates.length} pay dates</span></div>
+      <div class="kpi"><span class="label">Average per pay date</span><span class="value">${peso(Math.round(tot / Math.max(1, dates.length)))}</span></div>
+      <div class="kpi"><span class="label">Latest pay date</span><span class="value" style="font-size:18px">${dates[0] ? fmtLong(dates[0]) : "–"}</span></div>
+      <div class="kpi"><span class="label">People</span><span class="value">${per.size}</span></div>
+    </div>
+    <section class="panel"><h2>Per person</h2><div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th>Name</th><th>Latest position</th><th class="r">Pay dates</th><th class="r">Total net</th></tr></thead>
+      <tbody>${[...per.entries()].sort((a, b) => b[1].net - a[1].net).map(([n, x]) => `<tr data-prp="${esc(n)}" style="cursor:pointer"><td style="font-weight:600">${esc(n)}</td><td>${esc(x.pos || "")}</td><td class="r num">${x.n}</td><td class="r num">${peso(x.net)}</td></tr>`).join("")}</tbody></table></div></section>
+    ${dates.map((d, k) => { const rs = rows.filter(r => r.payDate === d); return `<details class="panel" ${k < 2 ? "open" : ""}><summary class="yr">${fmtLong(d)} <span>${rs.length} people · ${peso(rs.reduce((a, r) => a + (Number(r.net) || 0), 0))}</span></summary>
+      <div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th>ID</th><th>Name</th><th>Position</th><th class="r">Daily rate</th><th class="r">Net pay</th><th>Note</th></tr></thead>
+      <tbody>${rs.map(r => `<tr ${can && !r.fromApp ? `data-act="edit-pr" data-id="${r.doc}" data-i="${r.i}"` : 'style="cursor:default"'}><td class="num">${esc(r.idNumber || "")}</td><td style="font-weight:600">${esc(r.name)}</td><td>${esc(r.position || "")}</td><td class="r num">${r.rate ? peso(r.rate) : ""}</td><td class="r num" style="font-weight:700">${r.net === "" || r.net == null ? "–" : peso(r.net)}</td><td>${esc(r.note || "")}</td></tr>`).join("")}</tbody></table></div></details>`; }).join("")}
+    ${dates.length ? "" : `<div class="panel"><div class="empty">No payroll records yet.</div></div>`}
+    <div style="font-size:12px;color:var(--muted)">Payslips you mark Paid in Finance → Payroll are added here automatically.</div>`;
+}
+function openPayRecForm(docId, i) {
+  const r = docId ? ((S.payrecords.find(d => d.id === docId) || {}).rows || [])[i] || {} : {};
+  openSheet(`<h3>${docId ? "Edit payroll record" : "Add payroll record"}</h3>
+    <div class="row"><div class="field"><label for="pr-date">Pay date</label><input id="pr-date" type="date" value="${esc(docId || mToday())}" ${docId ? "disabled" : ""}></div>
+      <div class="field"><label for="pr-name">Name</label><input id="pr-name" list="pr-names" value="${esc(r.name || "")}"><datalist id="pr-names">${S.team.map(m => `<option value="${esc(m.name)}">`).join("")}</datalist></div></div>
+    <div class="row"><div class="field"><label for="pr-pos">Position</label><input id="pr-pos" value="${esc(r.position || "")}"></div>
+      <div class="field"><label for="pr-id">ID</label><input id="pr-id" value="${esc(r.idNumber || "")}"></div></div>
+    <div class="row"><div class="field"><label for="pr-rate">Daily rate (₱)</label><input id="pr-rate" type="number" value="${esc(r.rate ?? "")}"></div>
+      <div class="field"><label for="pr-net">Net pay (₱)</label><input id="pr-net" type="number" step="0.01" value="${esc(r.net ?? "")}"></div></div>
+    <div class="field"><label for="pr-note">Note</label><input id="pr-note" value="${esc(r.note || "")}" placeholder="e.g. Leave"></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${docId ? `<div><button class="btn danger sm" type="button" data-act="del-pr" data-id="${docId}" data-i="${i}">Delete record</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    const date = docId || val("pr-date"); if (!date || !val("pr-name")) return sheetError("Enter the pay date and name.");
+    const row = { idNumber: val("pr-id"), name: val("pr-name"), position: val("pr-pos"), rate: numv("pr-rate"), net: val("pr-net") === "" ? "" : numv("pr-net"), note: val("pr-note") };
+    const d = S.payrecords.find(x => x.id === date) || { rows: [] };
+    const rows = [...(d.rows || [])]; if (docId) rows[i] = row; else rows.push(row);
+    await save("payrecords", date, { ...clean(d), rows }); closeSheet(); toast("Saved.");
+  });
+}
+async function delPayRec(docId, i) {
+  const d = S.payrecords.find(x => x.id === docId); if (!d) return;
+  const rows = (d.rows || []).filter((_, k) => k !== i);
+  if (rows.length) await save("payrecords", docId, { ...clean(d), rows }); else await remove("payrecords", docId);
+  closeSheet(); toast("Record deleted.");
+}
+
+const QUARTER = ym => { const m = Number(ym.slice(5)); return `${ym.slice(0, 4)} Q${Math.ceil(m / 3)}`; };
+function viewBir() {
+  const months = [...new Set([...S.bir.map(d => d.id), mToday().slice(0, 7)])].sort().reverse();
+  if (!S.birMonth || !months.includes(S.birMonth)) S.birMonth = months[0];
+  const doc = S.bir.find(d => d.id === S.birMonth) || { rows: [] };
+  const rows = [...(doc.rows || [])].map((r, i) => ({ ...r, i })).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const tot = rows.reduce((a, r) => a + (Number(r.amount) || 0), 0);
+  const byMop = new Map(); for (const r of rows) byMop.set(r.mop || "Other", (byMop.get(r.mop || "Other") || 0) + (Number(r.amount) || 0));
+  const qs = new Map(); for (const d of S.bir) { const q = QUARTER(d.id); qs.set(q, (qs.get(q) || 0) + (d.rows || []).reduce((a, r) => a + (Number(r.amount) || 0), 0)); }
+  const can = !S.readOnly;
+  return `<div class="toolbar"><select id="bir-month" aria-label="Month">${months.map(m => `<option value="${m}" ${m === S.birMonth ? "selected" : ""}>${monthLabel(m)}</option>`).join("")}</select>
+      ${can ? `<button class="btn" type="button" data-act="bir-fill">Add this month's paid orders from Sales</button>` : ""}</div>
+    <div class="kpis">
+      <div class="kpi"><span class="label">Total sales · ${monthLabel(S.birMonth)}</span><span class="value">${peso2(tot)}</span><span class="sub">${rows.length} lines${doc.sheetTotal ? ` · your sheet said ${peso(doc.sheetTotal)}` : ""}</span></div>
+      <div class="kpi"><span class="label">${QUARTER(S.birMonth)} so far</span><span class="value">${peso(qs.get(QUARTER(S.birMonth)) || 0)}</span></div>
+      <div class="kpi"><span class="label">By payment</span><span class="value" style="font-size:14px;line-height:1.5">${[...byMop.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${esc(k)} ${peso(v)}`).join("<br>") || "–"}</span></div>
+      <div class="kpi"><span class="label">BIR tax paid (all)</span><span class="value">${peso(S.birtax.reduce((a, t) => a + (Number(t.amount) || 0), 0))}</span><span class="sub">${S.birtax.length} payment${S.birtax.length === 1 ? "" : "s"}</span></div>
+    </div>
+    ${doc.sheetTotal && Math.abs(doc.sheetTotal - tot) > 1 ? `<div class="notice">The lines add up to ${peso2(tot)}, but your sheet's TOTAL SALES said ${peso(doc.sheetTotal)} (a ${peso2(Math.abs(doc.sheetTotal - tot))} difference). Check for a missing line or a typo before filing.</div>` : ""}
+    <div class="table-wrap"><table class="otable"><thead><tr><th>Date</th><th>Order ID</th><th>Customer</th><th>Description</th><th class="r">Qty</th><th>MOP</th><th class="r">Amount</th></tr></thead>
+      <tbody>${rows.map(r => `<tr ${can ? `data-act="edit-bir" data-id="${doc.id}" data-i="${r.i}"` : 'style="cursor:default"'}><td class="nowrap">${r.date ? fmtDate(r.date) : ""}</td><td class="nowrap num">#${esc(r.orderNum || "")}</td><td>${esc(r.customer || "")}</td><td>${esc(r.item || "")}</td><td class="r num">${esc(r.qty || "")}</td><td>${esc(r.mop || "")}</td><td class="r num nowrap">${peso2(r.amount)}</td></tr>`).join("")}</tbody>
+      <tfoot><tr><td colspan="6" style="font-weight:800">TOTAL SALES</td><td class="r num" style="font-weight:800">${peso2(tot)}</td></tr></tfoot></table>
+      ${rows.length ? "" : `<div class="empty" style="padding:16px">No sales recorded for ${monthLabel(S.birMonth)} yet.</div>`}</div>
+    <section class="panel"><div class="head"><h2>Quarterly sales &amp; BIR tax payments</h2>${can ? `<button class="btn sm" type="button" data-act="new-birtax">Add tax payment</button>` : ""}</div>
+      <div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th>Quarter</th><th class="r">Sales</th><th class="r">Tax paid</th><th>Paid on</th><th>Notes</th></tr></thead>
+      <tbody>${[...new Set([...qs.keys(), ...S.birtax.map(t => t.quarter)])].filter(Boolean).sort().reverse().map(q => { const ts = S.birtax.filter(t => t.quarter === q); return `<tr ${ts[0] && can ? `data-act="edit-birtax" data-id="${ts[0].id}"` : 'style="cursor:default"'}><td style="font-weight:600">${esc(q)}</td><td class="r num">${peso(qs.get(q) || 0)}</td><td class="r num">${ts.length ? peso(ts.reduce((a, t) => a + (Number(t.amount) || 0), 0)) : `<span class="chip warn">Not recorded</span>`}</td><td>${ts.map(t => t.paidOn ? fmtLong(t.paidOn) : "").join(", ")}</td><td>${esc(ts.map(t => t.notes).filter(Boolean).join("; "))}</td></tr>`; }).join("")}</tbody></table></div>
+    </section>`;
+}
+function openBirForm(docId, i) {
+  const editing = Number.isInteger(i);
+  const doc = S.bir.find(d => d.id === docId) || { rows: [] };
+  const r = editing ? doc.rows[i] : { date: mToday().slice(0, 7) === docId ? mToday() : (docId || mToday().slice(0, 7)) + "-01", qty: "1" };
+  openSheet(`<h3>${editing ? "Edit sale" : "Add sale"}</h3>
+    <div class="row"><div class="field"><label for="bi-date">Date</label><input id="bi-date" type="date" value="${esc(r.date || "")}" ${editing ? "disabled" : ""}></div>
+      <div class="field"><label for="bi-num">Order ID</label><input id="bi-num" value="${esc(r.orderNum || "")}" placeholder="RS9941"></div></div>
+    <div class="field"><label for="bi-cust">Customer</label><input id="bi-cust" value="${esc(r.customer || "")}"></div>
+    <div class="field"><label for="bi-item">Description</label><input id="bi-item" value="${esc(r.item || "")}"></div>
+    <div class="row"><div class="field"><label for="bi-qty">Qty</label><input id="bi-qty" value="${esc(r.qty || "")}"></div>
+      <div class="field"><label for="bi-mop">MOP</label><input id="bi-mop" list="bi-mops" value="${esc(r.mop || "")}"><datalist id="bi-mops"><option value="BPI"><option value="BDO"><option value="Gcash"><option value="Maya"><option value="Cash"></datalist></div>
+      <div class="field"><label for="bi-amt">Amount (₱)</label><input id="bi-amt" type="number" step="0.01" value="${esc(r.amount ?? "")}"></div></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${editing ? `<div><button class="btn danger sm" type="button" data-act="del-bir" data-id="${docId}" data-i="${i}">Delete line</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    const date = editing ? r.date : val("bi-date"); if (!date) return sheetError("Pick the date.");
+    const row = { date, orderNum: val("bi-num").replace(/^#/, "").replace(/\s+/g, ""), customer: val("bi-cust"), item: val("bi-item"), qty: val("bi-qty"), mop: val("bi-mop"), amount: numv("bi-amt") };
+    const mid = date.slice(0, 7), d = S.bir.find(x => x.id === mid) || { month: mid, rows: [] };
+    const rows = [...(d.rows || [])]; if (editing) rows[i] = row; else rows.push(row);
+    await save("bir", mid, { ...clean(d), rows }); S.birMonth = mid; closeSheet(); toast("Saved.");
+  });
+}
+async function delBirRow(docId, i) {
+  const d = S.bir.find(x => x.id === docId); if (!d) return;
+  await save("bir", docId, { ...clean(d), rows: (d.rows || []).filter((_, k) => k !== i) }); closeSheet(); toast("Line deleted.");
+}
+async function birFillFromOrders() {
+  const mid = S.birMonth, d = S.bir.find(x => x.id === mid) || { month: mid, rows: [] };
+  const have = new Set((d.rows || []).map(r => String(r.orderNum).toUpperCase()));
+  const add = S.orders.filter(o => o.payment === "paid" && (o.date || mDate(o.createdAt)).slice(0, 7) === mid && !have.has(String(o.num).toUpperCase().replace(/\s+/g, "")))
+    .map(o => ({ date: o.date || mDate(o.createdAt), orderNum: String(o.num).replace(/\s+/g, ""), customer: o.customer || "", item: (o.items || []).map(i => i.name).join(" / "), qty: String(itemCount(o)), mop: plat(o.platform), amount: total(o) }));
+  if (!add.length) { toast(`No new paid orders in ${monthLabel(mid)}.`); return; }
+  await save("bir", mid, { ...clean(d), rows: [...(d.rows || []), ...add] }); toast(`Added ${add.length} paid order${add.length === 1 ? "" : "s"}.`);
+}
+function openBirTaxForm(id) {
+  const t = id ? S.birtax.find(x => x.id === id) : { quarter: QUARTER(mToday().slice(0, 7)) };
+  openSheet(`<h3>${id ? "Edit BIR tax payment" : "Add BIR tax payment"}</h3>
+    <div class="row"><div class="field"><label for="bt-q">Quarter</label><input id="bt-q" value="${esc(t.quarter || "")}" placeholder="2026 Q2"></div>
+      <div class="field"><label for="bt-amt">Amount paid (₱)</label><input id="bt-amt" type="number" step="0.01" value="${esc(t.amount ?? "")}"></div></div>
+    <div class="row"><div class="field"><label for="bt-date">Paid on</label><input id="bt-date" type="date" value="${esc(t.paidOn || "")}"></div>
+      <div class="field"><label for="bt-form">Form / reference</label><input id="bt-form" value="${esc(t.ref || "")}" placeholder="e.g. 2551Q"></div></div>
+    <div class="field"><label for="bt-notes">Notes</label><input id="bt-notes" value="${esc(t.notes || "")}"></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-birtax" data-id="${id}">Delete</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("bt-q")) return sheetError("Enter the quarter, e.g. 2026 Q2.");
+    await save("birtax", id || uid("bt"), { quarter: val("bt-q"), amount: numv("bt-amt"), paidOn: val("bt-date"), ref: val("bt-form"), notes: val("bt-notes"), updatedAt: Date.now() }); closeSheet(); toast("Saved.");
+  });
+}
+
+/* ---------- logins vault ---------- */
+const b64 = u => btoa(String.fromCharCode(...new Uint8Array(u)));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function vaultDerive(pass, salt, iter) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt: unb64(salt), iterations: iter, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function vEnc(key, text) { const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(text)); return { iv: b64(iv), ct: b64(ct) }; }
+async function vDec(key, box) { const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(box.iv) }, key, unb64(box.ct)); return new TextDecoder().decode(pt); }
+const VCHECK = "rs-vault-ok";
+async function vaultSubmit() {
+  const pass = val("v-pass");
+  const err = m => { const e = $("#v-err"); if (e) { e.textContent = m; e.hidden = false; } };
+  if (!S.vault) {
+    if (pass.length < 8) return err("Use at least 8 characters.");
+    if (pass !== val("v-pass2")) return err("The two passphrases don't match.");
+    const salt = b64(crypto.getRandomValues(new Uint8Array(16))), iter = 210000;
+    const key = await vaultDerive(pass, salt, iter);
+    const v = { salt, iter, check: await vEnc(key, VCHECK), setAt: Date.now() };
+    if (S.db) await S.db.doc("config/vault").set(v); S.vault = v; S.vaultKey = key; render(); toast("Logins vault created."); return;
+  }
+  try { const key = await vaultDerive(pass, S.vault.salt, S.vault.iter); if ((await vDec(key, S.vault.check)) !== VCHECK) throw 0; S.vaultKey = key; S.pwShown = {}; render(); }
+  catch (e) { err("That passphrase isn't right."); const el = $("#v-pass"); if (el) { el.value = ""; el.focus(); } }
+}
+async function vaultChange() {
+  const np = val("vc-new");
+  if (np.length < 8) return toast("Use at least 8 characters.");
+  if (np !== val("vc-new2")) return toast("The two passphrases don't match.");
+  const salt = b64(crypto.getRandomValues(new Uint8Array(16))), iter = 210000, nk = await vaultDerive(np, salt, iter);
+  const upd = [];
+  for (const l of S.logins) if (l.pw) upd.push([l.id, { pw: await vEnc(nk, await vDec(S.vaultKey, l.pw)) }]);
+  for (const [id, d] of upd) await patch("logins", id, d);
+  const v = { salt, iter, check: await vEnc(nk, VCHECK), setAt: Date.now() };
+  if (S.db) await S.db.doc("config/vault").set(v); S.vault = v; S.vaultKey = nk; S.pwShown = {};
+  render(); toast("Passphrase changed. Share the new one with your Admin team.");
+}
+async function loginPwAction(id, act) {
+  const l = S.logins.find(x => x.id === id); if (!l || !l.pw || !S.vaultKey) return;
+  if (act === "hide") { delete S.pwShown[id]; render(); return; }
+  const pw = await vDec(S.vaultKey, l.pw);
+  if (act === "show") { S.pwShown[id] = pw; render(); return; }
+  try { await navigator.clipboard.writeText(pw); toast(`${l.account} password copied.`); } catch (e) { S.pwShown[id] = pw; render(); toast("Couldn't copy here. The password is shown instead."); }
+}
+function viewLogins() {
+  if (!S.vault) return S.canEdit ? `<form class="panel lock-card" id="vault-form" style="max-width:440px">${svg("lock", "lock-big")}
+      <h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">Create the Logins vault</h2>
+      <div style="font-size:13px;color:var(--muted)">Passwords are scrambled with this passphrase before they're saved. Without it nobody can read them, so write it down somewhere safe.</div>
+      <div class="field" style="width:100%"><label for="v-pass">Vault passphrase</label><input id="v-pass" type="password" autocomplete="new-password"></div>
+      <div class="field" style="width:100%"><label for="v-pass2">Type it again</label><input id="v-pass2" type="password" autocomplete="new-password"></div>
+      <div id="v-err" class="confirm" hidden></div><button class="btn primary" type="submit">Create vault</button></form>`
+    : `<div class="panel"><div class="empty">The owner hasn't set up the Logins vault yet.</div></div>`;
+  if (!S.vaultKey) return `<form class="panel lock-card" id="vault-form">${svg("lock", "lock-big")}
+      <h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">Logins are locked</h2>
+      <div class="field" style="width:100%"><label for="v-pass">Vault passphrase</label><input id="v-pass" type="password" autocomplete="current-password"></div>
+      <div id="v-err" class="confirm" hidden></div><button class="btn primary" type="submit">Unlock logins</button>
+      <div style="font-size:12px;color:var(--muted)">Locks again when you close or reload the page.</div></form>`;
+  const q = S.lq.trim().toLowerCase();
+  const list = S.logins.filter(l => !q || [l.account, l.accountName, l.username, l.phone, l.notes].join(" ").toLowerCase().includes(q))
+    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.account || "").localeCompare(b.account || ""));
+  const can = !S.readOnly;
+  const pwCell = l => !l.pw ? `<span style="color:var(--muted)">${esc(l.pwHint || "")}</span>` : `<span class="nowrap" style="display:inline-flex;gap:6px;align-items:center"><code class="pw">${S.pwShown[l.id] != null ? esc(S.pwShown[l.id]) : "••••••••"}</code>
+    <button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="${S.pwShown[l.id] != null ? "hide" : "show"}">${S.pwShown[l.id] != null ? "Hide" : "Show"}</button><button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="copy">Copy</button></span>`;
+  const section = (title, rows) => `<tr class="grp"><td colspan="6">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>
+      <td style="font-weight:600">${esc(l.account)}</td><td>${esc(l.accountName || "")}</td><td style="user-select:all">${esc(l.username || "")}</td>
+      <td>${pwCell(l)}</td><td class="nowrap num">${esc(l.phone || "")}</td><td style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${esc(l.notes || "")}</td></tr>`).join("");
+  return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins"></div>
+    <div class="table-wrap"><table class="otable logins"><thead><tr><th>Account</th><th>Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th>Notes</th></tr></thead>
+    <tbody>${section("Active accounts", list.filter(l => l.status !== "inactive"))}${section("Inactive accounts", list.filter(l => l.status === "inactive"))}</tbody></table></div>
+    ${S.canEdit ? `<details class="panel"><summary style="cursor:pointer;font-weight:600">Change vault passphrase</summary>
+      <form id="vault-change" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;max-width:360px">
+        <div class="field"><label for="vc-new">New passphrase</label><input id="vc-new" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="vc-new2">Type it again</label><input id="vc-new2" type="password" autocomplete="new-password"></div>
+        <div><button class="btn primary" type="submit">Change passphrase</button></div></form></details>` : ""}
+    <div class="notice" style="background:var(--surface-2);color:var(--muted);font-weight:500">Passwords are encrypted in your browser before saving. Account names, usernames and notes are not, so anyone who can open this app could see those. Turn on 2-step verification for Gmail, GCash, Maya, Shopify and Shopee.</div>`;
+}
+function openLoginForm(id) {
+  const l = id ? S.logins.find(x => x.id === id) : { status: "active" };
+  if (!l || !S.vaultKey) return;
+  openSheet(`<h3>${id ? "Edit login" : "Add login"}</h3>
+    <div class="row"><div class="field"><label for="l-acc">Account</label><input id="l-acc" value="${esc(l.account || "")}" placeholder="e.g. Shopee"></div>
+      <div class="field"><label for="l-name">Account name</label><input id="l-name" value="${esc(l.accountName || "")}"></div></div>
+    <div class="field"><label for="l-user">Username / email</label><input id="l-user" value="${esc(l.username || "")}" autocomplete="off"></div>
+    <div class="field"><label for="l-pw">Password</label><input id="l-pw" type="text" autocomplete="off" spellcheck="false" placeholder="${id && l.pw ? "Leave blank to keep the current password" : ""}"></div>
+    ${id && l.pw ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="l-clear"> Remove the saved password</label>` : ""}
+    <div class="row"><div class="field"><label for="l-phone">Phone number</label><input id="l-phone" value="${esc(l.phone || "")}"></div>
+      <div class="field"><label for="l-status">Status</label><select id="l-status"><option value="active" ${l.status !== "inactive" ? "selected" : ""}>Active</option><option value="inactive" ${l.status === "inactive" ? "selected" : ""}>Inactive</option></select></div></div>
+    <div class="field"><label for="l-url">Website / link</label><input id="l-url" value="${esc(l.url || "")}"></div>
+    <div class="field"><label for="l-notes">Notes</label><textarea id="l-notes" rows="2">${esc(l.notes || "")}</textarea></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-login" data-id="${id}">Delete login</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("l-acc")) return sheetError("Enter the account, e.g. Shopee.");
+    const data = { ...(id ? clean(l) : {}), account: val("l-acc"), accountName: val("l-name"), username: val("l-user"), phone: val("l-phone"), status: val("l-status"), url: val("l-url"), notes: val("l-notes"), updatedAt: Date.now() };
+    const pw = document.getElementById("l-pw").value;
+    if (pw) data.pw = await vEnc(S.vaultKey, pw); else if ($("#l-clear") && $("#l-clear").checked) data.pw = null;
+    if (!id) data.order = S.logins.length + 1;
+    await save("logins", id || uid("l"), data); delete S.pwShown[id];
+    closeSheet(); toast(id ? "Login updated." : "Login added.");
+  });
+}
+
 const DEFAULT_POSITIONS = [["Founders", 1400], ["Admin", 700], ["Marketing", 700], ["Finance", 550], ["Senior Sales", 650], ["Sales Associate", 600], ["Sales Associate (trainee)", 500], ["Packer", 550]];
 const DEPT_POSITION = { CEO: "Founders", ADMIN: "Admin", MARKETING: "Marketing", FINANCE: "Finance", SALES: "Sales Associate", PACKING: "Packer" };
 const payCfg = () => ({ positions: DEFAULT_POSITIONS.map(([name, rate]) => ({ name, rate })), deductLate: false, paidLeave: false, paidHoliday: false, ...(S.paySettings || {}) });
@@ -2206,7 +2759,10 @@ async function exportCol(col) {
   if (col === "products") rows = [["Name", "SKU", "Category", "Price", "Cost", "Stock", "Reorder at", "Batch", "Best before"], ...S.products.map(p => [p.name, p.sku, p.category, p.price, p.cost, p.stock, p.reorder, p.batch, p.expiry])];
   if (col === "expenses") rows = [["Date", "Category", "Note", "Amount"], ...S.expenses.map(e => [e.date, e.category, e.note, e.amount])];
   if (col === "customers") rows = [["Name", "Email", "Phone", "Address", "Channels", "Orders", "Amount spent", "Last order", "Tags", "Note"], ...customerList().map(c => [c.name, c.email, c.phone, c.address, [...c.platforms].join("; "), c.orders, c.spent, c.last ? new Date(c.last).toLocaleDateString("en-CA") : "", (c.tags || []).join(", "), c.note])];
-  try { await S.dl.save({ data: csv(rows), filename: col === "payroll" ? `regal-spritz-payroll-${payPeriod().key}.csv` : col === "attendance" ? `regal-spritz-attendance-${S.att.month}.csv` : `regal-spritz-${col}-${today()}.csv` }); toast("Export ready."); }
+  if (col === "checks") rows = [["Check date", "Check no.", "Bank / account", "Payee", "Amount", "Purpose", "Status", "Issued", "Notes"], ...S.checks.map(c => [c.checkDate, c.checkNo, c.bank, c.payee, c.amount, c.purpose, CHECK_STATUS[c.status || "pending"].name, c.issued, c.notes])];
+  if (col === "payrecords") rows = [["Pay date", "ID", "Name", "Position", "Daily rate", "Net pay", "Note"], ...payRecRows().map(r => [r.payDate, r.idNumber, r.name, r.position, r.rate, r.net, r.note])];
+  if (col === "bir") { const d = S.bir.find(x => x.id === S.birMonth) || { rows: [] }; rows = [["Date", "Order ID", "Customer", "Description", "Qty", "MOP", "Amount"], ...(d.rows || []).map(r => [r.date, "#" + r.orderNum, r.customer, r.item, r.qty, r.mop, r.amount])]; }
+  try { await S.dl.save({ data: csv(rows), filename: col === "bir" ? `regal-spritz-bir-sales-${S.birMonth}.csv` : col === "payroll" ? `regal-spritz-payroll-${payPeriod().key}.csv` : col === "attendance" ? `regal-spritz-attendance-${S.att.month}.csv` : `regal-spritz-${col}-${today()}.csv` }); toast("Export ready."); }
   catch (e) { if (e && e.code !== "declined") toast("Couldn't export. Try again in a moment."); }
 }
 
@@ -2255,6 +2811,12 @@ document.addEventListener("click", guard(async ev => {
   if (pm) { const [y, m] = S.pay.month.split("-").map(Number); S.pay.month = dstr(new Date(y, m - 1 + Number(pm.dataset.pmonth), 1).getTime()).slice(0, 7); render(); return; }
   const ip = ev.target.closest("[data-invpay]");
   if (ip) { await setInvPaid(ip.dataset.invpay, ip.dataset.ym, ip.dataset.paid === "1"); if (ip.dataset.insheet) openInvForm(ip.dataset.invpay); else toast(ip.dataset.paid === "1" ? "Marked paid." : "Marked unpaid."); return; }
+  const prp = ev.target.closest("[data-prp]");
+  if (prp) { S.prPerson = prp.dataset.prp; render(); return; }
+  const sc = ev.target.closest("[data-scent]");
+  if (sc) return openScentForm(sc.dataset.scent);
+  const pwb = ev.target.closest("[data-pw]");
+  if (pwb) return loginPwAction(pwb.dataset.pw, pwb.dataset.do);
   const th = ev.target.closest("[data-theme-set]");
   if (th) return setTheme(th.dataset.themeSet);
   const ck = ev.target.closest("[data-clock]");
@@ -2297,6 +2859,32 @@ document.addEventListener("click", guard(async ev => {
     case "lock-all": S.unlocked.clear(); saveUnlocked(); render(); toast("All departments locked on this device."); return;
     case "edit-home": closeSheet(); S.view = "dept"; S.dept = "ADMIN"; S.tab = "homecontent"; saveNav(); render(); return;
     case "new-member": return openMemberForm();
+    case "new-login": return openLoginForm();
+    case "m-photo-clear": $("#m-photo").value = ""; $("#m-photo-prev").innerHTML = "<span>?</span>"; b.remove(); return;
+    case "scent-web": { const q = val("sc-name"); window.open("https://www.google.com/search?tbm=isch&q=" + encodeURIComponent((q || "perfume") + " perfume bottle"), "_blank", "noopener"); return; }
+    case "new-fixed": return openFixedForm();
+    case "edit-fixed": return openFixedForm(id);
+    case "del-fixed": await remove("fixedexp", id); closeSheet(); toast("Deleted."); return;
+    case "new-due": return openDueForm();
+    case "edit-due": return openDueForm(id);
+    case "del-due": await remove("dues", id); closeSheet(); toast("Deleted."); return;
+    case "due-paid": return toggleDuePaid(id, b.dataset.ym);
+    case "new-check": return openCheckForm(null, b.dataset.date);
+    case "edit-check": return openCheckForm(id);
+    case "del-check": await remove("checks", id); closeSheet(); toast("Check deleted."); return;
+    case "new-pr": return openPayRecForm();
+    case "edit-pr": return openPayRecForm(id, Number(b.dataset.i));
+    case "del-pr": return delPayRec(id, Number(b.dataset.i));
+    case "new-bir": return openBirForm(S.birMonth);
+    case "edit-bir": return openBirForm(id, Number(b.dataset.i));
+    case "del-bir": return delBirRow(id, Number(b.dataset.i));
+    case "bir-fill": return birFillFromOrders();
+    case "new-birtax": return openBirTaxForm();
+    case "edit-birtax": return openBirTaxForm(id);
+    case "del-birtax": await remove("birtax", id); closeSheet(); toast("Deleted."); return;
+    case "edit-login": return openLoginForm(id);
+    case "del-login": await remove("logins", id); closeSheet(); toast("Login deleted."); return;
+    case "vault-lock": S.vaultKey = null; S.pwShown = {}; render(); toast("Logins locked."); return;
     case "payslip": return openPayslip(b.dataset.mid);
     case "ps-copy": return copyPayslip(b.dataset.mid);
     case "ps-dl": return downloadPayslip(b.dataset.mid);
@@ -2324,7 +2912,7 @@ document.addEventListener("click", guard(async ev => {
     case "clear-ex": $("#clear-slot").innerHTML = `<span class="confirm">Delete all example rows? <button class="btn sm danger" type="button" data-act="clear-ex-yes">Yes, clear</button><button class="btn sm" type="button" data-act="clear-ex-no">Keep</button></span>`; return;
     case "clear-ex-no": render(); return;
     case "clear-ex-yes": return clearExamples();
-    case "ask-del-order": case "ask-del-product": case "ask-del-expense": case "ask-del-task": case "ask-del-member": case "ask-del-att": case "ask-del-inv": {
+    case "ask-del-order": case "ask-del-product": case "ask-del-expense": case "ask-del-task": case "ask-del-member": case "ask-del-login": case "ask-del-fixed": case "ask-del-due": case "ask-del-check": case "ask-del-birtax": case "ask-del-att": case "ask-del-inv": {
       const kind = b.dataset.act.slice(8);
       const extra = kind === "order" ? " Stock is not changed; set payment to Voided first if you want items back in stock." : "";
       $("#del-slot").innerHTML = `<div class="confirm">Delete this ${({ att: "attendance record", member: "team member", inv: "record and its payment history" })[kind] || kind}? This can't be undone.${extra} <button class="btn sm danger" type="button" data-act="del-${kind}" data-id="${id}">Delete</button><button class="btn sm" type="button" data-act="close">Keep</button></div>`;
@@ -2341,6 +2929,12 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
+  if (t.id === "sc-file" && t.files[0]) return setScentDraft(t.files[0]);
+  if (t.id === "my-photo" && t.files[0]) return myPhoto(t.files[0]);
+  if (t.id === "m-photo-file" && t.files[0]) { try { const d = await resizeImage(t.files[0], 256, true); $("#m-photo").value = d; $("#m-photo-prev").innerHTML = `<img src="${d}" alt="">`; } catch (e) { sheetError(e.message); } return; }
+  if (t.id === "bir-month") { S.birMonth = t.value; render(); return; }
+  if (t.id === "pr-person") { S.prPerson = t.value; render(); return; }
+  if (t.id === "imp-open") { S.impOpenOnly = t.checked; if (lastImportFile) return readImportFile(lastImportFile); return; }
   if (t.id === "a-date") { if (t.value) S.att.date = t.value; render(); return; }
   if (t.id === "tstatus") { S.tstatus = t.value; render(); return; }
   if (t.id === "a-dept") { S.att.dept = t.value; render(); return; }
@@ -2358,7 +2952,7 @@ document.addEventListener("input", ev => {
   const t = ev.target;
   if (t.matches(".it-q, .it-price")) return updateOrderTotal();
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
-  const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq" }[t.id];
+  const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq" }[t.id];
   if (!key) return;
   if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; }
   const pos = t.selectionStart; render();
@@ -2373,6 +2967,8 @@ $("#sheet").addEventListener("submit", guard(async ev => {
 }));
 document.addEventListener("submit", guard(async ev => {
   if (ev.target.id === "unlock-form") { ev.preventDefault(); return tryUnlock(); }
+  if (ev.target.id === "vault-form") { ev.preventDefault(); return vaultSubmit(); }
+  if (ev.target.id === "vault-change") { ev.preventDefault(); return vaultChange(); }
   if (ev.target.id === "pay-cfg") { ev.preventDefault(); return savePayCfg(); }
   if (ev.target.id === "att-cfg") {
     ev.preventDefault();
@@ -2387,6 +2983,11 @@ document.addEventListener("submit", guard(async ev => {
     toast("Home page saved."); render();
   }
 }));
+document.addEventListener("paste", ev => {
+  if (!$("#sc-prev")) return;
+  const it = [...(ev.clipboardData && ev.clipboardData.items || [])].find(i => i.type.startsWith("image/"));
+  if (it) { ev.preventDefault(); setScentDraft(it.getAsFile()); }
+});
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
 
 /* ---------- boot ---------- */
@@ -2412,9 +3013,10 @@ render();
     db.doc("config/home").onSnapshot(s => { S.home = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/payroll").onSnapshot(s => { S.paySettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/attendance").onSnapshot(s => { S.attSettings = s.exists ? s.data() : {}; keep(); }, () => {});
+    db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll"]) {
+    for (const col of ["products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax"]) {
       db.collection(col).onSnapshot(snap => {
         S[col] = snap.docs.map(d => { const r = { id: d.id, ...d.data() }; return col === "orders" ? norm(r) : r; });
         S.loaded[col] = true;

@@ -27,3 +27,28 @@ Department passwords hide pages from staff who don't need them. They are not str
 
 ## Branding
 The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
+
+## Department access
+- **Who sees what:**
+  - CEO staff see every department.
+  - Admin staff see everything except Finance.
+  - Everyone else sees only their own department.
+  - The department comes from the person's Directory entry, linked in My account.
+- **Passwords:** the CEO password unlocks every department, and the Admin password unlocks everything except Finance.
+
+## Photos and favorite scents
+- Admin can upload a photo in the Directory, and each person can upload their own in My account. Photos are cropped to a square and shrunk before saving.
+- The scent picker searches every perfume that appears in your BIR sales records and orders.
+- "Find picture online" opens an image search in a new tab. Upload the bottle picture or paste it with Ctrl+V. If someone already has a picture for the same scent, it's reused.
+
+## Finance
+- **Fixed expenses:** the monthly fixed costs list, editable, with a total, a per-day figure and the sales needed per day.
+- **Due dates:**
+  - Monthly investor payouts and credit card payments, each with a Mark paid button per month.
+  - Due dates also appear on the Tasks calendar, but only for people with Finance unlocked.
+  - Only the last 4 digits of account and card numbers are stored.
+- **Checks:** check number, date, payee, amount, bank and status (pending, cleared, bounced or cancelled). Pending checks show on the calendar.
+- **Payroll records:** past payroll from the PAYROLL 2026 sheet, plus every payslip marked Paid in Payroll.
+- **BIR records:**
+  - Daily sales per month, with totals by payment method and by quarter, and BIR tax payments.
+  - "Add this month's paid orders from Sales" copies orders from the Sales tab into the month.
