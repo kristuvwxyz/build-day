@@ -128,3 +128,9 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - **My account:** My salary (rate, current period estimate, pay history, payslip download; amounts blurred until "Show amounts") and Work style (Standard / Pomodoro timer).
 - **Attendance:** ☕ Break / End break. Break time is not counted in hours; the allowed break per day is set in Attendance settings (default 60 min).
 - **Logins:** "Import from spreadsheet" pastes a logins table; passwords are encrypted in the browser with the vault passphrase.
+
+## Reviews live on the website, task access, awards budget (Oct 2026)
+- **Website reviews:** the 479 Judge.me reviews from the website are imported into Reviews automatically (from `website-reviews.json`). Every add, edit, hide or delete is pushed to Shopify metaobjects (type `rs_review_chunk`, 50 reviews per entry). The website reads them live through the Shopify Storefront API, using a public token from the Headless channel. One-time setup is in Reviews → Website setup.
+- **Tasks:** new tasks default to you and your department. There is no start date, only a due date. CEO sees every task, Admin sees all except CEO's, and every other department sees only its own (plus tasks assigned to them).
+- **Department access:** CEO sees all, Admin sees all except CEO, and everyone else sees only their own.
+- **Awards:** ₱1,000 a month in total: ₱700 for the Employee of the Month, plus a ₱300 perfect attendance draw. If no one qualifies for the draw, the ₱300 goes to a year-end pot. There is no runner-up.

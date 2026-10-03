@@ -704,15 +704,15 @@ try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.u
 const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account", "eom"].includes(hv)) S.view = hv;
 const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
 const saveUnlocked = () => { try { sessionStorage.setItem("rs-unlocked", JSON.stringify([...S.unlocked])); } catch (e) {} };
-const isUnlocked = d => S.isOwner || S.unlocked.has(d) || S.unlocked.has("CEO") || (S.unlocked.has("ADMIN") && d !== "FINANCE");
-// Who sees which department: CEO all, ADMIN all except Finance, everyone else only their own.
+const isUnlocked = d => S.isOwner || S.unlocked.has(d) || S.unlocked.has("CEO") || (S.unlocked.has("ADMIN") && d !== "CEO");
+// Who sees which department: CEO all, ADMIN all except CEO, everyone else only their own.
 function allowedDepts() {
   const all = DEPTS.map(d => d.id);
   if (S.isOwner) return all;
   const m = S.team.find(x => x.id === (S.profile || {}).memberId);
   if (!m || !m.department) return [];
   if (m.department === "CEO") return all;
-  if (m.department === "ADMIN") return all.filter(x => x !== "FINANCE");
+  if (m.department === "ADMIN") return all.filter(x => x !== "CEO");
   return [m.department];
 }
 const canSee = d => allowedDepts().includes(d);
@@ -869,7 +869,8 @@ function viewReviews() {
   const list = rvFiltered();
   const active = R.stars || R.status || R.source || S.rvq;
   const sel = (id, label, opts, cur) => `<select id="${id}" aria-label="${label}">${opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
-  return `<section class="panel"><div class="rv-sum">
+  if (S.loaded.reviews && S.canEdit && !S.readOnly && !S.rvImporting && !rvCfg().imported && !S.reviews.some(r => r.jmId) && S.rvCfgLoaded) setTimeout(importWebsiteReviews, 50);
+  return `${rvSyncLine()}<section class="panel"><div class="rv-sum">
       <div class="rv-avg"><b class="num">${all.length ? avg.toFixed(1) : "–"}</b>${starsHTML(avg)}<span style="font-size:12px;color:var(--muted)">${all.length} review${all.length === 1 ? "" : "s"} · ${all.filter(r => r.status === "hidden").length} hidden</span></div>
       <div class="rv-dist">${dist.map(([n, c]) => `<button type="button" data-rvstars="${n}" aria-pressed="${String(R.stars) === String(n)}"><span>${n} ★</span><i><s style="width:${c / max * 100}%"></s></i><span class="num">${c}</span></button>`).join("")}</div>
     </div></section>
@@ -887,7 +888,7 @@ function viewReviews() {
         <td><span class="chip ${r.status === "hidden" ? "" : "good"}">${r.status === "hidden" ? "Hidden" : "Shown"}</span></td>
         ${can ? `<td class="r nowrap"><button class="btn sm ghost" type="button" data-act="rv-toggle" data-id="${r.id}">${r.status === "hidden" ? "Show" : "Hide"}</button></td>` : ""}</tr>`).join("")}</tbody></table>
       ${list.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No reviews match these filters." : "No reviews yet. Add one, or import them from a spreadsheet."}</div>`}</div>
-    <div style="font-size:12px;color:var(--muted)">Hidden reviews stay here for your records but are marked not to be posted. Click a review to edit or delete it.</div>`;
+    <div style="font-size:12px;color:var(--muted)">Hidden reviews stay here for your records but are taken off the website. Click a review to edit or delete it; changes go to the website automatically.</div>`;
 }
 function openReviewForm(id) {
   const r = id ? S.reviews.find(x => x.id === id) : { rating: 5, status: "shown", date: mToday(), source: "Website" };
@@ -907,8 +908,10 @@ function openReviewForm(id) {
   async () => {
     if (!val("rv-text") && !val("rv-cust")) return sheetError("Enter the review or the customer's name.");
     const data = { ...(id ? clean(r) : {}), customer: val("rv-cust"), rating: Number(val("rv-rating")) || 5, product: val("rv-prod"), text: val("rv-text"), reply: val("rv-reply"), date: val("rv-date"), source: val("rv-src"), status: val("rv-st"), updatedAt: Date.now(), updatedBy: actor() };
-    if (!id) data.createdAt = Date.now();
-    await save("reviews", id || uid("rv"), data); closeSheet(); toast(id ? "Review updated." : "Review added.");
+    if (!id) { data.createdAt = Date.now(); data.ord = rvNextOrd(); }
+    if (!data.handle || (id && r.product !== data.product)) data.handle = rvHandleFor(data.product);
+    data.chunk = data.chunk || rvNewChunk();
+    await save("reviews", id || uid("rv"), data); closeSheet(); toast(id ? "Review updated." : "Review added."); rvQueue([data.chunk]);
   });
 }
 function reviewRows(text) {
@@ -934,13 +937,147 @@ function openReviewImport() {
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Import</button></div>`,
   async () => {
     const rows = reviewRows($("#rvi-paste").value); if (!rows.length) return sheetError("Nothing to import. Paste rows with a header like Customer, Product, Rating, Review.");
-    let n = 0; for (const r of rows) { await save("reviews", uid("rv"), { ...r, createdAt: Date.now(), updatedAt: Date.now(), updatedBy: actor() }); n++; }
-    closeSheet(); toast(`Imported ${n} review${n === 1 ? "" : "s"}.`);
+    let n = 0, ch = rvNewChunk(), inCh = S.reviews.filter(x => x.chunk === ch).length, ord = rvNextOrd(); const touched = new Set();
+    for (const r of rows) {
+      if (inCh >= RV_PER) { ch = "c" + String(Number(ch.slice(1)) + 1).padStart(2, "0"); inCh = 0; }
+      await save("reviews", uid("rv"), { ...r, handle: rvHandleFor(r.product), chunk: ch, ord: ord++, createdAt: Date.now(), updatedAt: Date.now(), updatedBy: actor() }); n++; inCh++; touched.add(ch);
+    }
+    closeSheet(); toast(`Imported ${n} review${n === 1 ? "" : "s"}.`); rvQueue([...touched]);
   });
 }
 function reviewImportPreview() {
   const rows = reviewRows($("#rvi-paste").value), el = $("#rvi-prev"); if (!el) return;
   el.innerHTML = rows.length ? `<b>${rows.length}</b> review${rows.length === 1 ? "" : "s"} found. First: ${starsHTML(rows[0].rating)} ${esc(rows[0].customer || "Anonymous")}${rows[0].product ? " · " + esc(rows[0].product) : ""}` : "";
+}
+
+/* ---------- reviews → website (Shopify metaobjects the website reads live) ---------- */
+const RV_TYPE = "rs_review_chunk", RV_PER = 50, RV_SHOP = "tjs1uz-4a.myshopify.com";
+const rvCfg = () => S.rvCfg || {};
+const rvWebId = p => p.webId || slug([p.kind === "preorder" ? "preorder" : "", p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" "));
+function rvHandleFor(name) {
+  const k = String(name || "").toLowerCase().trim(); if (!k) return "";
+  const p = S.products.find(x => [x.brand, x.name].filter(Boolean).join(" ").toLowerCase() === k) || S.products.find(x => k.includes(String(x.name || "").toLowerCase()) && (!x.brand || k.includes(String(x.brand).toLowerCase())));
+  return p ? rvWebId(p) : slug(k);
+}
+const rvSite = r => [r.jmId || r.id, r.handle || rvHandleFor(r.product), r.product || "", Math.round(Number(r.rating)) || 5, r.date || "", r.customer || "Anonymous", r.title || "", r.text || "", Array.isArray(r.pics) ? r.pics : []];
+const rvOrder = (a, b) => (b.date || "").localeCompare(a.date || "") || (a.ord ?? 1e9) - (b.ord ?? 1e9);
+function rvNewChunk() {
+  const n = {}; S.reviews.forEach(r => { if (r.chunk) n[r.chunk] = (n[r.chunk] || 0) + 1; });
+  const ks = Object.keys(n).sort(), last = ks[ks.length - 1];
+  if (last && n[last] < RV_PER) return last;
+  return "c" + String(ks.length ? Number(last.slice(1)) + 1 : 0).padStart(2, "0");
+}
+const rvNextOrd = () => S.reviews.reduce((a, r) => Math.max(a, Number(r.ord) || 0), 0) + 1;
+const RV_UPSERT = `mutation RSRev($h: MetaobjectHandleInput!, $m: MetaobjectUpsertInput!) { metaobjectUpsert(handle: $h, metaobject: $m) { metaobject { id handle } userErrors { field message code } } }`;
+S.rvDirty = new Set(); let rvTimer = 0;
+function rvQueue(chunks) { (chunks || []).filter(Boolean).forEach(c => S.rvDirty.add(c)); clearTimeout(rvTimer); rvTimer = setTimeout(rvFlush, 1500); }
+async function rvFlush() {
+  if (!S.rvDirty.size) return;
+  if (!S.mcp) { S.rvSync = { err: "Open the app in claude.ai with Shopify connected to update the website." }; render(); return; }
+  const list = [...S.rvDirty]; S.rvDirty.clear(); S.rvSync = { busy: true, n: list.length }; render();
+  try {
+    for (const c of list) {
+      const items = S.reviews.filter(r => r.chunk === c && r.status !== "hidden").sort(rvOrder).map(rvSite);
+      await shopMut(RV_UPSERT, { h: { type: RV_TYPE, handle: "rs-reviews-" + c }, m: { fields: [{ key: "data", value: JSON.stringify(items) }] } });
+    }
+    S.rvSync = { at: Date.now() };
+    if (S.db && S.canEdit) S.db.doc("config/reviews").set({ ...rvCfg(), lastSync: Date.now() }).catch(() => {});
+  } catch (e) {
+    list.forEach(c => S.rvDirty.add(c));
+    const m = e && e.code === "needs_reauth" ? "Shopify needs you to sign in again (claude.ai → Settings → Connectors)." : e && e.code === "not_in_manifest" ? "Allow Shopify for this page in its Permissions menu." : (e && e.message) || "couldn't reach Shopify.";
+    S.rvSync = { err: m };
+  }
+  render();
+}
+const rvAllChunks = () => [...new Set(S.reviews.map(r => r.chunk).filter(Boolean))];
+async function importWebsiteReviews() {
+  if (S.rvImporting) return; S.rvImporting = { done: 0, total: 0 }; render();
+  try {
+    const r = await fetch("website-reviews.json"); if (!r.ok) throw new Error("file " + r.status);
+    const d = await r.json(), L = d.list || [], have = new Set(S.reviews.map(x => x.id));
+    const alias = {}; Object.entries(d.by || {}).forEach(([k, ix]) => ix.forEach(i => { if (L[i]) alias[L[i][1]] = k; }));
+    S.rvImporting.total = L.length; const now = Date.now();
+    for (let i = 0; i < L.length; i++) {
+      const x = L[i], id = "jm" + String(i).padStart(3, "0");
+      if (!have.has(id)) await save("reviews", id, { jmId: x[0], handle: x[1], product: x[2], rating: x[3], date: x[4], customer: x[5], title: x[6], text: x[7], pics: x[8] || [], source: "Website", status: "shown", chunk: "c" + String(Math.floor(i / RV_PER)).padStart(2, "0"), ord: i, createdAt: now, updatedAt: now, updatedBy: "Imported from website" });
+      S.rvImporting.done = i + 1; if (i % 25 === 0) render();
+    }
+    const cfg = { ...rvCfg(), imported: Date.now(), alias };
+    if (S.db) await S.db.doc("config/reviews").set(cfg); else S.rvCfg = cfg;
+    S.rvImporting = null; toast(`Imported ${L.length} reviews from the website.`);
+    setTimeout(() => rvQueue(rvAllChunks()), 1200);
+  } catch (e) { S.rvImporting = null; toast("Couldn't import the website reviews: " + ((e && e.message) || e)); }
+  render();
+}
+function rvSyncLine() {
+  const st = S.rvSync || {}, cfg = rvCfg();
+  const live = cfg.token ? "Website reads changes live" : "Website not connected yet";
+  const s = S.rvImporting ? `Importing website reviews… ${S.rvImporting.done}/${S.rvImporting.total || "…"}`
+    : st.busy ? "Updating the website…" : st.err ? `Website not updated: ${esc(st.err)}` : st.at || cfg.lastSync ? `Website updated ${relTime(st.at || cfg.lastSync)}` : "";
+  return `<div class="toolbar" style="font-size:12.5px;color:var(--muted)"><span class="chip ${st.err ? "bad" : cfg.token ? "good" : "warn"}">${live}</span><span>${s}</span><span style="flex:1"></span>
+    ${!S.readOnly ? `${st.err ? `<button class="btn sm" type="button" data-act="rv-sync">Try again</button>` : ""}<button class="btn sm" type="button" data-act="rv-sync-all">Push all to website</button><button class="btn sm" type="button" data-act="rv-web">Website setup</button>` : ""}</div>`;
+}
+function rvWebsiteCode() {
+  const cfg = rvCfg(), alias = cfg.alias || {};
+  const list = S.reviews.filter(r => r.status !== "hidden").sort(rvOrder).map(rvSite);
+  const by = {}; list.forEach((r, i) => { const k = alias[r[1]] || r[1]; (by[k] = by[k] || []).push(i); });
+  const avg = list.length ? Math.round(list.reduce((a, r) => a + r[3], 0) / list.length * 100) / 100 : 5;
+  const js = s => JSON.stringify(s).replace(/</g, "\\u003c");
+  return `<script>window.RS_REVIEWS=${js({ total: list.length, avg, list, by })};<\/script>
+<script>
+/* Regal Spritz PH: reviews read live from Shopify (edited in Business OS → Reviews). */
+(function () {
+  var T = ${js(cfg.token || "")}, U = "https://${RV_SHOP}/api/2025-07/graphql.json", K = "rs-rv-live", A = ${js(alias)};
+  function apply(L) {
+    var R = window.RS_REVIEWS; if (!R || !L || !L.length) return;
+    R.list.length = 0; L.forEach(function (x) { R.list.push(x); });
+    var by = {}; R.list.forEach(function (r, i) { var k = A[r[1]] || r[1]; (by[k] = by[k] || []).push(i); }); R.by = by;
+    R.total = R.list.length; R.avg = Math.round(R.list.reduce(function (s, r) { return s + r[3]; }, 0) / R.total * 100) / 100;
+  }
+  try { apply(JSON.parse(localStorage.getItem(K) || "null")); } catch (e) {}
+  if (!T) return;
+  fetch(U, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Storefront-Access-Token": T },
+    body: JSON.stringify({ query: '{ metaobjects(type: "${RV_TYPE}", first: 100) { nodes { handle field(key: "data") { value } } } }' }) })
+    .then(function (r) { return r.json(); }).then(function (d) {
+      var n = (((d || {}).data || {}).metaobjects || {}).nodes; if (!n || !n.length) return;
+      n.sort(function (a, b) { return a.handle < b.handle ? -1 : 1; });
+      var L = []; n.forEach(function (x) { try { L = L.concat(JSON.parse((x.field || {}).value || "[]")); } catch (e) {} });
+      L.sort(function (a, b) { return a[4] < b[4] ? 1 : a[4] > b[4] ? -1 : 0; });
+      var before = JSON.stringify(window.RS_REVIEWS.list); apply(L);
+      try { localStorage.setItem(K, JSON.stringify(L)); } catch (e) {}
+      if (JSON.stringify(window.RS_REVIEWS.list) !== before) window.dispatchEvent(new HashChangeEvent("hashchange"));
+    }).catch(function () {});
+})();
+<\/script>`;
+}
+function openRvWebsite() {
+  const cfg = rvCfg();
+  openSheet(`<h3>Connect reviews to the website</h3>
+    <div style="font-size:13px;display:flex;flex-direction:column;gap:6px">
+      <div><b>1. Get a public key from Shopify (one time, about 2 minutes).</b> Shopify doesn't let apps make this key, so you make it yourself:</div>
+      <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;color:var(--muted)">
+        <li>Shopify admin → <b>Sales channels</b> → <b>+</b> → add <b>Headless</b>.</li>
+        <li>Headless → <b>Create storefront</b> → open it.</li>
+        <li>Under <b>Storefront API permissions</b> click <b>Edit</b>, tick <b>metaobjects</b> (read), save.</li>
+        <li>Copy the <b>Public access token</b> and paste it below. This key is made to be public: it can only read what you allow.</li>
+      </ol>
+      <div class="field"><label for="rvw-token">Public access token</label><input id="rvw-token" value="${esc(cfg.token || "")}" autocomplete="off" spellcheck="false" placeholder="e.g. 3f9c…"></div>
+      <div><b>2. Paste the website code (one time).</b> In WebCake, find the block that starts with <code>&lt;script&gt;window.RS_REVIEWS=</code> and replace that whole &lt;script&gt;…&lt;/script&gt; block with the code below. Publish.</div>
+      <textarea id="rvw-code" rows="5" readonly style="font-family:ui-monospace,monospace;font-size:11px">${esc(rvWebsiteCode().slice(0, 3000))}…</textarea>
+      <div style="color:var(--muted)">After this, every edit, hide or delete here shows on the website within seconds, with no more pasting.</div>
+    </div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button><button class="btn" type="button" data-act="rv-copy">Copy website code</button><button class="btn primary" type="submit">Save key</button></div>`,
+  async () => {
+    const cfg2 = { ...rvCfg(), token: val("rvw-token") };
+    if (S.db) await S.db.doc("config/reviews").set(cfg2); else S.rvCfg = cfg2;
+    openRvWebsite(); toast(cfg2.token ? "Key saved. Now copy the website code and paste it in WebCake." : "Key removed.");
+  });
+}
+async function rvCopyCode() {
+  const t = rvWebsiteCode();
+  try { await navigator.clipboard.writeText(t); toast("Website code copied. Paste it in WebCake, then publish."); }
+  catch (e) { if (S.dl) { try { await S.dl.save({ filename: "website-reviews-code.html", data: t }); toast("Downloaded website-reviews-code.html. Open it in Notepad and copy everything."); return; } catch (e2) {} } toast("Couldn't copy here. Try again in the claude.ai app."); }
 }
 
 /* ---------- logins import (encrypted in this browser) ---------- */
@@ -1103,10 +1240,12 @@ const EOM_CRIT = [
   { k: "votes", name: "Team votes", how: "Everyone gets one vote a month for a teammate (not themselves), with a short reason." },
 ];
 const EOM_DEFAULT = {
-  weights: { att: 30, tasks: 25, ceo: 25, votes: 20 }, bonus: 1000, runnerBonus: 500,
-  rewards: "Winner: ₱1,000 cash bonus on the next payslip, 1 paid day off (use within 60 days), a certificate and a feature on Home\nRunner-up: ₱500 cash bonus on the next payslip\nPerfect attendance (no late, no absent all month): a 10 ml decant of their choice\nEmployee of the Year (most wins in the year, ties go to the higher total score): ₱5,000 and a full bottle of their choice",
+  weights: { att: 30, tasks: 25, ceo: 25, votes: 20 }, bonus: 700, perfectBonus: 300,
+  rewards: "Employee of the Month: ₱700 cash bonus on the next payslip, plus free perks: a certificate, a feature on Home, and first pick of a 5 ml decant from our tester bottles\nPerfect attendance draw: ₱300 to one teammate picked at random from everyone with no late days and no absences that month (the Employee of the Month is left out, so someone else gets a chance)\nNo one with perfect attendance? The ₱300 goes into the year-end pot, given in December to whoever won the most months\nTotal budget: ₱1,000 a month, never more",
 };
 const eomCfg = () => { const x = S.eomSettings || {}; return { ...EOM_DEFAULT, ...x, weights: { ...EOM_DEFAULT.weights, ...(x.weights || {}) } }; };
+const EOM_BUDGET = 1000;
+const eomPot = yr => S.eom.filter(e => e.id.startsWith(yr) && e.potAdd).reduce((a, e) => a + (Number(e.potAdd) || 0), 0);
 const eomMonth = () => S.eomMonth || mToday().slice(0, 7);
 const prevYM = ym => { const [y, m] = ym.split("-").map(Number); return dstr(new Date(y, m - 2, 1, 12).getTime()).slice(0, 7); };
 const eomRec = ym => S.eom.find(e => e.id === ym) || {};
@@ -1145,14 +1284,20 @@ function viewEom() {
   const ym = eomMonth(), rec = eomRec(ym), cfg = eomCfg(), rows = eomScores(ym), ceo = isCEO() && !S.readOnly;
   const me = myMemberId(), myVote = S.eomvotes.find(v => v.id === ym + "_" + me);
   const cur = ym === mToday().slice(0, 7), future = ym > mToday().slice(0, 7);
-  const W = member(rec.winner), RU = member(rec.runnerUp);
+  const W = member(rec.winner), PA = member(rec.perfectWinner);
+  const perfects = rows.filter(r => r.perfect && r.m.id !== rec.winner);
+  const closed = ym < mToday().slice(0, 7);
   const pick = [...rows.filter(r => r.elig), ...rows.filter(r => !r.elig)];
   const optName = r => `${esc(r.m.nickname || r.m.name)} · ${r.score}${r.elig ? "" : " (not eligible: " + esc(r.why.toLowerCase()) + ")"}`;
   const bonusBtn = (m, amt, kind) => ceo && m && amt && !(rec.bonus || {})[kind] ? `<button class="btn sm" type="button" data-act="eom-bonus" data-mid="${m.id}" data-amt="${amt}" data-kind="${kind}">Add ${peso(amt)} to ${esc(m.nickname || m.name)}'s payslip</button>` : (rec.bonus || {})[kind] ? `<span class="chip good">${peso(amt)} added to payslip</span>` : "";
   const wins = {}; S.eom.filter(e => e.winner && e.id.startsWith(ym.slice(0, 4))).forEach(e => wins[e.winner] = (wins[e.winner] || 0) + 1);
   return `<div class="toolbar"><div class="pager"><button class="btn sm" type="button" data-eommonth="-1" aria-label="Previous month">‹</button><strong style="min-width:150px;text-align:center">${monthLabel(ym)}</strong><button class="btn sm" type="button" data-eommonth="1" aria-label="Next month">›</button>${cur ? "" : `<button class="btn ghost sm" type="button" data-eommonth="0">This month</button>`}</div></div>
-    ${W ? `<div class="eom-card">${avatar(W, 72, false)}<div><div class="eyebrow">Employee of the Month · ${monthLabel(ym)}</div><div class="nm">${esc(W.nickname || W.name)}</div><div class="sub">${esc(rec.citation || "")}${RU ? ` · Runner-up: <b>${esc(RU.nickname || RU.name)}</b>` : ""}</div>
-      <div class="actions" style="margin-top:8px">${bonusBtn(W, cfg.bonus, "winner")} ${bonusBtn(RU, cfg.runnerBonus, "runner")}${ceo ? ` <button class="btn sm ghost" type="button" data-act="eom-unannounce">Undo announcement</button>` : ""}</div></div><span class="eom-medal" aria-hidden="true">🏆</span></div>` : ""}
+    ${W ? `<div class="eom-card">${avatar(W, 72, false)}<div><div class="eyebrow">Employee of the Month · ${monthLabel(ym)}</div><div class="nm">${esc(W.nickname || W.name)}</div><div class="sub">${esc(rec.citation || "")}</div>
+      <div class="actions" style="margin-top:8px">${bonusBtn(W, cfg.bonus, "winner")}${ceo ? ` <button class="btn sm ghost" type="button" data-act="eom-unannounce">Undo announcement</button>` : ""}</div></div><span class="eom-medal" aria-hidden="true">🏆</span></div>` : ""}
+    ${W && closed ? `<section class="panel"><div class="head"><h2>Perfect attendance draw · ${peso(cfg.perfectBonus)}</h2>${PA ? `<span class="chip good">Winner: ${esc(PA.nickname || PA.name)}</span>` : rec.potAdd ? `<span class="chip">Added to year-end pot</span>` : ""}</div>
+      <div style="font-size:13px;color:var(--muted)">${perfects.length ? `In the draw: ${perfects.map(r => esc(r.m.nickname || r.m.name)).join(", ")}.` : "Nobody besides the Employee of the Month had perfect attendance this month."}</div>
+      ${ceo && !PA && !rec.potAdd ? `<div><button class="btn primary sm" type="button" data-act="eom-draw">${perfects.length ? "Draw a winner" : `Add ${peso(cfg.perfectBonus)} to the year-end pot`}</button></div>` : ""}
+      ${PA ? `<div class="actions">${bonusBtn(PA, cfg.perfectBonus, "perfect")}</div>` : ""}</section>` : ""}
     <section class="panel"><div class="head"><h2>Leaderboard</h2><span style="font-size:12px;color:var(--muted)">${cur ? "Live, updates as the month goes" : future ? "Not started" : rec.winner ? "Final" : "Waiting for the CEO to announce"}</span></div>
       <div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th class="r">#</th><th>Team member</th>${EOM_CRIT.map(c => `<th>${c.name.split(" (")[0]} <small style="color:var(--muted)">${cfg.weights[c.k]}</small></th>`).join("")}<th class="r">Score</th><th>Eligible</th></tr></thead>
       <tbody>${rows.map((r, i) => `<tr style="cursor:default"><td class="r num">${i + 1}</td><td><div style="display:flex;gap:8px;align-items:center">${avatar(r.m, 30, false)}<div><b>${esc(r.m.nickname || r.m.name)}</b>${wins[r.m.id] ? ` <span class="chip">🏆×${wins[r.m.id]}</span>` : ""}${r.perfect ? ' <span class="chip good" title="Perfect attendance">Perfect attendance</span>' : ""}<div class="s">${esc((dept(r.m.department) || {}).name || "")}</div></div></div></td>
@@ -1166,8 +1311,7 @@ function viewEom() {
         <div class="field" style="flex:2"><label for="eom-why">Why? (one line)</label><input id="eom-why" value="${esc(myVote ? myVote.reason || "" : "")}" placeholder="e.g. Covered packing on a busy day"></div></div>
       <div><button class="btn primary sm" type="button" data-act="eom-vote">${myVote ? "Change my vote" : "Vote"}</button>${myVote ? ` <span style="font-size:13px;color:var(--muted)">You voted for <b>${esc(memberName(myVote.nominee))}</b>. Only the CEO sees who voted for whom.</span>` : ""}</div></section>` : ""}
     ${ceo && !future && !rec.winner ? `<section class="panel"><h2>Announce the winner</h2>
-      <div class="row"><div class="field"><label for="eom-w">Employee of the Month</label><select id="eom-w">${pick.map((r, i) => `<option value="${r.m.id}" ${i === 0 ? "selected" : ""}>${optName(r)}</option>`).join("")}</select></div>
-        <div class="field"><label for="eom-r">Runner-up</label><select id="eom-r"><option value="">None</option>${pick.map((r, i) => `<option value="${r.m.id}" ${i === 1 ? "selected" : ""}>${optName(r)}</option>`).join("")}</select></div></div>
+      <div class="field"><label for="eom-w">Employee of the Month</label><select id="eom-w">${pick.map((r, i) => `<option value="${r.m.id}" ${i === 0 ? "selected" : ""}>${optName(r)}</option>`).join("")}</select></div>
       <div class="field"><label for="eom-cite">Short citation (shown on Home)</label><input id="eom-cite" placeholder="e.g. Zero late days and 40 orders packed same-day"></div>
       <div><button class="btn primary" type="button" data-act="eom-announce">Announce</button> <span style="font-size:12px;color:var(--muted)">Best done on the 1st–3rd of next month, after the month closes.</span></div>
       ${S.eomvotes.filter(v => v.month === ym).length ? `<details><summary style="cursor:pointer;font-size:13px;font-weight:600">See vote reasons (${S.eomvotes.filter(v => v.month === ym).length})</summary><div class="list">${S.eomvotes.filter(v => v.month === ym).map(v => `<div class="li"><span><b>${esc(memberName(v.voter))}</b> → ${esc(memberName(v.nominee))}</span><span style="color:var(--muted)">${esc(v.reason || "")}</span></div>`).join("")}</div></details>` : ""}
@@ -1175,16 +1319,17 @@ function viewEom() {
     <details class="panel" ${S.eom.some(e => e.winner) ? "" : "open"}><summary style="font-weight:700;cursor:pointer">How it works: criteria and rewards</summary>
       <div class="crit" style="margin-top:12px">${EOM_CRIT.map(c => `<div><b class="num">${cfg.weights[c.k]}</b><strong>${c.name}</strong><span style="color:var(--muted)">${c.how}</span></div>`).join("")}</div>
       <h2 style="margin-top:14px">Rules</h2>
-      <ul style="margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px"><li>Everyone except the founders can win.</li><li>Not eligible: more than 2 absences in the month (approved leave is fine), or winning the month before, so others get a turn.</li><li>The app suggests the top eligible score; the CEO makes the final call and announces it.</li><li>Ties go to the person with more team votes.</li></ul>
+      <ul style="margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px"><li>Everyone except the founders can win.</li><li>Not eligible: more than 2 absences in the month (approved leave is fine), or winning the month before, so others get a turn.</li><li>The app suggests the top eligible score; the CEO makes the final call and announces it.</li><li>Ties go to the person with more team votes.</li><li>Cash prizes never go over ${peso(EOM_BUDGET)} a month.</li></ul>
       <h2 style="margin-top:14px">Rewards</h2>
       <ul style="margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px">${cfg.rewards.split("\n").filter(Boolean).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
       ${ceo && S.canEdit ? `<form id="eom-cfg" style="display:flex;flex-direction:column;gap:10px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
         <div class="row">${EOM_CRIT.map(c => `<div class="field"><label for="ew-${c.k}">${c.name.split(" (")[0]} (points)</label><input id="ew-${c.k}" type="number" min="0" max="100" value="${cfg.weights[c.k]}"></div>`).join("")}</div>
-        <div class="row"><div class="field"><label for="ew-bonus">Winner cash bonus (₱)</label><input id="ew-bonus" type="number" min="0" step="100" value="${cfg.bonus}"></div><div class="field"><label for="ew-rbonus">Runner-up cash bonus (₱)</label><input id="ew-rbonus" type="number" min="0" step="100" value="${cfg.runnerBonus}"></div></div>
+        <div class="row"><div class="field"><label for="ew-bonus">Winner cash bonus (₱)</label><input id="ew-bonus" type="number" min="0" step="100" value="${cfg.bonus}"></div><div class="field"><label for="ew-pbonus">Perfect attendance draw (₱)</label><input id="ew-pbonus" type="number" min="0" step="50" value="${cfg.perfectBonus}"></div></div>
+        <div style="font-size:12px;color:var(--muted)">Monthly budget: ${peso(EOM_BUDGET)}. The two cash prizes together can't go over it.</div>
         <div class="field"><label for="ew-rewards">Rewards (one per line)</label><textarea id="ew-rewards" rows="5">${esc(cfg.rewards)}</textarea></div>
         <div><button class="btn primary sm" type="submit">Save criteria and rewards</button></div></form>` : ""}
     </details>
-    ${S.eom.some(e => e.winner) ? `<section class="panel"><h2>Hall of fame</h2><div class="list">${[...S.eom].filter(e => e.winner).sort((a, b) => b.id.localeCompare(a.id)).map(e => `<div class="li"><span><b>${monthLabel(e.id)}</b> · ${esc(memberName(e.winner))}${e.runnerUp ? ` <span style="color:var(--muted)">(runner-up ${esc(memberName(e.runnerUp))})</span>` : ""}</span><span style="color:var(--muted);font-size:12.5px">${esc(e.citation || "")}</span></div>`).join("")}</div></section>` : ""}`;
+    ${S.eom.some(e => e.winner) ? `<section class="panel"><div class="head"><h2>Hall of fame</h2>${eomPot(ym.slice(0, 4)) ? `<span class="chip">Year-end pot ${ym.slice(0, 4)}: ${peso(eomPot(ym.slice(0, 4)))}</span>` : ""}</div><div class="list">${[...S.eom].filter(e => e.winner).sort((a, b) => b.id.localeCompare(a.id)).map(e => `<div class="li"><span><b>${monthLabel(e.id)}</b> · ${esc(memberName(e.winner))}${e.perfectWinner ? ` <span style="color:var(--muted)">· perfect attendance draw: ${esc(memberName(e.perfectWinner))}</span>` : ""}</span><span style="color:var(--muted);font-size:12.5px">${esc(e.citation || "")}</span></div>`).join("")}</div></section>` : ""}`;
 }
 async function eomRate(mid, n) {
   const ym = eomMonth(), rec = eomRec(ym);
@@ -1198,23 +1343,31 @@ async function eomVote() {
   toast(`Vote saved for ${memberName(nom)}.`);
 }
 async function eomAnnounce() {
-  const ym = eomMonth(), rec = eomRec(ym), w = val("eom-w"), r = val("eom-r");
-  if (!w) return toast("Nobody is eligible yet.");
-  if (r === w) return toast("The runner-up must be a different person.");
-  await save("eom", ym, { ...clean(rec), month: ym, winner: w, runnerUp: r, citation: val("eom-cite"), announcedAt: Date.now(), announcedBy: actor() });
+  const ym = eomMonth(), rec = eomRec(ym), w = val("eom-w");
+  if (!w) return toast("Add your team first.");
+  await save("eom", ym, { ...clean(rec), month: ym, winner: w, citation: val("eom-cite"), announcedAt: Date.now(), announcedBy: actor() });
   toast(`🏆 ${memberName(w)} is Employee of the Month for ${monthLabel(ym)}!`);
 }
 async function eomUnannounce() {
   const ym = eomMonth(), rec = eomRec(ym);
-  await save("eom", ym, { ...clean(rec), winner: "", runnerUp: "", citation: "", announcedAt: 0 });
+  await save("eom", ym, { ...clean(rec), winner: "", perfectWinner: "", potAdd: 0, citation: "", announcedAt: 0 });
   toast("Announcement undone.");
+}
+async function eomDraw() {
+  const ym = eomMonth(), rec = eomRec(ym), cfg = eomCfg();
+  if (rec.perfectWinner || rec.potAdd) return;
+  const pool = eomScores(ym).filter(r => r.perfect && r.m.id !== rec.winner);
+  if (!pool.length) { await save("eom", ym, { ...clean(rec), potAdd: cfg.perfectBonus }); toast(`${peso(cfg.perfectBonus)} added to the year-end pot.`); return; }
+  const pickR = pool[crypto.getRandomValues(new Uint32Array(1))[0] % pool.length];
+  await save("eom", ym, { ...clean(rec), perfectWinner: pickR.m.id, drawPool: pool.map(r => r.m.id), drawAt: Date.now() });
+  toast(`🎉 ${memberName(pickR.m.id)} wins the perfect attendance draw!`);
 }
 async function eomBonus(mid, amt, kind) {
   const ym = eomMonth(), rec = eomRec(ym);
   const t = mToday(), key = `${t.slice(0, 7)}-${Number(t.slice(8)) <= 15 ? "A" : "B"}`, id = key + "_" + mid;
   const ps = S.payroll.find(x => x.id === id) || {};
   if (ps.status === "paid") return toast("That payslip is already paid. Add the bonus on the next one in Finance → Payroll.");
-  const note = `Employee of the Month ${kind === "winner" ? "" : "runner-up "}bonus (${monthLabel(ym)})`;
+  const note = `${kind === "winner" ? "Employee of the Month bonus" : "Perfect attendance draw"} (${monthLabel(ym)})`;
   await save("payroll", id, { ...clean(ps), period: key, memberId: mid, incentives: (Number(ps.incentives) || 0) + amt, notes: [ps.notes, note].filter(Boolean).join(" · "), status: ps.status || "draft", updatedAt: Date.now() });
   await save("eom", ym, { ...clean(rec), bonus: { ...(rec.bonus || {}), [kind]: { amt, payslip: id, at: Date.now() } } });
   toast(`${peso(amt)} added to ${memberName(mid)}'s current payslip as Incentives.`);
@@ -1222,7 +1375,8 @@ async function eomBonus(mid, amt, kind) {
 async function saveEomCfg() {
   const weights = Object.fromEntries(EOM_CRIT.map(c => [c.k, Math.max(0, Math.round(numv("ew-" + c.k)))]));
   if (!Object.values(weights).some(Boolean)) return toast("Give at least one criterion some points.");
-  const data = { weights, bonus: numv("ew-bonus"), runnerBonus: numv("ew-rbonus"), rewards: val("ew-rewards") || EOM_DEFAULT.rewards, updatedAt: Date.now() };
+  if (numv("ew-bonus") + numv("ew-pbonus") > EOM_BUDGET) return toast(`The two prizes add up to ${peso(numv("ew-bonus") + numv("ew-pbonus"))}. Keep them within ${peso(EOM_BUDGET)}.`);
+  const data = { weights, bonus: numv("ew-bonus"), perfectBonus: numv("ew-pbonus"), rewards: val("ew-rewards") || EOM_DEFAULT.rewards, updatedAt: Date.now() };
   if (S.db) await S.db.doc("config/eom").set(data); else S.eomSettings = data;
   toast("Criteria and rewards saved."); render();
 }
@@ -1459,8 +1613,20 @@ const inMonth = (t, ym) => t.due && ((t.start || t.due).slice(0, 7) <= ym && t.d
 const pbar = p => `<div class="pbar" role="img" aria-label="${Number(p) || 0}% done"><i style="width:${Math.max(0, Math.min(100, Number(p) || 0))}%"></i></div>`;
 const isOverdue = t => t.due && t.due < today() && (t.status === "todo" || t.status === "in_progress");
 
+// Tasks: CEO sees all, Admin all except CEO's, everyone else only their own department (plus tasks assigned to them).
+const taskDepts = () => allowedDepts();
+const fullTaskView = () => taskDepts().length === DEPTS.length;
+function taskVisible(t) {
+  if (fullTaskView()) return true;
+  if (t.assigneeId && t.assigneeId === myMemberId()) return true;
+  const ds = taskDepts(), am = member(t.assigneeId), td = t.department || (am && am.department) || "";
+  if (am && am.department && !ds.includes(am.department)) return false;
+  return td ? ds.includes(td) : ds.length > 1;
+}
+const visTasks = () => S.tasks.filter(taskVisible);
+const taskTeam = () => activeTeam().filter(m => fullTaskView() || taskDepts().includes(m.department) || m.id === myMemberId());
 function scopeTasks(forceDept) {
-  return S.tasks.filter(t => {
+  return visTasks().filter(t => {
     if (forceDept) return t.department === forceDept;
     if (S.t.scope === "person" && S.t.person) return t.assigneeId === S.t.person;
     if (S.t.scope === "dept" && S.t.dept) return t.department === S.t.dept;
@@ -1515,9 +1681,9 @@ function viewTasks(forceDept) {
   const undated = scoped.filter(t => !t.due && t.status !== "done" && t.status !== "cancelled");
   const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : "Whole team";
   const controls = `<div class="toolbar">
-    ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[["team", "Whole team"], ["person", "Per person"], ["dept", "Per department"]].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
-    ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${activeTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
-    ${S.t.scope === "dept" ? `<select id="t-dept" aria-label="Department"><option value="">All departments</option>${DEPTS.map(d => `<option value="${d.id}" ${S.t.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>` : ""}`}
+    ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[["team", fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name], ["person", "Per person"], ...(taskDepts().length > 1 ? [["dept", "Per department"]] : [])].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
+    ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${taskTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
+    ${S.t.scope === "dept" ? `<select id="t-dept" aria-label="Department"><option value="">${fullTaskView() ? "All departments" : "All my departments"}</option>${DEPTS.filter(d => taskDepts().includes(d.id)).map(d => `<option value="${d.id}" ${S.t.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>` : ""}`}
     <span style="flex:1"></span>
     <div class="seg" role="group" aria-label="Layout">${[["calendar", "Calendar"], ["list", "List"]].map(([k, l]) => `<button type="button" data-tmode="${k}" aria-pressed="${S.t.mode === k}">${l}</button>`).join("")}</div>
   </div>`;
@@ -1565,7 +1731,8 @@ function viewTasks(forceDept) {
 }
 
 function openTaskForm(id, date, forceDept) {
-  const t = id ? S.tasks.find(x => x.id === id) : { due: date || S.t.day, department: forceDept || (S.t.scope === "dept" ? S.t.dept : "") || (member(myMemberId()) || {}).department || "", assigneeId: S.t.scope === "person" ? S.t.person : "", status: "todo", progress: 0, priority: "normal" };
+  const meM = member(myMemberId()) || {};
+  const t = id ? S.tasks.find(x => x.id === id) : { due: date || S.t.day, department: forceDept || meM.department || (S.t.scope === "dept" ? S.t.dept : "") || "", assigneeId: myMemberId() || (S.t.scope === "person" ? S.t.person : ""), status: "todo", progress: 0, priority: "normal" };
   if (!t) return;
   const ro = S.readOnly;
   openSheet(`
@@ -1573,13 +1740,10 @@ function openTaskForm(id, date, forceDept) {
     <div class="field"><label for="k-title">Task</label><input id="k-title" value="${esc(t.title || "")}" placeholder="e.g. Pack Shopee orders for pickup" ${ro ? "disabled" : ""}></div>
     <div class="field"><label for="k-notes">Details</label><textarea id="k-notes" rows="3" ${ro ? "disabled" : ""}>${esc(t.notes || "")}</textarea></div>
     <div class="row">
-      <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option>${DEPTS.map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
-      <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.filter(m => m.status !== "inactive" || m.id === t.assigneeId).map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
+      <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option>${DEPTS.filter(d => taskDepts().includes(d.id) || d.id === t.department).map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
+      <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.filter(m => (m.status !== "inactive" && (fullTaskView() || taskDepts().includes(m.department) || m.id === myMemberId())) || m.id === t.assigneeId).map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
     </div>
-    <div class="row">
-      <div class="field"><label for="k-start">Start date</label><input id="k-start" type="date" value="${esc(t.start || "")}" ${ro ? "disabled" : ""}></div>
-      <div class="field"><label for="k-due">Due date</label><input id="k-due" type="date" value="${esc(t.due || "")}" ${ro ? "disabled" : ""}></div>
-    </div>
+    <div class="field"><label for="k-due">Due date</label><input id="k-due" type="date" value="${esc(t.due || "")}" ${ro ? "disabled" : ""}></div>
     <div class="row">
       <div class="field"><label for="k-status">Status</label><select id="k-status" ${ro ? "disabled" : ""}>${TASK_STATUS.map(s => `<option value="${s.id}" ${t.status === s.id ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>
       <div class="field"><label for="k-pri">Priority</label><select id="k-pri" ${ro ? "disabled" : ""}>${PRIORITIES.map(p => `<option value="${p.id}" ${t.priority === p.id ? "selected" : ""}>${p.name}</option>`).join("")}</select></div>
@@ -1591,8 +1755,7 @@ function openTaskForm(id, date, forceDept) {
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${ro ? "Close" : "Cancel"}</button>${ro ? "" : `<button class="btn primary" type="submit">Save task</button>`}</div>`,
   ro ? null : async () => {
     if (!val("k-title")) return sheetError("Give the task a name.");
-    const start = val("k-start"), due = val("k-due") || start;
-    if (start && due && start > due) return sheetError("The start date is after the due date.");
+    const start = "", due = val("k-due");
     const status = val("k-status");
     let progress = Math.round(numv("k-prog"));
     if (status === "done") progress = 100;
@@ -1635,7 +1798,7 @@ function viewHome() {
   const fn = firstName(), h = S.home || {}, mid = myMemberId();
   const [q, who] = quoteOfDay();
   const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === mid && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
-  const dueToday = S.tasks.filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
+  const dueToday = visTasks().filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
   const showOrders = canSee("SALES") || canSee("PACKING") || visDepts().length > 0;
   const toShip = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
   const st = mid && member(mid) ? attStatus(mToday(), mid) : "";
@@ -1751,7 +1914,7 @@ async function sha(text) {
 async function tryUnlock() {
   const d = S.dept, rec = S.security[d], pw = val("unlock-pw");
   if (!rec || !pw) return;
-  if ((await sha(rec.salt + ":" + pw)) === rec.hash) { S.unlocked.add(d); saveUnlocked(); render(); toast(d === "CEO" ? "CEO unlocked: every department is open." : d === "ADMIN" ? "Admin unlocked: every department except Finance is open." : `${dept(d).name} unlocked.`); }
+  if ((await sha(rec.salt + ":" + pw)) === rec.hash) { S.unlocked.add(d); saveUnlocked(); render(); toast(d === "CEO" ? "CEO unlocked: every department is open." : d === "ADMIN" ? "Admin unlocked: every department except CEO is open." : `${dept(d).name} unlocked.`); }
   else { const e = $("#unlock-err"); if (e) e.hidden = false; $("#unlock-pw").value = ""; $("#unlock-pw").focus(); }
 }
 function viewPasswords() {
@@ -1762,7 +1925,7 @@ function viewPasswords() {
       <td><span class="chip ${has ? "good" : "warn"}">${has ? "Password set" : "No password"}</span></td>
       <td><input id="pw-${d.id}" type="password" autocomplete="new-password" placeholder="New password" style="border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;width:100%;min-width:140px"></td>
       <td class="r nowrap"><button class="btn sm primary" type="button" data-setpw="${d.id}">${has ? "Change" : "Set"}</button>${has ? ` <button class="btn sm ghost danger" type="button" data-clearpw="${d.id}">Remove</button>` : ""}</td></tr>`; }).join("")}</tbody></table></div>
-    <div style="font-size:13px;color:var(--muted)">Who sees what: <strong>CEO</strong> sees every department, <strong>Admin</strong> sees all except Finance, everyone else sees only their own department (from Directory). The CEO password opens everything; the Admin password opens everything except Finance.</div>
+    <div style="font-size:13px;color:var(--muted)">Who sees what: <strong>CEO</strong> sees every department, <strong>Admin</strong> sees all except CEO, everyone else sees only their own department (from Directory). The CEO password opens everything; the Admin password opens everything except CEO.</div>
     <div class="notice" style="background:var(--surface-2);color:var(--muted);font-weight:500">These passwords keep each department's pages out of view for staff who don't need them. They aren't bank-level security: anyone you share this app with can technically reach its data. Share the app only with your team, and change a password when someone leaves.</div>
   </section>`;
 }
@@ -4354,13 +4517,18 @@ document.addEventListener("click", guard(async ev => {
     case "lock-dept": S.unlocked.delete(S.dept); saveUnlocked(); render(); toast(`${dept(S.dept).name} locked.`); return;
     case "new-review": return openReviewForm();
     case "edit-review": return openReviewForm(id);
-    case "rv-toggle": { const r = S.reviews.find(x => x.id === id); if (!r) return; await patch("reviews", id, { status: r.status === "hidden" ? "shown" : "hidden", updatedAt: Date.now() }); toast(r.status === "hidden" ? "Review shown." : "Review hidden."); return; }
-    case "del-review": await remove("reviews", id); closeSheet(); toast("Review deleted."); return;
+    case "rv-toggle": { const r = S.reviews.find(x => x.id === id); if (!r) return; const was = r.status; await patch("reviews", id, { status: was === "hidden" ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); toast(was === "hidden" ? "Review shown on the website." : "Review hidden from the website."); rvQueue([r.chunk]); return; }
+    case "del-review": { const r = S.reviews.find(x => x.id === id); await remove("reviews", id); closeSheet(); toast("Review deleted."); if (r) rvQueue([r.chunk]); return; }
+    case "rv-sync": return rvFlush();
+    case "rv-sync-all": rvQueue(rvAllChunks()); toast("Sending every review to the website…"); return;
+    case "rv-web": return openRvWebsite();
+    case "rv-copy": return rvCopyCode();
     case "rv-clear": S.rv = { stars: "", status: "", sort: S.rv.sort, source: "" }; S.rvq = ""; render(); return;
     case "rv-import": return openReviewImport();
     case "login-import": return openLoginImport();
     case "eom-vote": return eomVote();
     case "eom-announce": return eomAnnounce();
+    case "eom-draw": return eomDraw();
     case "eom-unannounce": return eomUnannounce();
     case "eom-bonus": return eomBonus(b.dataset.mid, Number(b.dataset.amt), b.dataset.kind);
     case "my-ps": { const t = mToday(); return downloadPayslip(myMemberId(), payPeriod(t.slice(0, 7), Number(t.slice(8)) <= 15 ? 1 : 2)); }
@@ -4492,6 +4660,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "rv-stars" || t.id === "rv-status" || t.id === "rv-sort" || t.id === "rv-source") { S.rv[t.id.slice(3)] = t.value; render(); return; }
   if (t.dataset.eomrate) return eomRate(t.dataset.eomrate, Number(t.value));
   if (t.matches(".ws-num")) return setWorkStyle({ [t.dataset.k]: Math.max(1, Math.round(Number(t.value) || 1)) });
+  if (t.id === "k-who" && t.value) { const m = member(t.value), d = $("#k-dept"); if (m && m.department && d && [...d.options].some(o => o.value === m.department)) d.value = m.department; return; }
   if (t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
   if (t.id === "ei-dtype") return eiTotal();
@@ -4743,6 +4912,7 @@ render();
     db.doc("config/payroll").onSnapshot(s => { S.paySettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/attendance").onSnapshot(s => { S.attSettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/eom").onSnapshot(s => { S.eomSettings = s.exists ? s.data() : {}; keep(); }, () => {});
+    db.doc("config/reviews").onSnapshot(s => { S.rvCfg = s.exists ? s.data() : {}; S.rvCfgLoaded = true; keep(); }, () => { S.rvCfgLoaded = true; });
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
