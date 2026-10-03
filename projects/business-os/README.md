@@ -173,3 +173,11 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 ## Batch 8: premium account and sidebar
 - Sidebar: Workspace / Departments sections, soft highlight with gold marker, lock icons only when locked, profile card at the bottom.
 - My account: profile header (photo, name, role, department, access), quick stats (open, due this week, overdue, today), tabs Overview / Pay / Preferences / Access & security.
+
+## Batch 9
+- Attendance tab only for CEO, Admin and Finance; everyone gets a Time in / Time out button at the top of Workspace.
+- Running work timer in the page header while timed in (pauses on break); tap it to start/end a break or time out.
+- Developer options only for the owner (CEO), hidden while previewing.
+- Logo opens Home; tagline is now "The Scent Atelier".
+- Department passwords removed (Admin → Passwords tab gone); access follows each person's department.
+- Home banner uses a fixed deep plum with light text in both light and dark mode.

@@ -23,6 +23,7 @@
   --font-display: "Marcellus", "Cormorant Garamond", Georgia, serif;
   --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 10px;
+  --hero-bg: #4A2545; --hero-bg2: #6B4A3E; --hero-ink: #FBF6F1; --hero-gold: #D9B98A;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --brand: #C9A3C2; --brand-ink: #1E141D; --gold: #D2B07A;
@@ -50,7 +51,7 @@ button { cursor: pointer; }
 
 .app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; }
 .rail { background: var(--surface); border-right: 1px solid var(--line); padding: 24px 14px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; }
-.mark { font-family: var(--font-display); font-size: 22px; color: var(--brand); padding-inline: 10px; line-height: 1.1; }
+.mark { border: 0; background: none; text-align: left; cursor: pointer; font-family: var(--font-display); font-size: 22px; color: var(--brand); padding-inline: 10px; line-height: 1.1; }
 .mark small { display: block; font-family: var(--font-body); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); margin-top: 4px; }
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav button { display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: none; padding: 9px 10px; border-radius: 8px; color: var(--muted); font-weight: 500; }
@@ -238,7 +239,7 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .tabs button { border: 0; background: none; padding: 8px 14px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .tabs button[aria-selected="true"] { color: var(--brand); border-bottom-color: var(--brand); }
 
-.carousel { position: relative; overflow: hidden; border-radius: 14px; background: var(--brand); color: var(--brand-ink); }
+.carousel { position: relative; overflow: hidden; border-radius: 14px; background: var(--hero-bg); color: var(--hero-ink); }
 .car-track { display: flex; transition: transform .5s ease; }
 @media (prefers-reduced-motion: reduce) { .car-track { transition: none; } }
 .slide { flex: 0 0 100%; min-width: 0; padding: 22px 28px 50px; display: flex; flex-direction: column; gap: 6px; min-height: 168px; }
@@ -259,7 +260,7 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .car-dots button[aria-current="true"] { width: 22px; background: var(--gold); }
 
 /* home hero */
-.hero { position: relative; border-radius: 16px; background: var(--brand); color: var(--brand-ink); padding: clamp(28px, 5vw, 52px) clamp(22px, 5vw, 56px); display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.hero { position: relative; border-radius: 16px; background: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--hero-gold) 30%, transparent), transparent 55%), linear-gradient(135deg, #3A1C36 0%, var(--hero-bg) 55%, var(--hero-bg2) 100%); color: var(--hero-ink); --gold: var(--hero-gold); padding: clamp(28px, 5vw, 52px) clamp(22px, 5vw, 56px); display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
 .hero::after { content: ""; position: absolute; inset: 10px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 10px; pointer-events: none; }
 .hero-top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
 .hero-greet { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 4vw, 40px); line-height: 1.1; margin: 0; color: inherit; text-transform: none; letter-spacing: 0; text-wrap: balance; }
@@ -537,8 +538,21 @@ body.no-orders .gs { display: none !important; }
 .oactions .chip { cursor: pointer; border: 0; font: inherit; font-size: 12px; }
 .item-link { text-align: left; font: inherit; font-weight: 600; color: inherit; }
 #viewas-bar { position: sticky; top: 0; z-index: 60; background: #7c3aed; color: #fff; font-size: 13px; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-#viewas-bar select { width: auto; padding: 4px 8px; font-size: 13px; font-weight: 600; }
+#viewas-bar select { width: auto; max-width: 100%; padding: 4px 8px; font-size: 13px; font-weight: 600; color: #1E141D; background: #fff; border: 0; border-radius: 8px; }
 #viewas-bar .btn { background: #fff; color: #4c1d95; border-color: #fff; }
+.nav .tclock { margin-bottom: 6px; border: 1px solid color-mix(in srgb, var(--gold) 55%, var(--line)); background: color-mix(in srgb, var(--gold) 9%, var(--surface)); color: var(--fg); font-weight: 650; }
+.nav .tclock.on { border-color: var(--good); background: color-mix(in srgb, var(--good) 10%, var(--surface)); }
+.nav .tclock.brk { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+.nav .tclock span { white-space: nowrap; }
+.nav .tclock .wt { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); font-weight: 600; }
+.wclock { margin-left: auto; margin-right: 8px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--good); color: var(--fg); background: color-mix(in srgb, var(--good) 10%, var(--surface)); border-radius: 999px; padding: 6px 12px; font-weight: 650; font-size: 13px; font-variant-numeric: tabular-nums; }
+.wclock i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: wpulse 1.6s ease-in-out infinite; }
+.wclock.brk { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); } .wclock.brk i { background: var(--warn); animation: none; }
+@keyframes wpulse { 50% { opacity: .35; } }
+.tc-big { font-family: var(--font-display); font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { .nav .tclock { display: none; } .wclock { margin-right: 0; } }
+@media (min-width: 721px) { .wclock.idle { display: none; } }
+.wclock.idle { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--surface)); }
 .oactions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .sheet-back { align-self: flex-start; margin-bottom: -4px; }
 .gs .gs-in { width: 100%; border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 9px 10px 9px 32px; font-size: 14px; }
@@ -583,7 +597,7 @@ main > .gs.mobile-only { margin-bottom: 12px; }
 
 <div class="app">
   <aside class="rail">
-    <div class="mark">Regal Spritz PH<small>Business OS</small></div>
+    <button type="button" class="mark" data-nav="home" aria-label="Go to Home">Regal Spritz PH<small>The Scent Atelier</small></button>
     <div class="gs desktop-only"><span class="gs-ico"></span><input class="gs-in" type="search" placeholder="Search orders…" aria-label="Search orders" autocomplete="off"><div class="gs-res" hidden></div></div>
     <nav class="nav" id="nav"></nav>
     <div class="rail-foot"><div id="theme-slot"></div><div id="sync">Connecting…</div></div>
@@ -591,6 +605,7 @@ main > .gs.mobile-only { margin-bottom: 12px; }
   <main>
     <div class="head">
       <h1 id="view-title">Home</h1>
+      <button type="button" id="wclock" class="wclock" data-act="tclock" hidden></button>
       <div class="actions" id="head-actions"></div>
     </div>
     <div class="gs mobile-only"><span class="gs-ico"></span><input class="gs-in" type="search" placeholder="Search orders by #, name, phone or tracking" aria-label="Search orders" autocomplete="off"><div class="gs-res" hidden></div></div>
@@ -717,7 +732,7 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "orders", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "disputes", "archived", "listings", "reviews", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "disputes", "archived", "listings", "reviews", "logins", "homecontent", "dtasks"], blurb: "Directory, logins, Home page" },
   { id: "FINANCE", name: "Finance", tabs: ["orders", "dues", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["orders", "suppliers", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
@@ -756,7 +771,8 @@ try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.u
 const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account", "eom"].includes(hv)) S.view = hv;
 const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
 const saveUnlocked = () => { try { sessionStorage.setItem("rs-unlocked", JSON.stringify([...S.unlocked])); } catch (e) {} };
-const isUnlocked = d => S.isOwner || S.unlocked.has(d) || S.unlocked.has("CEO") || (S.unlocked.has("ADMIN") && d !== "CEO");
+// Department passwords are retired: access now follows each person's department (allowedDepts).
+const isUnlocked = () => true;
 // Who sees which department: CEO all, ADMIN all except CEO, everyone else only their own.
 function allowedDepts() {
   const all = DEPTS.map(d => d.id);
@@ -1284,6 +1300,33 @@ setInterval(() => {
   renderPomo();
 }, 1000);
 
+/* ---------- time clock: nav button, running timer, quick sheet ---------- */
+const myAtt = () => { const mid = myMemberId(); return mid ? attRec(mToday(), mid) : null; };
+const hms = ms => { const t = Math.max(0, Math.floor(ms / 1e3)); return `${String(Math.floor(t / 3600)).padStart(2, "0")}:${String(Math.floor(t % 3600 / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+const workedMs = r => r && r.in ? Math.max(0, (r.out || Date.now()) - r.in - breakMs(r)) : 0;
+function timeNavItem() {
+  if (!myMemberId()) return "";
+  const r = myAtt(), on = r && r.in && !r.out, brk = on && onBreak(r);
+  const label = !r || !r.in ? "Time in" : r.out ? "Done today" : brk ? "On break" : "Time out";
+  return `<button type="button" class="tclock${on ? (brk ? " brk" : " on") : ""}" data-act="tclock">${svg("clock")}<span>${label}</span><span class="wt" data-wtime>${r && r.in ? hms(workedMs(r)) : ""}</span></button>`;
+}
+function tickWorkClock() {
+  const r = myAtt(), on = r && r.in && !r.out, brk = on && onBreak(r), el = document.getElementById("wclock");
+  if (el) { const idle = !!myMemberId() && (!r || !r.in); el.hidden = !on && !idle; el.classList.toggle("idle", idle); if (idle && el.dataset.h !== "idle") { el.innerHTML = "⏱ Time in"; el.dataset.h = "idle"; } if (on) { const h = `<i></i>${brk ? "On break · " : ""}${hms(workedMs(r))} worked`; if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } el.classList.toggle("brk", !!brk); el.title = brk ? "On break. Tap to end break or time out." : "Timed in at " + mTime(r.in) + ". Tap to take a break or time out."; } }
+  document.querySelectorAll("[data-wtime]").forEach(e => { const t = r && r.in ? hms(workedMs(r)) : ""; if (e.textContent !== t) e.textContent = t; });
+  const sb = document.getElementById("tc-live"); if (sb) sb.textContent = hms(workedMs(r));
+}
+setInterval(tickWorkClock, 1000);
+async function tclock() {
+  const mid = myMemberId(); if (!mid) return toast("Your account isn't linked to the team directory yet.");
+  const r = myAtt();
+  if (!r || !r.in) { await clock(mid, "in"); if (!S.db) render(); return; }
+  const brk = onBreak(r), done = !!r.out;
+  openSheet(`<h3>${done ? "You've timed out" : brk ? "On break" : "You're timed in"}</h3>
+    <div style="display:flex;flex-direction:column;gap:4px"><span class="tc-big" id="tc-live">${hms(workedMs(r))}</span><span class="acct-note">worked today · in at ${mTime(r.in)}${r.out ? " · out at " + mTime(r.out) : ""}${breakMs(r) ? ` · breaks ${fmtMin(breakMs(r))}` : ""}</span></div>
+    ${done ? `<div class="acct-note">See you tomorrow. Ask Admin if this needs a correction.</div>` : ""}
+    <div class="sheet-foot">${done ? `<button class="btn primary" type="button" data-act="close">Close</button>` : `<button class="btn" type="button" data-act="close">Close</button><button class="btn" type="button" data-act="tc" data-dir="${brk ? "bend" : "bstart"}">${brk ? "End break" : "Start break"}</button><button class="btn primary" type="button" data-act="tc" data-dir="out">Time out</button>`}</div>`, null);
+}
 /* ---------- Employee of the Month ---------- */
 const isCEO = () => S.isOwner || myDept() === "CEO";
 const EOM_CRIT = [
@@ -1444,10 +1487,11 @@ function renderNav() {
   if (gated()) { $("#nav").innerHTML = ""; return; }
   $("#nav").innerHTML =
     `<div class="nav-label desktop-only">Workspace</div>` +
+    timeNavItem() +
     item('data-nav="home"', "home", "Home", S.view === "home") +
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
     (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders") : "") +
-    item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") +
+    (canAttendance() ? item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', "award", "Awards", S.view === "eom") : "") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
@@ -1463,7 +1507,7 @@ function headActions() {
   const ex = col => S.dl ? `<button class="btn" type="button" data-act="export" data-col="${col}">Export</button>` : "";
   if (S.view === "dept" && !isUnlocked(S.dept)) return "";
   if (S.loggedOut) return "";
-  const lockBtn = S.view === "dept" && !S.isOwner ? `<button class="btn ghost" type="button" data-act="lock-dept">${svg("lock", "btn-ico")} Lock</button>` : "";
+  const lockBtn = "";
   const map = {
     ordersMain: S.view === "orders" ? (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + (S.dl ? `<button class="btn" type="button" data-act="export" data-col="orders">Export</button>` : "") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "") : null,
     home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
@@ -1504,7 +1548,7 @@ function periodSeg() {
 const SCROLLERS = "#view .table-wrap, #view .strip, #view .tabs, #view .team-strip, #view .supbar, #view .seg";
 function render() {
   const keep = [...document.querySelectorAll(SCROLLERS)].map(e => e.scrollLeft), y = window.scrollY, key = S.view + "|" + S.dept + "|" + S.tab;
-  renderInner(); enhanceTables(); enhanceSearch();
+  renderInner(); enhanceTables(); enhanceSearch(); try { tickWorkClock(); } catch (e) {}
   if (key === S._rkey) { document.querySelectorAll(SCROLLERS).forEach((e, i) => { if (keep[i]) e.scrollLeft = keep[i]; }); if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); }
   S._rkey = key;
 }
@@ -1553,7 +1597,7 @@ function renderInner() {
   if (S.view === "home") { v.innerHTML = viewHome(); applySlide(); return; }
   if (S.view === "tasks") { v.innerHTML = viewTasks(null); return; }
   if (S.view === "account") { v.innerHTML = viewAccount(); return; }
-  if (S.view === "attendance") { v.innerHTML = viewAttendance(); return; }
+  if (S.view === "attendance") { if (!canAttendance()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewAttendance(); return; }
   if (S.view === "eom") { if (!isCEO()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewEom(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
   if (S.view === "orders") { if (!canOrders()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewOrders(); return; }
@@ -1602,10 +1646,10 @@ function viewAsBar() {
   if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
 }
 function devPanel() {
-  if (!S.realOwner) return "";
+  if (!S.realOwner || S.viewAs) return "";
   return `<section class="panel"><h2>Developer options</h2>
     <div class="field"><label for="dev-viewas">View as</label><select id="dev-viewas"><option value="">Myself (owner)</option>${activeTeam().filter(m => m.id !== (ownerMember() || {}).id).map(m => `<option value="${m.id}" ${S.viewAs === m.id ? "selected" : ""}>${esc(m.name)} · ${esc((dept(m.department) || {}).name || "")}</option>`).join("")}</select></div>
-    <div style="font-size:12px;color:var(--muted)">See the app exactly as that person does: their menu, departments, tasks and buttons. It's a preview: anything you try to save is blocked. Department passwords still apply.</div></section>`;
+    <div style="font-size:12px;color:var(--muted)">See the app exactly as that person does: their menu, departments, tasks and buttons. It's a preview: anything you try to save is blocked.</div></section>`;
 }
 function boundMember() {
   if (S.viewAs) return member(S.viewAs) || null;
@@ -1618,6 +1662,7 @@ function boundMember() {
 const myMemberId = () => (boundMember() || {}).id || "";
 const gated = () => !!S.uid && !S.isOwner && !S.realOwner && S.loaded.team && !boundMember();
 const canOrders = () => myDept() !== "MARKETING";
+const canAttendance = () => S.isOwner || ["CEO", "ADMIN", "FINANCE"].includes(myDept());
 const scentOf = id => ((S.scents.find(s => s.id === id) || {}).scent || "");
 const BOTTLE = '<svg viewBox="0 0 16 20" aria-hidden="true"><rect x="6" y="1" width="4" height="3" rx="1" fill="var(--gold)"/><rect x="5" y="4" width="6" height="2" fill="currentColor" opacity=".55"/><rect x="2.5" y="6" width="11" height="12.5" rx="3" fill="var(--gold)"/><rect x="4.5" y="9.5" width="7" height="4.5" rx="1" fill="#fff" opacity=".75"/></svg>';
 const extraOf = id => S.scents.find(s => s.id === id) || {};
@@ -2006,13 +2051,12 @@ function viewAccount() {
   const body = tab === "pay" ? mySalary() || `<div class="panel"><div class="empty">No salary set up for you yet.</div></div>`
     : tab === "prefs" ? `${workStylePanel()}<section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div class="acct-note">System follows your device's light or dark setting. Saved on this device.</div></section>`
     : tab === "access" ? `<section class="panel"><h2>Department access</h2>
-        ${S.isOwner ? `<div class="acct-note">You own this app, so every department opens without a password.</div>` : `
+        ${S.isOwner ? `<div class="acct-note">You own this app, so you can open every department.</div>` : `
         <div class="acct-note">${visDepts().length ? `You can open: ${visDepts().map(x => x.name).join(", ")}.` : "Your account isn't linked to the team directory yet."}</div>
-        <div class="dept-grid">${visDepts().map(x => `<button type="button" class="dept-card" data-dept="${x.id}" style="--dc:${DEPT_COLORS[x.id]}">${svg(isUnlocked(x.id) ? "unlock" : "lock", "lock-ico")}<strong>${x.name}</strong><span>${isUnlocked(x.id) ? "Unlocked on this device" : "Locked"}</span></button>`).join("")}</div>
-        ${S.unlocked.size ? `<div><button class="btn" type="button" data-act="lock-all">Lock all departments</button></div>` : ""}`}
+        <div class="dept-grid">${visDepts().map(x => `<button type="button" class="dept-card" data-dept="${x.id}" style="--dc:${DEPT_COLORS[x.id]}"><strong>${x.name}</strong><span>${esc(x.blurb)}</span></button>`).join("")}</div>`}
         <div class="acct-note">${S.me && S.me.email ? `Signed in as ${esc(S.me.email)}. ` : ""}${m ? `Linked to ${esc(m.name)}${S.isOwner ? " (owner account)" : " from the team directory"}.` : ""}</div></section>
       ${devPanel()}
-      <section class="panel"><h2>Log out</h2><div class="acct-note">Locks every department on this device and leaves the app. To switch to another Claude account, use “Sign out of Claude”.</div>
+      <section class="panel"><h2>Log out</h2><div class="acct-note">Leaves the app on this device. To switch to another Claude account, use “Sign out of Claude”.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn danger" type="button" data-act="log-out">Log out</button><a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign out of Claude</a></div></section>`
     : `${myClockCard()}
       <section class="panel"><div class="head"><h2>My tasks</h2><button class="btn sm" type="button" data-nav="tasks">Open calendar</button></div>
@@ -2039,7 +2083,7 @@ function viewAccount() {
 /* ---------- departments ---------- */
 function viewDeptPicker() {
   if (!visDepts().length) return `<div class="panel"><div class="empty">Your account isn't linked to the team directory yet.</div></div>`;
-  return `<div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>`;
+  return `<div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"><strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>`;
 }
 function viewLock(d) {
   const has = S.security && S.security[d.id] && S.security[d.id].hash;
@@ -4865,6 +4909,8 @@ document.addEventListener("click", guard(async ev => {
     case "jnt-file": return openJntFile();
     case "jnt-dl": return jntDownload();
     case "of-clear": Object.assign(S.of, { q: "", view: "all", ful: "all", pay: "all", sup: "all", month: "" }); S.page = 0; render(); return;
+    case "tclock": return tclock();
+    case "tc": { const mid = myMemberId(); await clock(mid, b.dataset.dir); closeSheet(); return; }
     case "item-inv": { const nm = (b.dataset.name || "").toLowerCase(); const p = S.products.find(x => x.id === b.dataset.pid) || S.products.find(x => (x.name || "").toLowerCase() === nm) || S.products.find(x => x.name && nm.includes(String(x.name).toLowerCase())); if (!p) return toast("This item isn't in the inventory yet. Add it in Inventory or Listings."); return openProductForm(p.id); }
     case "viewas-stop": try { sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return;
     case "sp-clear": S.sp = { sup: "all", ful: "all", pay: "all", q: "" }; render(); return;
