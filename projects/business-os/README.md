@@ -56,7 +56,10 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 ## Listings (Sales, Admin, Marketing)
 - One shared product list, edited from the Listings tab in Sales, Admin or Marketing.
 - **Fields:** photo, brand, size, type (sealed, tester, partial and so on), price, compare-at price, cost, stock, SKU, barcode, category, description and website link.
-- **Website sync:** every add or edit is marked "To sync". A live connection to regal.famcoventures.com isn't set up yet; until then, use Export to get the file for the website.
+- **Website (regal.famcoventures.com, built on WebCake):** the site reads its products from a `window.PRODUCTS` code block in WebCake's custom HTML.
+  - All 666 live products (155 on hand, 511 pre-order) were imported from that block on 2026-10-03.
+  - Every add or edit is marked "To sync".
+  - **Website code** rebuilds the exact block (unchanged listings come out byte-for-byte identical) to paste in WebCake: Edit → General → </> HTML/Javascript → replace the `window.PRODUCTS` block → Save → Publish. Then mark the changes as on the website.
 - **Import CSV:** columns are matched by name, and a matching SKU or barcode updates the existing listing.
 
 ## Packing: barcode scan

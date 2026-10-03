@@ -670,7 +670,7 @@ function headActions() {
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
     logins: S.vaultKey && can ? `<button class="btn ghost" type="button" data-act="vault-lock">${svg("lock", "btn-ico")} Lock logins</button><button class="btn primary" type="button" data-act="new-login">Add login</button>` : "",
-    listings: (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
+    listings: `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
   return lockBtn + (map[moduleKey()] || "");
@@ -722,7 +722,8 @@ const scentOf = id => ((S.scents.find(s => s.id === id) || {}).scent || "");
 const BOTTLE = '<svg viewBox="0 0 16 20" aria-hidden="true"><rect x="6" y="1" width="4" height="3" rx="1" fill="var(--gold)"/><rect x="5" y="4" width="6" height="2" fill="currentColor" opacity=".55"/><rect x="2.5" y="6" width="11" height="12.5" rx="3" fill="var(--gold)"/><rect x="4.5" y="9.5" width="7" height="4.5" rx="1" fill="#fff" opacity=".75"/></svg>';
 const extraOf = id => S.scents.find(s => s.id === id) || {};
 const photoOf = m => extraOf(m.id).photo || m.photo || "";
-const scentImgOf = id => { const x = extraOf(id); if (x.scentImg) return x.scentImg; const same = x.scent && S.scents.find(s => s.scentImg && (s.scent || "").toLowerCase() === x.scent.toLowerCase()); return same ? same.scentImg : ""; };
+const productForScent = sc => { const k = String(sc || "").toLowerCase().trim(); if (!k) return null; return S.products.find(p => p.photo && [p.brand, p.name, p.size].filter(Boolean).join(" ").toLowerCase() === k) || S.products.find(p => p.photo && k.includes(String(p.name || "").toLowerCase()) && (!p.brand || k.includes(String(p.brand).toLowerCase()))); };
+const scentImgOf = id => { const x = extraOf(id); if (x.scentImg) return x.scentImg; const same = x.scent && S.scents.find(s => s.scentImg && (s.scent || "").toLowerCase() === x.scent.toLowerCase()); if (same) return same.scentImg; const p = productForScent(x.scent); return p ? p.photo : ""; };
 function resizeImage(file, max = 256, square = true) {
   return new Promise((ok, bad) => {
     const url = URL.createObjectURL(file), img = new Image();
@@ -743,8 +744,8 @@ function perfumeCatalog() {
   const add = n => { n = String(n || "").replace(/\s+/g, " ").trim(); if (n.length > 2 && !set.has(n.toLowerCase())) set.set(n.toLowerCase(), n); };
   S.scents.forEach(s => add(s.scent));
   S.bir.forEach(b => (b.rows || []).forEach(r => String(r.item || "").split(" / ").forEach(add)));
+  S.products.forEach(p => add([p.brand, p.name, p.size].filter(Boolean).join(" ")));
   S.orders.forEach(o => (o.items || []).forEach(i => add(i.name)));
-  S.products.forEach(p => add(p.name));
   return [...set.values()].sort((a, b) => a.localeCompare(b));
 }
 function avatar(m, size = 40, bottle = true) {
@@ -770,7 +771,7 @@ function openScentForm(mid) {
   openSheet(`<h3>${esc(m.nickname || m.name)}'s favorite scent</h3>
     <div style="display:flex;gap:14px;align-items:center">${avatar(m, 64, false)}<div style="font-size:13px;color:var(--muted)">Shows as the little bottle on ${esc(m.nickname || m.name)}'s photo. Change it anytime.</div></div>
     <div class="field"><label for="sc-name">Search perfume</label><input id="sc-name" list="sc-list" value="${esc(scentOf(mid))}" placeholder="Type a brand or name, e.g. Good Girl, Sauvage" autocomplete="off"><datalist id="sc-list">${cat.map(s => `<option value="${esc(s)}">`).join("")}</datalist>
-      <div style="font-size:12px;color:var(--muted)">${cat.length.toLocaleString("en-PH")} perfumes from your sales records. You can also type any name.</div></div>
+      <div style="font-size:12px;color:var(--muted)">${cat.length.toLocaleString("en-PH")} perfumes from your website and sales records. Pick one from your website and its bottle photo is added automatically.</div></div>
     <div class="field"><label>Bottle picture</label>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <span class="scent-prev" id="sc-prev">${cur ? `<img src="${esc(cur)}" alt="">` : BOTTLE}</span>
@@ -1693,7 +1694,9 @@ function openOrderDetails(id) {
   });
 }
 
-const LIST_TYPES = ["Sealed", "Tester", "Partial", "Decant", "Set", "Mini", "Other"];
+const LIST_TYPES = ["Sealed", "Tester", "Partial", "Unsealed, New", "Boxed, New", "Set", "Mini", "Vial", "Decant", "Other"];
+const WEB_CATS = [["her", "For her"], ["him", "For him"], ["unisex", "Unisex"], ["arabian", "Arabian"], ["beauty", "Beauty"]];
+const SITE = "https://regal.famcoventures.com/";
 const LIST_STATUS = { active: { name: "Active", cls: "good" }, draft: { name: "Draft", cls: "" }, hidden: { name: "Hidden", cls: "warn" } };
 function openProductForm(id, preset = {}) {
   const p = id ? S.products.find(x => x.id === id) : { status: "active", reorder: 1, stock: 0, ...preset };
@@ -1708,7 +1711,7 @@ function openProductForm(id, preset = {}) {
     <div class="row">
       <div class="field"><label for="p-brand">Brand</label><input id="p-brand" value="${esc(p.brand || "")}"></div>
       <div class="field"><label for="p-size">Size</label><input id="p-size" value="${esc(p.size || "")}" placeholder="100ml"></div>
-      <div class="field"><label for="p-type">Type</label><select id="p-type"><option value="">–</option>${LIST_TYPES.map(t => `<option ${p.ptype === t ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label for="p-type">Type</label><select id="p-type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
     </div>
     <div class="row">
       <div class="field"><label for="p-price">Selling price (₱)</label><input id="p-price" type="number" min="0" step="0.01" value="${p.price ?? ""}"></div>
@@ -1723,7 +1726,17 @@ function openProductForm(id, preset = {}) {
     <div class="row">
       <div class="field"><label for="p-sku">SKU</label><input id="p-sku" value="${esc(p.sku || "")}"></div>
       <div class="field"><label for="p-barcode">Barcode</label><div style="display:flex;gap:6px"><input id="p-barcode" value="${esc(p.barcode || "")}" style="flex:1;min-width:0"><label class="btn sm" for="p-bc-cam" title="Scan with camera" style="cursor:pointer">📷</label><input id="p-bc-cam" type="file" accept="image/*" capture="environment" hidden></div></div>
-      <div class="field"><label for="p-cat">Category</label><input id="p-cat" value="${esc(p.category || "")}" placeholder="Women, Men, Unisex, Makeup"></div>
+      <div class="field"><label for="p-cat">Category</label><select id="p-cat"><option value="">–</option>${[...WEB_CATS, ...(p.category && !WEB_CATS.some(c => c[0] === p.category) ? [[p.category, p.category]] : [])].map(([k, l]) => `<option value="${esc(k)}" ${p.category === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="p-kind">Availability</label><select id="p-kind"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand (ships in 24h)</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select></div>
+      <div class="field"><label for="p-eta">Pre-order arrival</label><input id="p-eta" value="${esc(p.eta || "")}" placeholder="e.g. October"></div>
+      <div class="field"><label for="p-new">Badges</label><label style="display:flex;gap:6px;align-items:center;font-size:13px;padding-top:8px"><input type="checkbox" id="p-new" ${p.isNew ? "checked" : ""}> New arrival</label></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="p-ntop">Top notes</label><input id="p-ntop" value="${esc(((p.notes || {}).top || []).join(", "))}" placeholder="Lime, Cardamom"></div>
+      <div class="field"><label for="p-nheart">Heart notes</label><input id="p-nheart" value="${esc(((p.notes || {}).heart || []).join(", "))}"></div>
+      <div class="field"><label for="p-nbase">Base notes</label><input id="p-nbase" value="${esc(((p.notes || {}).base || []).join(", "))}"></div>
     </div>
     <div class="field"><label for="p-desc">Description</label><textarea id="p-desc" rows="3">${esc(p.description || "")}</textarea></div>
     <div class="row">
@@ -1737,7 +1750,7 @@ function openProductForm(id, preset = {}) {
     if (!val("p-name")) return sheetError("Give the product a name.");
     const bc = val("p-barcode");
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
-    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: val("p-type"), sku: val("p-sku"), barcode: bc, category: val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: val("p-status"), description: val("p-desc"), url: val("p-url"), batch: val("p-batch"), photo: document.getElementById("p-photo").value, webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: val("p-type"), sku: val("p-sku"), barcode: bc, category: val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: val("p-status"), kind: val("p-kind"), eta: val("p-eta"), isNew: $("#p-new").checked, notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), description: val("p-desc"), url: val("p-url"), batch: val("p-batch"), photo: document.getElementById("p-photo").value, imgs: (() => { const ph = document.getElementById("p-photo").value, rest = (p.imgs || []).filter(u => u !== p.photo); return ph && !ph.startsWith("data:") ? [ph, ...rest] : (p.imgs || []); })(), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     if (!id) data.createdAt = Date.now();
     await save("products", id || uid("p"), data);
     closeSheet(); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
@@ -1747,18 +1760,18 @@ function openProductForm(id, preset = {}) {
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter || "all";
   const all = [...S.products].sort((a, b) => (b.editedAt || b.createdAt || 0) - (a.editedAt || a.createdAt || 0));
-  const counts = { all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, out: all.filter(p => (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
-  const rows = all.filter(p => (f === "all" || (f === "out" ? (Number(p.stock) || 0) <= 0 : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
-    && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype].join(" ").toLowerCase().includes(q)));
+  const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, out: all.filter(p => p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
+  const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? p.kind !== "preorder" && (Number(p.stock) || 0) <= 0 : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
+    && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId].join(" ").toLowerCase().includes(q)));
   const can = !S.readOnly;
-  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website link:</strong> ${counts.pending} listing${counts.pending === 1 ? "" : "s"} added or edited here ${counts.pending === 1 ? "is" : "are"} waiting to go to regal.famcoventures.com. The live connection to your website isn't switched on yet. Until it is, use <strong>Export</strong> to get the file for the website.</span></div>
+  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending ? `${counts.pending} change${counts.pending === 1 ? "" : "s"} not on <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet. Click <strong>Website code</strong>, then paste it into WebCake and publish.` : `Everything here matches <a href="${SITE}" target="_blank" rel="noopener">your website</a>.`}</span></div>
     <div class="toolbar"><input id="liq" type="search" placeholder="Search name, brand, SKU, barcode" value="${esc(S.liq || "")}" aria-label="Search listings">
-      <div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["active", "Active"], ["draft", "Draft"], ["out", "Sold out"], ["pending", "To sync"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div></div>
+      <div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["draft", "Draft"], ["pending", "To sync"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div></div>
     <div class="lgrid">${rows.map(p => { const st = LIST_STATUS[p.status || "active"], out = (Number(p.stock) || 0) <= 0; return `<button type="button" class="lcard" ${can ? `data-act="edit-product" data-id="${p.id}"` : "disabled"}>
-      <div class="lphoto">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy">` : `<span>${BOTTLE}</span>`}</div>
-      <div class="lbody"><div class="lname">${esc(p.name)}</div><div class="s">${esc([p.brand, p.size, p.ptype].filter(Boolean).join(" · "))}</div>
+      <div class="lphoto">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : `<span>${BOTTLE}</span>`}</div>
+      <div class="lbody"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div class="lname">${esc(p.name)}</div><div class="s">${esc([p.size, p.ptype].filter(Boolean).join(" · "))}</div>
         <div class="lprice"><b class="num">${peso(p.price)}</b>${p.compareAt > p.price ? ` <s class="num">${peso(p.compareAt)}</s>` : ""}</div>
-        <div class="lchips"><span class="chip ${st.cls}">${st.name}</span><span class="chip ${out ? "bad" : stockState(p).cls}">${out ? "Sold out" : (Number(p.stock) || 0) + " in stock"}</span>${p.webSync === "pending" ? `<span class="chip info">To sync</span>` : ""}</div></div></button>`; }).join("")}</div>
+        <div class="lchips"><span class="chip ${st.cls}">${st.name}</span>${p.kind === "preorder" ? `<span class="chip info">Pre-order${p.eta ? " · " + esc(p.eta) : ""}</span>` : `<span class="chip ${out ? "bad" : stockState(p).cls}">${out ? "Sold out" : (Number(p.stock) || 0) + " in stock"}</span>`}${p.isNew ? `<span class="chip warn">New</span>` : ""}${p.webSync === "pending" ? `<span class="chip info">To sync</span>` : ""}</div></div></button>`; }).join("")}</div>
     ${rows.length ? "" : `<div class="panel"><div class="empty">${all.length ? "No listings match." : "No listings yet. Click “Add listing”, or “Import CSV” if you have a product file from the website."}</div></div>`}`;
 }
 let pendingListings = null;
@@ -1794,6 +1807,37 @@ async function readListingFile(file) {
   const upd = pendingListings.filter(w => S.products.some(p => p.id === w.id)).length;
   $("#li-prev").innerHTML = `<div class="panel" style="padding:12px"><strong>${pendingListings.length}</strong> listings · ${pendingListings.length - upd} new · ${upd} to update<div class="s">${pendingListings.slice(0, 3).map(w => esc(w.data.name) + " · " + peso(w.data.price)).join("<br>")}</div></div>`;
   const go = $("#li-go"); go.disabled = !pendingListings.length; go.textContent = `Import ${pendingListings.length} listings`;
+}
+
+/* ---------- website code (WebCake custom HTML block) ---------- */
+const slug = s => String(s || "").toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 90);
+function webProducts() {
+  const live = S.products.filter(p => (p.status || "active") === "active" && p.name && (p.kind === "preorder" || (Number(p.stock) || 0) > 0 || p.webId));
+  return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
+    .filter(p => p.kind === "preorder" || (Number(p.stock) || 0) > 0)
+    .map(p => ({ id: p.webId || slug([p.kind === "preorder" ? "preorder" : "", p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" ")), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, isNew: !!p.isNew, eta: p.eta || "", vac: !!p.vac, created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
+}
+const webCodeText = () => "<script>\nwindow.PRODUCTS=" + JSON.stringify(webProducts()).replace(/<\//g, "<\\/") + ";\n</" + "script>";
+function openWebCode() {
+  const list = webProducts(), pend = S.products.filter(p => p.webSync === "pending").length;
+  const noImg = list.filter(p => !p.imgs.length).length, sold = S.products.filter(p => p.webId && p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length;
+  openSheet(`<h3>Update your website</h3>
+    <div style="font-size:13px">This builds the product code your website reads (<code>window.PRODUCTS</code>) from the listings here: <strong>${list.filter(p => p.kind === "onhand").length} on hand</strong> and <strong>${list.filter(p => p.kind === "preorder").length} pre-order</strong>. Sold-out, draft and hidden listings are left out.${noImg ? ` ${noImg} listing${noImg === 1 ? " has" : "s have"} no web photo link, so ${noImg === 1 ? "it" : "they"} will show without a picture.` : ""}${sold ? ` ${sold} on-hand item${sold === 1 ? "" : "s"} at 0 stock will disappear from the site.` : ""}</div>
+    <ol class="steps"><li>Click <strong>Copy website code</strong>.</li><li>In WebCake open your site → <strong>Edit</strong> → <strong>General</strong> → <strong>&lt;/&gt; HTML/Javascript</strong>.</li><li>Find the block that starts with <code>&lt;script&gt; window.PRODUCTS=</code>, select that whole block and paste over it.</li><li>Click <strong>Save</strong>, then <strong>Publish</strong>. Check the site.</li><li>Come back and click <strong>Mark ${pend} change${pend === 1 ? "" : "s"} as on the website</strong>.</li></ol>
+    <textarea id="web-code" rows="6" readonly style="font-family:ui-monospace,monospace;font-size:11px">${esc(webCodeText().slice(0, 4000))}${webCodeText().length > 4000 ? "\n… (" + Math.round(webCodeText().length / 1024) + " KB in total; Copy gets all of it)" : ""}</textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-act="web-copy">Copy website code</button>${S.dl ? `<button class="btn" type="button" data-act="web-dl">Download as file</button>` : ""}${pend && !S.readOnly ? `<button class="btn" type="button" data-act="web-synced">Mark ${pend} change${pend === 1 ? "" : "s"} as on the website</button>` : ""}</div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null);
+}
+async function copyWebCode() {
+  const t = webCodeText();
+  try { await navigator.clipboard.writeText(t); toast("Website code copied. Paste it in WebCake."); }
+  catch (e) { const ta = $("#web-code"); ta.value = t; ta.select(); try { document.execCommand("copy"); toast("Website code copied."); } catch (e2) { toast("Select the text and copy it with Ctrl+C / ⌘C."); } }
+}
+async function downloadWebCode() { try { await S.dl.save({ filename: `regal-spritz-website-products-${mToday()}.html`, data: webCodeText() }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } }
+async function markSynced() {
+  const pend = S.products.filter(p => p.webSync === "pending");
+  for (const p of pend) await patch("products", p.id, { webSync: "synced" });
+  closeSheet(); toast(`${pend.length} change${pend.length === 1 ? "" : "s"} marked as on the website.`);
 }
 
 /* ---------- barcode scanning ---------- */
@@ -3070,6 +3114,10 @@ document.addEventListener("click", guard(async ev => {
     case "new-member": return openMemberForm();
     case "new-login": return openLoginForm();
     case "import-listings": return openListingImport();
+    case "web-code": return openWebCode();
+    case "web-copy": return copyWebCode();
+    case "web-dl": return downloadWebCode();
+    case "web-synced": return markSynced();
     case "scan-undo": return scanUndo();
     case "p-photo-clear": $("#p-photo").value = ""; $("#p-photo-prev").innerHTML = ""; b.remove(); return;
     case "m-photo-clear": $("#m-photo").value = ""; $("#m-photo-prev").innerHTML = "<span>?</span>"; b.remove(); return;
