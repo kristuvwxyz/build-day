@@ -120,3 +120,11 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - Each department has its own colour, used in the menu, page title, tabs, cards and task rows.
 - The Home banner is smaller.
 - Home has an Orders panel with big To pack, On hold, Unpaid and New today tiles, plus the oldest open orders, each clickable.
+
+## Home, awards, reviews (Oct 2026)
+- **Home:** greeting, a daily perfume quote (classics plus your own from Admin → Home page), a 4-number "Today" strip with Time in / Break, the Employee of the Month card, and My tasks. Mission/Vision are no longer shown.
+- **Awards (Employee of the Month):** score out of 100 = Attendance & punctuality 30 + Tasks on time 25 + CEO rating 25 + Team votes 20. Not eligible: more than 2 absences, or won last month. Founders don't compete. CEO rates, announces, and can add the cash bonus to the current payslip. Criteria points and rewards are editable by the CEO.
+- **Reviews (Admin, Marketing):** add, import from a pasted spreadsheet, edit, hide/show, delete; filter by stars, status, source; sort by rating or date.
+- **My account:** My salary (rate, current period estimate, pay history, payslip download; amounts blurred until "Show amounts") and Work style (Standard / Pomodoro timer).
+- **Attendance:** ☕ Break / End break. Break time is not counted in hours; the allowed break per day is set in Attendance settings (default 60 min).
+- **Logins:** "Import from spreadsheet" pastes a logins table; passwords are encrypted in the browser with the vault passphrase.

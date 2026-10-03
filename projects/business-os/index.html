@@ -224,6 +224,62 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .car-dots button { width: 8px; height: 8px; border-radius: 4px; border: 0; padding: 0; background: color-mix(in srgb, var(--brand-ink) 40%, transparent); transition: width .2s; }
 .car-dots button[aria-current="true"] { width: 22px; background: var(--gold); }
 
+/* home hero */
+.hero { position: relative; border-radius: 16px; background: var(--brand); color: var(--brand-ink); padding: clamp(28px, 5vw, 52px) clamp(22px, 5vw, 56px); display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.hero::after { content: ""; position: absolute; inset: 10px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 10px; pointer-events: none; }
+.hero-top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+.hero-greet { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 4vw, 40px); line-height: 1.1; margin: 0; color: inherit; text-transform: none; letter-spacing: 0; text-wrap: balance; }
+.hero-rule { width: 48px; height: 1px; background: var(--gold); border: 0; margin: 4px 0; }
+.hero-q { margin: 0; max-width: 60ch; }
+.hero-q blockquote { margin: 0; font-family: var(--font-display); font-style: italic; font-size: clamp(16px, 2vw, 20px); line-height: 1.45; opacity: .95; text-wrap: pretty; }
+.hero-q figcaption { margin-top: 8px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .75; }
+.today { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.today > * { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; border: 0; border-left: 1px solid var(--line); background: none; text-align: left; color: inherit; font: inherit; min-width: 0; }
+.today > *:first-child { border-left: 0; }
+.today button:hover { background: var(--surface-2); }
+.today b { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1; }
+.today span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.today .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+@media (max-width: 720px) { .today { grid-template-columns: repeat(2, minmax(0, 1fr)); } .today > *:nth-child(3) { border-left: 0; } .today > *:nth-child(n+3) { border-top: 1px solid var(--line); } }
+.quiet h2 { font-size: 11px; letter-spacing: .16em; }
+.goals-line { font-size: 13px; color: var(--muted); text-align: center; padding: 4px 8px; }
+.goals-line b { color: var(--gold); letter-spacing: .14em; text-transform: uppercase; font-size: 11px; margin-right: 6px; }
+/* employee of the month */
+.eom-card { display: flex; gap: 18px; align-items: center; border: 1px solid color-mix(in srgb, var(--gold) 55%, var(--line)); border-radius: 14px; padding: 18px 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 12%, var(--surface)), var(--surface)); }
+.eom-card .eyebrow { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+.eom-card .nm { font-family: var(--font-display); font-size: clamp(22px, 3vw, 28px); line-height: 1.15; }
+.eom-card .sub { font-size: 13px; color: var(--muted); }
+.eom-medal { font-size: 30px; margin-left: auto; }
+.crit { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.crit > div { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.crit b { font-family: var(--font-display); font-weight: 400; font-size: 24px; color: var(--brand); }
+@media (max-width: 720px) { .crit { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sbar { display: inline-block; width: 46px; height: 5px; border-radius: 3px; background: var(--surface-2); vertical-align: middle; margin-right: 6px; overflow: hidden; }
+.sbar i { display: block; height: 100%; background: var(--gold); }
+/* reviews */
+.stars { color: var(--gold); letter-spacing: 1px; white-space: nowrap; }
+.stars .off { color: var(--line); }
+.rv-sum { display: flex; gap: 28px; flex-wrap: wrap; align-items: center; }
+.rv-avg { display: flex; flex-direction: column; gap: 2px; }
+.rv-avg b { font-family: var(--font-display); font-weight: 400; font-size: 40px; line-height: 1; }
+.rv-dist { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 200px; max-width: 360px; }
+.rv-dist button { display: grid; grid-template-columns: 34px 1fr 34px; gap: 8px; align-items: center; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12px; color: var(--muted); text-align: left; }
+.rv-dist button[aria-pressed="true"] { color: var(--fg); font-weight: 700; }
+.rv-dist i { display: block; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.rv-dist i s { display: block; height: 100%; background: var(--gold); text-decoration: none; }
+.rv-text { max-width: 420px; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+tr.dim td { opacity: .55; }
+/* salary */
+.blur-amt .amt { filter: blur(7px); user-select: none; }
+/* pomodoro */
+.pomo { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 8px 6px 14px; box-shadow: 0 6px 24px rgb(0 0 0 / .14); font-size: 13px; }
+.pomo .ph { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.pomo .tm { font-family: var(--font-display); font-size: 20px; min-width: 58px; text-align: center; }
+.pomo.focus { border-color: var(--brand); }
+.pomo.brk { border-color: var(--gold); }
+.pomo button { border: 1px solid var(--line); background: var(--surface-2); border-radius: 50%; width: 30px; height: 30px; padding: 0; line-height: 1; color: inherit; }
+@media (max-width: 860px) { .pomo { bottom: 76px; } }
+body.has-pomo #view { padding-bottom: 64px; }
 .dept-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .dept-card { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 2px; position: relative; }
 .dept-card:hover { border-color: var(--brand); }
@@ -460,6 +516,9 @@ main > .gs.mobile-only { margin-bottom: 12px; }
   .mark, .rail-foot { display: none; }
   .nav { flex-direction: row; justify-content: space-around; width: 100%; }
   .nav button { flex-direction: column; gap: 2px; font-size: 11px; padding: 6px 4px; flex: 1; align-items: center; }
+  .nav button span { white-space: nowrap; font-size: 10.5px; }
+  .nav button.account-item span { font-size: 0; }
+  .nav button.account-item span::after { content: "Account"; font-size: 10.5px; }
   main { padding: 18px 16px 96px; }
   h1 { font-size: 24px; }
   .bar-row { grid-template-columns: 80px minmax(0, 1fr) 84px; }
@@ -496,6 +555,7 @@ main > .gs.mobile-only { margin-bottom: 12px; }
 </div>
 <div class="scrim" id="scrim" hidden><form class="sheet" id="sheet" novalidate></form></div>
 <div class="toast" id="toast" hidden></div>
+<div class="pomo" id="pomo" hidden></div>
 
 <script>
 (() => {
@@ -596,6 +656,7 @@ const ICONS = {
   depts: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>',
   account: '<path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  award: '<circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.2"/>',
 };
@@ -604,13 +665,13 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "orders", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "archived", "listings", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "archived", "listings", "reviews", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
   { id: "FINANCE", name: "Finance", tabs: ["orders", "dues", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["orders", "suppliers", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
-  { id: "MARKETING", name: "Marketing", tabs: ["channels", "orders", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
+  { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "orders", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["orders", "inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -622,12 +683,12 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
-  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [],
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
   att: { mode: "day", date: "", month: "", dept: "" },
-  loaded: { colprefs: false, products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false },
+  loaded: { colprefs: false, products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false, reviews: false, eom: false, eomvotes: false },
   pay: { month: "", half: 1 }, paySettings: {},
   view: "home", dept: "SALES", tab: "orders", period: "month",
   of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
@@ -638,9 +699,9 @@ const S = {
   unlocked: new Set(),
   db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
 };
-try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
 try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
-const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account"].includes(hv)) S.view = hv;
+const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account", "eom"].includes(hv)) S.view = hv;
 const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
 const saveUnlocked = () => { try { sessionStorage.setItem("rs-unlocked", JSON.stringify([...S.unlocked])); } catch (e) {} };
 const isUnlocked = d => S.isOwner || S.unlocked.has(d) || S.unlocked.has("CEO") || (S.unlocked.has("ADMIN") && d !== "FINANCE");
@@ -769,8 +830,407 @@ function writeErr(e) {
   else toast("Couldn't save. Check your connection and try again.");
 }
 
+/* ---------- pasted tables (Sheets / Excel / CSV) ---------- */
+function parseTable(text) {
+  text = String(text || "").replace(/\r\n?/g, "\n");
+  const delim = text.includes("\t") ? "\t" : ",";
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; continue; }
+    if (ch === '"' && cell === "") { q = true; continue; }
+    if (ch === delim) { row.push(cell); cell = ""; continue; }
+    if (ch === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; continue; }
+    cell += ch;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows.map(r => r.map(c => c.trim())).filter(r => r.some(Boolean));
+}
+const headIdx = (H, test) => H.findIndex(test);
+
+/* ---------- reviews (Admin, Marketing) ---------- */
+const RV_SOURCES = ["Website", "Shopee", "Facebook", "Instagram", "TikTok", "Lazada", "Viber / Messenger", "Other"];
+const starsHTML = n => { n = Math.max(0, Math.min(5, Math.round(Number(n) || 0))); return `<span class="stars" role="img" aria-label="${n} out of 5 stars">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`; };
+function rvFiltered() {
+  const R = S.rv, q = (S.rvq || "").toLowerCase().trim();
+  const list = S.reviews.filter(r => (!R.stars || Math.round(Number(r.rating) || 0) === Number(R.stars))
+    && (!R.status || (R.status === "hidden" ? r.status === "hidden" : r.status !== "hidden"))
+    && (!R.source || r.source === R.source)
+    && (!q || [r.customer, r.product, r.text, r.reply].join(" ").toLowerCase().includes(q)));
+  const dt = r => r.date || "";
+  const sorter = { high: (a, b) => (b.rating || 0) - (a.rating || 0) || dt(b).localeCompare(dt(a)), low: (a, b) => (a.rating || 0) - (b.rating || 0) || dt(b).localeCompare(dt(a)), new: (a, b) => dt(b).localeCompare(dt(a)), old: (a, b) => dt(a).localeCompare(dt(b)) }[R.sort] || (() => 0);
+  return list.sort(sorter);
+}
+function viewReviews() {
+  const all = S.reviews, R = S.rv, can = !S.readOnly;
+  const avg = all.length ? all.reduce((a, r) => a + (Number(r.rating) || 0), 0) / all.length : 0;
+  const dist = [5, 4, 3, 2, 1].map(n => [n, all.filter(r => Math.round(Number(r.rating) || 0) === n).length]);
+  const max = Math.max(1, ...dist.map(d => d[1]));
+  const list = rvFiltered();
+  const active = R.stars || R.status || R.source || S.rvq;
+  const sel = (id, label, opts, cur) => `<select id="${id}" aria-label="${label}">${opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+  return `<section class="panel"><div class="rv-sum">
+      <div class="rv-avg"><b class="num">${all.length ? avg.toFixed(1) : "–"}</b>${starsHTML(avg)}<span style="font-size:12px;color:var(--muted)">${all.length} review${all.length === 1 ? "" : "s"} · ${all.filter(r => r.status === "hidden").length} hidden</span></div>
+      <div class="rv-dist">${dist.map(([n, c]) => `<button type="button" data-rvstars="${n}" aria-pressed="${String(R.stars) === String(n)}"><span>${n} ★</span><i><s style="width:${c / max * 100}%"></s></i><span class="num">${c}</span></button>`).join("")}</div>
+    </div></section>
+    <div class="toolbar"><input id="rvq" type="search" placeholder="Search customer, product, review" value="${esc(S.rvq)}" aria-label="Search reviews">
+      ${sel("rv-stars", "Rating", [["", "All ratings"], ...[5, 4, 3, 2, 1].map(n => [n, n + " star" + (n === 1 ? "" : "s")])], R.stars)}
+      ${sel("rv-status", "Status", [["", "Shown and hidden"], ["shown", "Shown"], ["hidden", "Hidden"]], R.status)}
+      ${sel("rv-source", "Source", [["", "All sources"], ...RV_SOURCES.map(x => [x, x])], R.source)}
+      ${sel("rv-sort", "Sort", [["high", "Highest rating first"], ["low", "Lowest rating first"], ["new", "Newest first"], ["old", "Oldest first"]], R.sort)}
+      ${active ? `<button class="btn ghost sm" type="button" data-act="rv-clear">✕ Clear filters</button>` : ""}</div>
+    <div class="table-wrap"><table class="otable"><thead><tr><th>Rating</th><th>Customer</th><th>Product</th><th>Review</th><th>Source</th><th>Date</th><th>Status</th>${can ? "<th></th>" : ""}</tr></thead>
+      <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>
+        <td data-sort="${Number(r.rating) || 0}">${starsHTML(r.rating)}</td><td style="font-weight:600">${esc(r.customer || "Anonymous")}</td><td>${esc(r.product || "")}</td>
+        <td><div class="rv-text">${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}</td>
+        <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap">${r.date ? fmtDate(r.date) : ""}</td>
+        <td><span class="chip ${r.status === "hidden" ? "" : "good"}">${r.status === "hidden" ? "Hidden" : "Shown"}</span></td>
+        ${can ? `<td class="r nowrap"><button class="btn sm ghost" type="button" data-act="rv-toggle" data-id="${r.id}">${r.status === "hidden" ? "Show" : "Hide"}</button></td>` : ""}</tr>`).join("")}</tbody></table>
+      ${list.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No reviews match these filters." : "No reviews yet. Add one, or import them from a spreadsheet."}</div>`}</div>
+    <div style="font-size:12px;color:var(--muted)">Hidden reviews stay here for your records but are marked not to be posted. Click a review to edit or delete it.</div>`;
+}
+function openReviewForm(id) {
+  const r = id ? S.reviews.find(x => x.id === id) : { rating: 5, status: "shown", date: mToday(), source: "Website" };
+  if (!r) return;
+  openSheet(`<h3>${id ? "Edit review" : "Add review"}</h3>
+    <div class="row"><div class="field"><label for="rv-cust">Customer</label><input id="rv-cust" value="${esc(r.customer || "")}" list="rv-custs"><datalist id="rv-custs">${S.customers.slice(0, 400).map(c => `<option value="${esc(c.name || "")}">`).join("")}</datalist></div>
+      <div class="field"><label for="rv-rating">Rating</label><select id="rv-rating">${[5, 4, 3, 2, 1].map(n => `<option value="${n}" ${Math.round(r.rating) === n ? "selected" : ""}>${"★".repeat(n)} ${n}</option>`).join("")}</select></div></div>
+    <div class="field"><label for="rv-prod">Product</label><input id="rv-prod" value="${esc(r.product || "")}" list="rv-prods"><datalist id="rv-prods">${S.products.slice(0, 800).map(p => `<option value="${esc([p.brand, p.name].filter(Boolean).join(" "))}">`).join("")}</datalist></div>
+    <div class="field"><label for="rv-text">Review</label><textarea id="rv-text" rows="4">${esc(r.text || "")}</textarea></div>
+    <div class="field"><label for="rv-reply">Our reply (optional)</label><textarea id="rv-reply" rows="2">${esc(r.reply || "")}</textarea></div>
+    <div class="row"><div class="field"><label for="rv-date">Date</label><input id="rv-date" type="date" value="${esc(r.date || "")}"></div>
+      <div class="field"><label for="rv-src">Source</label><select id="rv-src">${RV_SOURCES.map(x => `<option ${r.source === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div class="field"><label for="rv-st">Status</label><select id="rv-st"><option value="shown" ${r.status !== "hidden" ? "selected" : ""}>Shown</option><option value="hidden" ${r.status === "hidden" ? "selected" : ""}>Hidden</option></select></div></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-review" data-id="${id}">Delete review</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("rv-text") && !val("rv-cust")) return sheetError("Enter the review or the customer's name.");
+    const data = { ...(id ? clean(r) : {}), customer: val("rv-cust"), rating: Number(val("rv-rating")) || 5, product: val("rv-prod"), text: val("rv-text"), reply: val("rv-reply"), date: val("rv-date"), source: val("rv-src"), status: val("rv-st"), updatedAt: Date.now(), updatedBy: actor() };
+    if (!id) data.createdAt = Date.now();
+    await save("reviews", id || uid("rv"), data); closeSheet(); toast(id ? "Review updated." : "Review added.");
+  });
+}
+function reviewRows(text) {
+  const rows = parseTable(text); if (!rows.length) return [];
+  const H = rows[0].map(h => h.toLowerCase());
+  const ix = { customer: headIdx(H, h => /name|customer|buyer|reviewer/.test(h) && !/product/.test(h)), product: headIdx(H, h => /product|item|perfume|scent/.test(h)), rating: headIdx(H, h => /rating|star|score/.test(h)), text: headIdx(H, h => /review|comment|feedback|message|body/.test(h)), date: headIdx(H, h => /date|time/.test(h)), source: headIdx(H, h => /source|platform|channel/.test(h)) };
+  const hasHead = ix.rating >= 0 || ix.text >= 0;
+  if (!hasHead) Object.assign(ix, { customer: 0, product: 1, rating: 2, text: 3, date: 4, source: 5 });
+  const g = (r, k) => ix[k] >= 0 ? (r[ix[k]] || "") : "";
+  const toDate = v => { if (!v) return ""; if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10); const d = new Date(v); return isNaN(d) ? "" : dstr(d.getTime()); };
+  return rows.slice(hasHead ? 1 : 0).map(r => {
+    const rv = g(r, "rating"), stars = (rv.match(/★/g) || []).length, n = stars || Math.round(parseFloat(rv) || 0);
+    const src = RV_SOURCES.find(x => x.toLowerCase() === g(r, "source").toLowerCase()) || (g(r, "source") ? "Other" : "Website");
+    return { customer: g(r, "customer"), product: g(r, "product"), rating: Math.max(1, Math.min(5, n || 5)), text: g(r, "text"), date: toDate(g(r, "date")), source: src, status: "shown" };
+  }).filter(r => r.text || r.customer);
+}
+function openReviewImport() {
+  openSheet(`<h3>Import reviews</h3>
+    <div style="font-size:13px;color:var(--muted)">In Google Sheets, Excel or your review app's export, select the reviews with the header row, copy, and paste here. Columns are matched by name: <b>Customer</b>, <b>Product</b>, <b>Rating</b> (1–5 or ★), <b>Review</b>, <b>Date</b>, <b>Source</b>.</div>
+    <textarea id="rvi-paste" rows="9" placeholder="Customer&#9;Product&#9;Rating&#9;Review&#9;Date"></textarea>
+    <div id="rvi-prev" style="font-size:13px"></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Import</button></div>`,
+  async () => {
+    const rows = reviewRows($("#rvi-paste").value); if (!rows.length) return sheetError("Nothing to import. Paste rows with a header like Customer, Product, Rating, Review.");
+    let n = 0; for (const r of rows) { await save("reviews", uid("rv"), { ...r, createdAt: Date.now(), updatedAt: Date.now(), updatedBy: actor() }); n++; }
+    closeSheet(); toast(`Imported ${n} review${n === 1 ? "" : "s"}.`);
+  });
+}
+function reviewImportPreview() {
+  const rows = reviewRows($("#rvi-paste").value), el = $("#rvi-prev"); if (!el) return;
+  el.innerHTML = rows.length ? `<b>${rows.length}</b> review${rows.length === 1 ? "" : "s"} found. First: ${starsHTML(rows[0].rating)} ${esc(rows[0].customer || "Anonymous")}${rows[0].product ? " · " + esc(rows[0].product) : ""}` : "";
+}
+
+/* ---------- logins import (encrypted in this browser) ---------- */
+function loginRows(text) {
+  const rows = parseTable(text); if (!rows.length) return [];
+  const H = rows[0].map(h => h.toLowerCase());
+  const ix = {
+    account: headIdx(H, h => /^(account|platform|app|site|service)$/.test(h)),
+    accountName: headIdx(H, h => /name/.test(h) && !/user/.test(h)),
+    username: headIdx(H, h => /user|email|e-mail|login/.test(h)),
+    pw: headIdx(H, h => /pass|^pw$|pin/.test(h)),
+    phone: headIdx(H, h => /phone|mobile|contact|number/.test(h)),
+    url: headIdx(H, h => /link|url|website/.test(h)),
+    notes: headIdx(H, h => /note|remark/.test(h)),
+    status: headIdx(H, h => /status/.test(h)),
+  };
+  if (ix.account < 0) ix.account = headIdx(H, h => /account/.test(h) && !/name/.test(h));
+  const hasHead = ix.account >= 0 || ix.pw >= 0 || ix.username >= 0;
+  if (!hasHead) Object.assign(ix, { account: 0, accountName: 1, username: 2, pw: 3, phone: 4, notes: 5, url: -1, status: -1 });
+  const g = (r, k) => ix[k] >= 0 ? (r[ix[k]] || "") : "";
+  let section = "active"; const out = [];
+  for (const r of rows.slice(hasHead ? 1 : 0)) {
+    const filled = r.filter(Boolean);
+    if (filled.length === 1 && !g(r, "pw") && !g(r, "username")) { section = /inactive|old|closed|unused/i.test(filled[0]) ? "inactive" : "active"; continue; }
+    if (!g(r, "account")) continue;
+    const st = g(r, "status");
+    out.push({ account: g(r, "account"), accountName: g(r, "accountName"), username: g(r, "username"), pw: g(r, "pw"), phone: g(r, "phone"), url: g(r, "url"), notes: g(r, "notes"), status: st ? (/inactive|old|closed/i.test(st) ? "inactive" : "active") : section });
+  }
+  return out;
+}
+const loginMatch = r => S.logins.find(l => (l.account || "").toLowerCase() === r.account.toLowerCase() && (l.username || "").toLowerCase() === (r.username || "").toLowerCase());
+function openLoginImport() {
+  if (!S.vaultKey) return toast("Unlock the logins vault first.");
+  openSheet(`<h3>Import logins</h3>
+    <div style="font-size:13px;color:var(--muted)">Open your logins spreadsheet, select the table <b>including the header row</b>, copy, and paste it here. Columns are matched by name: Account, Account name, Username / email, Password, Phone, Link, Notes, Status. Rows like “Inactive accounts” mark the rows under them as inactive.</div>
+    <textarea id="li-paste" rows="9" autocomplete="off" spellcheck="false" placeholder="Account&#9;Account name&#9;Username / email&#9;Password&#9;Phone number&#9;Notes"></textarea>
+    <div id="li-prev" style="font-size:13px"></div>
+    <div class="notice" style="background:var(--surface-2);color:var(--muted);font-weight:500">Passwords are encrypted in this browser with your vault passphrase before saving. Logins with the same account and username are updated instead of duplicated. After importing, delete the plain spreadsheet copy if you no longer need it.</div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Import and encrypt</button></div>`,
+  async () => {
+    const ta = $("#li-paste"), rows = loginRows(ta.value);
+    if (!rows.length) return sheetError("Nothing to import. Paste the table with its header row.");
+    let add = 0, upd = 0, ord = S.logins.length;
+    for (const r of rows) {
+      const ex = loginMatch(r), { pw, ...rest } = r;
+      const data = { ...(ex ? clean(ex) : { order: ++ord }), ...Object.fromEntries(Object.entries(rest).filter(([k, v]) => v || k === "status")), updatedAt: Date.now() };
+      if (pw) data.pw = await vEnc(S.vaultKey, pw);
+      await save("logins", ex ? ex.id : uid("l"), data); ex ? upd++ : add++;
+    }
+    ta.value = ""; closeSheet(); toast(`Logins imported: ${add} new, ${upd} updated.`);
+  });
+}
+function loginImportPreview() {
+  const rows = loginRows($("#li-paste").value), el = $("#li-prev"); if (!el) return;
+  const ex = rows.filter(loginMatch).length;
+  el.innerHTML = rows.length ? `<b>${rows.length}</b> login${rows.length === 1 ? "" : "s"} found · ${rows.filter(r => r.pw).length} with passwords · ${rows.filter(r => r.status === "inactive").length} inactive${ex ? ` · ${ex} already saved (will be updated)` : ""}. Accounts: ${esc(rows.slice(0, 8).map(r => r.account).join(", "))}${rows.length > 8 ? "…" : ""}` : "";
+}
+
+/* ---------- my salary (My account) ---------- */
+function mySalary() {
+  const m = member(myMemberId()); if (!m) return "";
+  const t = mToday(), per = payPeriod(t.slice(0, 7), Number(t.slice(8)) <= 15 ? 1 : 2), c = payCalc(m, per);
+  const nm = (m.name || "").toLowerCase();
+  const hist = payRecRows().filter(r => r.memberId === m.id || (r.name || "").toLowerCase() === nm).sort((a, b) => b.payDate.localeCompare(a.payDate));
+  const yr = t.slice(0, 4), ytd = hist.filter(r => r.payDate.startsWith(yr)).reduce((a, r) => a + (Number(r.net) || 0), 0);
+  const a = v => `<span class="amt">${v}</span>`;
+  return `<section class="panel ${S.salShown ? "" : "blur-amt"}"><div class="head"><h2>My salary</h2><button class="btn sm ghost" type="button" data-act="sal-toggle">${S.salShown ? "Hide amounts" : "Show amounts"}</button></div>
+    <div class="kpis">
+      <div class="kpi"><span class="label">Daily rate</span><span class="value">${a(c.rate ? peso(c.rate) : "–")}</span><span class="sub">${esc(positionOf(m) || "No position yet")}</span></div>
+      <div class="kpi"><span class="label">This pay period so far</span><span class="value">${a(peso(c.net))}</span><span class="sub">${esc(per.label)} · ${c.paidDays} paid day${c.paidDays === 1 ? "" : "s"} · ${PAY_STATUS[c.status].name}</span></div>
+      <div class="kpi"><span class="label">Received in ${yr}</span><span class="value">${a(peso(ytd))}</span><span class="sub">${hist.filter(r => r.payDate.startsWith(yr)).length} pay dates</span></div>
+    </div>
+    <div class="list">
+      <div class="li"><span>Basic (${c.paidDays} × ${a(peso2(c.rate))})</span><span class="num">${a(peso2(c.basic))}</span></div>
+      <div class="li"><span>Additions${ADD_FIELDS.filter(([k]) => Number(c.rec[k])).length ? " · " + ADD_FIELDS.filter(([k]) => Number(c.rec[k])).map(([, n]) => n).join(", ") : ""}</span><span class="num">${a("+" + peso2(c.adds))}</span></div>
+      <div class="li"><span>Deductions${c.late ? ` · late ${c.late}×` : ""}</span><span class="num">${a("−" + peso2(c.deds))}</span></div>
+      <div class="li" style="font-weight:800"><span>Net so far</span><span class="num">${a(peso2(c.net))}</span></div>
+    </div>
+    ${S.dl ? `<div><button class="btn sm" type="button" data-act="my-ps">Download my payslip (${esc(per.label)})</button></div>` : ""}
+    ${hist.length ? `<details><summary style="cursor:pointer;font-weight:600;font-size:13px">Pay history (${hist.length})</summary><div class="table-wrap" style="border:0;margin-top:8px"><table class="otable"><thead><tr><th>Pay date</th><th>Position</th><th class="r">Daily rate</th><th class="r">Net pay</th><th>Note</th></tr></thead>
+      <tbody>${hist.slice(0, 24).map(r => `<tr style="cursor:default"><td class="nowrap" data-sort="${esc(r.payDate)}">${fmtLong(r.payDate)}</td><td>${esc(r.position || "")}</td><td class="r num">${a(r.rate ? peso(r.rate) : "")}</td><td class="r num" style="font-weight:700">${a(r.net !== "" && r.net != null ? peso2(r.net) : "")}</td><td>${esc(r.note || "")}</td></tr>`).join("")}</tbody></table></div></details>` : ""}
+    <div style="font-size:12px;color:var(--muted)">Estimate from your attendance; Finance confirms the final amount on payday. Questions about your pay? Message Finance.</div>
+  </section>`;
+}
+
+/* ---------- work style: Pomodoro ---------- */
+const WS_DEFAULT = { mode: "standard", focus: 25, short: 5, long: 15, every: 4 };
+const wsCfg = () => ({ ...WS_DEFAULT, ...((S.profile || {}).workStyle || {}) });
+async function setWorkStyle(chg) {
+  const ws = { ...wsCfg(), ...chg };
+  S.profile = { ...S.profile, workStyle: ws };
+  if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(S.profile);
+  if (chg.mode === "standard") pomoSave(null);
+  if (chg.mode === "pomodoro" && !pomoState()) pomoSave({ phase: "focus", running: false, left: ws.focus * 6e4, count: 0, day: mToday(), done: 0 });
+  render(); if (chg.mode) toast(chg.mode === "pomodoro" ? "Pomodoro on. Press ▶ on the timer to start a focus session." : "Standard work style.");
+}
+function workStylePanel() {
+  const ws = wsCfg(), st = pomoState();
+  const n = (k, label) => `<div class="field"><label for="ws-${k}">${label}</label><input id="ws-${k}" class="ws-num" data-k="${k}" type="number" min="1" max="120" value="${ws[k]}"></div>`;
+  return `<section class="panel"><h2>Work style</h2>
+    <div class="seg" role="group" aria-label="Work style"><button type="button" data-wstyle="standard" aria-pressed="${ws.mode !== "pomodoro"}">Standard</button><button type="button" data-wstyle="pomodoro" aria-pressed="${ws.mode === "pomodoro"}">🍅 Pomodoro</button></div>
+    <div style="font-size:13px;color:var(--muted)">${ws.mode === "pomodoro" ? `Work in focused blocks with short breaks. A timer stays at the bottom right on every page and chimes when it's time to switch.${st && st.day === mToday() && st.done ? ` Focus sessions today: <b>${st.done}</b>.` : ""}` : "Pomodoro = focus for 25 minutes, rest for 5, and take a longer break after every 4 rounds. Turn it on to get a timer."}</div>
+    ${ws.mode === "pomodoro" ? `<div class="row">${n("focus", "Focus (minutes)")}${n("short", "Short break")}${n("long", "Long break")}${n("every", "Long break after")}</div>
+      <div style="font-size:12px;color:var(--muted)">Pomodoro breaks are short pauses and don't change your attendance. For lunch or longer breaks, use ☕ Break in Attendance.</div>` : ""}
+  </section>`;
+}
+const pomoState = () => { try { return JSON.parse(localStorage.getItem("rs-pomo") || "null"); } catch (e) { return S.pomoMem || null; } };
+const pomoSave = v => { S.pomoMem = v; try { v ? localStorage.setItem("rs-pomo", JSON.stringify(v)) : localStorage.removeItem("rs-pomo"); } catch (e) {} };
+const pomoLen = (ph, ws = wsCfg()) => (ph === "focus" ? ws.focus : ph === "long" ? ws.long : ws.short) * 6e4;
+const pomoLeft = st => st.running ? Math.max(0, st.endAt - Date.now()) : st.left;
+function pomoAct(a) {
+  let st = pomoState() || { phase: "focus", running: false, left: pomoLen("focus"), count: 0, day: mToday(), done: 0 };
+  if (a === "toggle") st = st.running ? { ...st, running: false, left: pomoLeft(st) } : { ...st, running: true, endAt: Date.now() + st.left };
+  if (a === "reset") st = { ...st, running: false, left: pomoLen(st.phase) };
+  if (a === "skip") st = pomoNext(st, false);
+  pomoSave(st); renderPomo();
+}
+function pomoNext(st, finished) {
+  const ws = wsCfg();
+  if (st.day !== mToday()) st = { ...st, day: mToday(), done: 0 };
+  if (st.phase === "focus") {
+    const count = st.count + 1, ph = count % ws.every === 0 ? "long" : "short";
+    return { ...st, phase: ph, count, done: st.done + (finished ? 1 : 0), running: finished, left: pomoLen(ph), endAt: Date.now() + pomoLen(ph) };
+  }
+  return { ...st, phase: "focus", running: false, left: pomoLen("focus") };
+}
+function pomoChime() {
+  try { const A = window.AudioContext || window.webkitAudioContext, c = new A(); [0, .25, .5].forEach((t, i) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = [660, 880, 990][i]; g.gain.setValueAtTime(.0001, c.currentTime + t); g.gain.exponentialRampToValueAtTime(.2, c.currentTime + t + .02); g.gain.exponentialRampToValueAtTime(.0001, c.currentTime + t + .4); o.connect(g).connect(c.destination); o.start(c.currentTime + t); o.stop(c.currentTime + t + .45); }); } catch (e) {}
+}
+function renderPomo() {
+  const el = $("#pomo"); if (!el) return;
+  const st = pomoState();
+  const on = wsCfg().mode === "pomodoro" && !!st && !S.loggedOut;
+  document.body.classList.toggle("has-pomo", on);
+  if (!on) { el.hidden = true; return; }
+  const ms = pomoLeft(st), mm = Math.floor(ms / 6e4), ss = Math.floor(ms % 6e4 / 1e3);
+  const label = st.phase === "focus" ? "Focus" : st.phase === "long" ? "Long break" : "Break";
+  el.hidden = false; el.className = "pomo " + (st.phase === "focus" ? "focus" : "brk");
+  const html = `<span><span class="ph">🍅 ${label}${st.phase === "focus" ? " " + ((st.count % wsCfg().every) + 1) + "/" + wsCfg().every : ""}</span><br><span class="tm num">${mm}:${String(ss).padStart(2, "0")}</span></span>
+    <button type="button" data-pomo="toggle" aria-label="${st.running ? "Pause" : "Start"}">${st.running ? "❚❚" : "▶"}</button><button type="button" data-pomo="reset" aria-label="Restart this round">↺</button><button type="button" data-pomo="skip" aria-label="Skip to next">⏭</button>`;
+  if (el.dataset.h !== html) { el.innerHTML = html; el.dataset.h = html; }
+}
+setInterval(() => {
+  const st = pomoState();
+  if (st && st.running && Date.now() >= st.endAt && wsCfg().mode === "pomodoro") {
+    const nx = pomoNext(st, st.phase === "focus"); pomoSave(nx); pomoChime();
+    toast(st.phase === "focus" ? `Focus done! Take a ${nx.phase === "long" ? wsCfg().long : wsCfg().short}-minute break.` : "Break over. Press ▶ when you're ready to focus.");
+    if (S.view === "account") render();
+  }
+  renderPomo();
+}, 1000);
+
+/* ---------- Employee of the Month ---------- */
+const isCEO = () => S.isOwner || myDept() === "CEO";
+const EOM_CRIT = [
+  { k: "att", name: "Attendance & punctuality", how: "On-time days count fully, late days count half, absences count zero. Approved leave and days off don't count against you." },
+  { k: "tasks", name: "Tasks done on time", how: "Tasks due this month that are marked Done by their due date. Done late counts half." },
+  { k: "ceo", name: "Quality & attitude (CEO rating)", how: "The CEO rates 1–5 stars for work quality, customer care, initiative and attitude." },
+  { k: "votes", name: "Team votes", how: "Everyone gets one vote a month for a teammate (not themselves), with a short reason." },
+];
+const EOM_DEFAULT = {
+  weights: { att: 30, tasks: 25, ceo: 25, votes: 20 }, bonus: 1000, runnerBonus: 500,
+  rewards: "Winner: ₱1,000 cash bonus on the next payslip, 1 paid day off (use within 60 days), a certificate and a feature on Home\nRunner-up: ₱500 cash bonus on the next payslip\nPerfect attendance (no late, no absent all month): a 10 ml decant of their choice\nEmployee of the Year (most wins in the year, ties go to the higher total score): ₱5,000 and a full bottle of their choice",
+};
+const eomCfg = () => { const x = S.eomSettings || {}; return { ...EOM_DEFAULT, ...x, weights: { ...EOM_DEFAULT.weights, ...(x.weights || {}) } }; };
+const eomMonth = () => S.eomMonth || mToday().slice(0, 7);
+const prevYM = ym => { const [y, m] = ym.split("-").map(Number); return dstr(new Date(y, m - 2, 1, 12).getTime()).slice(0, 7); };
+const eomRec = ym => S.eom.find(e => e.id === ym) || {};
+const eomContenders = () => activeTeam().filter(m => m.department !== "CEO");
+function eomScores(ym) {
+  const w = eomCfg().weights, [y, mo] = ym.split("-").map(Number), dim = new Date(y, mo, 0).getDate();
+  const end = ym === mToday().slice(0, 7) ? mToday() : `${ym}-${String(dim).padStart(2, "0")}`;
+  const votes = S.eomvotes.filter(v => v.month === ym), vc = {};
+  votes.forEach(v => vc[v.nominee] = (vc[v.nominee] || 0) + 1);
+  const maxV = Math.max(0, ...Object.values(vc)), rec = eomRec(ym), prev = eomRec(prevYM(ym));
+  return eomContenders().map(m => {
+    let on = 0, late = 0, abs = 0;
+    for (let d = 1; d <= dim; d++) { const ds = `${ym}-${String(d).padStart(2, "0")}`; if (ds > end) break; const st = attStatus(ds, m.id); if (st === "present") on++; else if (st === "late") late++; else if (st === "absent") abs++; }
+    const wd = on + late + abs;
+    const tk = S.tasks.filter(t => t.assigneeId === m.id && t.due && t.due.slice(0, 7) === ym && t.due <= end && t.status !== "cancelled");
+    const done = tk.filter(t => t.status === "done"), ok = done.filter(t => !t.updatedAt || mDate(t.updatedAt) <= t.due).length;
+    const cr = Number((rec.ratings || {})[m.id]) || 0;
+    const parts = {
+      att: { r: wd ? (on + late * .5) / wd : null, note: wd ? `${on} on time · ${late} late · ${abs} absent` : "No work days yet" },
+      tasks: { r: tk.length ? (ok + (done.length - ok) * .5) / tk.length : null, note: tk.length ? `${ok} of ${tk.length} on time` : "No tasks due" },
+      ceo: { r: cr ? cr / 5 : null, note: cr ? `${cr} of 5 stars` : "Not rated yet" },
+      votes: { r: maxV ? (vc[m.id] || 0) / maxV : null, note: `${vc[m.id] || 0} vote${vc[m.id] === 1 ? "" : "s"}` },
+    };
+    let avail = 0, got = 0; for (const c of EOM_CRIT) if (parts[c.k].r !== null) { avail += Number(w[c.k]) || 0; got += (Number(w[c.k]) || 0) * parts[c.k].r; }
+    const why = abs > 2 ? "More than 2 absences" : prev.winner === m.id ? "Won last month" : "";
+    return { m, parts, score: avail ? Math.round(got / avail * 100) : 0, elig: !why, why, perfect: wd > 0 && !late && !abs && ym < mToday().slice(0, 7), cr, votes: vc[m.id] || 0 };
+  }).sort((a, b) => b.score - a.score || b.votes - a.votes);
+}
+function eomHomeCard() {
+  const ym = mToday().slice(0, 7), last = [...S.eom].filter(e => e.winner && e.id < ym && e.id >= prevYM(prevYM(ym))).sort((a, b) => b.id.localeCompare(a.id))[0];
+  if (!last || !member(last.winner)) return "";
+  const m = member(last.winner);
+  return `<button type="button" class="eom-card" data-nav="eom" style="text-align:left;color:inherit;font:inherit;width:100%">${avatar(m, 60, false)}<div><div class="eyebrow">Employee of the Month · ${monthLabel(last.id)}</div><div class="nm">${esc(m.nickname || m.name)}</div><div class="sub">${esc(last.citation || (dept(m.department) || {}).name || "")}</div></div><span class="eom-medal" aria-hidden="true">🏆</span></button>`;
+}
+function viewEom() {
+  const ym = eomMonth(), rec = eomRec(ym), cfg = eomCfg(), rows = eomScores(ym), ceo = isCEO() && !S.readOnly;
+  const me = myMemberId(), myVote = S.eomvotes.find(v => v.id === ym + "_" + me);
+  const cur = ym === mToday().slice(0, 7), future = ym > mToday().slice(0, 7);
+  const W = member(rec.winner), RU = member(rec.runnerUp);
+  const pick = [...rows.filter(r => r.elig), ...rows.filter(r => !r.elig)];
+  const optName = r => `${esc(r.m.nickname || r.m.name)} · ${r.score}${r.elig ? "" : " (not eligible: " + esc(r.why.toLowerCase()) + ")"}`;
+  const bonusBtn = (m, amt, kind) => ceo && m && amt && !(rec.bonus || {})[kind] ? `<button class="btn sm" type="button" data-act="eom-bonus" data-mid="${m.id}" data-amt="${amt}" data-kind="${kind}">Add ${peso(amt)} to ${esc(m.nickname || m.name)}'s payslip</button>` : (rec.bonus || {})[kind] ? `<span class="chip good">${peso(amt)} added to payslip</span>` : "";
+  const wins = {}; S.eom.filter(e => e.winner && e.id.startsWith(ym.slice(0, 4))).forEach(e => wins[e.winner] = (wins[e.winner] || 0) + 1);
+  return `<div class="toolbar"><div class="pager"><button class="btn sm" type="button" data-eommonth="-1" aria-label="Previous month">‹</button><strong style="min-width:150px;text-align:center">${monthLabel(ym)}</strong><button class="btn sm" type="button" data-eommonth="1" aria-label="Next month">›</button>${cur ? "" : `<button class="btn ghost sm" type="button" data-eommonth="0">This month</button>`}</div></div>
+    ${W ? `<div class="eom-card">${avatar(W, 72, false)}<div><div class="eyebrow">Employee of the Month · ${monthLabel(ym)}</div><div class="nm">${esc(W.nickname || W.name)}</div><div class="sub">${esc(rec.citation || "")}${RU ? ` · Runner-up: <b>${esc(RU.nickname || RU.name)}</b>` : ""}</div>
+      <div class="actions" style="margin-top:8px">${bonusBtn(W, cfg.bonus, "winner")} ${bonusBtn(RU, cfg.runnerBonus, "runner")}${ceo ? ` <button class="btn sm ghost" type="button" data-act="eom-unannounce">Undo announcement</button>` : ""}</div></div><span class="eom-medal" aria-hidden="true">🏆</span></div>` : ""}
+    <section class="panel"><div class="head"><h2>Leaderboard</h2><span style="font-size:12px;color:var(--muted)">${cur ? "Live, updates as the month goes" : future ? "Not started" : rec.winner ? "Final" : "Waiting for the CEO to announce"}</span></div>
+      <div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th class="r">#</th><th>Team member</th>${EOM_CRIT.map(c => `<th>${c.name.split(" (")[0]} <small style="color:var(--muted)">${cfg.weights[c.k]}</small></th>`).join("")}<th class="r">Score</th><th>Eligible</th></tr></thead>
+      <tbody>${rows.map((r, i) => `<tr style="cursor:default"><td class="r num">${i + 1}</td><td><div style="display:flex;gap:8px;align-items:center">${avatar(r.m, 30, false)}<div><b>${esc(r.m.nickname || r.m.name)}</b>${wins[r.m.id] ? ` <span class="chip">🏆×${wins[r.m.id]}</span>` : ""}${r.perfect ? ' <span class="chip good" title="Perfect attendance">Perfect attendance</span>' : ""}<div class="s">${esc((dept(r.m.department) || {}).name || "")}</div></div></div></td>
+        ${EOM_CRIT.map(c => { const p = r.parts[c.k]; const cell = c.k === "ceo" && ceo && !future ? `<select data-eomrate="${r.m.id}" aria-label="CEO rating for ${esc(r.m.name)}"><option value="0">Rate…</option>${[5, 4, 3, 2, 1].map(n => `<option value="${n}" ${r.cr === n ? "selected" : ""}>${"★".repeat(n)}</option>`).join("")}</select>` : `<span class="sbar"><i style="width:${p.r === null ? 0 : Math.round(p.r * 100)}%"></i></span><span class="s" style="display:inline">${esc(p.note)}</span>`; return `<td class="nowrap" data-sort="${p.r === null ? -1 : p.r}">${cell}</td>`; }).join("")}
+        <td class="r num" style="font-weight:800;font-size:15px">${r.score}</td><td>${r.elig ? '<span class="chip good">Yes</span>' : `<span class="chip warn" title="${esc(r.why)}">${esc(r.why)}</span>`}</td></tr>`).join("")}</tbody></table>
+      ${rows.length ? "" : `<div class="empty">Add your team in Admin → Directory first.</div>`}</div>
+      <div style="font-size:12px;color:var(--muted)">Score is out of 100. A criterion with no data yet (for example, no tasks due) is left out and the others are scaled up, so nobody loses points for it. Founders don't compete.</div>
+    </section>
+    ${!future && !rec.winner && me && member(me) ? `<section class="panel"><h2>Your vote for ${monthLabel(ym)}</h2>
+      <div class="row"><div class="field"><label for="eom-nom">Who went above and beyond?</label><select id="eom-nom"><option value="">Choose a teammate…</option>${eomContenders().filter(m => m.id !== me).map(m => `<option value="${m.id}" ${myVote && myVote.nominee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></div>
+        <div class="field" style="flex:2"><label for="eom-why">Why? (one line)</label><input id="eom-why" value="${esc(myVote ? myVote.reason || "" : "")}" placeholder="e.g. Covered packing on a busy day"></div></div>
+      <div><button class="btn primary sm" type="button" data-act="eom-vote">${myVote ? "Change my vote" : "Vote"}</button>${myVote ? ` <span style="font-size:13px;color:var(--muted)">You voted for <b>${esc(memberName(myVote.nominee))}</b>. Only the CEO sees who voted for whom.</span>` : ""}</div></section>` : ""}
+    ${ceo && !future && !rec.winner ? `<section class="panel"><h2>Announce the winner</h2>
+      <div class="row"><div class="field"><label for="eom-w">Employee of the Month</label><select id="eom-w">${pick.map((r, i) => `<option value="${r.m.id}" ${i === 0 ? "selected" : ""}>${optName(r)}</option>`).join("")}</select></div>
+        <div class="field"><label for="eom-r">Runner-up</label><select id="eom-r"><option value="">None</option>${pick.map((r, i) => `<option value="${r.m.id}" ${i === 1 ? "selected" : ""}>${optName(r)}</option>`).join("")}</select></div></div>
+      <div class="field"><label for="eom-cite">Short citation (shown on Home)</label><input id="eom-cite" placeholder="e.g. Zero late days and 40 orders packed same-day"></div>
+      <div><button class="btn primary" type="button" data-act="eom-announce">Announce</button> <span style="font-size:12px;color:var(--muted)">Best done on the 1st–3rd of next month, after the month closes.</span></div>
+      ${S.eomvotes.filter(v => v.month === ym).length ? `<details><summary style="cursor:pointer;font-size:13px;font-weight:600">See vote reasons (${S.eomvotes.filter(v => v.month === ym).length})</summary><div class="list">${S.eomvotes.filter(v => v.month === ym).map(v => `<div class="li"><span><b>${esc(memberName(v.voter))}</b> → ${esc(memberName(v.nominee))}</span><span style="color:var(--muted)">${esc(v.reason || "")}</span></div>`).join("")}</div></details>` : ""}
+    </section>` : ""}
+    <details class="panel" ${S.eom.some(e => e.winner) ? "" : "open"}><summary style="font-weight:700;cursor:pointer">How it works: criteria and rewards</summary>
+      <div class="crit" style="margin-top:12px">${EOM_CRIT.map(c => `<div><b class="num">${cfg.weights[c.k]}</b><strong>${c.name}</strong><span style="color:var(--muted)">${c.how}</span></div>`).join("")}</div>
+      <h2 style="margin-top:14px">Rules</h2>
+      <ul style="margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px"><li>Everyone except the founders can win.</li><li>Not eligible: more than 2 absences in the month (approved leave is fine), or winning the month before, so others get a turn.</li><li>The app suggests the top eligible score; the CEO makes the final call and announces it.</li><li>Ties go to the person with more team votes.</li></ul>
+      <h2 style="margin-top:14px">Rewards</h2>
+      <ul style="margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px">${cfg.rewards.split("\n").filter(Boolean).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
+      ${ceo && S.canEdit ? `<form id="eom-cfg" style="display:flex;flex-direction:column;gap:10px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
+        <div class="row">${EOM_CRIT.map(c => `<div class="field"><label for="ew-${c.k}">${c.name.split(" (")[0]} (points)</label><input id="ew-${c.k}" type="number" min="0" max="100" value="${cfg.weights[c.k]}"></div>`).join("")}</div>
+        <div class="row"><div class="field"><label for="ew-bonus">Winner cash bonus (₱)</label><input id="ew-bonus" type="number" min="0" step="100" value="${cfg.bonus}"></div><div class="field"><label for="ew-rbonus">Runner-up cash bonus (₱)</label><input id="ew-rbonus" type="number" min="0" step="100" value="${cfg.runnerBonus}"></div></div>
+        <div class="field"><label for="ew-rewards">Rewards (one per line)</label><textarea id="ew-rewards" rows="5">${esc(cfg.rewards)}</textarea></div>
+        <div><button class="btn primary sm" type="submit">Save criteria and rewards</button></div></form>` : ""}
+    </details>
+    ${S.eom.some(e => e.winner) ? `<section class="panel"><h2>Hall of fame</h2><div class="list">${[...S.eom].filter(e => e.winner).sort((a, b) => b.id.localeCompare(a.id)).map(e => `<div class="li"><span><b>${monthLabel(e.id)}</b> · ${esc(memberName(e.winner))}${e.runnerUp ? ` <span style="color:var(--muted)">(runner-up ${esc(memberName(e.runnerUp))})</span>` : ""}</span><span style="color:var(--muted);font-size:12.5px">${esc(e.citation || "")}</span></div>`).join("")}</div></section>` : ""}`;
+}
+async function eomRate(mid, n) {
+  const ym = eomMonth(), rec = eomRec(ym);
+  await save("eom", ym, { ...clean(rec), month: ym, ratings: { ...(rec.ratings || {}), [mid]: n }, updatedAt: Date.now() });
+}
+async function eomVote() {
+  const me = myMemberId(), nom = val("eom-nom"), ym = eomMonth();
+  if (!me) return toast("Link your name in My account first.");
+  if (!nom) return toast("Choose a teammate to vote for.");
+  await save("eomvotes", ym + "_" + me, { month: ym, voter: me, nominee: nom, reason: val("eom-why"), at: Date.now() });
+  toast(`Vote saved for ${memberName(nom)}.`);
+}
+async function eomAnnounce() {
+  const ym = eomMonth(), rec = eomRec(ym), w = val("eom-w"), r = val("eom-r");
+  if (!w) return toast("Nobody is eligible yet.");
+  if (r === w) return toast("The runner-up must be a different person.");
+  await save("eom", ym, { ...clean(rec), month: ym, winner: w, runnerUp: r, citation: val("eom-cite"), announcedAt: Date.now(), announcedBy: actor() });
+  toast(`🏆 ${memberName(w)} is Employee of the Month for ${monthLabel(ym)}!`);
+}
+async function eomUnannounce() {
+  const ym = eomMonth(), rec = eomRec(ym);
+  await save("eom", ym, { ...clean(rec), winner: "", runnerUp: "", citation: "", announcedAt: 0 });
+  toast("Announcement undone.");
+}
+async function eomBonus(mid, amt, kind) {
+  const ym = eomMonth(), rec = eomRec(ym);
+  const t = mToday(), key = `${t.slice(0, 7)}-${Number(t.slice(8)) <= 15 ? "A" : "B"}`, id = key + "_" + mid;
+  const ps = S.payroll.find(x => x.id === id) || {};
+  if (ps.status === "paid") return toast("That payslip is already paid. Add the bonus on the next one in Finance → Payroll.");
+  const note = `Employee of the Month ${kind === "winner" ? "" : "runner-up "}bonus (${monthLabel(ym)})`;
+  await save("payroll", id, { ...clean(ps), period: key, memberId: mid, incentives: (Number(ps.incentives) || 0) + amt, notes: [ps.notes, note].filter(Boolean).join(" · "), status: ps.status || "draft", updatedAt: Date.now() });
+  await save("eom", ym, { ...clean(rec), bonus: { ...(rec.bonus || {}), [kind]: { amt, payslip: id, at: Date.now() } } });
+  toast(`${peso(amt)} added to ${memberName(mid)}'s current payslip as Incentives.`);
+}
+async function saveEomCfg() {
+  const weights = Object.fromEntries(EOM_CRIT.map(c => [c.k, Math.max(0, Math.round(numv("ew-" + c.k)))]));
+  if (!Object.values(weights).some(Boolean)) return toast("Give at least one criterion some points.");
+  const data = { weights, bonus: numv("ew-bonus"), runnerBonus: numv("ew-rbonus"), rewards: val("ew-rewards") || EOM_DEFAULT.rewards, updatedAt: Date.now() };
+  if (S.db) await S.db.doc("config/eom").set(data); else S.eomSettings = data;
+  toast("Criteria and rewards saved."); render();
+}
+
 /* ---------- rendering ---------- */
+function renderNavPre() { try { renderPomo(); } catch (e) {} }
 function renderNav() {
+  renderNavPre();
   const item = (attrs, icon, label, current, extra = "", cls = "") => `<button type="button" class="${cls}" ${attrs} ${current ? 'aria-current="page"' : ""}>${svg(icon)}<span>${label}</span>${extra}</button>`;
   const inDept = S.view === "dept" || S.view === "depts";
   $("#nav").innerHTML =
@@ -778,6 +1238,7 @@ function renderNav() {
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
     item('data-nav="orders"', "orders", "Orders", S.view === "orders") +
     item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") +
+    item('data-nav="eom"', "award", "Awards", S.view === "eom") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
     visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico"), "desktop-only dept-item")).join("") +
@@ -797,6 +1258,8 @@ function headActions() {
     home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
     tasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
     attendance: ex("attendance"),
+    eom: "",
+    reviews: can ? `<button class="btn" type="button" data-act="rv-import">Import reviews</button><button class="btn primary" type="button" data-act="new-review">Add review</button>` : "",
     dtasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
     overview: can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "",
     dashboard: ex("orders"),
@@ -846,7 +1309,7 @@ function globalSearch(inp) {
 function renderInner() {
   renderNav();
   const d = dept(S.dept);
-  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments", orders: "Orders" }[S.view] || d.name;
+  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments", orders: "Orders", eom: "Employee of the Month" }[S.view] || d.name;
   $("#view-title").textContent = title;
   const dc = S.view === "dept" ? DEPT_COLORS[S.dept] : "";
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
@@ -863,6 +1326,7 @@ function renderInner() {
   if (S.view === "tasks") { v.innerHTML = viewTasks(null); return; }
   if (S.view === "account") { v.innerHTML = viewAccount(); return; }
   if (S.view === "attendance") { v.innerHTML = viewAttendance(); return; }
+  if (S.view === "eom") { v.innerHTML = viewEom(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
   if (S.view === "orders") { v.innerHTML = viewOrders(); return; }
   if (!canSee(S.dept)) { v.innerHTML = `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} isn't part of your access</h2><div class="empty">${myMemberId() ? "Your department decides what you can open. Ask the owner if you need this one." : `Link your name in <button type="button" class="linkish" data-nav="account">My account</button> first.`}</div></div>`; return; }
@@ -871,7 +1335,7 @@ function renderInner() {
   if (!dtabs.includes(S.tab)) S.tab = dtabs[0];
   const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
   const body = ({
-    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent,
+    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
     dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
@@ -1141,60 +1605,64 @@ function openTaskForm(id, date, forceDept) {
 }
 
 /* ---------- home ---------- */
-function slides() {
-  const h = S.home || {};
-  const fn = firstName();
-  const goals = (h.goals || "").split("\n").map(s => s.trim()).filter(Boolean);
-  const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === myMemberId() && (t.status === "todo" || t.status === "in_progress"));
-  const toPack = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
-  const placeholder = what => `<p class="slide-ph">${S.canEdit ? `Add your ${what} in <button type="button" class="linkish" data-act="edit-home">Admin → Home page</button>.` : `Your Admin hasn't added the ${what} yet.`}</p>`;
-  return [
-    { eyebrow: longDate(today()), title: `${greeting()}${fn ? ", " + esc(fn) : ""}`, body: `<p>${esc(h.welcome || "Welcome to Regal Spritz PH HQ. Here's what's happening today.")}</p>
-      <div class="slide-stats"><span><b class="num">${mine.length}</b> open task${mine.length === 1 ? "" : "s"} for you</span><span><b class="num">${S.tasks.filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length}</b> due today across the team</span><button type="button" class="slide-link" data-goorders="unfulfilled"><b class="num">${toPack}</b> order${toPack === 1 ? "" : "s"} to ship →</button></div>` },
-    { eyebrow: "RS Mission", title: "Our mission", body: h.mission ? `<p class="slide-quote">${esc(h.mission)}</p>` : placeholder("mission statement") },
-    { eyebrow: "RS Vision", title: "Our vision", body: h.vision ? `<p class="slide-quote">${esc(h.vision)}</p>` : placeholder("vision statement") },
-    { eyebrow: "RS Goals", title: "Our goals", body: goals.length ? `<ol class="slide-goals">${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ol>` : placeholder("goals") },
-  ];
+const QUOTES = [
+  ["A woman who doesn't wear perfume has no future.", "Coco Chanel"],
+  ["Perfume is the indispensable complement to the personality of women, the finishing touch on a dress.", "Christian Dior"],
+  ["Perfume is the art that makes memory speak.", "Francis Kurkdjian"],
+  ["Smell is a potent wizard that transports you across thousands of miles and all the years you have lived.", "Helen Keller"],
+  ["Nothing awakens a reminiscence like an odor.", "Victor Hugo"],
+  ["Perfume is the most intense form of memory.", "Jean-Paul Guerlain"],
+  ["Smells are surer than sounds or sights to make your heart-strings crack.", "Rudyard Kipling"],
+  ["Perfume is a story in odour, sometimes poetry in memory.", "Jean-Claude Ellena"],
+  ["Odours have a power of persuasion stronger than that of words, appearances, emotions, or will.", "Patrick Süskind"],
+  ["Where should one use perfume? Wherever one wants to be kissed.", "Coco Chanel"],
+  ["Perfume is the unseen, unforgettable, ultimate accessory of fashion.", "Coco Chanel"],
+  ["Luxury is in each detail.", "Hubert de Givenchy"],
+  ["Simplicity is the keynote of all true elegance.", "Coco Chanel"],
+  ["Quality is remembered long after the price is forgotten.", "Aldo Gucci"],
+  ["Perfume is like a new dress, it makes you quite simply marvellous.", "Estée Lauder"],
+  ["Elegance is not standing out, but being remembered.", "Giorgio Armani"],
+  ["Perfume is the key to our memories.", "Kate Lord Brown"],
+  ["The sense of smell can be extraordinarily evocative, bringing back pictures as sharp as photographs of scenes that had left the conscious mind.", "Thalassa Cruso"],
+];
+function quoteOfDay() {
+  const own = ((S.home || {}).quotes || "").split("\n").map(l => l.trim()).filter(Boolean).map(l => { const m = /^(.*?)\s*[—–-]{1,2}\s*([^—–-]+)$/.exec(l); return m && m[1] ? [m[1].replace(/^["“]|["”]$/g, ""), m[2].trim()] : [l.replace(/^["“]|["”]$/g, ""), ""]; });
+  const all = QUOTES.concat(own);
+  const d = mToday(), n = Math.floor((new Date(d + "T00:00:00Z") - new Date(d.slice(0, 4) + "-01-01T00:00:00Z")) / 864e5) + Number(d.slice(0, 4));
+  return all[n % all.length];
 }
 function viewHome() {
-  const sl = slides();
-  S.slide = S.slide % sl.length;
-  const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === myMemberId() && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
-  const monthTasks = S.tasks.filter(t => inMonth(t, today().slice(0, 7)));
+  const fn = firstName(), h = S.home || {}, mid = myMemberId();
+  const [q, who] = quoteOfDay();
+  const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === mid && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
+  const dueToday = S.tasks.filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
+  const showOrders = canSee("SALES") || canSee("PACKING") || visDepts().length > 0;
+  const toShip = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
+  const st = mid && member(mid) ? attStatus(mToday(), mid) : "";
+  const r = mid ? attRec(mToday(), mid) : null;
+  const goals = (h.goals || "").split("\n").map(x => x.trim()).filter(Boolean);
   return `${birthdayBanner()}
-  <section class="carousel" id="carousel" aria-roledescription="carousel" aria-label="Welcome">
-    <div class="car-track" id="car-track">${sl.map((s, i) => `<div class="slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${sl.length}" ${i !== S.slide ? 'aria-hidden="true"' : ""}>
-      <div class="slide-eyebrow">${s.eyebrow}</div><h2 class="slide-title">${s.title}</h2><div class="slide-body">${s.body}</div></div>`).join("")}</div>
-    <div class="car-ctrl">
-      <button type="button" class="car-btn" data-slidestep="-1" aria-label="Previous slide">‹</button>
-      <div class="car-dots">${sl.map((s, i) => `<button type="button" data-slide="${i}" aria-label="Show ${esc(s.eyebrow)}" aria-current="${i === S.slide}"></button>`).join("")}</div>
-      <button type="button" class="car-btn" data-slidestep="1" aria-label="Next slide">›</button>
-    </div>
+  <section class="hero" aria-label="Welcome">
+    <div class="hero-top"><span>${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span><span>Regal Spritz PH</span></div>
+    <h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}</h2>
+    <hr class="hero-rule">
+    <figure class="hero-q"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure>
   </section>
-  ${homeOrders()}
-  ${myClockCard()}
-  ${teamStrip()}
-  <div class="grid-2">
-    <section class="panel"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
-      ${myMemberId() ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
-        : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your tasks here.</div>`}
-    </section>
-    <section class="panel"><h2>Team this month</h2>${taskSummary(monthTasks, monthLabel(today().slice(0, 7)))}</section>
-  </div>
-  ${visDepts().length ? "" : "<!--"}<section class="panel"><h2>Departments</h2>
-    <div class="dept-grid">${visDepts().map(d => `<button type="button" class="dept-card" data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}">${svg(isUnlocked(d.id) ? "unlock" : "lock", "lock-ico")}<strong>${d.name}</strong><span>${d.blurb}</span></button>`).join("")}</div>
-  </section>${visDepts().length ? "" : "-->"}`;
+  <section class="today" aria-label="Today">
+    <button type="button" data-nav="tasks"><b class="num">${mine.length}</b><span>My open tasks</span></button>
+    <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
+    ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="eom"><b>🏆</b><span>Employee of the Month</span></button>`}
+    <div>${st ? `<b style="font-size:20px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
+      : `<b style="font-size:20px">–</b><span>Attendance</span><button type="button" class="linkish" data-nav="account" style="font-size:12px">Link your name</button>`}</div>
+  </section>
+  ${eomHomeCard()}
+  <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
+    ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 5).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
+      : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your tasks here.</div>`}
+  </section>
+  ${goals.length ? `<div class="goals-line"><b>Our goals</b>${goals.map(esc).join(" · ")}</div>` : ""}`;
 }
-function applySlide() {
-  const tr = $("#car-track"); if (!tr) return;
-  tr.style.transform = `translateX(-${S.slide * 100}%)`;
-  tr.querySelectorAll(".slide").forEach((s, i) => i === S.slide ? s.removeAttribute("aria-hidden") : s.setAttribute("aria-hidden", "true"));
-  document.querySelectorAll(".car-dots button").forEach((b, i) => b.setAttribute("aria-current", String(i === S.slide)));
-}
-const reduceMotion = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
-setInterval(() => { if (S.view === "home" && !S.slidePaused && !reduceMotion && $("#car-track") && $("#scrim").hidden) { S.slide = (S.slide + 1) % 4; applySlide(); } }, 7000);
-document.addEventListener("mouseover", e => { S.slidePaused = !!e.target.closest("#carousel"); });
-document.addEventListener("focusin", e => { S.slidePaused = !!e.target.closest("#carousel"); });
+function applySlide() {}
 
 function homeOrders() {
   const sales = canSee("SALES") || visDepts().length > 0, packing = canSee("PACKING");
@@ -1220,10 +1688,9 @@ function viewHomeContent() {
   const h = S.home || {};
   if (!S.canEdit) return `<div class="panel"><div class="empty">Only the owner or an Editor can change the Home page.</div></div>`;
   return `<form class="panel" id="home-form">
-    <div class="field"><label for="h-welcome">Welcome message (first slide)</label><textarea id="h-welcome" rows="2" placeholder="Welcome to Regal Spritz PH HQ. Here's what's happening today.">${esc(h.welcome || "")}</textarea></div>
-    <div class="field"><label for="h-mission">RS Mission</label><textarea id="h-mission" rows="3">${esc(h.mission || "")}</textarea></div>
-    <div class="field"><label for="h-vision">RS Vision</label><textarea id="h-vision" rows="3">${esc(h.vision || "")}</textarea></div>
-    <div class="field"><label for="h-goals">RS Goals (one per line)</label><textarea id="h-goals" rows="5">${esc(h.goals || "")}</textarea></div>
+    <div class="field"><label for="h-quotes">Your own quotes (optional, one per line, like: Scent is memory — Regal Spritz PH)</label><textarea id="h-quotes" rows="5">${esc(h.quotes || "")}</textarea>
+      <div style="font-size:12px;color:var(--muted)">Home shows one perfume quote a day. Yours are mixed in with ${QUOTES.length} classic quotes from Chanel, Dior, Guerlain and others.</div></div>
+    <div class="field"><label for="h-goals">RS Goals (one per line, shown quietly at the bottom of Home)</label><textarea id="h-goals" rows="4">${esc(h.goals || "")}</textarea></div>
     <div><button class="btn primary" type="submit">Save Home page</button></div>
   </form>`;
 }
@@ -1247,6 +1714,8 @@ function viewAccount() {
     </section>
   </div>
   ${myClockCard()}
+  ${mySalary()}
+  ${workStylePanel()}
   <section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div style="font-size:12px;color:var(--muted)">System follows your device's light or dark setting. Saved on this device.</div></section>
   <section class="panel"><h2>Department access</h2>
     ${S.isOwner ? `<div class="empty">You own this app, so every department opens without a password.</div>` : `
@@ -2861,7 +3330,10 @@ const ATT_STATUS = [
   { id: "notin", name: "Not in yet", cls: "", short: "" },
 ];
 const astat = id => ATT_STATUS.find(s => s.id === id) || ATT_STATUS[7];
-const attCfg = () => ({ start: "09:00", end: "18:00", grace: 15, workdays: [1, 2, 3, 4, 5, 6], ...(S.attSettings || {}) });
+const attCfg = () => ({ start: "09:00", end: "18:00", grace: 15, breakMin: 60, workdays: [1, 2, 3, 4, 5, 6], ...(S.attSettings || {}) });
+const onBreak = r => !!(r && r.in && !r.out && r.breaks && r.breaks.length && !r.breaks[r.breaks.length - 1].e);
+const breakMs = r => !r || !r.breaks ? 0 : r.breaks.reduce((a, b) => a + Math.max(0, (b.e || r.out || (mDate(b.s) === mToday() ? Date.now() : b.s)) - b.s), 0);
+const fmtMin = ms => { const m = Math.round(ms / 6e4); return m <= 0 ? "–" : m < 60 ? m + "m" : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`; };
 const attId = (date, mid) => date + "_" + mid;
 const attRec = (date, mid) => S.attendance.find(a => a.id === attId(date, mid));
 const isWorkday = d => attCfg().workdays.includes(new Date(d + "T12:00:00+08:00").getDay());
@@ -2873,7 +3345,7 @@ function attStatus(date, mid) {
   if (date < mToday()) return "absent";
   return "notin";
 }
-const hoursOf = r => r && r.in ? ((r.out || (mDate(r.in) === mToday() ? Date.now() : r.in)) - r.in) / 36e5 : 0;
+const hoursOf = r => r && r.in ? Math.max(0, ((r.out || (mDate(r.in) === mToday() ? Date.now() : r.in)) - r.in - breakMs(r)) / 36e5) : 0;
 const fmtHours = h => h > 0 ? `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, "0")}m` : "–";
 
 async function clock(mid, dir) {
@@ -2883,10 +3355,23 @@ async function clock(mid, dir) {
     if (r && r.in) { toast(`${memberName(mid)} already timed in at ${mTime(r.in)}.`); return; }
     await save("attendance", id, { ...(r ? clean(r) : {}), date, memberId: mid, in: now, out: 0, status: "present", recordedByName: by, updatedAt: now });
     toast(`${memberName(mid)} timed in at ${mTime(now)}.`);
+  } else if (dir === "bstart") {
+    if (!r || !r.in || r.out) { toast("Time in first."); return; }
+    if (onBreak(r)) return;
+    await patch("attendance", id, { breaks: [...(r.breaks || []), { s: now, e: 0 }], updatedAt: now });
+    toast(`${memberName(mid)} is on break since ${mTime(now)}. Allowed today: ${attCfg().breakMin} min.`);
+  } else if (dir === "bend") {
+    if (!onBreak(r)) return;
+    const b = r.breaks.map(x => ({ ...x })); b[b.length - 1].e = now;
+    await patch("attendance", id, { breaks: b, updatedAt: now });
+    const used = breakMs({ ...r, breaks: b });
+    toast(`Welcome back! Break today: ${fmtMin(used)}${used > attCfg().breakMin * 6e4 ? ` (over by ${fmtMin(used - attCfg().breakMin * 6e4)})` : ""}.`);
   } else {
     if (!r || !r.in) { toast("Time in first."); return; }
-    await patch("attendance", id, { out: now, updatedAt: now });
-    toast(`${memberName(mid)} timed out at ${mTime(now)} · ${fmtHours((now - r.in) / 36e5)}.`);
+    const upd = { out: now, updatedAt: now };
+    if (onBreak(r)) { const b = r.breaks.map(x => ({ ...x })); b[b.length - 1].e = now; upd.breaks = b; }
+    await patch("attendance", id, upd);
+    toast(`${memberName(mid)} timed out at ${mTime(now)} · ${fmtHours(hoursOf({ ...r, ...upd }))} worked.`);
   }
 }
 function clockButtons(mid, date) {
@@ -2894,15 +3379,16 @@ function clockButtons(mid, date) {
   const r = attRec(date, mid);
   if (r && r.status && !["present"].includes(r.status)) return "";
   if (!r || !r.in) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in</button>`;
-  if (!r.out) return `<button class="btn sm" type="button" data-clock="out" data-mid="${mid}">Time out</button>`;
+  if (!r.out) return onBreak(r) ? `<button class="btn sm primary" type="button" data-clock="bend" data-mid="${mid}">End break</button>`
+    : `<button class="btn sm" type="button" data-clock="bstart" data-mid="${mid}">☕ Break</button><button class="btn sm" type="button" data-clock="out" data-mid="${mid}">Time out</button>`;
   return "";
 }
 function myClockCard() {
   const mid = myMemberId(); if (!mid || !member(mid)) return "";
   const r = attRec(mToday(), mid), st = attStatus(mToday(), mid);
-  return `<section class="panel clock-card"><div class="head"><h2>My attendance today</h2><span class="chip ${astat(st).cls}">${astat(st).name}</span></div>
+  return `<section class="panel clock-card"><div class="head"><h2>My attendance today</h2><span class="chip ${onBreak(r) ? "warn" : astat(st).cls}">${onBreak(r) ? "On break" : astat(st).name}</span></div>
     <div class="clock-row"><div><div class="clock-big num" data-live-clock>${mTime(Date.now())}</div><div style="font-size:12px;color:var(--muted)">Manila time · shift ${esc(attCfg().start)}–${esc(attCfg().end)}</div></div>
-    <div style="font-size:13px">${r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))}` : "Not timed in yet"}</div>
+    <div style="font-size:13px">${r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))} worked${breakMs(r) ? ` · break ${fmtMin(breakMs(r))} of ${attCfg().breakMin}m` : ""}` : "Not timed in yet"}</div>
     <div class="actions">${clockButtons(mid, mToday())}</div></div></section>`;
 }
 setInterval(() => document.querySelectorAll("[data-live-clock]").forEach(e => e.textContent = mTime(Date.now())), 20000);
@@ -2928,13 +3414,14 @@ function viewAttendance() {
     <div class="toolbar">${seg}${deptSel}<span style="flex:1"></span>
       <div class="pager"><button class="btn sm" type="button" data-aday="-1" aria-label="Previous day">‹</button><input id="a-date" type="date" value="${A.date}" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 8px"><button class="btn sm" type="button" data-aday="1" aria-label="Next day">›</button><button class="btn ghost sm" type="button" data-aday="0">Today</button></div></div>
     <div class="table-wrap"><table class="otable">
-      <thead><tr><th>Team member</th><th>Department</th><th>Status</th><th>Time in</th><th>Time out</th><th class="r">Hours</th><th>Note</th><th></th></tr></thead>
+      <thead><tr><th>Team member</th><th>Department</th><th>Status</th><th>Time in</th><th>Time out</th><th class="r">Break</th><th class="r">Hours</th><th>Note</th><th></th></tr></thead>
       <tbody>${team.map(m => { const r = attRec(A.date, m.id), st = astat(attStatus(A.date, m.id)); return `<tr data-att="${m.id}">
         <td style="font-weight:600">${esc(m.name)}${m.id === myMemberId() ? ' <span class="chip">You</span>' : ""}</td>
         <td>${esc((dept(m.department) || { name: "–" }).name)}</td>
-        <td><span class="chip ${st.cls}">${st.name}</span></td>
+        <td><span class="chip ${st.cls}">${st.name}</span>${onBreak(r) ? ' <span class="chip warn">On break</span>' : ""}</td>
         <td class="num nowrap">${r && r.in ? mTime(r.in) : "–"}</td>
         <td class="num nowrap">${r && r.out ? mTime(r.out) : r && r.in ? '<span style="color:var(--muted)">still in</span>' : "–"}</td>
+        <td class="r num nowrap" data-sort="${Math.round(breakMs(r) / 6e4)}" style="color:${breakMs(r) > attCfg().breakMin * 6e4 ? "var(--warn)" : "inherit"}">${fmtMin(breakMs(r))}${r && r.breaks && r.breaks.length > 1 ? ` <small style="color:var(--muted)">×${r.breaks.length}</small>` : ""}</td>
         <td class="r num">${fmtHours(hoursOf(r))}</td>
         <td style="max-width:200px;color:var(--muted)">${esc(r && r.note || "")}</td>
         <td class="r nowrap">${clockButtons(m.id, A.date)} ${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-att" data-mid="${m.id}">Edit</button>`}</td></tr>`; }).join("")}</tbody>
@@ -2961,7 +3448,9 @@ function viewAttendance() {
   const settings = S.canEdit ? `<details class="panel"><summary style="font-weight:700;cursor:pointer">Attendance settings</summary>
     <form id="att-cfg" style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
       <div class="row"><div class="field"><label for="ac-start">Shift starts</label><input id="ac-start" type="time" value="${esc(c.start)}"></div><div class="field"><label for="ac-end">Shift ends</label><input id="ac-end" type="time" value="${esc(c.end)}"></div></div>
-      <div class="field"><label for="ac-grace">Grace period before "Late" (minutes)</label><input id="ac-grace" type="number" min="0" step="1" value="${Number(c.grace) || 0}"></div>
+      <div class="row"><div class="field"><label for="ac-grace">Grace period before "Late" (minutes)</label><input id="ac-grace" type="number" min="0" step="1" value="${Number(c.grace) || 0}"></div>
+        <div class="field"><label for="ac-break">Break time allowed per day (minutes)</label><input id="ac-break" type="number" min="0" step="5" value="${Number(c.breakMin) || 0}"></div></div>
+      <div style="font-size:12px;color:var(--muted)">Break time is not counted in hours worked. Going over the allowed break shows in orange.</div>
       <fieldset class="field" style="border:0;padding:0;margin:0"><legend style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">Work days</legend><div style="display:flex;gap:10px;flex-wrap:wrap">${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => `<label style="display:flex;gap:4px;align-items:center;font-size:13px"><input type="checkbox" name="ac-wd" value="${i}" ${c.workdays.includes(i) ? "checked" : ""}> ${d}</label>`).join("")}</div></fieldset>
       <div><button class="btn primary" type="submit">Save settings</button></div>
     </form></details>` : "";
@@ -2982,6 +3471,11 @@ function openAttForm(mid) {
       <div class="field"><label for="at-in">Time in</label><input id="at-in" type="time" value="${hhmm(r.in)}"></div>
       <div class="field"><label for="at-out">Time out</label><input id="at-out" type="time" value="${hhmm(r.out)}"></div>
     </div>
+    <div class="row">
+      <div class="field"><label for="at-bs">Break start</label><input id="at-bs" type="time" value="${hhmm(r.breaks && r.breaks[0] && r.breaks[0].s)}"></div>
+      <div class="field"><label for="at-be">Break end</label><input id="at-be" type="time" value="${hhmm(r.breaks && r.breaks[0] && r.breaks[0].e)}"></div>
+    </div>
+    ${r.breaks && r.breaks.length > 1 ? `<div style="font-size:12px;color:var(--muted)">Plus ${r.breaks.length - 1} more break${r.breaks.length > 2 ? "s" : ""} (${fmtMin(breakMs({ ...r, breaks: r.breaks.slice(1) }))}), kept as is.</div>` : ""}
     <div class="field"><label for="at-note">Note</label><input id="at-note" value="${esc(r.note || "")}" placeholder="e.g. Half day, approved by CEO"></div>
     ${r.recordedByName ? `<div style="font-size:12px;color:var(--muted)">Last recorded by ${esc(r.recordedByName)}${r.updatedAt ? " · " + relTime(r.updatedAt) : ""}</div>` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
@@ -2993,8 +3487,11 @@ function openAttForm(mid) {
     if (!status) { closeSheet(); return; }
     if (status === "present" && !tin) return sheetError("Enter a time in, or choose a leave status.");
     if (tin && tout && tout < tin) return sheetError("Time out is earlier than time in.");
+    const bs = fromHHMM(date, val("at-bs")), be = fromHHMM(date, val("at-be"));
+    if (bs && be && be < bs) return sheetError("Break end is earlier than break start.");
+    const breaks = status === "present" ? [...(bs ? [{ s: bs, e: be || 0 }] : []), ...((r.breaks || []).slice(1))] : [];
     const by = (member(myMemberId()) || {}).name || (S.me && S.me.name) || "";
-    await save("attendance", attId(date, mid), { date, memberId: mid, status, in: status === "present" ? tin : 0, out: status === "present" ? tout : 0, note: val("at-note"), recordedByName: by, updatedAt: Date.now() });
+    await save("attendance", attId(date, mid), { date, memberId: mid, status, in: status === "present" ? tin : 0, out: status === "present" ? tout : 0, breaks, note: val("at-note"), recordedByName: by, updatedAt: Date.now() });
     closeSheet(); toast("Attendance saved.");
   });
 }
@@ -3481,7 +3978,7 @@ function viewLogins() {
   const section = (title, rows) => `<tr class="grp"><td colspan="6">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>
       <td style="font-weight:600">${esc(l.account)}</td><td>${esc(l.accountName || "")}</td><td style="user-select:all">${esc(l.username || "")}</td>
       <td>${pwCell(l)}</td><td class="nowrap num">${esc(l.phone || "")}</td><td style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${esc(l.notes || "")}</td></tr>`).join("");
-  return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins"></div>
+  return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins">${can ? `<span style="flex:1"></span><button class="btn" type="button" data-act="login-import">Import from spreadsheet</button>` : ""}</div>
     <div class="table-wrap"><table class="otable logins"><thead><tr><th>Account</th><th>Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th>Notes</th></tr></thead>
     <tbody>${section("Active accounts", list.filter(l => l.status !== "inactive"))}${section("Inactive accounts", list.filter(l => l.status === "inactive"))}</tbody></table></div>
     ${S.canEdit ? `<details class="panel"><summary style="cursor:pointer;font-weight:600">Change vault passphrase</summary>
@@ -3523,13 +4020,12 @@ const DEPT_POSITION = { CEO: "Founders", ADMIN: "Admin", MARKETING: "Marketing",
 const payCfg = () => ({ positions: DEFAULT_POSITIONS.map(([name, rate]) => ({ name, rate })), deductLate: false, paidLeave: false, paidHoliday: false, ...(S.paySettings || {}) });
 const positionOf = m => m.payPosition || DEPT_POSITION[m.department] || "";
 const rateOf = m => { if (m.dailyRate) return Number(m.dailyRate); const p = payCfg().positions.find(x => x.name === positionOf(m)); return p ? Number(p.rate) : 0; };
-function payPeriod() {
-  const [y, mo] = S.pay.month.split("-").map(Number), dim = new Date(y, mo, 0).getDate();
-  const half = S.pay.half;
+function payPeriod(month = S.pay.month, half = S.pay.half) {
+  const [y, mo] = month.split("-").map(Number), dim = new Date(y, mo, 0).getDate();
   const from = half === 2 ? 16 : 1, to = half === 1 ? 15 : dim;
-  const d = n => `${S.pay.month}-${String(n).padStart(2, "0")}`;
-  const label = half === 0 ? monthLabel(S.pay.month) : `${new Date(y, mo - 1, from).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}–${to}, ${y}`;
-  return { start: d(from), end: d(to), key: `${S.pay.month}-${half === 0 ? "M" : half === 1 ? "A" : "B"}`, label };
+  const d = n => `${month}-${String(n).padStart(2, "0")}`;
+  const label = half === 0 ? monthLabel(month) : `${new Date(y, mo - 1, from).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}–${to}, ${y}`;
+  return { start: d(from), end: d(to), key: `${month}-${half === 0 ? "M" : half === 1 ? "A" : "B"}`, label };
 }
 const ADD_FIELDS = [["overtime", "Overtime"], ["holidayPay", "Holiday pay"], ["allowance", "Allowance"], ["incentives", "Incentives / commission"], ["otherAdd", "Other additions"]];
 const DED_FIELDS = [["cashAdvance", "Cash advance"], ["sss", "SSS"], ["philhealth", "PhilHealth"], ["pagibig", "Pag-IBIG"], ["otherDed", "Other deductions"]];
@@ -3687,8 +4183,8 @@ async function copyPayslip(mid) {
   try { await navigator.clipboard.writeText(text); toast("Payslip copied. Paste it in Messenger or Viber."); }
   catch (e) { openSheet(`<h3>Payslip text</h3><textarea id="ps-text" rows="18" style="width:100%;font-family:monospace;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg)">${esc(text)}</textarea><div style="font-size:12px;color:var(--muted)">Select all and copy.</div><div class="sheet-foot"><button class="btn primary" type="button" data-act="close">Done</button></div>`, null); const t = $("#ps-text"); t.focus(); t.select(); }
 }
-async function downloadPayslip(mid) {
-  const m = member(mid), per = payPeriod(), c = payCalc(m, per);
+async function downloadPayslip(mid, per = payPeriod()) {
+  const m = member(mid), c = payCalc(m, per);
   const name = `payslip-${(m.nickname || m.name).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${per.key}`;
   try { await S.dl.save({ filename: name + ".html", data: payslipHTML(c, per) }); toast("Payslip downloaded."); }
   catch (e) {
@@ -3810,6 +4306,14 @@ document.addEventListener("click", guard(async ev => {
   if (pwb) return loginPwAction(pwb.dataset.pw, pwb.dataset.do);
   const th = ev.target.closest("[data-theme-set]");
   if (th) return setTheme(th.dataset.themeSet);
+  const em = ev.target.closest("[data-eommonth]");
+  if (em) { const k = Number(em.dataset.eommonth); const [y, m] = eomMonth().split("-").map(Number); S.eomMonth = k ? dstr(new Date(y, m - 1 + k, 1, 12).getTime()).slice(0, 7) : mToday().slice(0, 7); render(); return; }
+  const rs = ev.target.closest("[data-rvstars]");
+  if (rs) { S.rv.stars = S.rv.stars === rs.dataset.rvstars ? "" : rs.dataset.rvstars; render(); return; }
+  const ws = ev.target.closest("[data-wstyle]");
+  if (ws) return setWorkStyle({ mode: ws.dataset.wstyle });
+  const pmo = ev.target.closest("[data-pomo]");
+  if (pmo) return pomoAct(pmo.dataset.pomo);
   const ck = ev.target.closest("[data-clock]");
   if (ck) return clock(ck.dataset.mid, ck.dataset.clock);
   const am = ev.target.closest("[data-amode]");
@@ -3848,6 +4352,19 @@ document.addEventListener("click", guard(async ev => {
   switch (b.dataset.act) {
     case "new-order": return openOrderForm();
     case "lock-dept": S.unlocked.delete(S.dept); saveUnlocked(); render(); toast(`${dept(S.dept).name} locked.`); return;
+    case "new-review": return openReviewForm();
+    case "edit-review": return openReviewForm(id);
+    case "rv-toggle": { const r = S.reviews.find(x => x.id === id); if (!r) return; await patch("reviews", id, { status: r.status === "hidden" ? "shown" : "hidden", updatedAt: Date.now() }); toast(r.status === "hidden" ? "Review shown." : "Review hidden."); return; }
+    case "del-review": await remove("reviews", id); closeSheet(); toast("Review deleted."); return;
+    case "rv-clear": S.rv = { stars: "", status: "", sort: S.rv.sort, source: "" }; S.rvq = ""; render(); return;
+    case "rv-import": return openReviewImport();
+    case "login-import": return openLoginImport();
+    case "eom-vote": return eomVote();
+    case "eom-announce": return eomAnnounce();
+    case "eom-unannounce": return eomUnannounce();
+    case "eom-bonus": return eomBonus(b.dataset.mid, Number(b.dataset.amt), b.dataset.kind);
+    case "my-ps": { const t = mToday(); return downloadPayslip(myMemberId(), payPeriod(t.slice(0, 7), Number(t.slice(8)) <= 15 ? 1 : 2)); }
+    case "sal-toggle": S.salShown = !S.salShown; render(); return;
     case "lock-all": S.unlocked.clear(); saveUnlocked(); render(); toast("All departments locked on this device."); return;
     case "edit-home": closeSheet(); S.view = "dept"; S.dept = "ADMIN"; S.tab = "homecontent"; saveNav(); render(); return;
     case "new-member": return openMemberForm();
@@ -3937,7 +4454,7 @@ document.addEventListener("click", guard(async ev => {
     case "clear-ex": $("#clear-slot").innerHTML = `<span class="confirm">Delete all example rows? <button class="btn sm danger" type="button" data-act="clear-ex-yes">Yes, clear</button><button class="btn sm" type="button" data-act="clear-ex-no">Keep</button></span>`; return;
     case "clear-ex-no": render(); return;
     case "clear-ex-yes": return clearExamples();
-    case "ask-del-order": case "ask-del-product": case "ask-del-expense": case "ask-del-task": case "ask-del-member": case "ask-del-login": case "ask-del-fixed": case "ask-del-due": case "ask-del-check": case "ask-del-birtax": case "ask-del-att": case "ask-del-inv": {
+    case "ask-del-order": case "ask-del-product": case "ask-del-expense": case "ask-del-task": case "ask-del-member": case "ask-del-login": case "ask-del-fixed": case "ask-del-due": case "ask-del-check": case "ask-del-birtax": case "ask-del-att": case "ask-del-inv": case "ask-del-review": {
       const kind = b.dataset.act.slice(8);
       const extra = kind === "order" ? " Stock is not changed; set payment to Voided first if you want items back in stock." : "";
       $("#del-slot").innerHTML = `<div class="confirm">Delete this ${({ att: "attendance record", member: "team member", inv: "record and its payment history" })[kind] || kind}? This can't be undone.${extra} <button class="btn sm danger" type="button" data-act="del-${kind}" data-id="${id}">Delete</button><button class="btn sm" type="button" data-act="close">Keep</button></div>`;
@@ -3972,6 +4489,9 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "t-person") { S.t.person = t.value; render(); return; }
   if (t.id === "t-dept") { S.t.dept = t.value; render(); return; }
   if (t.id === "k-status" && t.value === "done") { $("#k-prog").value = 100; $("#k-prog-val").textContent = "100%"; return; }
+  if (t.id === "rv-stars" || t.id === "rv-status" || t.id === "rv-sort" || t.id === "rv-source") { S.rv[t.id.slice(3)] = t.value; render(); return; }
+  if (t.dataset.eomrate) return eomRate(t.dataset.eomrate, Number(t.value));
+  if (t.matches(".ws-num")) return setWorkStyle({ [t.dataset.k]: Math.max(1, Math.round(Number(t.value) || 1)) });
   if (t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
   if (t.id === "ei-dtype") return eiTotal();
@@ -4003,7 +4523,9 @@ document.addEventListener("input", ev => {
   if (t.classList.contains("jnt-f") && t.tagName === "INPUT") { jntField(t, true); return; }
   if (t.id === "spq") { S.sp.q = t.value; const pos = t.selectionStart; render(); const el = $("#spq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } return; }
   if (t.id === "aq") { S.aq = t.value; const pos = t.selectionStart; render(); const el = $("#aq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } return; }
-  const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq" }[t.id];
+  if (t.id === "li-paste") return loginImportPreview();
+  if (t.id === "rvi-paste") return reviewImportPreview();
+  const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq", rvq: "rvq" }[t.id];
   if (!key) return;
   if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; if (key === "liq") S.lpage = 0; }
   const pos = t.selectionStart; render();
@@ -4021,15 +4543,16 @@ document.addEventListener("submit", guard(async ev => {
   if (ev.target.id === "vault-form") { ev.preventDefault(); return vaultSubmit(); }
   if (ev.target.id === "vault-change") { ev.preventDefault(); return vaultChange(); }
   if (ev.target.id === "pay-cfg") { ev.preventDefault(); return savePayCfg(); }
+  if (ev.target.id === "eom-cfg") { ev.preventDefault(); return saveEomCfg(); }
   if (ev.target.id === "att-cfg") {
     ev.preventDefault();
-    const data = { start: val("ac-start") || "09:00", end: val("ac-end") || "18:00", grace: Math.max(0, Math.round(numv("ac-grace"))), workdays: [...document.querySelectorAll('input[name="ac-wd"]:checked')].map(x => Number(x.value)) };
+    const data = { start: val("ac-start") || "09:00", end: val("ac-end") || "18:00", grace: Math.max(0, Math.round(numv("ac-grace"))), breakMin: Math.max(0, Math.round(numv("ac-break"))), workdays: [...document.querySelectorAll('input[name="ac-wd"]:checked')].map(x => Number(x.value)) };
     if (S.db) await S.db.doc("config/attendance").set(data); else S.attSettings = data;
     toast("Attendance settings saved."); render(); return;
   }
   if (ev.target.id === "home-form") {
     ev.preventDefault();
-    const data = { welcome: val("h-welcome"), mission: val("h-mission"), vision: val("h-vision"), goals: val("h-goals"), updatedAt: Date.now() };
+    const data = { ...(S.home || {}), quotes: val("h-quotes"), goals: val("h-goals"), updatedAt: Date.now() };
     if (S.db) await S.db.doc("config/home").set(data); else S.home = data;
     toast("Home page saved."); render();
   }
@@ -4219,10 +4742,11 @@ render();
     db.doc("config/home").onSnapshot(s => { S.home = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/payroll").onSnapshot(s => { S.paySettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/attendance").onSnapshot(s => { S.attSettings = s.exists ? s.data() : {}; keep(); }, () => {});
+    db.doc("config/eom").onSnapshot(s => { S.eomSettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes"]) {
       db.collection(col).onSnapshot(snap => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         if (col === "orders") { S.orders = docs.filter(r => !r.archived).map(norm); S.archived = docs.filter(r => r.archived); }
