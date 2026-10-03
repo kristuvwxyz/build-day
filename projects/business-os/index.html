@@ -393,6 +393,34 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
 .wb-row .wb-in { flex: 1; min-width: 160px; }
 .wb-done { width: 100%; font-size: 13px; }
 .ei-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px 110px auto; gap: 6px; }
+.status.st-orange { background: var(--orange-bg); color: var(--orange); border-color: transparent; }
+.status.st-amber { background: var(--amber-bg); color: var(--amber); border-color: transparent; }
+.status.st-green { background: var(--good-bg); color: var(--good); border-color: transparent; }
+.status.st-red { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+.status.st-violet { background: color-mix(in srgb, #8B5CF6 14%, var(--surface)); color: #7C3AED; border-color: transparent; }
+.status.st-blue { background: color-mix(in srgb, #3B82F6 14%, var(--surface)); color: #2563EB; border-color: transparent; }
+.status.st-teal { background: color-mix(in srgb, #0D9488 14%, var(--surface)); color: #0F766E; border-color: transparent; }
+.status.st-grey { background: var(--surface-2); color: var(--fg); border-color: transparent; }
+.items-btn { border: 1px dashed var(--line); background: none; border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 13px; cursor: pointer; color: inherit; }
+.items-btn:hover { border-color: var(--fg); }
+.ipop { position: fixed; z-index: 40; width: min(380px, calc(100vw - 16px)); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.ipop-h { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); } .ipop-h b { color: var(--fg); }
+.ipop-i { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); }
+.ipop-t { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 6px; }
+.from { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 5px; background: var(--info-bg); color: var(--info); }
+.olog { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.olog-h { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+.olog b { color: var(--fg); font-weight: 600; } .olog span { opacity: .8; }
+.supbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; }
+.supbar .lab { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 4px; }
+.supbar button[data-sup] { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; color: inherit; }
+.supbar button[data-sup] span { opacity: .55; margin-left: 2px; }
+.supbar button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.colrows { display: flex; flex-direction: column; gap: 4px; }
+.colrow { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.colrow label { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.radio-line { display: flex; gap: 8px; align-items: center; font-size: 13.5px; padding: 4px 0; font-weight: 400; }
+.wb-cell .wb-row { flex-wrap: nowrap; } .wb-cell .wb-in { min-width: 130px; }
 @media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -480,7 +508,23 @@ const tagStage = tags => { const set = new Set((tags || []).map(normTag)); for (
 const fulFromTags = (f, tags) => !OPEN_FUL.has(f) ? f : (tagStage(tags) || (STAGE_IDS.has(f) ? "unfulfilled" : f));
 const STAGE_TAGS = new Set(STAGES.map(x => x.tag));
 const withStageTag = (tags, f) => { const st = STAGES.find(x => x.id === f); const rest = (tags || []).filter(t => !STAGE_TAGS.has(normTag(t))); return st ? [...rest, st.tag] : rest; };
-const COURIERS = ["J&T Express", "LBC", "Flash Express", "Ninja Van", "2GO", "XDE", "Lalamove", "Grab Express", "Other"];
+const COURIERS = ["J&T", "SDD"];
+const SHOP_COMPANY = { "J&T": "J&T Express", SDD: "Other" };
+const courierOf = o => { const c = o.courier || ""; if (/j\s*&?\s*t|jnt/i.test(c)) return "J&T"; if (c === "SDD") return "SDD"; return o.pickup ? "SDD" : "J&T"; };
+const pickCourier = (title, hasAddr) => /j\s*&\s*t|jnt|j\s*n\s*t/i.test(title || "") ? "J&T" : (!hasAddr || /pick ?up|branch|sdd|same ?day/i.test(title || "")) ? "SDD" : "J&T";
+const onum = o => [o.num, ...(o.merged || [])].map(n => "#" + n).join(" ");
+const findOrder = id => S.orders.find(o => o.id === id) || S.archived.find(o => o.id === id);
+/* who can do what on orders: CEO, Sales, Admin everything · Finance payment + fulfillment · Packing fulfillment + shipping · others view */
+const myDept = () => S.isOwner ? "CEO" : ((member(myMemberId()) || {}).department || "");
+const orderRole = () => S.readOnly ? "view" : (S.isOwner || ["CEO", "SALES", "ADMIN"].includes(myDept())) ? "all" : myDept() === "FINANCE" ? "status" : myDept() === "PACKING" ? "pack" : "view";
+const canAll = () => orderRole() === "all";
+const canPay = () => ["all", "status"].includes(orderRole());
+const canFul = () => ["all", "status", "pack"].includes(orderRole());
+const canShip = () => ["all", "pack"].includes(orderRole());
+const actor = () => { const m = member(myMemberId()); if (m) return `${m.nickname || m.name}, the ${m.role || (dept(m.department) || {}).name || "team"}`; return ((S.me && S.me.name) || "Owner") + (S.isOwner ? ", the owner" : ""); };
+const logAdd = (o, msgs, by) => [...(o.log || []), ...msgs.map(msg => ({ at: Date.now(), by: by || actor(), msg }))].slice(-80);
+const salesTeam = () => activeTeam().filter(m => m.department === "SALES");
+const clsKey = st => String(st.cls || "").split(" ")[0] || "grey";
 const ORDER_VIEWS = [
   { id: "all", name: "All" },
   { id: "unfulfilled", name: "To ship" },
@@ -518,14 +562,14 @@ const svg = (k, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none
 const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Has note"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
 const DEPTS = [
-  { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "listings", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
-  { id: "FINANCE", name: "Finance", tabs: ["dashboard", "fixed", "dues", "checks", "payroll", "payrecords", "bir", "investors", "expenses", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
-  { id: "SALES", name: "Sales", tabs: ["orders", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
-  { id: "MARKETING", name: "Marketing", tabs: ["channels", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
-  { id: "PACKING", name: "Packing", tabs: ["packing", "inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
+  { id: "CEO", name: "CEO", tabs: ["overview", "orders", "dtasks"], blurb: "Whole-business overview" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "listings", "logins", "passwords", "homecontent", "dtasks"], blurb: "Directory, logins, passwords, Home page" },
+  { id: "FINANCE", name: "Finance", tabs: ["dashboard", "orders", "fixed", "dues", "checks", "payroll", "payrecords", "bir", "investors", "expenses", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
+  { id: "SALES", name: "Sales", tabs: ["orders", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
+  { id: "MARKETING", name: "Marketing", tabs: ["channels", "orders", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
+  { id: "PACKING", name: "Packing", tabs: ["packing", "orders", "inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", archived: "Archived orders", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -537,12 +581,12 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
-  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [],
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [],
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
   att: { mode: "day", date: "", month: "", dept: "" },
-  loaded: { products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false },
+  loaded: { colprefs: false, products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false },
   pay: { month: "", half: 1 }, paySettings: {},
   view: "home", dept: "SALES", tab: "orders", period: "month",
   of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
@@ -666,6 +710,13 @@ async function updateOrder(o, ch) {
     if (!was && will) { upd.voidedAt = now; if (!o.noStock && !o.restocked) { upd.restocked = true; stockDelta = 1; } }
     if (was && !will) { upd.voidedAt = 0; if (!o.noStock && o.restocked) { upd.restocked = false; stockDelta = -1; } }
   }
+  const L = { payment: ["Payment Status", v => pay(v).name], fulfillment: ["Fulfillment Status", v => ful(v).name], courier: ["Courier", v => v], tracking: ["Tracking #", v => v || "(cleared)"], assignee: ["Assigned to", v => v ? memberName(v) : "Unassigned"] };
+  const msgs = [];
+  for (const [k, [lab, f]] of Object.entries(L)) if (upd[k] !== undefined && upd[k] !== (o[k] ?? (k === "courier" ? courierOf(o) : undefined))) msgs.push(`changed ${lab} → ${f(upd[k])}`);
+  if (upd.tags) { const add = upd.tags.filter(t => !(o.tags || []).includes(t)), rm = (o.tags || []).filter(t => !upd.tags.includes(t)); if (add.length) msgs.push(`added tag ${add.join(", ")}`); if (rm.length) msgs.push(`removed tag ${rm.join(", ")}`); }
+  if (upd.note !== undefined && (upd.note || "") !== (o.note || "")) msgs.push("edited the note");
+  const by = upd._by; delete upd._by;
+  if (msgs.length) upd.log = logAdd(o, msgs, by);
   await patch("orders", o.id, upd);
   if (stockDelta) for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, stockDelta * (Number(i.qty) || 0));
   return stockDelta;
@@ -712,8 +763,9 @@ function headActions() {
     payrecords: ex("payrecords") + (can ? `<button class="btn primary" type="button" data-act="new-pr">Add record</button>` : ""),
     bir: ex("bir") + (can ? `<button class="btn primary" type="button" data-act="new-bir">Add sale</button>` : ""),
     investors: ex("investments") + (can ? `<button class="btn primary" type="button" data-act="new-inv">Add investment</button>` : ""),
-    orders: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (can ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
-    packing: "",
+    orders: (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
+    archived: "",
+    packing: (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
     customers: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
     channels: ex("customers"),
@@ -757,7 +809,7 @@ function renderInner() {
   const tabs = `<div class="tabs" role="tablist">${d.tabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent,
-    dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, customers: viewCustomers, channels: viewChannels,
+    dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, archived: viewArchived, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
   v.innerHTML = tabs + body;
@@ -1082,7 +1134,7 @@ document.addEventListener("mouseover", e => { S.slidePaused = !!e.target.closest
 document.addEventListener("focusin", e => { S.slidePaused = !!e.target.closest("#carousel"); });
 
 function homeOrders() {
-  const sales = canSee("SALES"), packing = canSee("PACKING");
+  const sales = canSee("SALES") || visDepts().length > 0, packing = canSee("PACKING");
   if (!sales && !packing) return "";
   const live = S.orders.filter(o => !isVoid(o));
   const toPack = live.filter(o => o.fulfillment === "unfulfilled"), hold = live.filter(o => o.fulfillment === "on_hold");
@@ -1099,7 +1151,8 @@ function goOrders(view) {
   if (canSee("SALES") && !(view === "unfulfilled" && !canSee("SALES"))) {
     S.view = "dept"; S.dept = "SALES"; S.tab = "orders"; S.page = 0;
     if (view === "today") { S.of.view = "all"; S.of.range = "today"; } else S.of.view = view;
-  } else { S.view = "dept"; S.dept = "PACKING"; S.tab = "packing"; }
+  } else if (canSee("PACKING")) { S.view = "dept"; S.dept = "PACKING"; S.tab = "packing"; }
+  else if (visDepts()[0]) { S.view = "dept"; S.dept = visDepts()[0].id; S.tab = "orders"; S.of.view = view === "today" ? "all" : view; }
   saveNav(); render(); window.scrollTo(0, 0);
 }
 
@@ -1271,36 +1324,6 @@ function openMemberForm(id) {
   });
 }
 
-const PACK_SHOW = ["unfulfilled", "sorted", "arrived", "arrived_hold", "on_hold"];
-function viewPacking() {
-  const open = S.orders.filter(o => !isVoid(o) && PACK_SHOW.includes(o.fulfillment));
-  const f = S.packF || "unfulfilled";
-  const q = open.filter(o => f === "all" || o.fulfillment === f).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  const toShip = open.filter(o => o.fulfillment === "unfulfilled");
-  const courier = S.courier || "J&T Express", ship = S.wbShip !== false;
-  return `<div class="kpis">
-      <div class="kpi"><span class="label">To ship</span><span class="value">${toShip.length}</span><span class="sub">Oldest first</span></div>
-      <div class="kpi"><span class="label">Arrived / sorted</span><span class="value">${open.filter(o => ["sorted", "arrived", "arrived_hold"].includes(o.fulfillment)).length}</span></div>
-      <div class="kpi"><span class="label">Items to pick</span><span class="value">${toShip.reduce((a, o) => a + itemCount(o), 0)}</span></div>
-      <div class="kpi"><span class="label">Shipped today</span><span class="value">${S.orders.filter(o => o.fulfilledAt && dstr(o.fulfilledAt) === today()).length}</span></div>
-    </div>
-    <section class="panel scanbar" style="--dc:${DEPT_COLORS.PACKING}"><div class="scanrow"><input id="pack-scan" autocomplete="off" placeholder="Scan or type an order # (e.g. RS9978) to open it" aria-label="Order number">
-      <label class="btn" for="pack-cam" style="cursor:pointer">📷 Camera</label><input id="pack-cam" type="file" accept="image/*" capture="environment" hidden></div>
-      <div class="wb-set"><strong>Waybills</strong><label>Courier <select id="pack-courier">${COURIERS.map(c => `<option ${c === courier ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
-        <label><input type="checkbox" id="pack-ship" ${ship ? "checked" : ""}> After scanning, mark <strong>Shipped</strong> and send the tracking # to Shopify (buyer sees it in their Order History)</label></div></section>
-    <div class="head"><select id="pack-filter" aria-label="Show">${[["unfulfilled", "To ship"], ["sorted", "Sorted"], ["arrived", "Arrived"], ["arrived_hold", "Arrived-Hold"], ["on_hold", "On hold"], ["all", "All of these"]].map(([k, l]) => `<option value="${k}" ${f === k ? "selected" : ""}>${l} (${k === "all" ? open.length : open.filter(o => o.fulfillment === k).length})</option>`).join("")}</select></div>
-    <div class="pack-list">${q.map(o => `<article class="panel pack">
-      <div class="head"><div><span class="onum" style="font-size:15px">#${esc(o.num)}</span> <span style="color:var(--muted);font-size:13px">${esc(plat(o.platform))} · ${relTime(o.createdAt)}</span></div><div style="display:flex;gap:6px">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}</div></div>
-      <div><strong>${esc(o.customer || "No customer")}</strong>${o.phone ? ` · <span style="user-select:all">${esc(o.phone)}</span>` : ""}${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : ""}</div>
-      <ul class="pick">${(o.items || []).map(i => `<li><b class="num">${esc(i.qty)}×</b> ${esc(i.name)}${i.sku ? ` <span style="color:var(--muted)">${esc(i.sku)}</span>` : ""}</li>`).join("")}</ul>
-      ${o.note ? `<div class="notice" style="font-weight:500">${esc(o.note)}</div>` : ""}
-      ${(o.tags || []).length ? tagCell(o.tags) : ""}
-      ${S.readOnly ? (o.tracking ? `<div class="wb-done">🚚 ${esc(o.courier || "")} ${esc(o.tracking)}</div>` : "") : `<div class="wb-row">${o.tracking ? `<div class="wb-done">🚚 ${esc(o.courier || "")} <b class="num">${esc(o.tracking)}</b>${o.shopShippedAt ? ` · <span style="color:var(--good)">sent to Shopify ✓</span>` : o.shopShipErr ? ` · <span style="color:var(--bad)">${esc(o.shopShipErr)}</span>` : ""}</div>` : ""}
-        <input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan waybill" : "Scan waybill / type tracking # + Enter"}" aria-label="Waybill tracking number for #${esc(o.num)}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan waybill with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>`}
-      ${S.readOnly ? "" : `<div class="actions"><button class="btn primary sm" type="button" data-ful="${o.id}" data-to="fulfilled">Mark as shipped</button>${o.fulfillment === "on_hold" ? `<button class="btn sm" type="button" data-ful="${o.id}" data-to="unfulfilled">Release hold</button>` : `<button class="btn sm" type="button" data-ful="${o.id}" data-to="on_hold">Put on hold</button>`}<button class="btn ghost sm" type="button" data-open="${o.id}">Details</button></div>`}
-    </article>`).join("") || `<div class="panel"><div class="empty">Nothing here. New orders appear automatically.</div></div>`}</div>`;
-}
-
 function viewChannels() {
   const live = S.orders.filter(o => inPeriod(o.date) && !isVoid(o));
   const byPlat = PLATFORMS.map(p => { const os = live.filter(o => (o.platform || "other") === p.id); return { ...p, n: os.length, v: os.reduce((a, o) => a + total(o), 0) }; }).filter(p => p.n || p.id !== "other").sort((a, b) => b.v - a.v);
@@ -1421,13 +1444,14 @@ function filteredOrders() {
   const vw = S.of.view;
   return S.orders.filter(o => {
     if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
+    if (S.of.sup && S.of.sup !== "all" && !(o.tags || []).some(t => t.toUpperCase() === S.of.sup)) return false;
     if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
     if (vw === "unfulfilled" && (o.fulfillment !== "unfulfilled" || isVoid(o))) return false;
     if (vw === "unpaid" && !(o.payment === "pending" || o.payment === "partial")) return false;
     if (vw === "on_hold" && o.fulfillment !== "on_hold") return false;
     if (vw === "open" && (isVoid(o) || !(OPEN_FUL.has(o.fulfillment) || o.payment !== "paid"))) return false;
     if (vw === "archived" && !(isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)))) return false;
-    if (q && ![o.num, "#" + o.num, o.customer, o.email, o.ref, o.phone, o.tracking, plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)) return false;
+    if (q && ![o.num, "#" + o.num, o.customer, o.email, o.ref, o.phone, o.tracking, ...(o.merged || []), memberName(o.assignee), plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)) return false;
     return true;
   }).sort(orderSorter());
 }
@@ -1436,15 +1460,17 @@ const ORDER_SORTS = {
   num: o => Number(String(o.num).replace(/\D/g, "")) || 0, date: o => o.createdAt || 0, items: o => itemCount(o), customer: o => (o.customer || "").toLowerCase(),
   total: o => total(o), payment: o => PAYMENTS.findIndex(x => x.id === o.payment), fulfillment: o => FULFILLMENTS.findIndex(x => x.id === o.fulfillment),
   tracking: o => (o.tracking || "").toLowerCase(), tags: o => (o.tags || []).join(",").toLowerCase(),
+  assigned: o => o.assignee ? memberName(o.assignee).toLowerCase() : "~", courier: o => courierOf(o), phone: o => o.phone || "", address: o => (o.address || "").toLowerCase(),
+  waybill: o => (o.tracking || "").toLowerCase(),
 };
-function orderSorter() {
-  const f = ORDER_SORTS[S.of.sort] || ORDER_SORTS.date, d = S.of.dir === "asc" ? 1 : -1;
+function orderSorter(st = S.of) {
+  const f = ORDER_SORTS[st.sort] || ORDER_SORTS.date, d = st.dir === "asc" ? 1 : -1;
   return (a, b) => { const x = f(a), y = f(b); const c = typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y; return c * d || (b.createdAt || 0) - (a.createdAt || 0); };
 }
-const sortTh = (k, label, cls = "") => `<th class="sortable ${cls}" data-osort="${k}" aria-sort="${S.of.sort === k ? (S.of.dir === "asc" ? "ascending" : "descending") : "none"}">${label}<span class="sarr">${S.of.sort === k ? (S.of.dir === "asc" ? "↑" : "↓") : "↕"}</span></th>`;
+const sortTh = (k, label, cls = "", st = S.of, attr = "osort") => `<th class="sortable ${cls}" data-${attr}="${k}" aria-sort="${st.sort === k ? (st.dir === "asc" ? "ascending" : "descending") : "none"}">${label}<span class="sarr">${st.sort === k ? (st.dir === "asc" ? "↑" : "↓") : "↕"}</span></th>`;
 
 /* click-to-sort for every other table: sorts the rows on screen, remembered per table */
-S.tsort = {};
+S.tsort = {}; try { S.tsort = JSON.parse(localStorage.getItem("rs-tsort") || "{}"); } catch (e) {}
 const tableKey = (t, i) => [S.view, S.dept, S.tab, i].join(":");
 const cellVal = td => {
   if (!td) return "";
@@ -1464,7 +1490,7 @@ function sortTable(t, col, dir) {
 }
 function enhanceTables() {
   document.querySelectorAll("#view table, #sheet table").forEach((t, i) => {
-    if (t.classList.contains("otable") || !t.tHead || !t.tHead.rows[0] || !t.tBodies[0] || t.tBodies[0].rows.length < 2) return;
+    if (t.dataset.own || !t.tHead || !t.tHead.rows[0] || !t.tBodies[0] || t.tBodies[0].rows.length < 2) return;
     const key = tableKey(t, i); t.dataset.skey = key;
     [...t.tHead.rows[0].cells].forEach((th, c) => { if (th.classList.contains("cb") || th.colSpan > 1 || !th.textContent.trim() || th.dataset.sidx) return; th.dataset.sidx = c; th.classList.add("sortable"); th.insertAdjacentHTML("beforeend", `<span class="sarr">↕</span>`); });
     const st = S.tsort[key]; if (st) sortTable(t, st.col, st.dir);
@@ -1477,63 +1503,267 @@ function tagCell(tags) {
   return `<div class="tags">${shown.map(t => `<span class="tag">${esc(t)}</span>`).join("")}${tags.length > 5 ? `<span class="tag more">+${tags.length - 5}</span>` : ""}</div>`;
 }
 
+/* ---------- order table columns (arrangeable per department) ---------- */
+const ORDER_COLS = {
+  num: { label: "Order" }, date: { label: "Date" }, items: { label: "Items" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
+  total: { label: "Total", cls: "r" }, payment: { label: "Payment status" }, fulfillment: { label: "Fulfillment status" }, courier: { label: "Courier" },
+  tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
+};
+const TABLE_COLS = {
+  orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "phone", "address"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags"] },
+  packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
+};
+const colPref = table => S.colprefs.find(p => p.id === `${S.dept}_${table}`);
+function colOrder(table) {
+  const T = TABLE_COLS[table], pr = colPref(table);
+  if (!pr) return { order: T.all.slice(), hidden: T.all.filter(k => !T.show.includes(k)) };
+  const order = [...(pr.order || []).filter(k => T.all.includes(k)), ...T.all.filter(k => !(pr.order || []).includes(k))];
+  return { order, hidden: (pr.hidden || []).filter(k => T.all.includes(k)) };
+}
+const visCols = table => { const c = colOrder(table); return c.order.filter(k => !c.hidden.includes(k)); };
+function openColumns(table) {
+  const c = colOrder(table), pr = colPref(table);
+  const row = k => `<div class="colrow" data-ck="${k}"><label><input type="checkbox" ${c.hidden.includes(k) ? "" : "checked"}> ${esc(ORDER_COLS[k].label)}</label><span><button class="btn ghost sm" type="button" data-act="col-up" aria-label="Move up">↑</button><button class="btn ghost sm" type="button" data-act="col-down" aria-label="Move down">↓</button></span></div>`;
+  openSheet(`
+    <h3>Arrange columns · ${esc(dept(S.dept).name)}</h3>
+    <div style="font-size:13px;color:var(--muted)">Tick to show, use the arrows to move. Saved for everyone in ${esc(dept(S.dept).name)}.${pr && pr.by ? ` Last arranged by ${esc(pr.by)}.` : ""}</div>
+    <div id="colrows" class="colrows">${c.order.map(row).join("")}</div>
+    <button class="btn ghost sm" type="button" data-act="col-reset" data-table="${table}" style="align-self:flex-start">Reset to default</button>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save for ${esc(dept(S.dept).name)}</button></div>`,
+  async () => {
+    const rows = [...document.querySelectorAll("#colrows .colrow")];
+    const order = rows.map(r => r.dataset.ck), hidden = rows.filter(r => !r.querySelector("input").checked).map(r => r.dataset.ck);
+    if (hidden.length === order.length) return sheetError("Keep at least one column.");
+    await save("colprefs", `${S.dept}_${table}`, { dept: S.dept, table, order, hidden, by: actor(), at: Date.now() });
+    closeSheet(); toast("Columns saved for " + dept(S.dept).name + ".");
+  });
+}
+
+const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
+function orderCell(k, o, table) {
+  const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
+  switch (k) {
+    case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}${o.note ? NOTE_ICON : ""}</span>${exChip(o)}</td>`;
+    case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
+    case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
+    case "customer": return `<td class="strike">${esc(o.customer || "No customer")}</td>`;
+    case "assigned": { const team = salesTeam(); const cur = o.assignee && !team.some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [];
+      return canAll() ? `<td><select class="status st-grey" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
+    case "total": return `<td class="r num strike nowrap">${peso2(total(o))}</td>`;
+    case "payment": return `<td>${canPay() ? st(pay(o.payment), "payment", opts(PAYMENTS, o.payment)) : badge(pay(o.payment))}</td>`;
+    case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(FULFILLMENTS, o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
+    case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option ${courierOf(o) === c ? "selected" : ""}>${c}</option>`).join("")}</select>` : esc(courierOf(o))}</td>`;
+    case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
+    case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
+    case "tags": return `<td>${tagCell(o.tags)}</td>`;
+    case "phone": return `<td class="nowrap" style="user-select:all">${esc(o.phone || (o.ship || {}).phone || "")}</td>`;
+    case "address": { const sh = shipOf(o); return `<td style="min-width:200px;font-size:12.5px">${esc([sh.address1, sh.address2, sh.city, sh.province].filter(Boolean).join(", ") || (o.pickup ? "Pickup" : ""))}</td>`; }
+    case "actions": return `<td class="nowrap">${canShip() && o.fulfillment !== "fulfilled" ? `<button class="btn primary sm" type="button" data-ful="${o.id}" data-to="fulfilled">Shipped</button>` : ""} <button class="btn ghost sm" type="button" data-open="${o.id}">Details</button></td>`;
+  }
+  return "<td></td>";
+}
+function ordersTable(rows, table, st, attr, selAllId) {
+  const cols = visCols(table), selectable = canPay() || canShip();
+  const allSel = rows.length && rows.every(o => S.sel.has(o.id));
+  return `<div class="table-wrap"><table class="otable" data-own="1">
+    <thead><tr>${selectable ? `<th class="cb"><input type="checkbox" id="${selAllId}" aria-label="Select all" ${allSel ? "checked" : ""}></th>` : ""}${cols.map(k => ORDER_COLS[k].nosort ? `<th>${ORDER_COLS[k].label}</th>` : sortTh(k, ORDER_COLS[k].label, ORDER_COLS[k].cls || "", st, attr)).join("")}</tr></thead>
+    <tbody>${rows.map(o => { const v = isVoid(o) && o.payment === "voided"; const done = !v && (isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)));
+      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>` : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
+  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.orders.length ? "No orders match these filters." : "No orders yet."}</div>`}</div>`;
+}
+function supplierBar(list) {
+  const m = new Map(); for (const o of list) for (const t of o.tags || []) if (/^S-/i.test(t)) m.set(t.toUpperCase(), (m.get(t.toUpperCase()) || 0) + 1);
+  if (!m.size) return "";
+  const cur = S.of.sup || "all";
+  return `<div class="supbar"><span class="lab">Suppliers</span><button type="button" data-sup="all" aria-pressed="${cur === "all"}">All</button>${[...m].sort().map(([t, n]) => `<button type="button" data-sup="${esc(t)}" aria-pressed="${cur === t}">${esc(t)} <span>${n}</span></button>`).join("")}${cur !== "all" ? `<button type="button" class="btn sm primary" data-act="sup-list">📋 Order list for ${esc(cur)}</button>` : ""}</div>`;
+}
+function openSupplierList() {
+  const sup = S.of.sup; const os = filteredOrders();
+  const agg = new Map();
+  for (const o of os) for (const i of o.items || []) { const k = i.name || "?"; const a = agg.get(k) || { name: k, qty: 0, orders: [] }; a.qty += Number(i.qty) || 0; a.orders.push(i.from || o.num); agg.set(k, a); }
+  const rows = [...agg.values()].sort((a, b) => a.name.localeCompare(b.name));
+  S.supText = `ORDER LIST · ${sup} · ${mToday()}\n` + rows.map(r => `${r.qty}x ${r.name}  (${[...new Set(r.orders)].map(n => "#" + n).join(", ")})`).join("\n") + `\n\nTotal pcs: ${rows.reduce((a, r) => a + r.qty, 0)}`;
+  S.supRows = [["Qty", "Item", "Orders"], ...rows.map(r => [r.qty, r.name, [...new Set(r.orders)].map(n => "#" + n).join(" ")])];
+  openSheet(`<h3>Order list for ${esc(sup)}</h3>
+    <div style="font-size:13px;color:var(--muted)">${os.length} order${os.length === 1 ? "" : "s"} · current filters (${esc(S.of.ful === "all" ? "all fulfillment" : ful(S.of.ful).name)}). Change the Fulfillment filter to narrow it, e.g. FWD or To confirm.</div>
+    <div class="table-wrap"><table><thead><tr><th class="r">Qty</th><th>Item</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr><td class="r num" style="font-weight:700">${r.qty}</td><td>${esc(r.name)}</td><td style="font-size:12px">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody></table></div>
+    <div style="font-weight:700">Total pcs: ${rows.reduce((a, r) => a + r.qty, 0)}</div>
+    <div style="font-size:12px;color:var(--muted)">Supplier invoices will link here next.</div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button>${S.dl ? `<button class="btn" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn primary" type="button" data-act="sup-copy">Copy list</button></div>`, null);
+}
 function viewOrders() {
   const all = filteredOrders();
   const pages = Math.max(1, Math.ceil(all.length / PAGE));
   if (S.page >= pages) S.page = pages - 1;
   const rows = all.slice(S.page * PAGE, S.page * PAGE + PAGE);
   for (const id of [...S.sel]) if (!S.orders.some(o => o.id === id)) S.sel.delete(id);
-  const allSel = rows.length && rows.every(o => S.sel.has(o.id));
-  const bulk = S.sel.size && !S.readOnly ? `<div class="bulk"><strong>${S.sel.size} selected</strong>
-      <select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>
-      <select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>
-      <button class="btn sm" type="button" data-bulk="fulfilled">Mark as shipped</button>
-      <button class="btn sm" type="button" data-bulk="delivered">Mark as delivered</button>
-      <input id="bulk-tag" placeholder="Tag e.g. 8.FWD" aria-label="Tag to add" autocomplete="off">
-      <button class="btn sm" type="button" data-bulk="tag">Add tag</button>
+  const bulk = S.sel.size && (canPay() || canShip()) ? `<div class="bulk"><strong>${S.sel.size} selected</strong>
+      ${canPay() ? `<select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
+      ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
+      ${canAll() ? `<button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>
+      <input id="bulk-tag" placeholder="Tag e.g. 8.FWD" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
+      <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
   return `
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${statsStrip()}
   <div class="toolbar">
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
-    <input id="of-q" type="search" placeholder="Search and filter: order #, customer, tag, product" value="${esc(S.of.q)}" aria-label="Search orders">
+    <input id="of-q" type="search" placeholder="Search and filter: order #, customer, tag, product, tracking" value="${esc(S.of.q)}" aria-label="Search orders">
     <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
     <select id="of-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${S.of.pay === f.id ? "selected" : ""}>${f.name} (${S.orders.filter(o => o.payment === f.id).length})</option>`).join("")}</select>
+    <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
   </div>
+  ${supplierBar(S.orders)}
   ${bulk}
-  <div class="table-wrap"><table class="otable">
-    <thead><tr>
-      <th class="cb"><input type="checkbox" id="sel-all" aria-label="Select all on this page" ${allSel ? "checked" : ""} ${S.readOnly ? "disabled" : ""}></th>
-      ${sortTh("num", "Order")}${sortTh("date", "Date")}${sortTh("items", "Items")}${sortTh("customer", "Customer")}${sortTh("total", "Total", "r")}${sortTh("payment", "Payment status")}${sortTh("fulfillment", "Fulfillment status")}${sortTh("tracking", "Tracking #")}${sortTh("tags", "Tags")}
-    </tr></thead>
-    <tbody>${rows.map(o => {
-      const v = isVoid(o) && o.payment === "voided";
-      const done = !v && (isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)));
-      const n = itemCount(o);
-      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">
-      <td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select order ${esc(o.num)}" ${S.sel.has(o.id) ? "checked" : ""} ${S.readOnly ? "disabled" : ""}></td>
-      <td class="strike"><span class="onum">#${esc(o.num)}${o.note ? NOTE_ICON : ""}</span>${exChip(o)}</td>
-      <td class="strike nowrap">${relTime(o.createdAt)}</td>
-      <td class="strike nowrap">${n} item${n === 1 ? "" : "s"}</td>
-      <td class="strike">${esc(o.customer || "No customer")}</td>
-      <td class="r num strike nowrap">${peso2(total(o))}</td>
-      <td>${badge(pay(o.payment))}</td>
-      <td>${badge(ful(o.fulfillment))}</td>
-      <td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>
-      <td>${tagCell(o.tags)}</td>
-    </tr>`; }).join("")}</tbody>
-  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.orders.length ? "No orders match these filters." : "No orders yet. Click “Import from Shopify” to bring in your existing orders, or “Create order” to log one."}</div>`}</div>
+  ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
   <div class="head"><div class="pager">
     <button class="btn sm" type="button" data-page="-1" ${S.page === 0 ? "disabled" : ""} aria-label="Previous page">‹</button>
     <span>${all.length ? `${S.page * PAGE + 1}–${Math.min(all.length, S.page * PAGE + PAGE)} of ${all.length.toLocaleString("en-PH")}` : "0 orders"}</span>
     <button class="btn sm" type="button" data-page="1" ${S.page >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button>
-  </div></div>`;
+  </div><span style="font-size:12px;color:var(--muted)">${orderRole() === "status" ? "Finance can change payment and fulfillment status." : orderRole() === "pack" ? "Packing can change fulfillment, courier and tracking." : orderRole() === "view" ? "View only." : ""}</span></div>`;
 }
 
+function viewArchived() {
+  const q = (S.aq || "").trim().toLowerCase();
+  const rows = S.archived.filter(o => !q || [o.num, ...(o.merged || []), o.customer, o.archivedReason, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
+  return `<div class="toolbar"><input id="aq" type="search" placeholder="Search archived orders" value="${esc(S.aq || "")}" aria-label="Search archived orders"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th class="r">Total</th><th>Archived</th><th>Why</th><th>By</th><th></th></tr></thead>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><span class="onum">${esc(onum(o))}</span></td><td>${esc(o.customer || "")}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
+      <td class="nowrap">${canAll() ? `<button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Make active again</button> <button class="btn ghost sm" type="button" data-act="ask-del-forever" data-id="${o.id}">Delete forever</button>` : ""}</td></tr>`).join("")}</tbody>
+  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No archived orders. “Archive” on an order moves it here; you can make it active again any time.</div>`}</div>`;
+}
+async function archiveOrder(o, reason, extra = {}) {
+  const upd = { archived: true, archivedAt: Date.now(), archivedBy: actor(), archivedReason: reason || "", archivedPrev: { payment: o.payment, fulfillment: o.fulfillment }, payment: "", fulfillment: "", log: logAdd(o, [reason ? `archived the order (${reason})` : "archived the order"]), ...extra };
+  await patch("orders", o.id, upd);
+  if (!S.db) { S.orders = S.orders.filter(x => x.id !== o.id); S.archived.push(Object.assign(o, upd)); }
+  S.sel.delete(o.id);
+}
+async function restoreOrder(o) {
+  const pv = o.archivedPrev || {};
+  const upd = { archived: false, archivedAt: 0, archivedReason: "", mergedInto: "", payment: pv.payment || "pending", fulfillment: pv.fulfillment || "unfulfilled", log: logAdd(o, ["made the order active again"]) };
+  if (S.db) await S.db.collection("orders").doc(o.id).update(upd);
+  else { S.archived = S.archived.filter(x => x.id !== o.id); S.orders.push(Object.assign(o, upd)); render(); }
+}
+function openMerge() {
+  const os = S.orders.filter(o => S.sel.has(o.id)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  if (os.length < 2) { toast("Select 2 or more orders to merge."); return; }
+  const names = new Set(os.map(o => (o.customer || "").trim().toLowerCase()));
+  openSheet(`<h3>Merge ${os.length} orders into 1 shipment</h3>
+    ${names.size > 1 ? `<div class="notice">Heads up: these orders are for different customers.</div>` : ""}
+    <div class="field"><label>Keep this order #</label>${os.map((o, i) => `<label class="radio-line"><input type="radio" name="mg-main" value="${o.id}" ${i === 0 ? "checked" : ""}> <b>${esc(onum(o))}</b> · ${esc(o.customer || "")} · ${itemsLabel(o)} · ${peso2(total(o))}</label>`).join("")}</div>
+    <div style="font-size:13px">All items move into the order you keep, each marked with the order # it came from. The other orders go to <b>Archived orders</b> (you can unmerge later). Combined total <b>${peso2(os.reduce((a, o) => a + total(o), 0))}</b>.</div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Merge</button></div>`,
+  async () => {
+    const mainId = document.querySelector("input[name=mg-main]:checked").value;
+    const main = os.find(o => o.id === mainId), rest = os.filter(o => o.id !== mainId);
+    const tagIt = o => (o.items || []).map(i => ({ ...i, from: i.from || o.num }));
+    const sum = k => rest.reduce((a, o) => a + (Number(o[k]) || 0), Number(main[k]) || 0);
+    await patch("orders", main.id, {
+      items: [...tagIt(main), ...rest.flatMap(tagIt)], merged: [...(main.merged || []), ...rest.flatMap(o => [o.num, ...(o.merged || [])])],
+      mergedParts: [...(main.mergedParts || []), ...rest.map(o => ({ id: o.id, num: o.num, ref: o.ref || "", adjust: Number(o.adjust) || 0, discount: Number(o.discount) || 0, nums: [o.num, ...(o.merged || [])] }))],
+      adjust: sum("adjust"), discount: sum("discount"), tags: [...new Set([...(main.tags || []), ...rest.flatMap(o => o.tags || [])])],
+      log: logAdd(main, [`merged ${rest.map(onum).join(", ")} into this order for 1 shipment`]),
+    });
+    for (const o of rest) await archiveOrder(o, `merged into #${main.num}`, { mergedInto: main.id });
+    S.sel.clear(); closeSheet(); render(); toast(`Merged into ${onum(findOrder(main.id) || main)}.`);
+  });
+}
+async function unmergeOrder(o) {
+  const parts = o.mergedParts || []; const nums = new Set(parts.flatMap(p => p.nums || [p.num]));
+  for (const p of parts) { const a = S.archived.find(x => x.id === p.id); if (a) await restoreOrder(a); }
+  const sub = k => (Number(o[k]) || 0) - parts.reduce((a, p) => a + (Number(p[k]) || 0), 0);
+  await patch("orders", o.id, { items: (o.items || []).filter(i => !nums.has(i.from)), merged: [], mergedParts: [], adjust: sub("adjust"), discount: sub("discount"), log: logAdd(o, [`unmerged ${[...nums].map(n => "#" + n).join(", ")}`]) });
+  toast("Unmerged. The other orders are active again.");
+}
+/* which order each item came from, for orders merged in Shopify (#RS2604 #RS2612) */
+async function traceItems(o) {
+  const nums = [...new Set((onum(o).match(/[A-Z]{1,4}\d{3,}/gi) || []).map(x => x.toUpperCase()))];
+  if (!S.mcp) { toast("Open the app in claude.ai with Shopify connected to look this up."); return; }
+  toast("Checking Shopify…");
+  const map = new Map();
+  for (const n of nums) {
+    try {
+      const p = await shopCall(`query RSByName($q: String!) { orders(first: 5, query: $q) { nodes { name lineItems(first: 50) { nodes { name quantity } } } } }`, { q: "name:" + n }, 5);
+      for (const node of (dig(p, "orders") || {}).nodes || []) if (String(node.name).replace(/^#/, "").toUpperCase() === n) for (const li of (node.lineItems || {}).nodes || []) if (!map.has(li.name)) map.set(li.name, n);
+    } catch (e) {}
+  }
+  if (!map.size) { toast("Shopify has no separate orders under those numbers."); return; }
+  const items = (o.items || []).map(i => i.from || !map.has(i.name) ? i : { ...i, from: map.get(i.name) });
+  await patch("orders", o.id, { items, log: logAdd(o, ["matched each item to its order # from Shopify"]) });
+  closeSheet(); openOrderDetails(o.id); toast("Done. Each item now shows its order #.");
+}
+function itemsPop(btn) {
+  closePop(); const o = findOrder(btn.dataset.items); if (!o) return;
+  const r = btn.getBoundingClientRect();
+  const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop"; el.setAttribute("role", "dialog");
+  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span></div>${(o.items || []).map(i => `<div class="ipop-i"><span class="num">${esc(i.qty)}×</span><span>${esc(i.name)}${i.from && (o.merged || []).length ? ` <span class="from">#${esc(i.from)}</span>` : ""}</span><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("") || `<div class="ipop-i">No items</div>`}<div class="ipop-t"><span>Total</span><b class="num">${peso2(total(o))}</b></div><button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
+  document.body.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
+  el.style.top = (r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px";
+}
+const closePop = () => { const p = $("#ipop"); if (p) p.remove(); };
+window.addEventListener("scroll", closePop, { passive: true });
+
+/* ---------- J&T VIP booking export ---------- */
+function shipOf(o) {
+  if (o.ship && (o.ship.address1 || o.ship.city)) return { name: o.ship.name || o.customer || "", phone: o.ship.phone || o.phone || "", ...o.ship };
+  const parts = (o.address || "").split(",").map(x => x.trim()).filter(Boolean);
+  const country = /philippines/i.test(parts[parts.length - 1] || "") ? parts.pop() : "";
+  const zip = /^\d{4}$/.test(parts[parts.length - 1] || "") ? parts.pop() : "";
+  const province = parts.length > 2 ? parts.pop() : "", city = parts.length > 1 ? parts.pop() : "";
+  const address2 = parts.length > 1 ? parts.pop() : "";
+  return { name: o.customer || "", phone: o.phone || "", address1: parts.join(", "), address2, city, province, zip, country };
+}
+function jntRows() {
+  const sel = S.orders.filter(o => S.sel.has(o.id));
+  const list = sel.length ? sel : packList().filter(o => courierOf(o) === "J&T");
+  return [["Order No.", "Receiver Name", "Receiver Phone", "Province", "City/Municipality", "Barangay", "Street Address", "Zip Code", "Item Name", "Quantity", "Weight (kg)", "COD Amount", "Declared Value", "Remarks"],
+    ...list.map(o => { const sh = shipOf(o); return [onum(o), sh.name || o.customer, (sh.phone || o.phone || "").replace(/^\+63/, "0"), sh.province, sh.city, sh.address2, sh.address1, sh.zip, (o.items || []).map(i => `${i.qty}x ${i.name}`).join("; ").slice(0, 120), itemCount(o), "", o.payment === "paid" ? 0 : o.payment === "pending" ? total(o) : "", total(o), o.note || ""]; })];
+}
+async function jntExport() {
+  const rows = jntRows(); if (rows.length < 2) { toast("No J&T orders to export here. Select orders or switch the filter."); return; }
+  try { await S.dl.save({ data: csv(rows), filename: `jnt-vip-booking-${mToday()}.csv` }); toast(`J&T file ready · ${rows.length - 1} order${rows.length === 2 ? "" : "s"}.`); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); }
+}
+async function jntCopy() {
+  const rows = jntRows(); if (rows.length < 2) { toast("No J&T orders to copy here. Select orders or switch the filter."); return; }
+  const tsv = rows.map(r => r.map(c => String(c ?? "").replace(/[\t\n]/g, " ")).join("\t")).join("\n");
+  try { await navigator.clipboard.writeText(tsv); toast(`Copied ${rows.length - 1} order${rows.length === 2 ? "" : "s"}. Paste into the J&T VIP Excel template.`); } catch (e) { toast("Couldn't copy. Use the booking file instead."); }
+}
+
+const PACK_SHOW = ["unfulfilled", "sorted", "arrived", "arrived_hold", "on_hold"];
+S.pk = { sort: "date", dir: "asc" };
+const packList = () => { const f = S.packF || "unfulfilled"; return S.orders.filter(o => !isVoid(o) && PACK_SHOW.includes(o.fulfillment) && (f === "all" || o.fulfillment === f)); };
+function viewPacking() {
+  const open = S.orders.filter(o => !isVoid(o) && PACK_SHOW.includes(o.fulfillment));
+  const f = S.packF || "unfulfilled";
+  const q = packList().sort(orderSorter(S.pk));
+  const toShip = open.filter(o => o.fulfillment === "unfulfilled");
+  const ship = S.wbShip !== false;
+  const bulk = S.sel.size && canShip() ? `<div class="bulk"><strong>${S.sel.size} selected</strong><button class="btn sm" type="button" data-act="jnt-copy">Copy for J&T</button>${S.dl ? `<button class="btn sm" type="button" data-act="jnt-export">J&T booking file</button>` : ""}<button class="btn sm" type="button" data-bulk="fulfilled">Mark as shipped</button><button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">To ship</span><span class="value">${toShip.length}</span><span class="sub">J&T ${toShip.filter(o => courierOf(o) === "J&T").length} · SDD ${toShip.filter(o => courierOf(o) === "SDD").length}</span></div>
+      <div class="kpi"><span class="label">Arrived / sorted</span><span class="value">${open.filter(o => ["sorted", "arrived", "arrived_hold"].includes(o.fulfillment)).length}</span></div>
+      <div class="kpi"><span class="label">Items to pick</span><span class="value">${toShip.reduce((a, o) => a + itemCount(o), 0)}</span></div>
+      <div class="kpi"><span class="label">Shipped today</span><span class="value">${S.orders.filter(o => o.fulfilledAt && dstr(o.fulfilledAt) === today()).length}</span></div>
+    </div>
+    <section class="panel scanbar" style="--dc:${DEPT_COLORS.PACKING}"><div class="scanrow"><input id="pack-scan" autocomplete="off" placeholder="Scan or type an order # (e.g. RS9978) to open it" aria-label="Order number">
+      <label class="btn" for="pack-cam" style="cursor:pointer">📷 Camera</label><input id="pack-cam" type="file" accept="image/*" capture="environment" hidden></div>
+      <div class="wb-set"><label><input type="checkbox" id="pack-ship" ${ship ? "checked" : ""}> After scanning a waybill, mark <strong>Shipped</strong> and send the tracking # to Shopify (buyer sees it in their Order History)</label></div></section>
+    <div class="toolbar"><select id="pack-filter" aria-label="Show">${[["unfulfilled", "To ship"], ["sorted", "Sorted"], ["arrived", "Arrived"], ["arrived_hold", "Arrived-Hold"], ["on_hold", "On hold"], ["all", "All of these"]].map(([k, l]) => `<option value="${k}" ${f === k ? "selected" : ""}>${l} (${k === "all" ? open.length : open.filter(o => o.fulfillment === k).length})</option>`).join("")}</select>
+      <button class="btn" type="button" data-act="columns" data-table="packing">⚙︎ Columns</button>
+      <span style="font-size:12.5px;color:var(--muted)">J&T booking: select orders (or none = all J&T in this list), then <b>Copy for J&T</b> or <b>J&T VIP booking file</b>.</span></div>
+    ${bulk}
+    ${ordersTable(q, "packing", S.pk, "psort", "psel-all")}`;
+}
 async function bulkAction(kind) {
   const targets = S.orders.filter(o => S.sel.has(o.id));
   if (kind === "clear") { S.sel.clear(); render(); return; }
+  if (kind === "archive") { for (const o of targets) await archiveOrder(o, ""); toast(`Archived ${targets.length} order${targets.length === 1 ? "" : "s"}.`); S.sel.clear(); render(); return; }
   if (kind === "tag") {
     const t = val("bulk-tag").toUpperCase(); if (!t) { toast("Type a tag first."); return; }
     for (const o of targets) if (!(o.tags || []).includes(t)) await updateOrder(o, { tags: [...(o.tags || []), t] });
@@ -1603,7 +1833,10 @@ function customerList() {
 function viewCustomers() {
   const q = S.cq.trim().toLowerCase();
   const all = customerList();
-  const rows = all.filter(c => !q || [c.name, c.email, c.phone, c.address, ...(c.tags || [])].join(" ").toLowerCase().includes(q));
+  const cs = S.csort || { sort: "spent", dir: "desc" };
+  const assigneeOf = c => { const os = c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(o => o && o.assignee).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); return os[0] ? os[0].assignee : ""; };
+  const CS = { name: c => (c.name || "").toLowerCase(), phone: c => c.phone || "", loc: c => (c.city || c.address || "").toLowerCase(), assigned: c => assigneeOf(c) ? memberName(assigneeOf(c)).toLowerCase() : "~", channels: c => [...c.platforms].join(), orders: c => c.orders, spent: c => c.spent, last: c => c.last || 0, tags: c => (c.tags || []).join() };
+  const rows = all.filter(c => !q || [c.name, c.email, c.phone, c.address, ...(c.tags || [])].join(" ").toLowerCase().includes(q)).sort((a, b) => { const f = CS[cs.sort] || CS.spent, x = f(a), y = f(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * (cs.dir === "asc" ? 1 : -1); });
   const pages = Math.max(1, Math.ceil(rows.length / PAGE)); if (S.cpage >= pages) S.cpage = pages - 1;
   const page = rows.slice(S.cpage * PAGE, S.cpage * PAGE + PAGE);
   const repeat = all.filter(c => c.orders > 1).length;
@@ -1616,12 +1849,13 @@ function viewCustomers() {
     <div class="kpi"><span class="label">Avg per customer</span><span class="value">${peso(all.length ? sum / all.length : 0)}</span></div>
   </div>
   <div class="toolbar"><input id="cq" type="search" placeholder="Search name, email, phone, city or tag" value="${esc(S.cq)}" aria-label="Search customers"></div>
-  <div class="table-wrap"><table class="otable">
-    <thead><tr><th>Customer</th><th>Phone</th><th>Location</th><th>Channels</th><th class="r">Orders</th><th class="r">Amount spent</th><th>Last order</th><th>Tags</th></tr></thead>
+  <div class="table-wrap"><table class="otable" data-own="1">
+    <thead><tr>${[["name", "Customer"], ["phone", "Phone"], ["loc", "Location"], ["assigned", "Assigned to"], ["channels", "Channels"], ["orders", "Orders", "r"], ["spent", "Amount spent", "r"], ["last", "Last order"], ["tags", "Tags"]].map(([k, l, c]) => sortTh(k, l, c || "", cs, "csort")).join("")}</tr></thead>
     <tbody>${page.map(c => `<tr data-cust="${esc(custKey(c))}">
       <td><div style="font-weight:600">${esc(c.name)}${c.example ? ' <span class="chip ex">Example</span>' : ""}${c.orders > 1 ? ' <span class="chip good">Repeat</span>' : ""}</div><div class="s">${esc(c.email || "")}</div></td>
       <td class="nowrap">${esc(c.phone || "")}</td>
       <td>${esc(c.city || (c.address || "").split(",").slice(-3, -2)[0] || "")}</td>
+      <td>${canAll() && c.orderIds.length ? `<select class="status st-grey" data-cassign="${esc(custKey(c))}" aria-label="Assigned to"><option value="">Unassigned</option>${salesTeam().map(m => `<option value="${m.id}" ${assigneeOf(c) === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select>` : esc(assigneeOf(c) ? memberName(assigneeOf(c)) : "–")}</td>
       <td>${[...c.platforms].map(esc).join(", ")}</td>
       <td class="r num">${c.orders.toLocaleString("en-PH")}</td>
       <td class="r num" style="font-weight:700">${peso2(c.spent)}</td>
@@ -1762,14 +1996,19 @@ function openOrderForm() {
 }
 
 function openOrderDetails(id) {
-  const o = S.orders.find(x => x.id === id); if (!o) return;
-  const ro = S.readOnly;
+  const o = findOrder(id); if (!o) return;
+  closePop();
+  const arch = !!o.archived, all = canAll() && !arch, cp = canPay() && !arch, cf = canFul() && !arch, cs = canShip() && !arch;
+  const editable = cp || cf || cs || all;
+  const multi = (onum(o).match(/[A-Z]{1,4}\d{3,}/gi) || []).length > 1;
+  const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
-    <h3>#${esc(o.num)}</h3>
-    <div style="color:var(--muted);font-size:13px">${esc(plat(o.platform))} · ${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}</div>
-    <div><div style="font-weight:700">${esc(o.customer || "No customer")}</div><div style="color:var(--muted);font-size:13px;user-select:all">${[o.email, o.phone].filter(Boolean).map(esc).join(" · ")}</div>${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : ""}</div>
-    <div class="list">${(o.items || []).map(i => `<div class="li"><div class="main"><div class="t">${esc(i.qty)}× ${esc(i.name)}</div><div class="s num">${peso2(i.price)} each${i.cost ? " · cost " + peso2(i.cost) : ""}${i.sku ? " · " + esc(i.sku) : ""}</div></div><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("")}</div>
+    <h3>${esc(onum(o))}</h3>
+    <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
+    ${arch ? `<div class="notice">Archived ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Make active again</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(courierOf(o))}</span></div>`}
+    <div><div style="font-weight:700">${esc(o.customer || "No customer")}</div><div style="color:var(--muted);font-size:13px;user-select:all">${[o.email, o.phone].filter(Boolean).map(esc).join(" · ")}</div>${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : o.pickup ? `<div style="color:var(--muted);font-size:13px">Pickup${o.shipTitle ? " · " + esc(o.shipTitle) : ""}</div>` : ""}</div>
+    <div class="list">${(o.items || []).map(i => `<div class="li"><div class="main"><div class="t">${esc(i.qty)}× ${esc(i.name)}</div><div class="s num">${showFrom ? `<span class="from">${i.from ? "from #" + esc(i.from) : "order # unknown"}</span> ` : ""}${peso2(i.price)} each${i.cost ? " · cost " + peso2(i.cost) : ""}${i.sku ? " · " + esc(i.sku) : ""}</div></div><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("")}</div>
+    ${multi && (o.items || []).some(i => !i.from) && all ? `<button class="btn sm" type="button" data-act="trace-items" data-id="${o.id}" style="align-self:flex-start">Find which order # each item came from (Shopify)</button>` : ""}
     <div class="list">
       ${o.adjust ? `<div class="li"><span>Shipping fee & other charges</span><span class="num">${peso2(o.adjust)}</span></div>` : ""}
       ${o.discount ? `<div class="li"><span>Discount${o.discountNote ? " · " + esc(o.discountNote) : ""}</span><span class="num">−${peso2(o.discount)}</span></div>` : ""}
@@ -1777,37 +2016,40 @@ function openOrderDetails(id) {
       <div class="li"><span>Platform fees</span><span class="num">−${peso2(o.fees)}</span></div>
       <div class="li"><span>Shipping you paid</span><span class="num">−${peso2(o.shipping)}</span></div>
       <div class="li"><span>Product cost</span><span class="num">−${peso2(cogs(o))}</span></div>
-      <div class="li"><span style="font-weight:700">Profit</span><span class="num" style="font-weight:700;color:${profit(o) < 0 ? "var(--bad)" : "var(--good)"}">${isVoid(o) ? "–" : peso2(profit(o))}</span></div>
+      <div class="li"><span style="font-weight:700">Profit</span><span class="num" style="font-weight:700;color:${profit(o) < 0 ? "var(--bad)" : "var(--good)"}">${isVoid(o) || arch ? "–" : peso2(profit(o))}</span></div>
     </div>
     ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
-    ${ro ? (o.tracking ? `<div>🚚 ${esc(o.courier || "")} ${esc(o.tracking)}</div>` : "") : `
-    <button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}" style="align-self:flex-start">✏️ Edit items, prices & discount</button>
-    <div class="row">
+    ${all ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items, prices & discount</button>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}</div>` : ""}
+    ${cs ? `<div class="row">
       <div class="field"><label for="d-track">Tracking # (waybill)</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
-      <div class="field"><label for="d-courier">Courier</label><select id="d-courier">${COURIERS.map(c => `<option ${c === (o.courier || S.courier || "J&T Express") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+      <div class="field"><label for="d-courier">Courier</label><select id="d-courier">${COURIERS.map(c => `<option ${c === courierOf(o) ? "selected" : ""}>${c}</option>`).join("")}</select></div>
     </div>
-    ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}
-    <div class="row">
-      <div class="field"><label for="d-pay">Payment status</label><select id="d-pay">${opts(PAYMENTS, o.payment)}</select></div>
-      <div class="field"><label for="d-ful">Fulfillment status</label><select id="d-ful">${opts(FULFILLMENTS, o.fulfillment)}</select></div>
-    </div>
-    ${tagField(o.tags)}
+    ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}` : o.tracking ? `<div>🚚 ${esc(courierOf(o))} ${esc(o.tracking)}</div>` : ""}
+    ${cp || cf || all ? `<div class="row">
+      ${cp ? `<div class="field"><label for="d-pay">Payment status</label><select id="d-pay">${opts(PAYMENTS, o.payment)}</select></div>` : ""}
+      ${cf ? `<div class="field"><label for="d-ful">Fulfillment status</label><select id="d-ful">${opts(FULFILLMENTS, o.fulfillment)}</select></div>` : ""}
+      ${all ? `<div class="field"><label for="d-assign">Assigned to</label><select id="d-assign"><option value="">Unassigned</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></div>` : ""}
+    </div>` : ""}
+    ${all ? `${tagField(o.tags)}
     <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2">${esc(o.note || "")}</textarea></div>
     <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."}</div>
-    <div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-order" data-id="${o.id}">Delete order</button></div>`}
+    <div><button class="btn danger sm" type="button" data-act="archive-order" data-id="${o.id}">Delete (move to Archived orders)</button></div>` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
-    <div class="sheet-foot"><button class="btn" type="button" data-act="close">${ro ? "Close" : "Cancel"}</button>${ro ? "" : `<button class="btn primary" type="submit">Save changes</button>`}</div>`,
-  ro ? null : async () => {
-    const ch = { payment: val("d-pay"), fulfillment: val("d-ful"), tags: parseTags(val("o-tags")), note: val("o-note") };
-    const tr = val("d-track").trim();
-    if (tr !== (o.tracking || "") || (tr && val("d-courier") !== (o.courier || ""))) Object.assign(ch, { tracking: tr, courier: val("d-courier"), trackingAt: tr ? Date.now() : 0 });
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">${editable ? "Cancel" : "Close"}</button>${editable ? `<button class="btn primary" type="submit">Save changes</button>` : ""}</div>
+    ${(o.log || []).length ? `<div class="olog"><div class="olog-h">Team activity</div>${[...o.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>` : ""}`,
+  editable ? async () => {
+    const ch = {};
+    if (cp) ch.payment = val("d-pay");
+    if (cf) ch.fulfillment = val("d-ful");
+    if (all) Object.assign(ch, { tags: parseTags(val("o-tags")), note: val("o-note"), assignee: val("d-assign") });
+    if (cs) { const tr = val("d-track").trim(); if (tr !== (o.tracking || "")) Object.assign(ch, { tracking: tr, trackingAt: tr ? Date.now() : 0 }); if (val("d-courier") !== courierOf(o) || o.courier === undefined) ch.courier = val("d-courier"); }
     const d = await updateOrder(o, ch);
     closeSheet(); toast(d > 0 ? "Saved. Items returned to stock." : d < 0 ? "Saved. Items deducted from stock again." : "Order updated.");
-  });
+  } : null);
 }
 
 /* ---------- internal order edit: items, prices, discount ---------- */
-const editItemRow = (i = {}) => `<div class="ei-row"><input class="ei-name" list="ei-products" value="${esc(i.name || "")}" placeholder="Item name" aria-label="Item"><input class="ei-q num" type="number" min="0" step="1" value="${i.qty ?? 1}" aria-label="Qty"><input class="ei-p num" type="number" min="0" step="0.01" value="${i.price ?? ""}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="ei-rm" aria-label="Remove item">×</button></div>`;
+const editItemRow = (i = {}) => `<div class="ei-row" ${i.from ? `data-from="${esc(i.from)}"` : ""}><input class="ei-name" list="ei-products" value="${esc(i.name || "")}" placeholder="Item name" aria-label="Item"><input class="ei-q num" type="number" min="0" step="1" value="${i.qty ?? 1}" aria-label="Qty"><input class="ei-p num" type="number" min="0" step="0.01" value="${i.price ?? ""}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="ei-rm" aria-label="Remove item">×</button></div>`;
 function eiRead() {
   const items = [];
   document.querySelectorAll("#sheet .ei-row").forEach(r => {
@@ -1815,7 +2057,7 @@ function eiRead() {
     if (!name || qty <= 0) return;
     const p = S.products.find(x => (x.name || "").toLowerCase() === name.toLowerCase());
     const pv = r.querySelector(".ei-p").value;
-    items.push({ productId: p ? p.id : "", name, sku: p ? p.sku || "" : "", qty, price: pv === "" ? (p ? Number(p.price) || 0 : 0) : Number(pv) || 0, cost: p ? Number(p.cost) || 0 : 0 });
+    items.push({ ...(r.dataset.from ? { from: r.dataset.from } : {}), productId: p ? p.id : "", name, sku: p ? p.sku || "" : "", qty, price: pv === "" ? (p ? Number(p.price) || 0 : 0) : Number(pv) || 0, cost: p ? Number(p.cost) || 0 : 0 });
   });
   return items;
 }
@@ -1852,7 +2094,7 @@ function openItemsEdit(id) {
       items.forEach(i => { if (i.productId) by[i.productId] = (by[i.productId] || 0) - i.qty; });
       for (const [pid, d] of Object.entries(by)) if (d) await adjustStock(pid, d);
     }
-    await patch("orders", o.id, { items, adjust: numv("ei-adj"), discount, discountNote: val("ei-dnote"), editedItemsAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" });
+    await patch("orders", o.id, { items, adjust: numv("ei-adj"), discount, discountNote: val("ei-dnote"), editedItemsAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(o, [`edited items/prices (total ${peso2(total(o))} → ${peso2(sub + numv("ei-adj") - discount)})`]) });
     closeSheet(); toast(`#${o.num} updated · total ${peso2(sub + numv("ei-adj") - discount)}`);
   });
   eiTotal();
@@ -1861,15 +2103,15 @@ function openItemsEdit(id) {
 /* ---------- waybill scan → tracking # → Shopify fulfillment ---------- */
 async function saveWaybill(id, code) {
   const o = S.orders.find(x => x.id === id); if (!o || S.readOnly) return;
-  const tracking = String(code).trim().replace(/\s+/g, ""), courier = S.courier || "J&T Express";
+  const tracking = String(code).trim().replace(/\s+/g, ""), courier = courierOf(o);
   const dupe = S.orders.find(x => x.id !== id && x.tracking === tracking);
   if (dupe) { toast(`That waybill is already on #${dupe.num}.`); return; }
-  await patch("orders", o.id, { tracking, courier, trackingAt: Date.now(), shopShipErr: "" });
+  await patch("orders", o.id, { tracking, courier, trackingAt: Date.now(), shopShipErr: "", log: logAdd(o, [`scanned waybill ${tracking} (${courier})`]) });
   Object.assign(o, { tracking, courier });
   if (S.wbShip !== false) {
     if (o.fulfillment !== "fulfilled" && o.fulfillment !== "delivered") await updateOrder(o, { fulfillment: "fulfilled" });
     toast(`#${o.num}: ${tracking} saved · shipped`);
-    if (o.ref && /^\d+$/.test(o.ref)) await shopifyShip(o, false);
+    if ((o.ref && /^\d+$/.test(o.ref)) || (o.mergedParts || []).some(p => /^\d+$/.test(p.ref || ""))) await shopifyShip(o, false);
   } else toast(`#${o.num}: tracking ${tracking} saved`);
 }
 const SHIP_FO_Q = `query RSFO($id: ID!) { order(id: $id) { id displayFulfillmentStatus fulfillmentOrders(first: 10) { nodes { id status requestStatus } } } }`;
@@ -1884,17 +2126,20 @@ async function shopMut(query, variables) {
 }
 async function shopifyShip(o, manual) {
   if (!S.mcp) { const m = "Open the app in claude.ai with Shopify connected to send tracking."; await patch("orders", o.id, { shopShipErr: m }); if (manual) toast(m); return; }
+  const refs = [o.ref, ...(o.mergedParts || []).map(p => p.ref)].filter(r => /^\d+$/.test(r || ""));
   try {
-    const gid = "gid://shopify/Order/" + o.ref;
-    const p = await shopCall(SHIP_FO_Q, { id: gid }, 10);
-    let fos = ((dig(p, "fulfillmentOrders") || {}).nodes || []);
-    for (const fo of fos.filter(f => f.status === "ON_HOLD")) await shopMut(SHIP_RELEASE_M, { id: fo.id });
-    if (fos.some(f => f.status === "ON_HOLD")) fos = ((dig(await shopCall(SHIP_FO_Q, { id: gid }, 10), "fulfillmentOrders") || {}).nodes || []);
-    const open = fos.filter(f => ["OPEN", "IN_PROGRESS", "SCHEDULED"].includes(f.status));
-    if (!open.length) { if (fos.some(f => f.status === "CLOSED")) { await patch("orders", o.id, { shopShippedAt: Date.now(), shopShipErr: "", shopFul: "fulfilled" }); if (manual) toast("Already fulfilled in Shopify."); return; } throw { code: "tool_error", message: "Shopify has nothing left to fulfill on this order." }; }
-    await shopMut(SHIP_CREATE_M, { fulfillment: { lineItemsByFulfillmentOrder: open.map(f => ({ fulfillmentOrderId: f.id })), trackingInfo: { number: o.tracking, company: o.courier || "Other" }, notifyCustomer: true } });
-    await patch("orders", o.id, { shopShippedAt: Date.now(), shopShipErr: "", shopFul: "fulfilled" });
-    toast(`#${o.num}: tracking sent to Shopify. The buyer can see it in their Order History.`);
+    for (const ref of refs) {
+      const gid = "gid://shopify/Order/" + ref;
+      let fos = ((dig(await shopCall(SHIP_FO_Q, { id: gid }, 10), "fulfillmentOrders") || {}).nodes || []);
+      for (const fo of fos.filter(f => f.status === "ON_HOLD")) await shopMut(SHIP_RELEASE_M, { id: fo.id });
+      if (fos.some(f => f.status === "ON_HOLD")) fos = ((dig(await shopCall(SHIP_FO_Q, { id: gid }, 10), "fulfillmentOrders") || {}).nodes || []);
+      const open = fos.filter(f => ["OPEN", "IN_PROGRESS", "SCHEDULED"].includes(f.status));
+      if (!open.length) { if (fos.some(f => f.status === "CLOSED")) continue; throw { code: "tool_error", message: "Shopify has nothing left to fulfill on order " + ref + "." }; }
+      await shopMut(SHIP_CREATE_M, { fulfillment: { lineItemsByFulfillmentOrder: open.map(f => ({ fulfillmentOrderId: f.id })), trackingInfo: { number: o.tracking, company: SHOP_COMPANY[courierOf(o)] || "Other" }, notifyCustomer: true } });
+    }
+    const cur = findOrder(o.id) || o;
+    await patch("orders", o.id, { shopShippedAt: Date.now(), shopShipErr: "", shopFul: "fulfilled", log: logAdd(cur, [`sent tracking ${o.tracking} to Shopify`]) });
+    toast(`${onum(o)}: tracking sent to Shopify. The buyer can see it in their Order History.`);
   } catch (e) {
     const m = e && e.code === "needs_reauth" ? "Shopify needs you to sign in again (claude.ai → Settings → Connectors)." : e && e.code === "not_in_manifest" ? "Allow Shopify for this page in its Permissions menu." : "Shopify: " + ((e && e.message) || "couldn't send tracking.");
     await patch("orders", o.id, { shopShipErr: m }); toast(m);
@@ -2085,7 +2330,7 @@ async function scanUndo() {
 }
 function handlePackScan(code) {
   const c = String(code).replace(/^#/, "").replace(/\s+/g, "").toUpperCase();
-  const o = S.orders.find(x => String(x.num).replace(/\s+/g, "").toUpperCase() === c || String(x.ref || "").toUpperCase() === c);
+  const o = S.orders.find(x => [x.num, ...(x.merged || [])].some(n => String(n).replace(/\s+/g, "").toUpperCase() === c) || String(x.ref || "").toUpperCase() === c || String(x.tracking || "").toUpperCase() === c);
   if (o) return openOrderDetails(o.id);
   const p = findByCode(code);
   toast(p ? `${p.name}: ${Number(p.stock) || 0} in stock` : `No order or product found for “${code}”.`);
@@ -2187,6 +2432,8 @@ function shopifyOrders(text) {
         email: get(r, "Email").toLowerCase(),
         address: [get(r, "Shipping Address1") || get(r, "Shipping Street"), get(r, "Shipping Address2"), get(r, "Shipping City"), get(r, "Shipping Province"), get(r, "Shipping Zip"), get(r, "Shipping Country")].filter(Boolean).join(", "),
         ref: get(r, "Id"), items: [], fees: 0, shipping: 0,
+        ship: { name: get(r, "Shipping Name"), phone: cleanPhone(get(r, "Shipping Phone")), address1: get(r, "Shipping Address1") || get(r, "Shipping Street"), address2: get(r, "Shipping Address2"), city: get(r, "Shipping City"), province: get(r, "Shipping Province Name") || get(r, "Shipping Province"), zip: get(r, "Shipping Zip"), country: get(r, "Shipping Country") },
+        courier: pickCourier(get(r, "Shipping Method"), !!(get(r, "Shipping Address1") || get(r, "Shipping Street"))), shipTitle: get(r, "Shipping Method"),
         shopifyTotal: Number(get(r, "Total")) || 0,
         payment, fulfillment, tags: parseTags(get(r, "Tags")), note: get(r, "Notes"),
         imported: true, noStock: true, restocked: false,
@@ -2279,11 +2526,12 @@ async function readImportFile(file) {
     const writes = []; let fresh = 0, updated = 0, sample = [], warn = "";
     if (kind === "orders") {
       const openOnly = S.impOpenOnly !== false;
-      const have = new Map(S.orders.map(o => [o.id, o]));
+      const have = new Map([...S.orders, ...S.archived].map(o => [o.id, o]));
       const parsed = shopifyOrders(text).filter(o => !openOnly || have.has(orderDocId(o)) || (OPEN_FUL.has(o.fulfillment) && !isVoid(o)));
       for (const o of parsed) {
         const id = orderDocId(o), ex = have.get(id);
-        if (!ex) { writes.push({ col: "orders", id, data: o }); fresh++; }
+        if (ex && ex.archived) continue;
+        if (!ex) { o.pickup = o.courier === "SDD"; writes.push({ col: "orders", id, data: o }); fresh++; }
         else {
           const ch = { payment: o.payment, fulfillment: !OPEN_FUL.has(ex.fulfillment) && OPEN_FUL.has(o.fulfillment) ? ex.fulfillment : ex.fulfillment === "delivered" && o.fulfillment === "fulfilled" ? "delivered" : o.fulfillment, tags: o.tags, note: o.note || ex.note || "", fulfilledAt: o.fulfilledAt || ex.fulfilledAt || 0, voidedAt: o.voidedAt || 0 };
           if (["payment", "fulfillment", "note"].some(k => ch[k] !== ex[k]) || (ch.tags || []).join() !== (ex.tags || []).join()) { writes.push({ col: "orders", id, data: ch, update: true }); updated++; }
@@ -3257,10 +3505,19 @@ document.addEventListener("click", guard(async ev => {
   if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
   const dy = ev.target.closest("[data-day]");
   if (dy) { S.t.day = dy.dataset.day; render(); return; }
+  if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]")) closePop();
+  const itb = ev.target.closest("[data-items]");
+  if (itb) { if ($("#ipop") && S.popFor === itb.dataset.items) { closePop(); S.popFor = ""; return; } S.popFor = itb.dataset.items; itemsPop(itb); return; }
+  const psrt = ev.target.closest("[data-psort]");
+  if (psrt) { const k = psrt.dataset.psort; if (S.pk.sort === k) S.pk.dir = S.pk.dir === "asc" ? "desc" : "asc"; else { S.pk.sort = k; S.pk.dir = k === "date" ? "desc" : "asc"; } render(); return; }
+  const csrt = ev.target.closest("[data-csort]");
+  if (csrt) { const k = csrt.dataset.csort, c = S.csort || { sort: "spent", dir: "desc" }; S.csort = c.sort === k ? { sort: k, dir: c.dir === "asc" ? "desc" : "asc" } : { sort: k, dir: ["orders", "spent", "last"].includes(k) ? "desc" : "asc" }; render(); return; }
+  const sup = ev.target.closest("[data-sup]");
+  if (sup) { S.of.sup = sup.dataset.sup; S.page = 0; render(); return; }
   const os = ev.target.closest("[data-osort]");
   if (os) { const k = os.dataset.osort; if (S.of.sort === k) S.of.dir = S.of.dir === "asc" ? "desc" : "asc"; else { S.of.sort = k; S.of.dir = ["date", "total", "items", "num"].includes(k) ? "desc" : "asc"; } S.page = 0; render(); return; }
   const sth = ev.target.closest("th[data-sidx]");
-  if (sth) { const t = sth.closest("table"), col = Number(sth.dataset.sidx), key = t.dataset.skey, cur = S.tsort[key]; const dir = cur && cur.col === col ? (cur.dir === "asc" ? "desc" : "asc") : (typeof cellVal(t.tBodies[0].rows[0] && t.tBodies[0].rows[0].cells[col]) === "string" ? "asc" : "desc"); S.tsort[key] = { col, dir }; sortTable(t, col, dir); return; }
+  if (sth) { const t = sth.closest("table"), col = Number(sth.dataset.sidx), key = t.dataset.skey, cur = S.tsort[key]; const dir = cur && cur.col === col ? (cur.dir === "asc" ? "desc" : "asc") : (typeof cellVal(t.tBodies[0].rows[0] && t.tBodies[0].rows[0].cells[col]) === "string" ? "asc" : "desc"); S.tsort[key] = { col, dir }; try { localStorage.setItem("rs-tsort", JSON.stringify(S.tsort)); } catch (e) {} sortTable(t, col, dir); return; }
   const fu = ev.target.closest("[data-ful]");
   if (fu) { const o = S.orders.find(x => x.id === fu.dataset.ful); if (o) { await updateOrder(o, { fulfillment: fu.dataset.to }); toast(`#${o.num} ${ful(fu.dataset.to).name.toLowerCase()}.`); } return; }
   const ph = ev.target.closest("[data-phalf]");
@@ -3313,8 +3570,9 @@ document.addEventListener("click", guard(async ev => {
   if (op) return openOrderDetails(op.dataset.open);
   const ct = ev.target.closest("[data-cust]");
   if (ct) return openCustomer(ct.dataset.cust);
+  if (ev.target.closest("tr[data-row]") && ev.target.closest("select, input, label, .wb-cell")) return;
   const tr = ev.target.closest("tr[data-row]");
-  if (tr) return openOrderDetails(tr.dataset.row);
+  if (tr && !ev.target.closest("button")) return openOrderDetails(tr.dataset.row);
   const b = ev.target.closest("[data-act]"); if (!b) return;
   const id = b.dataset.id;
   switch (b.dataset.act) {
@@ -3372,6 +3630,20 @@ document.addEventListener("click", guard(async ev => {
     case "del-member": await remove("team", id); closeSheet(); toast("Removed from team."); return;
     case "import": return openImport();
     case "edit-items": return openItemsEdit(id);
+    case "columns": return openColumns(b.dataset.table);
+    case "col-up": case "col-down": { const r = b.closest(".colrow"); if (b.dataset.act === "col-up" && r.previousElementSibling) r.parentNode.insertBefore(r, r.previousElementSibling); if (b.dataset.act === "col-down" && r.nextElementSibling) r.parentNode.insertBefore(r.nextElementSibling, r); return; }
+    case "col-reset": { const pr = colPref(b.dataset.table); if (pr) await remove("colprefs", pr.id); closeSheet(); toast("Columns reset to default."); return; }
+    case "merge": return openMerge();
+    case "unmerge": { const o = findOrder(id); if (o) { closeSheet(); await unmergeOrder(o); } return; }
+    case "trace-items": { const o = findOrder(id); if (o) await traceItems(o); return; }
+    case "archive-order": { const o = findOrder(id); if (o) { await archiveOrder(o, ""); closeSheet(); render(); toast(`${onum(o)} moved to Archived orders.`); } return; }
+    case "restore-order": { const o = findOrder(id); if (o) { await restoreOrder(o); closeSheet(); toast(`${onum(o)} is active again.`); } return; }
+    case "ask-del-forever": { const o = findOrder(id); if (!o) return; if (b.dataset.sure) { await remove("orders", id); if (!S.db) { S.archived = S.archived.filter(x => x.id !== id); render(); } toast(`${onum(o)} deleted for good.`); } else { b.dataset.sure = "1"; b.textContent = "Tap again to delete forever"; b.classList.add("danger"); } return; }
+    case "sup-list": return openSupplierList();
+    case "sup-copy": try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
+    case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${(S.of.sup || "").toLowerCase()}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
+    case "jnt-export": return jntExport();
+    case "jnt-copy": return jntCopy();
     case "ei-add": $("#ei-items").insertAdjacentHTML("beforeend", editItemRow()); return;
     case "ei-rm": ev.target.closest(".ei-row").remove(); eiTotal(); return;
     case "ship-shopify": { const o = S.orders.find(x => x.id === id); if (o) { closeSheet(); await shopifyShip(o, true); } return; }
@@ -3426,6 +3698,9 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
   if (t.id === "ei-dtype") return eiTotal();
+  if (t.dataset.oset) { const o = findOrder(t.dataset.id); if (!o) return; const f = t.dataset.oset; await updateOrder(o, { [f]: t.value }); const lab = { payment: pay(t.value).name, fulfillment: ful(t.value).name, courier: t.value, assignee: t.value ? memberName(t.value) : "Unassigned" }[f]; toast(`${onum(o)} → ${lab}`); if (!S.db) render(); return; }
+  if (t.dataset.cassign !== undefined) { const c = customerList().find(x => custKey(x) === t.dataset.cassign); if (!c) return; const os = c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(o => o && OPEN_FUL.has(o.fulfillment)); for (const o of os) await updateOrder(o, { assignee: t.value }); toast(`${c.name} → ${t.value ? memberName(t.value) : "Unassigned"} (${os.length} open order${os.length === 1 ? "" : "s"}; new orders follow).`); render(); return; }
+  if (t.id === "psel-all") { packList().forEach(o => t.checked ? S.sel.add(o.id) : S.sel.delete(o.id)); render(); return; }
   if (t.id === "of-ful") { S.of.ful = t.value; S.page = 0; render(); return; }
   if (t.id === "of-pay") { S.of.pay = t.value; S.page = 0; render(); return; }
   if ((t.id === "bulk-pay" || t.id === "bulk-ful") && t.value) return bulkAction((t.id === "bulk-pay" ? "pay:" : "ful:") + t.value);
@@ -3443,6 +3718,7 @@ document.addEventListener("input", ev => {
   if (t.matches(".it-q, .it-price")) return updateOrderTotal();
   if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-disc")) return eiTotal();
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
+  if (t.id === "aq") { S.aq = t.value; const pos = t.selectionStart; render(); const el = $("#aq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } return; }
   const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq" }[t.id];
   if (!key) return;
   if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; }
@@ -3482,12 +3758,13 @@ document.addEventListener("paste", ev => {
 document.addEventListener("keydown", ev => {
   if (ev.key === "Enter" && ev.target.id === "scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handleScan(v); return; }
   if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.wb) { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) saveWaybill(ev.target.dataset.wb, v); return; }
-  if (ev.key === "Enter" && ev.target.id === "pack-scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handlePackScan(v); return; } if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
+  if (ev.key === "Enter" && ev.target.id === "pack-scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handlePackScan(v); return; } if (ev.key === "Escape") closePop(); if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
 
 /* ---------- Shopify live sync (viewer's Shopify connector via mcp) ---------- */
 const SHOP_SERVER = "Shopify", SHOP_TOOL = "graphql_query", SHOP_EVERY = 60000;
 const SHOP_FIELDS = `id name createdAt cancelledAt displayFinancialStatus displayFulfillmentStatus note tags email phone
   customer { displayName email phone }
+  shippingLine { title }
   shippingAddress { name phone address1 address2 city province zip country }
   totalPriceSet { shopMoney { amount } }
   lineItems(first: 50) { nodes { name sku quantity originalUnitPriceSet { shopMoney { amount } } } }`;
@@ -3535,6 +3812,8 @@ function shopToOrder(n) {
     ref: String(n.id || "").split("/").pop(), items, fees: 0, shipping: 0,
     payment, fulfillment: fulFromTags(fulfillment, tags0), tags: tags0, note: n.note || "",
     shopPay: payment, shopFul: fulfillment, shopTags: tags0, shopNote: n.note || "",
+    ship: { name: a.name || c.displayName || "", phone: a.phone || n.phone || "", address1: a.address1 || "", address2: a.address2 || "", city: a.city || "", province: a.province || "", zip: a.zip || "", country: a.country || "" },
+    shipTitle: (n.shippingLine && n.shippingLine.title) || "", pickup: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress) === "SDD", courier: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress),
     imported: true, noStock: true, restocked: false, source: "shopify-live",
     fulfilledAt: fulfillment === "fulfilled" ? Date.now() : 0, deliveredAt: 0,
     voidedAt: VOIDPAY.has(payment) || n.cancelledAt ? (Date.parse(n.cancelledAt) || createdAt) : 0,
@@ -3544,7 +3823,8 @@ function shopToOrder(n) {
 }
 async function shopApply(o, isNew) {
   const id = orderDocId(o), ex = S.orders.find(x => x.id === id);
-  if (!ex) { if (isNew) { await save("orders", id, o); return 1; } return 0; }
+  if (S.archived.some(x => x.id === id)) return 0;
+  if (!ex) { if (isNew) { const prior = S.orders.find(x => x.assignee && ((o.email && x.email === o.email) || (o.phone && x.phone === o.phone))); if (prior) o.assignee = prior.assignee; o.log = [{ at: Date.now(), by: "Shopify", msg: "order came in from Shopify" }]; await save("orders", id, o); return 1; } return 0; }
   // 3-way merge: only what changed in Shopify since the last sync overrides edits made in the app
   const prevTags = ex.shopTags || ex.tags || [], shTags = o.shopTags || [];
   const added = shTags.filter(t => !prevTags.includes(t)), removed = prevTags.filter(t => !shTags.includes(t));
@@ -3557,7 +3837,11 @@ async function shopApply(o, isNew) {
   const ch = { payment, fulfillment: fl, tags, note, fulfilledAt: fl === "fulfilled" ? (ex.fulfilledAt || Date.now()) : (ex.fulfilledAt || 0), voidedAt: VOIDPAY.has(payment) ? (ex.voidedAt || o.voidedAt || Date.now()) : 0 };
   const changed = ["payment", "fulfillment", "note"].some(k => ch[k] !== ex[k]) || tags.join() !== (ex.tags || []).join();
   const marks = o.shopPay !== ex.shopPay || o.shopFul !== ex.shopFul || o.shopNote !== ex.shopNote || shTags.join() !== (ex.shopTags || []).join();
-  if (changed || marks) { await patch("orders", id, { ...(changed ? ch : {}), shopPay: o.shopPay, shopFul: o.shopFul, shopTags: shTags, shopNote: o.shopNote }); return changed ? 1 : 0; }
+  const backfill = {};
+  if (!ex.ship && o.ship) backfill.ship = o.ship;
+  if (ex.courier === undefined) Object.assign(backfill, { courier: o.courier, pickup: o.pickup, shipTitle: o.shipTitle });
+  if (changed) { const ms = []; if (ch.payment !== ex.payment) ms.push(`changed Payment Status → ${pay(ch.payment).name}`); if (ch.fulfillment !== ex.fulfillment) ms.push(`changed Fulfillment Status → ${ful(ch.fulfillment).name}`); if (tags.join() !== (ex.tags || []).join()) ms.push("updated tags"); if (ms.length) ch.log = logAdd(ex, ms, "Shopify"); }
+  if (changed || marks || Object.keys(backfill).length) { await patch("orders", id, { ...(changed ? ch : {}), ...backfill, shopPay: o.shopPay, shopFul: o.shopFul, shopTags: shTags, shopNote: o.shopNote }); return changed ? 1 : 0; }
   return 0;
 }
 async function shopSync(manual) {
@@ -3651,9 +3935,11 @@ render();
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax"]) {
       db.collection(col).onSnapshot(snap => {
-        S[col] = snap.docs.map(d => { const r = { id: d.id, ...d.data() }; return col === "orders" ? norm(r) : r; });
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (col === "orders") { S.orders = docs.filter(r => !r.archived).map(norm); S.archived = docs.filter(r => r.archived); }
+        else S[col] = docs;
         S.loaded[col] = true;
         if ($("#scrim").hidden) render(); else renderNav();
       }, () => { S.loaded[col] = true; $("#sync").textContent = "Connection lost · reload the page"; render(); });

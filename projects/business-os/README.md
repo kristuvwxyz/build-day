@@ -87,6 +87,21 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - By default this saves the tracking #, marks the order **Shipped** and creates the fulfillment in Shopify with tracking. Shopify releases the hold first if needed, and the buyer is notified. The buyer sees the tracking in their Shopify Order History.
 - The courier is picked once at the top. You can turn off the auto-ship tick box.
 
+## Orders (all departments)
+- Every department has an **Orders** tab. CEO, Sales and Admin can change everything. Finance can change payment and fulfillment status only. Packing can change fulfillment, courier and tracking. Everyone else can view.
+- Payment status, fulfillment status, courier and **Assigned to** (Sales team members) change right in the table.
+- **Items ▾** opens a quick preview of an order's items.
+- **⚙︎ Columns:** show, hide and reorder columns. This is saved per department for everyone in that department and shows who arranged it last.
+- **Supplier bar:** S-JEFF, S-GAL and so on, taken from tags. Click one to filter, then **📋 Order list** gives a combined quantity per item to send the supplier (copy or CSV).
+- **Merge into 1 shipment:** select 2 or more orders → Merge. Items keep the order # they came from (`from #RS…`), and the other orders go to Archived orders. **Unmerge** undoes it.
+- **Delete** moves an order to **Sales → Archived orders**, which clears its statuses. **Make active again** restores them.
+- **Team activity:** each order lists who changed what, e.g. "K, the CEO changed Payment Status → Unpaid".
+- **Courier:** J&T or SDD. Shopify pickup orders (e.g. "MANDALUYONG BRANCH", or no address) default to SDD; everything else defaults to J&T.
+
+## Packing list + J&T VIP booking
+- To pack is now a table like Orders, with a waybill scan box on each row.
+- **Copy for J&T** copies the selected orders (or all J&T orders in the list) to paste into the J&T VIP Excel template. **J&T VIP booking file** downloads a CSV. Columns: receiver, phone, province, city, barangay, street, zip, items, qty, COD, declared value.
+
 ## Look and feel
 - Each department has its own colour, used in the menu, page title, tabs, cards and task rows.
 - The Home banner is smaller.
