@@ -74,6 +74,19 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - The chip on Home → Orders and Sales → Orders shows the status. Click it to sync now.
 - It needs the Shopify connector signed in (claude.ai → Settings → Connectors). The first sync asks you to allow Shopify for the page.
 
+## Order statuses
+- **Payment:** Unpaid, Partially paid (DP+SF), Fully paid, To refund, Refunded, Voided.
+- **Fulfillment:** FWD (8.FWD), To confirm (7.CONF), Billed (6.BILLED), Partially paid (DP) (5.DP), Arrived (4.ARRIVED), Sorted (3.SORTED), Arrived-Hold (2.AB), To ship, On hold, Shipped, Delivered, Cancelled.
+- Stage statuses follow the order's tags. When an order has several stage tags, the lowest number wins. Picking a stage in the app swaps the tag to match.
+- Shopify sync merges: a status, tag or note changed in the app stays unless it changes in Shopify too.
+- **Sorting:** click any column header to sort it. Orders sort across all pages; other tables sort what's on screen.
+- **Internal edit:** Order → **Edit items, prices & discount** (₱ or %). This changes the app only, not Shopify.
+
+## Waybills (Packing)
+- Scan the waybill barcode (USB scanner, or 📷) into the order's card, or type the tracking # and press Enter.
+- By default this saves the tracking #, marks the order **Shipped** and creates the fulfillment in Shopify with tracking. Shopify releases the hold first if needed, and the buyer is notified. The buyer sees the tracking in their Shopify Order History.
+- The courier is picked once at the top. You can turn off the auto-ship tick box.
+
 ## Look and feel
 - Each department has its own colour, used in the menu, page title, tabs, cards and task rows.
 - The Home banner is smaller.

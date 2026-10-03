@@ -178,6 +178,10 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .badge.amber { background: var(--amber-bg); color: var(--amber); }
 .badge.red { background: var(--bad-bg); color: var(--bad); }
 .badge.grey { background: var(--surface-2); color: var(--muted); }
+.badge.green { background: var(--good-bg); color: var(--good); }
+.badge.violet { background: color-mix(in srgb, #8B5CF6 14%, var(--surface)); color: #7C3AED; }
+.badge.blue { background: color-mix(in srgb, #3B82F6 14%, var(--surface)); color: #2563EB; }
+.badge.teal { background: color-mix(in srgb, #0D9488 14%, var(--surface)); color: #0F766E; }
 .tags { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--line); color: var(--fg); white-space: nowrap; }
 .tag.more { background: none; border: 0; color: var(--muted); padding: 1px 2px; }
@@ -378,6 +382,17 @@ h1.dept-title::before { content: ""; width: 12px; height: 12px; border-radius: 5
 .shop-slot { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; margin-right: 8px; }
 .shop-line { display: flex; margin: 0 0 10px; }
 .shop-line:empty { display: none; }
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--fg); }
+th .sarr { margin-left: 4px; font-size: 10px; opacity: .45; }
+th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; color: var(--dc, var(--brand)); }
+.wb-set { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; margin-top: 10px; }
+.wb-set label { display: inline-flex; gap: 6px; align-items: center; }
+.wb-set select, #pack-filter, .bulk select, .wb-in { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 9px; width: auto; }
+.wb-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.wb-row .wb-in { flex: 1; min-width: 160px; }
+.wb-done { width: 100%; font-size: 13px; }
+.ei-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px 110px auto; gap: 6px; }
 @media (max-width: 960px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -430,24 +445,45 @@ const PLATFORMS = [
   { id: "other", name: "Other" },
 ];
 const PAYMENTS = [
-  { id: "pending", name: "Payment pending", cls: "orange hollow" },
-  { id: "paid", name: "Paid", cls: "grey" },
-  { id: "partial", name: "Partially paid", cls: "amber hollow" },
+  { id: "pending", name: "Unpaid", cls: "orange hollow" },
+  { id: "partial", name: "Partially paid (DP+SF)", cls: "amber hollow" },
+  { id: "paid", name: "Fully paid", cls: "green" },
+  { id: "to_refund", name: "To refund", cls: "red hollow" },
   { id: "refunded", name: "Refunded", cls: "grey" },
   { id: "voided", name: "Voided", cls: "grey" },
 ];
+/* pre-order pipeline stages come from Shopify tags (8.FWD … 2.AB); lower number = further along */
+const STAGES = [
+  { id: "fwd", name: "FWD", tag: "8.FWD", cls: "violet hollow" },
+  { id: "to_confirm", name: "To confirm", tag: "7.CONF", cls: "violet hollow" },
+  { id: "billed", name: "Billed", tag: "6.BILLED", cls: "blue hollow" },
+  { id: "dp", name: "Partially paid (DP)", tag: "5.DP", cls: "blue hollow" },
+  { id: "arrived", name: "Arrived", tag: "4.ARRIVED", cls: "teal hollow" },
+  { id: "sorted", name: "Sorted", tag: "3.SORTED", cls: "teal hollow" },
+  { id: "arrived_hold", name: "Arrived-Hold", tag: "2.AB", cls: "orange hollow" },
+];
 const FULFILLMENTS = [
-  { id: "unfulfilled", name: "Unfulfilled", cls: "amber hollow" },
+  ...STAGES,
+  { id: "unfulfilled", name: "To ship", cls: "amber hollow" },
   { id: "on_hold", name: "On hold", cls: "orange hollow" },
-  { id: "fulfilled", name: "Fulfilled", cls: "grey" },
-  { id: "delivered", name: "Delivered", cls: "grey" },
+  { id: "fulfilled", name: "Shipped", cls: "grey" },
+  { id: "delivered", name: "Delivered", cls: "green" },
+  { id: "cancelled", name: "Cancelled", cls: "red" },
   { id: "not_required", name: "Not required", cls: "grey" },
 ];
 const VOIDPAY = new Set(["refunded", "voided"]);
-const OPEN_FUL = new Set(["unfulfilled", "on_hold"]);
+const STAGE_IDS = new Set(STAGES.map(x => x.id));
+const OPEN_FUL = new Set(["unfulfilled", "on_hold", ...STAGE_IDS]);
+const normTag = t => String(t || "").toUpperCase().replace(/\s+/g, "");
+const tagStage = tags => { const set = new Set((tags || []).map(normTag)); for (let i = STAGES.length - 1; i >= 0; i--) if (set.has(STAGES[i].tag)) return STAGES[i].id; return ""; };
+/* open orders follow their stage tag; a stage with its tag removed falls back to To ship */
+const fulFromTags = (f, tags) => !OPEN_FUL.has(f) ? f : (tagStage(tags) || (STAGE_IDS.has(f) ? "unfulfilled" : f));
+const STAGE_TAGS = new Set(STAGES.map(x => x.tag));
+const withStageTag = (tags, f) => { const st = STAGES.find(x => x.id === f); const rest = (tags || []).filter(t => !STAGE_TAGS.has(normTag(t))); return st ? [...rest, st.tag] : rest; };
+const COURIERS = ["J&T Express", "LBC", "Flash Express", "Ninja Van", "2GO", "XDE", "Lalamove", "Grab Express", "Other"];
 const ORDER_VIEWS = [
   { id: "all", name: "All" },
-  { id: "unfulfilled", name: "Unfulfilled" },
+  { id: "unfulfilled", name: "To ship" },
   { id: "unpaid", name: "Unpaid" },
   { id: "on_hold", name: "On hold" },
   { id: "open", name: "Open" },
@@ -509,7 +545,7 @@ const S = {
   loaded: { products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false },
   pay: { month: "", half: 1 }, paySettings: {},
   view: "home", dept: "SALES", tab: "orders", period: "month",
-  of: { view: "all", platform: "all", q: "", range: "today" },
+  of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
   page: 0, sel: new Set(),
   pq: "", cq: "", cpage: 0,
   t: { scope: "team", person: "", dept: "", mode: "calendar", month: today().slice(0, 7), day: today() },
@@ -551,7 +587,7 @@ function relTime(t) {
 }
 
 const itemsTotal = o => (o.items || []).reduce((a, i) => a + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
-const total = o => itemsTotal(o) + (Number(o.adjust) || 0);
+const total = o => itemsTotal(o) + (Number(o.adjust) || 0) - (Number(o.discount) || 0);
 const itemCount = o => (o.items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0);
 const cogs = o => (o.items || []).reduce((a, i) => a + (Number(i.qty) || 0) * (Number(i.cost) || 0), 0);
 const profit = o => total(o) - cogs(o) - (Number(o.fees) || 0) - (Number(o.shipping) || 0);
@@ -616,8 +652,11 @@ async function adjustStock(productId, delta) {
 
 /* Applies a payment/fulfillment/tag/note change and keeps stock + timestamps right. */
 async function updateOrder(o, ch) {
+  ch = { ...ch };
   const upd = { ...ch }, now = Date.now();
   let stockDelta = 0;
+  if (ch.fulfillment && ch.fulfillment !== o.fulfillment) { if (OPEN_FUL.has(ch.fulfillment)) upd.tags = withStageTag(ch.tags || o.tags, ch.fulfillment); }
+  else if (ch.tags) { const f = fulFromTags(o.fulfillment, ch.tags); if (f !== o.fulfillment) { upd.fulfillment = f; ch = { ...ch, fulfillment: f }; } }
   if (ch.fulfillment && ch.fulfillment !== o.fulfillment) {
     if (ch.fulfillment === "fulfilled") upd.fulfilledAt = o.fulfilledAt || now;
     if (ch.fulfillment === "delivered") { upd.deliveredAt = now; upd.fulfilledAt = o.fulfilledAt || now; }
@@ -691,7 +730,8 @@ function periodSeg() {
   return `<div class="seg" role="group" aria-label="Period">${[["month", "This month"], ["last", "Last month"], ["all", "All time"]].map(([k, l]) => `<button type="button" data-period="${k}" aria-pressed="${S.period === k}">${l}</button>`).join("")}</div>`;
 }
 
-function render() {
+function render() { renderInner(); enhanceTables(); }
+function renderInner() {
   renderNav();
   const d = dept(S.dept);
   const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments" }[S.view] || d.name;
@@ -995,7 +1035,7 @@ function slides() {
   const placeholder = what => `<p class="slide-ph">${S.canEdit ? `Add your ${what} in <button type="button" class="linkish" data-act="edit-home">Admin → Home page</button>.` : `Your Admin hasn't added the ${what} yet.`}</p>`;
   return [
     { eyebrow: longDate(today()), title: `${greeting()}${fn ? ", " + esc(fn) : ""}`, body: `<p>${esc(h.welcome || "Welcome to Regal Spritz HQ. Here's what's happening today.")}</p>
-      <div class="slide-stats"><span><b class="num">${mine.length}</b> open task${mine.length === 1 ? "" : "s"} for you</span><span><b class="num">${S.tasks.filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length}</b> due today across the team</span><button type="button" class="slide-link" data-goorders="unfulfilled"><b class="num">${toPack}</b> order${toPack === 1 ? "" : "s"} to pack →</button></div>` },
+      <div class="slide-stats"><span><b class="num">${mine.length}</b> open task${mine.length === 1 ? "" : "s"} for you</span><span><b class="num">${S.tasks.filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length}</b> due today across the team</span><button type="button" class="slide-link" data-goorders="unfulfilled"><b class="num">${toPack}</b> order${toPack === 1 ? "" : "s"} to ship →</button></div>` },
     { eyebrow: "RS Mission", title: "Our mission", body: h.mission ? `<p class="slide-quote">${esc(h.mission)}</p>` : placeholder("mission statement") },
     { eyebrow: "RS Vision", title: "Our vision", body: h.vision ? `<p class="slide-quote">${esc(h.vision)}</p>` : placeholder("vision statement") },
     { eyebrow: "RS Goals", title: "Our goals", body: goals.length ? `<ol class="slide-goals">${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ol>` : placeholder("goals") },
@@ -1050,8 +1090,8 @@ function homeOrders() {
   const tile = (n, label, view, cls) => `<button type="button" class="otile ${cls}" data-goorders="${view}"><b class="num">${n}</b><span>${label}</span></button>`;
   const recent = [...toPack, ...hold].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).slice(0, 6);
   return `<section class="panel orders-home" style="--dc:${DEPT_COLORS.SALES}"><div class="head"><h2>Orders</h2><span class="shop-slot">${shopChip()}</span><button class="btn sm" type="button" data-goorders="all">${sales ? "Open all orders" : "Open packing"} →</button></div>
-    <div class="otiles">${tile(toPack.length, "To pack", "unfulfilled", toPack.length ? "hot" : "")}${tile(hold.length, "On hold", "on_hold", "")}${tile(unpaid.length, "Unpaid", "unpaid", "")}${tile(todays.length, "New today", "today", "")}</div>
-    ${recent.length ? `<div class="olist">${recent.map(o => `<button type="button" class="orow" data-open="${o.id}"><span class="onum">#${esc(o.num)}</span><span class="ocust">${esc(o.customer || "No customer")}<small>${esc(plat(o.platform))} · ${relTime(o.createdAt)} · ${itemCount(o)} item${itemCount(o) === 1 ? "" : "s"}</small></span><span class="ototal num">${peso(total(o))}</span>${badge(ful(o.fulfillment))}</button>`).join("")}</div>`
+    <div class="otiles">${tile(toPack.length, "To ship", "unfulfilled", toPack.length ? "hot" : "")}${tile(hold.length, "On hold", "on_hold", "")}${tile(unpaid.length, "Unpaid", "unpaid", "")}${tile(todays.length, "New today", "today", "")}</div>
+    ${recent.length ? `<div class="olist">${recent.map(o => `<button type="button" class="orow" data-open="${o.id}"><span class="onum">#${esc(o.num)}</span><span class="ocust">${esc(o.customer || "No customer")}<small>${relTime(o.createdAt)} · ${itemCount(o)} item${itemCount(o) === 1 ? "" : "s"}</small></span><span class="ototal num">${peso(total(o))}</span>${badge(ful(o.fulfillment))}</button>`).join("")}</div>`
       : `<div class="empty">${S.orders.length ? "Everything is packed. 🎉" : sales ? "No orders yet. Import them in Sales → Orders." : "No orders to pack."}</div>`}
   </section>`;
 }
@@ -1231,25 +1271,34 @@ function openMemberForm(id) {
   });
 }
 
+const PACK_SHOW = ["unfulfilled", "sorted", "arrived", "arrived_hold", "on_hold"];
 function viewPacking() {
-  const q = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  const hold = q.filter(o => o.fulfillment === "on_hold").length;
+  const open = S.orders.filter(o => !isVoid(o) && PACK_SHOW.includes(o.fulfillment));
+  const f = S.packF || "unfulfilled";
+  const q = open.filter(o => f === "all" || o.fulfillment === f).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const toShip = open.filter(o => o.fulfillment === "unfulfilled");
+  const courier = S.courier || "J&T Express", ship = S.wbShip !== false;
   return `<div class="kpis">
-      <div class="kpi"><span class="label">To pack</span><span class="value">${q.length - hold}</span><span class="sub">Unfulfilled, oldest first</span></div>
-      <div class="kpi"><span class="label">On hold</span><span class="value">${hold}</span></div>
-      <div class="kpi"><span class="label">Items to pick</span><span class="value">${q.filter(o => o.fulfillment === "unfulfilled").reduce((a, o) => a + itemCount(o), 0)}</span></div>
-      <div class="kpi"><span class="label">Fulfilled today</span><span class="value">${S.orders.filter(o => o.fulfilledAt && dstr(o.fulfilledAt) === today()).length}</span></div>
+      <div class="kpi"><span class="label">To ship</span><span class="value">${toShip.length}</span><span class="sub">Oldest first</span></div>
+      <div class="kpi"><span class="label">Arrived / sorted</span><span class="value">${open.filter(o => ["sorted", "arrived", "arrived_hold"].includes(o.fulfillment)).length}</span></div>
+      <div class="kpi"><span class="label">Items to pick</span><span class="value">${toShip.reduce((a, o) => a + itemCount(o), 0)}</span></div>
+      <div class="kpi"><span class="label">Shipped today</span><span class="value">${S.orders.filter(o => o.fulfilledAt && dstr(o.fulfilledAt) === today()).length}</span></div>
     </div>
     <section class="panel scanbar" style="--dc:${DEPT_COLORS.PACKING}"><div class="scanrow"><input id="pack-scan" autocomplete="off" placeholder="Scan or type an order # (e.g. RS9978) to open it" aria-label="Order number">
-      <label class="btn" for="pack-cam" style="cursor:pointer">📷 Camera</label><input id="pack-cam" type="file" accept="image/*" capture="environment" hidden></div></section>
+      <label class="btn" for="pack-cam" style="cursor:pointer">📷 Camera</label><input id="pack-cam" type="file" accept="image/*" capture="environment" hidden></div>
+      <div class="wb-set"><strong>Waybills</strong><label>Courier <select id="pack-courier">${COURIERS.map(c => `<option ${c === courier ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
+        <label><input type="checkbox" id="pack-ship" ${ship ? "checked" : ""}> After scanning, mark <strong>Shipped</strong> and send the tracking # to Shopify (buyer sees it in their Order History)</label></div></section>
+    <div class="head"><select id="pack-filter" aria-label="Show">${[["unfulfilled", "To ship"], ["sorted", "Sorted"], ["arrived", "Arrived"], ["arrived_hold", "Arrived-Hold"], ["on_hold", "On hold"], ["all", "All of these"]].map(([k, l]) => `<option value="${k}" ${f === k ? "selected" : ""}>${l} (${k === "all" ? open.length : open.filter(o => o.fulfillment === k).length})</option>`).join("")}</select></div>
     <div class="pack-list">${q.map(o => `<article class="panel pack">
       <div class="head"><div><span class="onum" style="font-size:15px">#${esc(o.num)}</span> <span style="color:var(--muted);font-size:13px">${esc(plat(o.platform))} · ${relTime(o.createdAt)}</span></div><div style="display:flex;gap:6px">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}</div></div>
       <div><strong>${esc(o.customer || "No customer")}</strong>${o.phone ? ` · <span style="user-select:all">${esc(o.phone)}</span>` : ""}${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : ""}</div>
       <ul class="pick">${(o.items || []).map(i => `<li><b class="num">${esc(i.qty)}×</b> ${esc(i.name)}${i.sku ? ` <span style="color:var(--muted)">${esc(i.sku)}</span>` : ""}</li>`).join("")}</ul>
       ${o.note ? `<div class="notice" style="font-weight:500">${esc(o.note)}</div>` : ""}
       ${(o.tags || []).length ? tagCell(o.tags) : ""}
-      ${S.readOnly ? "" : `<div class="actions"><button class="btn primary sm" type="button" data-ful="${o.id}" data-to="fulfilled">Mark as fulfilled</button>${o.fulfillment === "on_hold" ? `<button class="btn sm" type="button" data-ful="${o.id}" data-to="unfulfilled">Release hold</button>` : `<button class="btn sm" type="button" data-ful="${o.id}" data-to="on_hold">Put on hold</button>`}<button class="btn ghost sm" type="button" data-open="${o.id}">Details</button></div>`}
-    </article>`).join("") || `<div class="panel"><div class="empty">Nothing to pack. New unfulfilled orders appear here automatically.</div></div>`}</div>`;
+      ${S.readOnly ? (o.tracking ? `<div class="wb-done">🚚 ${esc(o.courier || "")} ${esc(o.tracking)}</div>` : "") : `<div class="wb-row">${o.tracking ? `<div class="wb-done">🚚 ${esc(o.courier || "")} <b class="num">${esc(o.tracking)}</b>${o.shopShippedAt ? ` · <span style="color:var(--good)">sent to Shopify ✓</span>` : o.shopShipErr ? ` · <span style="color:var(--bad)">${esc(o.shopShipErr)}</span>` : ""}</div>` : ""}
+        <input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan waybill" : "Scan waybill / type tracking # + Enter"}" aria-label="Waybill tracking number for #${esc(o.num)}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan waybill with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>`}
+      ${S.readOnly ? "" : `<div class="actions"><button class="btn primary sm" type="button" data-ful="${o.id}" data-to="fulfilled">Mark as shipped</button>${o.fulfillment === "on_hold" ? `<button class="btn sm" type="button" data-ful="${o.id}" data-to="unfulfilled">Release hold</button>` : `<button class="btn sm" type="button" data-ful="${o.id}" data-to="on_hold">Put on hold</button>`}<button class="btn ghost sm" type="button" data-open="${o.id}">Details</button></div>`}
+    </article>`).join("") || `<div class="panel"><div class="empty">Nothing here. New orders appear automatically.</div></div>`}</div>`;
 }
 
 function viewChannels() {
@@ -1371,15 +1420,55 @@ function filteredOrders() {
   const q = S.of.q.trim().toLowerCase();
   const vw = S.of.view;
   return S.orders.filter(o => {
-    if (S.of.platform !== "all" && o.platform !== S.of.platform) return false;
+    if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
+    if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
     if (vw === "unfulfilled" && (o.fulfillment !== "unfulfilled" || isVoid(o))) return false;
     if (vw === "unpaid" && !(o.payment === "pending" || o.payment === "partial")) return false;
     if (vw === "on_hold" && o.fulfillment !== "on_hold") return false;
     if (vw === "open" && (isVoid(o) || !(OPEN_FUL.has(o.fulfillment) || o.payment !== "paid"))) return false;
     if (vw === "archived" && !(isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)))) return false;
-    if (q && ![o.num, "#" + o.num, o.customer, o.email, o.ref, o.phone, plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)) return false;
+    if (q && ![o.num, "#" + o.num, o.customer, o.email, o.ref, o.phone, o.tracking, plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)) return false;
     return true;
-  }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }).sort(orderSorter());
+}
+
+const ORDER_SORTS = {
+  num: o => Number(String(o.num).replace(/\D/g, "")) || 0, date: o => o.createdAt || 0, items: o => itemCount(o), customer: o => (o.customer || "").toLowerCase(),
+  total: o => total(o), payment: o => PAYMENTS.findIndex(x => x.id === o.payment), fulfillment: o => FULFILLMENTS.findIndex(x => x.id === o.fulfillment),
+  tracking: o => (o.tracking || "").toLowerCase(), tags: o => (o.tags || []).join(",").toLowerCase(),
+};
+function orderSorter() {
+  const f = ORDER_SORTS[S.of.sort] || ORDER_SORTS.date, d = S.of.dir === "asc" ? 1 : -1;
+  return (a, b) => { const x = f(a), y = f(b); const c = typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y; return c * d || (b.createdAt || 0) - (a.createdAt || 0); };
+}
+const sortTh = (k, label, cls = "") => `<th class="sortable ${cls}" data-osort="${k}" aria-sort="${S.of.sort === k ? (S.of.dir === "asc" ? "ascending" : "descending") : "none"}">${label}<span class="sarr">${S.of.sort === k ? (S.of.dir === "asc" ? "↑" : "↓") : "↕"}</span></th>`;
+
+/* click-to-sort for every other table: sorts the rows on screen, remembered per table */
+S.tsort = {};
+const tableKey = (t, i) => [S.view, S.dept, S.tab, i].join(":");
+const cellVal = td => {
+  if (!td) return "";
+  if (td.dataset.sort !== undefined) { const n = Number(td.dataset.sort); return isNaN(n) ? td.dataset.sort.toLowerCase() : n; }
+  const s = td.innerText.trim();
+  const num = s.replace(/[₱,%\s]/g, "").replace(/^−/, "-");
+  if (/^-?\d+(\.\d+)?$/.test(num)) return Number(num);
+  if (/[A-Za-z]{3} \d{1,2},? \d{4}|^\d{4}-\d{2}-\d{2}/.test(s)) { const t = Date.parse(s.replace(/·.*$/, "")); if (!isNaN(t)) return t; }
+  return s.toLowerCase();
+};
+function sortTable(t, col, dir) {
+  const tb = t.tBodies[0]; if (!tb) return;
+  const rows = [...tb.rows], d = dir === "asc" ? 1 : -1;
+  rows.sort((a, b) => { const x = cellVal(a.cells[col]), y = cellVal(b.cells[col]); if (x === "" && y !== "") return 1; if (y === "" && x !== "") return -1; const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "en", { numeric: true }); return c * d; });
+  rows.forEach(r => tb.appendChild(r));
+  [...t.tHead.rows[0].cells].forEach((th, i) => { th.setAttribute("aria-sort", i === col ? (dir === "asc" ? "ascending" : "descending") : "none"); const a = th.querySelector(".sarr"); if (a) a.textContent = i === col ? (dir === "asc" ? "↑" : "↓") : "↕"; });
+}
+function enhanceTables() {
+  document.querySelectorAll("#view table, #sheet table").forEach((t, i) => {
+    if (t.classList.contains("otable") || !t.tHead || !t.tHead.rows[0] || !t.tBodies[0] || t.tBodies[0].rows.length < 2) return;
+    const key = tableKey(t, i); t.dataset.skey = key;
+    [...t.tHead.rows[0].cells].forEach((th, c) => { if (th.classList.contains("cb") || th.colSpan > 1 || !th.textContent.trim() || th.dataset.sidx) return; th.dataset.sidx = c; th.classList.add("sortable"); th.insertAdjacentHTML("beforeend", `<span class="sarr">↕</span>`); });
+    const st = S.tsort[key]; if (st) sortTable(t, st.col, st.dir);
+  });
 }
 
 function tagCell(tags) {
@@ -1396,9 +1485,9 @@ function viewOrders() {
   for (const id of [...S.sel]) if (!S.orders.some(o => o.id === id)) S.sel.delete(id);
   const allSel = rows.length && rows.every(o => S.sel.has(o.id));
   const bulk = S.sel.size && !S.readOnly ? `<div class="bulk"><strong>${S.sel.size} selected</strong>
-      <button class="btn sm" type="button" data-bulk="paid">Mark as paid</button>
-      <button class="btn sm" type="button" data-bulk="on_hold">Put on hold</button>
-      <button class="btn sm" type="button" data-bulk="fulfilled">Mark as fulfilled</button>
+      <select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>
+      <select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>
+      <button class="btn sm" type="button" data-bulk="fulfilled">Mark as shipped</button>
       <button class="btn sm" type="button" data-bulk="delivered">Mark as delivered</button>
       <input id="bulk-tag" placeholder="Tag e.g. 8.FWD" aria-label="Tag to add" autocomplete="off">
       <button class="btn sm" type="button" data-bulk="tag">Add tag</button>
@@ -1409,13 +1498,14 @@ function viewOrders() {
   <div class="toolbar">
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
     <input id="of-q" type="search" placeholder="Search and filter: order #, customer, tag, product" value="${esc(S.of.q)}" aria-label="Search orders">
-    <select id="of-platform" aria-label="Channel"><option value="all">All channels</option>${PLATFORMS.map(p => `<option value="${p.id}" ${S.of.platform === p.id ? "selected" : ""}>${p.name}</option>`).join("")}</select>
+    <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
+    <select id="of-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${S.of.pay === f.id ? "selected" : ""}>${f.name} (${S.orders.filter(o => o.payment === f.id).length})</option>`).join("")}</select>
   </div>
   ${bulk}
   <div class="table-wrap"><table class="otable">
     <thead><tr>
       <th class="cb"><input type="checkbox" id="sel-all" aria-label="Select all on this page" ${allSel ? "checked" : ""} ${S.readOnly ? "disabled" : ""}></th>
-      <th>Order</th><th>Date ↓</th><th>Items</th><th>Customer</th><th>Channel</th><th class="r">Total</th><th>Payment status</th><th>Fulfillment status</th><th>Tags</th>
+      ${sortTh("num", "Order")}${sortTh("date", "Date")}${sortTh("items", "Items")}${sortTh("customer", "Customer")}${sortTh("total", "Total", "r")}${sortTh("payment", "Payment status")}${sortTh("fulfillment", "Fulfillment status")}${sortTh("tracking", "Tracking #")}${sortTh("tags", "Tags")}
     </tr></thead>
     <tbody>${rows.map(o => {
       const v = isVoid(o) && o.payment === "voided";
@@ -1427,10 +1517,10 @@ function viewOrders() {
       <td class="strike nowrap">${relTime(o.createdAt)}</td>
       <td class="strike nowrap">${n} item${n === 1 ? "" : "s"}</td>
       <td class="strike">${esc(o.customer || "No customer")}</td>
-      <td class="nowrap">${esc(plat(o.platform))}</td>
       <td class="r num strike nowrap">${peso2(total(o))}</td>
       <td>${badge(pay(o.payment))}</td>
       <td>${badge(ful(o.fulfillment))}</td>
+      <td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>
       <td>${tagCell(o.tags)}</td>
     </tr>`; }).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.orders.length ? "No orders match these filters." : "No orders yet. Click “Import from Shopify” to bring in your existing orders, or “Create order” to log one."}</div>`}</div>
@@ -1449,7 +1539,7 @@ async function bulkAction(kind) {
     for (const o of targets) if (!(o.tags || []).includes(t)) await updateOrder(o, { tags: [...(o.tags || []), t] });
     toast(`Added ${t} to ${targets.length} order${targets.length === 1 ? "" : "s"}.`);
   } else {
-    const ch = kind === "paid" ? { payment: "paid" } : { fulfillment: kind };
+    const ch = kind === "paid" ? { payment: "paid" } : kind.startsWith("pay:") ? { payment: kind.slice(4) } : { fulfillment: kind.replace(/^ful:/, "") };
     for (const o of targets) await updateOrder(o, ch);
     toast(`Updated ${targets.length} order${targets.length === 1 ? "" : "s"}.`);
   }
@@ -1681,14 +1771,22 @@ function openOrderDetails(id) {
     <div><div style="font-weight:700">${esc(o.customer || "No customer")}</div><div style="color:var(--muted);font-size:13px;user-select:all">${[o.email, o.phone].filter(Boolean).map(esc).join(" · ")}</div>${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : ""}</div>
     <div class="list">${(o.items || []).map(i => `<div class="li"><div class="main"><div class="t">${esc(i.qty)}× ${esc(i.name)}</div><div class="s num">${peso2(i.price)} each${i.cost ? " · cost " + peso2(i.cost) : ""}${i.sku ? " · " + esc(i.sku) : ""}</div></div><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("")}</div>
     <div class="list">
-      ${o.adjust ? `<div class="li"><span>Shipping, tax and discounts</span><span class="num">${peso2(o.adjust)}</span></div>` : ""}
+      ${o.adjust ? `<div class="li"><span>Shipping fee & other charges</span><span class="num">${peso2(o.adjust)}</span></div>` : ""}
+      ${o.discount ? `<div class="li"><span>Discount${o.discountNote ? " · " + esc(o.discountNote) : ""}</span><span class="num">−${peso2(o.discount)}</span></div>` : ""}
       <div class="li"><span style="font-weight:700">Total</span><span class="num" style="font-weight:700">${peso2(total(o))}</span></div>
       <div class="li"><span>Platform fees</span><span class="num">−${peso2(o.fees)}</span></div>
       <div class="li"><span>Shipping you paid</span><span class="num">−${peso2(o.shipping)}</span></div>
       <div class="li"><span>Product cost</span><span class="num">−${peso2(cogs(o))}</span></div>
       <div class="li"><span style="font-weight:700">Profit</span><span class="num" style="font-weight:700;color:${profit(o) < 0 ? "var(--bad)" : "var(--good)"}">${isVoid(o) ? "–" : peso2(profit(o))}</span></div>
     </div>
-    ${ro ? "" : `
+    ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
+    ${ro ? (o.tracking ? `<div>🚚 ${esc(o.courier || "")} ${esc(o.tracking)}</div>` : "") : `
+    <button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}" style="align-self:flex-start">✏️ Edit items, prices & discount</button>
+    <div class="row">
+      <div class="field"><label for="d-track">Tracking # (waybill)</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
+      <div class="field"><label for="d-courier">Courier</label><select id="d-courier">${COURIERS.map(c => `<option ${c === (o.courier || S.courier || "J&T Express") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+    </div>
+    ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}
     <div class="row">
       <div class="field"><label for="d-pay">Payment status</label><select id="d-pay">${opts(PAYMENTS, o.payment)}</select></div>
       <div class="field"><label for="d-ful">Fulfillment status</label><select id="d-ful">${opts(FULFILLMENTS, o.fulfillment)}</select></div>
@@ -1701,9 +1799,106 @@ function openOrderDetails(id) {
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${ro ? "Close" : "Cancel"}</button>${ro ? "" : `<button class="btn primary" type="submit">Save changes</button>`}</div>`,
   ro ? null : async () => {
     const ch = { payment: val("d-pay"), fulfillment: val("d-ful"), tags: parseTags(val("o-tags")), note: val("o-note") };
+    const tr = val("d-track").trim();
+    if (tr !== (o.tracking || "") || (tr && val("d-courier") !== (o.courier || ""))) Object.assign(ch, { tracking: tr, courier: val("d-courier"), trackingAt: tr ? Date.now() : 0 });
     const d = await updateOrder(o, ch);
     closeSheet(); toast(d > 0 ? "Saved. Items returned to stock." : d < 0 ? "Saved. Items deducted from stock again." : "Order updated.");
   });
+}
+
+/* ---------- internal order edit: items, prices, discount ---------- */
+const editItemRow = (i = {}) => `<div class="ei-row"><input class="ei-name" list="ei-products" value="${esc(i.name || "")}" placeholder="Item name" aria-label="Item"><input class="ei-q num" type="number" min="0" step="1" value="${i.qty ?? 1}" aria-label="Qty"><input class="ei-p num" type="number" min="0" step="0.01" value="${i.price ?? ""}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="ei-rm" aria-label="Remove item">×</button></div>`;
+function eiRead() {
+  const items = [];
+  document.querySelectorAll("#sheet .ei-row").forEach(r => {
+    const name = r.querySelector(".ei-name").value.trim(), qty = Number(r.querySelector(".ei-q").value) || 0;
+    if (!name || qty <= 0) return;
+    const p = S.products.find(x => (x.name || "").toLowerCase() === name.toLowerCase());
+    const pv = r.querySelector(".ei-p").value;
+    items.push({ productId: p ? p.id : "", name, sku: p ? p.sku || "" : "", qty, price: pv === "" ? (p ? Number(p.price) || 0 : 0) : Number(pv) || 0, cost: p ? Number(p.cost) || 0 : 0 });
+  });
+  return items;
+}
+function eiTotal() {
+  const items = eiRead(), sub = items.reduce((a, i) => a + i.qty * i.price, 0);
+  const pct = $("#ei-dtype") && $("#ei-dtype").value === "pct", dv = numv("ei-disc");
+  const disc = pct ? Math.round(sub * dv) / 100 : dv;
+  const el = $("#ei-total"); if (el) el.textContent = peso2(sub + numv("ei-adj") - disc);
+  const ds = $("#ei-dshow"); if (ds) ds.textContent = disc ? "−" + peso2(disc) : "";
+}
+function openItemsEdit(id) {
+  const o = S.orders.find(x => x.id === id); if (!o) return;
+  openSheet(`
+    <h3>Edit #${esc(o.num)}: items & prices</h3>
+    <div style="font-size:12px;color:var(--muted)">Changes stay inside the Business OS. Shopify keeps its own copy.</div>
+    <datalist id="ei-products">${S.products.map(p => `<option value="${esc(p.name)}"></option>`).join("")}</datalist>
+    <div class="field"><label>Items <span style="font-weight:400;color:var(--muted)">(name · qty · unit price)</span></label><div id="ei-items" style="display:flex;flex-direction:column;gap:6px">${(o.items || []).map(editItemRow).join("") || editItemRow()}</div>
+      <button class="btn sm" type="button" data-act="ei-add" style="align-self:flex-start;margin-top:4px">+ Add item</button></div>
+    <div class="row">
+      <div class="field"><label for="ei-adj">Shipping fee & other charges (₱)</label><input id="ei-adj" type="number" step="0.01" value="${Number(o.adjust) || ""}" placeholder="0"></div>
+      <div class="field"><label for="ei-disc">Discount</label><div style="display:flex;gap:6px"><input id="ei-disc" type="number" min="0" step="0.01" value="${Number(o.discount) || ""}" placeholder="0" style="flex:1;min-width:0"><select id="ei-dtype" aria-label="Discount type" style="width:auto"><option value="amt">₱</option><option value="pct">%</option></select></div><span id="ei-dshow" style="font-size:12px;color:var(--muted)"></span></div>
+    </div>
+    <div class="field"><label for="ei-dnote">Discount reason (optional)</label><input id="ei-dnote" value="${esc(o.discountNote || "")}" placeholder="e.g. loyal buyer, promo code"></div>
+    <div class="total-line"><span>New order total</span><span id="ei-total" class="num">${peso2(total(o))}</span></div>
+    ${o.noStock ? "" : `<div style="font-size:12px;color:var(--muted)">Inventory adjusts for added or removed items.</div>`}
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save changes</button></div>`,
+  async () => {
+    const items = eiRead(); if (!items.length) return sheetError("Keep at least one item with a quantity.");
+    const sub = items.reduce((a, i) => a + i.qty * i.price, 0), dv = numv("ei-disc");
+    const discount = $("#ei-dtype").value === "pct" ? Math.round(sub * dv) / 100 : dv;
+    if (!o.noStock && !isVoid(o)) {
+      const by = {}; (o.items || []).forEach(i => { if (i.productId) by[i.productId] = (by[i.productId] || 0) + (Number(i.qty) || 0); });
+      items.forEach(i => { if (i.productId) by[i.productId] = (by[i.productId] || 0) - i.qty; });
+      for (const [pid, d] of Object.entries(by)) if (d) await adjustStock(pid, d);
+    }
+    await patch("orders", o.id, { items, adjust: numv("ei-adj"), discount, discountNote: val("ei-dnote"), editedItemsAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" });
+    closeSheet(); toast(`#${o.num} updated · total ${peso2(sub + numv("ei-adj") - discount)}`);
+  });
+  eiTotal();
+}
+
+/* ---------- waybill scan → tracking # → Shopify fulfillment ---------- */
+async function saveWaybill(id, code) {
+  const o = S.orders.find(x => x.id === id); if (!o || S.readOnly) return;
+  const tracking = String(code).trim().replace(/\s+/g, ""), courier = S.courier || "J&T Express";
+  const dupe = S.orders.find(x => x.id !== id && x.tracking === tracking);
+  if (dupe) { toast(`That waybill is already on #${dupe.num}.`); return; }
+  await patch("orders", o.id, { tracking, courier, trackingAt: Date.now(), shopShipErr: "" });
+  Object.assign(o, { tracking, courier });
+  if (S.wbShip !== false) {
+    if (o.fulfillment !== "fulfilled" && o.fulfillment !== "delivered") await updateOrder(o, { fulfillment: "fulfilled" });
+    toast(`#${o.num}: ${tracking} saved · shipped`);
+    if (o.ref && /^\d+$/.test(o.ref)) await shopifyShip(o, false);
+  } else toast(`#${o.num}: tracking ${tracking} saved`);
+}
+const SHIP_FO_Q = `query RSFO($id: ID!) { order(id: $id) { id displayFulfillmentStatus fulfillmentOrders(first: 10) { nodes { id status requestStatus } } } }`;
+const SHIP_RELEASE_M = `mutation RSRelease($id: ID!) { fulfillmentOrderReleaseHold(id: $id) { fulfillmentOrder { id status } userErrors { field message } } }`;
+const SHIP_CREATE_M = `mutation RSShip($fulfillment: FulfillmentInput!) { fulfillmentCreate(fulfillment: $fulfillment) { fulfillment { id status trackingInfo { number company url } } userErrors { field message } } }`;
+async function shopMut(query, variables) {
+  const p = shopPayload(await S.mcp.callTool(SHOP_SERVER, "graphql_mutation", { query, variables }));
+  const ue = dig(p, "userErrors"), errs = dig(p, "errors");
+  if (Array.isArray(ue) && ue.length) throw { code: "tool_error", message: ue.map(e => e.message).join("; ") };
+  if (Array.isArray(errs) && errs.length) throw { code: "tool_error", message: errs.map(e => e.message || e).join("; ") };
+  return p;
+}
+async function shopifyShip(o, manual) {
+  if (!S.mcp) { const m = "Open the app in claude.ai with Shopify connected to send tracking."; await patch("orders", o.id, { shopShipErr: m }); if (manual) toast(m); return; }
+  try {
+    const gid = "gid://shopify/Order/" + o.ref;
+    const p = await shopCall(SHIP_FO_Q, { id: gid }, 10);
+    let fos = ((dig(p, "fulfillmentOrders") || {}).nodes || []);
+    for (const fo of fos.filter(f => f.status === "ON_HOLD")) await shopMut(SHIP_RELEASE_M, { id: fo.id });
+    if (fos.some(f => f.status === "ON_HOLD")) fos = ((dig(await shopCall(SHIP_FO_Q, { id: gid }, 10), "fulfillmentOrders") || {}).nodes || []);
+    const open = fos.filter(f => ["OPEN", "IN_PROGRESS", "SCHEDULED"].includes(f.status));
+    if (!open.length) { if (fos.some(f => f.status === "CLOSED")) { await patch("orders", o.id, { shopShippedAt: Date.now(), shopShipErr: "", shopFul: "fulfilled" }); if (manual) toast("Already fulfilled in Shopify."); return; } throw { code: "tool_error", message: "Shopify has nothing left to fulfill on this order." }; }
+    await shopMut(SHIP_CREATE_M, { fulfillment: { lineItemsByFulfillmentOrder: open.map(f => ({ fulfillmentOrderId: f.id })), trackingInfo: { number: o.tracking, company: o.courier || "Other" }, notifyCustomer: true } });
+    await patch("orders", o.id, { shopShippedAt: Date.now(), shopShipErr: "", shopFul: "fulfilled" });
+    toast(`#${o.num}: tracking sent to Shopify. The buyer can see it in their Order History.`);
+  } catch (e) {
+    const m = e && e.code === "needs_reauth" ? "Shopify needs you to sign in again (claude.ai → Settings → Connectors)." : e && e.code === "not_in_manifest" ? "Allow Shopify for this page in its Permissions menu." : "Shopify: " + ((e && e.message) || "couldn't send tracking.");
+    await patch("orders", o.id, { shopShipErr: m }); toast(m);
+  }
 }
 
 const LIST_TYPES = ["Sealed", "Tester", "Partial", "Unsealed, New", "Boxed, New", "Set", "Mini", "Vial", "Decant", "Other"];
@@ -1984,7 +2179,7 @@ function shopifyOrders(text) {
       const payment = { paid: "paid", pending: "pending", authorized: "pending", partially_paid: "partial", partially_refunded: "paid", refunded: "refunded", voided: "voided", expired: "voided" }[fin] || "pending";
       const createdAt = shopifyTime(get(r, "Created at"));
       const fulfilledAt = shopifyTime(get(r, "Fulfilled at"));
-      const fulfillment = fs === "fulfilled" ? "fulfilled" : (payment === "voided" ? "not_required" : "unfulfilled");
+      const fulfillment = get(r, "Cancelled at") ? "cancelled" : fs === "fulfilled" ? "fulfilled" : (payment === "voided" ? "not_required" : "unfulfilled");
       o = {
         num: name.replace(/^#/, ""), createdAt, date: createdAt ? dstr(createdAt) : today(), platform: "website",
         customer: get(r, "Billing Name") || get(r, "Shipping Name") || get(r, "Email"),
@@ -2007,7 +2202,7 @@ function shopifyOrders(text) {
       o.items.push({ productId: p ? p.id : "", name: iname, sku, qty, price: Number(get(r, "Lineitem price")) || 0, cost: p ? Number(p.cost) || 0 : 0 });
     }
   }
-  return [...byName.values()].map(o => { o.adjust = Math.round((o.shopifyTotal - itemsTotal(o)) * 100) / 100; delete o.shopifyTotal; return o; });
+  return [...byName.values()].map(o => { o.adjust = Math.round((o.shopifyTotal - itemsTotal(o)) * 100) / 100; delete o.shopifyTotal; o.fulfillment = fulFromTags(o.fulfillment, o.tags); return o; });
 }
 const cleanPhone = s => (s || "").replace(/^'+/, "").trim();
 const safeId = s => String(s).replace(/[^A-Za-z0-9_\-.]/g, "").slice(0, 120) || uid("x");
@@ -2090,7 +2285,7 @@ async function readImportFile(file) {
         const id = orderDocId(o), ex = have.get(id);
         if (!ex) { writes.push({ col: "orders", id, data: o }); fresh++; }
         else {
-          const ch = { payment: o.payment, fulfillment: ex.fulfillment === "delivered" && o.fulfillment === "fulfilled" ? "delivered" : o.fulfillment, tags: o.tags, note: o.note || ex.note || "", fulfilledAt: o.fulfilledAt || ex.fulfilledAt || 0, voidedAt: o.voidedAt || 0 };
+          const ch = { payment: o.payment, fulfillment: !OPEN_FUL.has(ex.fulfillment) && OPEN_FUL.has(o.fulfillment) ? ex.fulfillment : ex.fulfillment === "delivered" && o.fulfillment === "fulfilled" ? "delivered" : o.fulfillment, tags: o.tags, note: o.note || ex.note || "", fulfilledAt: o.fulfilledAt || ex.fulfilledAt || 0, voidedAt: o.voidedAt || 0 };
           if (["payment", "fulfillment", "note"].some(k => ch[k] !== ex[k]) || (ch.tags || []).join() !== (ex.tags || []).join()) { writes.push({ col: "orders", id, data: ch, update: true }); updated++; }
         }
       }
@@ -3062,6 +3257,10 @@ document.addEventListener("click", guard(async ev => {
   if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
   const dy = ev.target.closest("[data-day]");
   if (dy) { S.t.day = dy.dataset.day; render(); return; }
+  const os = ev.target.closest("[data-osort]");
+  if (os) { const k = os.dataset.osort; if (S.of.sort === k) S.of.dir = S.of.dir === "asc" ? "desc" : "asc"; else { S.of.sort = k; S.of.dir = ["date", "total", "items", "num"].includes(k) ? "desc" : "asc"; } S.page = 0; render(); return; }
+  const sth = ev.target.closest("th[data-sidx]");
+  if (sth) { const t = sth.closest("table"), col = Number(sth.dataset.sidx), key = t.dataset.skey, cur = S.tsort[key]; const dir = cur && cur.col === col ? (cur.dir === "asc" ? "desc" : "asc") : (typeof cellVal(t.tBodies[0].rows[0] && t.tBodies[0].rows[0].cells[col]) === "string" ? "asc" : "desc"); S.tsort[key] = { col, dir }; sortTable(t, col, dir); return; }
   const fu = ev.target.closest("[data-ful]");
   if (fu) { const o = S.orders.find(x => x.id === fu.dataset.ful); if (o) { await updateOrder(o, { fulfillment: fu.dataset.to }); toast(`#${o.num} ${ful(fu.dataset.to).name.toLowerCase()}.`); } return; }
   const ph = ev.target.closest("[data-phalf]");
@@ -3172,6 +3371,10 @@ document.addEventListener("click", guard(async ev => {
     case "del-task": await remove("tasks", id); closeSheet(); toast("Task deleted."); return;
     case "del-member": await remove("team", id); closeSheet(); toast("Removed from team."); return;
     case "import": return openImport();
+    case "edit-items": return openItemsEdit(id);
+    case "ei-add": $("#ei-items").insertAdjacentHTML("beforeend", editItemRow()); return;
+    case "ei-rm": ev.target.closest(".ei-row").remove(); eiTotal(); return;
+    case "ship-shopify": { const o = S.orders.find(x => x.id === id); if (o) { closeSheet(); await shopifyShip(o, true); } return; }
     case "shop-sync": if (S.shop.state === "blocked" || S.shop.state === "off") { toast(S.shop.msg || "Live sync works when the app is open in claude.ai with Shopify connected."); if (S.shop.state === "off") return; } return shopSync(true);
     case "new-product": return openProductForm();
     case "edit-product": return openProductForm(id);
@@ -3222,6 +3425,14 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "k-status" && t.value === "done") { $("#k-prog").value = 100; $("#k-prog-val").textContent = "100%"; return; }
   if (t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await S.db.doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
+  if (t.id === "ei-dtype") return eiTotal();
+  if (t.id === "of-ful") { S.of.ful = t.value; S.page = 0; render(); return; }
+  if (t.id === "of-pay") { S.of.pay = t.value; S.page = 0; render(); return; }
+  if ((t.id === "bulk-pay" || t.id === "bulk-ful") && t.value) return bulkAction((t.id === "bulk-pay" ? "pay:" : "ful:") + t.value);
+  if (t.id === "pack-courier") { S.courier = t.value; try { localStorage.setItem("rs-courier", t.value); } catch (e) {} return; }
+  if (t.id === "pack-ship") { S.wbShip = t.checked; try { localStorage.setItem("rs-wbship", t.checked ? "1" : "0"); } catch (e) {} return; }
+  if (t.dataset.wbcam && t.files[0]) { const f = t.files[0], id = t.dataset.wbcam; t.value = ""; toast("Reading waybill barcode…"); const c = await decodeBarcode(f); if (!c) { toast("No barcode found. Try again closer, flat, and in good light."); return; } return saveWaybill(id, c); }
+  if (t.id === "pack-filter") { S.packF = t.value; render(); return; }
   if (t.id === "of-view") { S.of.view = t.value; S.page = 0; render(); }
   if (t.id === "of-range") { S.of.range = t.value; render(); }
   if (t.matches(".it-p")) { const p = S.products.find(x => x.id === t.value); const pr = t.closest(".item-row").querySelector(".it-price"); if (p) pr.value = p.price ?? ""; updateOrderTotal(); }
@@ -3230,6 +3441,7 @@ document.addEventListener("change", guard(async ev => {
 document.addEventListener("input", ev => {
   const t = ev.target;
   if (t.matches(".it-q, .it-price")) return updateOrderTotal();
+  if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-disc")) return eiTotal();
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
   const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq" }[t.id];
   if (!key) return;
@@ -3269,6 +3481,7 @@ document.addEventListener("paste", ev => {
 });
 document.addEventListener("keydown", ev => {
   if (ev.key === "Enter" && ev.target.id === "scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handleScan(v); return; }
+  if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.wb) { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) saveWaybill(ev.target.dataset.wb, v); return; }
   if (ev.key === "Enter" && ev.target.id === "pack-scan") { ev.preventDefault(); const v = ev.target.value.trim(); ev.target.value = ""; if (v) handlePackScan(v); return; } if (ev.key === "Escape" && !$("#scrim").hidden) closeSheet(); });
 
 /* ---------- Shopify live sync (viewer's Shopify connector via mcp) ---------- */
@@ -3308,7 +3521,8 @@ function shopToOrder(n) {
   const fin = String(n.displayFinancialStatus || "").toUpperCase(), fs = String(n.displayFulfillmentStatus || "").toUpperCase();
   const payment = { PAID: "paid", PENDING: "pending", AUTHORIZED: "pending", PARTIALLY_PAID: "partial", PARTIALLY_REFUNDED: "paid", REFUNDED: "refunded", VOIDED: "voided", EXPIRED: "voided" }[fin] || "pending";
   const createdAt = Date.parse(n.createdAt) || Date.now();
-  const fulfillment = n.cancelledAt ? "not_required" : fs === "FULFILLED" ? "fulfilled" : fs === "ON_HOLD" ? "on_hold" : SHOP_OPEN.has(fs) ? "unfulfilled" : "not_required";
+  const tags0 = Array.isArray(n.tags) ? n.tags : parseTags(n.tags || "");
+  const fulfillment = n.cancelledAt ? "cancelled" : fs === "FULFILLED" ? "fulfilled" : fs === "ON_HOLD" ? "on_hold" : SHOP_OPEN.has(fs) ? "unfulfilled" : "not_required";
   const a = n.shippingAddress || {}, c = n.customer || {};
   const items = ((n.lineItems && n.lineItems.nodes) || []).filter(i => i.quantity).map(i => {
     const p = S.products.find(x => (i.sku && x.sku && x.sku.toLowerCase() === i.sku.toLowerCase()) || (x.name || "").toLowerCase() === (i.name || "").toLowerCase());
@@ -3319,7 +3533,8 @@ function shopToOrder(n) {
     customer: c.displayName || a.name || n.email || "", phone: cleanPhone(n.phone || a.phone || c.phone || ""), email: String(n.email || c.email || "").toLowerCase(),
     address: [a.address1, a.address2, a.city, a.province, a.zip, a.country].filter(Boolean).join(", "),
     ref: String(n.id || "").split("/").pop(), items, fees: 0, shipping: 0,
-    payment, fulfillment, tags: Array.isArray(n.tags) ? n.tags : parseTags(n.tags || ""), note: n.note || "",
+    payment, fulfillment: fulFromTags(fulfillment, tags0), tags: tags0, note: n.note || "",
+    shopPay: payment, shopFul: fulfillment, shopTags: tags0, shopNote: n.note || "",
     imported: true, noStock: true, restocked: false, source: "shopify-live",
     fulfilledAt: fulfillment === "fulfilled" ? Date.now() : 0, deliveredAt: 0,
     voidedAt: VOIDPAY.has(payment) || n.cancelledAt ? (Date.parse(n.cancelledAt) || createdAt) : 0,
@@ -3330,9 +3545,19 @@ function shopToOrder(n) {
 async function shopApply(o, isNew) {
   const id = orderDocId(o), ex = S.orders.find(x => x.id === id);
   if (!ex) { if (isNew) { await save("orders", id, o); return 1; } return 0; }
-  const fl = ex.fulfillment === "delivered" && o.fulfillment === "fulfilled" ? "delivered" : (ex.fulfillment === "fulfilled" || ex.fulfillment === "delivered") && OPEN_FUL.has(o.fulfillment) ? ex.fulfillment : o.fulfillment;
-  const ch = { payment: o.payment, fulfillment: fl, tags: o.tags, note: o.note || ex.note || "", fulfilledAt: fl === "fulfilled" ? (ex.fulfilledAt || o.fulfilledAt) : (ex.fulfilledAt || 0), voidedAt: o.voidedAt || 0 };
-  if (["payment", "fulfillment", "note"].some(k => ch[k] !== ex[k]) || (ch.tags || []).join() !== (ex.tags || []).join()) { await patch("orders", id, ch); return 1; }
+  // 3-way merge: only what changed in Shopify since the last sync overrides edits made in the app
+  const prevTags = ex.shopTags || ex.tags || [], shTags = o.shopTags || [];
+  const added = shTags.filter(t => !prevTags.includes(t)), removed = prevTags.filter(t => !shTags.includes(t));
+  const tags = [...(ex.tags || []).filter(t => !removed.includes(t)), ...added.filter(t => !(ex.tags || []).includes(t))];
+  const payment = ex.shopPay === undefined || o.shopPay !== ex.shopPay ? o.shopPay : ex.payment;
+  const note = ex.shopNote === undefined || o.shopNote !== ex.shopNote ? (o.shopNote || ex.note || "") : ex.note || "";
+  let fl = ex.shopFul === undefined || o.shopFul !== ex.shopFul ? o.shopFul : ex.fulfillment;
+  if (!OPEN_FUL.has(ex.fulfillment) && OPEN_FUL.has(fl)) fl = ex.fulfillment;
+  fl = fulFromTags(fl, tags);
+  const ch = { payment, fulfillment: fl, tags, note, fulfilledAt: fl === "fulfilled" ? (ex.fulfilledAt || Date.now()) : (ex.fulfilledAt || 0), voidedAt: VOIDPAY.has(payment) ? (ex.voidedAt || o.voidedAt || Date.now()) : 0 };
+  const changed = ["payment", "fulfillment", "note"].some(k => ch[k] !== ex[k]) || tags.join() !== (ex.tags || []).join();
+  const marks = o.shopPay !== ex.shopPay || o.shopFul !== ex.shopFul || o.shopNote !== ex.shopNote || shTags.join() !== (ex.shopTags || []).join();
+  if (changed || marks) { await patch("orders", id, { ...(changed ? ch : {}), shopPay: o.shopPay, shopFul: o.shopFul, shopTags: shTags, shopNote: o.shopNote }); return changed ? 1 : 0; }
   return 0;
 }
 async function shopSync(manual) {
@@ -3347,7 +3572,7 @@ async function shopSync(manual) {
       if (!conn) throw { code: "tool_error", message: "Shopify sent back an unexpected answer." };
       for (const n of conn.nodes || (conn.edges || []).map(e => e.node)) {
         const o = shopToOrder(n);
-        if (!OPEN_FUL.has(o.fulfillment) || n.cancelledAt) continue;
+        if (!OPEN_FUL.has(o.shopFul) || n.cancelledAt) continue;
         seen.add(orderDocId(o)); changed += await shopApply(o, true);
       }
       const pi = conn.pageInfo || {}; after = pi.hasNextPage ? pi.endCursor : null;
@@ -3380,7 +3605,15 @@ function shopChip() {
   return `<button type="button" class="shop-chip ${st.state}" data-act="shop-sync" title="${esc(st.msg || "Syncs unfulfilled Shopify orders every minute. Click to sync now.")}"><i></i>${esc(label)}</button>${st.msg && st.state !== "ok" ? `<span class="shop-msg">${esc(st.msg)}</span>` : ""}`;
 }
 function paintShop() { document.querySelectorAll(".shop-slot").forEach(el => { el.innerHTML = shopChip(); }); }
+async function reconcileStages() {
+  if (S.readOnly) return;
+  const t0 = Date.now();
+  while (S.db && !S.loaded.orders) { if (Date.now() - t0 > 20000) return; await new Promise(r => setTimeout(r, 300)); }
+  const fix = S.orders.filter(o => fulFromTags(o.fulfillment, o.tags) !== o.fulfillment);
+  for (let i = 0; i < fix.length; i += 8) await Promise.all(fix.slice(i, i + 8).map(o => patch("orders", o.id, { fulfillment: fulFromTags(o.fulfillment, o.tags) }).catch(() => {})));
+}
 async function startShopSync(c) {
+  reconcileStages();
   S.mcp = c?.use ? await c.use("mcp").catch(() => null) : null;
   if (!S.mcp) { paintShop(); return; }
   S.shop.state = "syncing"; paintShop();
@@ -3392,6 +3625,7 @@ async function startShopSync(c) {
 }
 
 /* ---------- boot ---------- */
+try { S.courier = localStorage.getItem("rs-courier") || ""; S.wbShip = localStorage.getItem("rs-wbship") !== "0"; } catch (e) {}
 S.att.date = mToday(); S.att.month = S.att.date.slice(0, 7);
 S.pay.month = mToday().slice(0, 7); S.pay.half = Number(mToday().slice(8)) <= 15 ? 1 : 2;
 renderThemeSwitch();
