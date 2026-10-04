@@ -1,0 +1,211 @@
+<title>Regal Spritz App Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one narrow column you scroll through on a phone; two paths (today vs. own app), each a numbered checklist. */
+:root {
+  --bg: #F7F4F6; --surface: #FFFFFF; --surface-2: #F1EBEF; --fg: #23161F; --muted: #6E5E69; --line: #E4DAE1;
+  --brand: #4A2545; --brand-ink: #FFFFFF; --gold: #A9814A; --good: #2F7A4F; --good-bg: #E5F2EA;
+  --font-display: "Marcellus", "Cormorant Garamond", Georgia, serif;
+  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161014; --surface: #201820; --surface-2: #2A2029; --fg: #F2EAF0; --muted: #B3A3AE; --line: #3A2E38;
+  --brand: #C9A3C2; --brand-ink: #1E141D; --gold: #D2B07A; --good: #7CCB9A; --good-bg: #1D3326; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #161014; --surface: #201820; --surface-2: #2A2029; --fg: #F2EAF0; --muted: #B3A3AE; --line: #3A2E38;
+  --brand: #C9A3C2; --brand-ink: #1E141D; --gold: #D2B07A; --good: #7CCB9A; --good-bg: #1D3326; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; padding: 0 16px; }
+.wrap { max-width: 680px; margin: 0 auto; padding-block: 28px 64px; display: flex; flex-direction: column; gap: 22px; }
+header .eyebrow { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 7vw, 40px); line-height: 1.1; margin: 6px 0 8px; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0; line-height: 1.2; text-wrap: balance; }
+p { margin: 0; } .muted { color: var(--muted); } small { font-size: 12.5px; }
+.path { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.path-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tag { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.tag.good { background: var(--good-bg); color: var(--good); }
+.qr-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.qr { background: #FFFFFF; padding: 10px; border-radius: 12px; border: 1px solid var(--line); line-height: 0; flex: none; }
+.qr svg { width: 148px; height: 148px; display: block; }
+.qr-t { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.link { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 8px 10px; border-radius: 8px; overflow-wrap: anywhere; user-select: all; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; padding: 7px 12px; border-radius: 8px; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+ol.how { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+ol.how b { font-weight: 700; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 12px; padding: 16px 0; border-top: 1px solid var(--line); }
+.step:first-child { border-top: 0; padding-top: 4px; }
+.step input[type=checkbox] { width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--good); cursor: pointer; }
+.step-b { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.step h3 { margin: 0; font-size: 15.5px; font-weight: 700; }
+.step.done h3 { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--good); }
+.step ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; padding: 9px 14px; border-radius: 10px; text-decoration: none; cursor: pointer; }
+.btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.btn:focus-visible, input:focus-visible, .seg button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.field input { font: inherit; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); width: 100%; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; font-size: 13.5px; align-items: center; }
+.kv code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 3px 7px; border-radius: 6px; overflow-wrap: anywhere; }
+.note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--gold); padding-left: 10px; }
+.progress { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--good); transition: width .3s; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 600; z-index: 5; }
+.share { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 12px; background: var(--surface-2); }
+@media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Regal Spritz PH · Team workspace</div>
+    <h1>Put the dashboard on your phone</h1>
+    <p class="muted">Two ways. Use the first one today. Set up the second when you want a real app icon for the whole team that doesn't need claude.ai.</p>
+  </header>
+
+  <section class="path" aria-labelledby="a-h">
+    <div class="path-h"><h2 id="a-h">1 · Today, in one minute</h2><span class="tag good">Works now</span></div>
+    <div class="qr-row">
+      <div class="qr" id="qr-now" aria-label="QR code for the dashboard link"></div>
+      <div class="qr-t">
+        <p><b>Scan this with your phone camera</b>, or open the link below on your phone. Sign in to claude.ai if it asks.</p>
+        <div class="link" id="now-link">https://claude.ai/artifact/RbUQpD5J8M2dKELDEEKoyp</div>
+        <div class="btns"><button class="btn" type="button" data-copy="now-link">Copy link</button><a class="btn" href="https://claude.ai/artifact/RbUQpD5J8M2dKELDEEKoyp" target="_blank" rel="noopener">Open</a></div>
+      </div>
+    </div>
+    <div class="seg" role="group" aria-label="Phone type"><button type="button" data-os="ios" aria-pressed="true">iPhone</button><button type="button" data-os="android" aria-pressed="false">Android</button></div>
+    <ol class="how" id="how-now"></ol>
+    <p class="note">This is a shortcut to the claude.ai page, so it needs a claude.ai sign-in, and each staff member must be shared on the page (Share menu). For a proper app that staff sign into with an email code, use option 2.</p>
+  </section>
+
+  <section class="path" aria-labelledby="b-h">
+    <div class="path-h"><h2 id="b-h">2 · Your own app, for the whole team</h2><span class="tag">One-time · about 30 min · free</span></div>
+    <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+    <p class="muted"><small id="prog-t">0 of 7 done</small> · Tick each step as you go. Your ticks are saved on this device.</p>
+    <ol class="steps">
+      <li class="step" data-step="s0"><input type="checkbox" id="c-s0" aria-label="Step done"><div class="step-b">
+        <h3>Move the app to your main branch on GitHub</h3>
+        <p>Vercel builds from your <b>main</b> branch, and the app is still on the work branch.</p>
+        <ul><li>Open the link → <b>Create pull request</b> → <b>Create pull request</b> again → <b>Merge pull request</b> → <b>Confirm</b>.</li></ul>
+        <div class="btns"><a class="btn primary" href="https://github.com/kristuvwxyz/build-day/compare/main...claude/vibrant-shannon-n2cw0j?expand=1" target="_blank" rel="noopener">Open on GitHub</a></div>
+      </div></li>
+      <li class="step" data-step="s1"><input type="checkbox" id="c-s1" aria-label="Step done"><div class="step-b">
+        <h3>Make the database (Supabase)</h3>
+        <ul><li>Sign up → <b>New project</b>. Name <b>regal-spritz</b>, region <b>Singapore</b>. Save the database password in your password manager.</li>
+        <li>Type your sign-in email below, tap <b>Copy database script</b>, then in Supabase open <b>SQL Editor → New query</b>, paste, <b>Run</b>. It should say “Success”.</li></ul>
+        <div class="field"><label for="own-email">Your sign-in email (you become the owner)</label><input id="own-email" type="email" autocomplete="email" placeholder="you@example.com"></div>
+        <div class="btns"><a class="btn" href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener">Open Supabase</a><button class="btn primary" type="button" id="copy-sql">Copy database script</button></div>
+      </div></li>
+      <li class="step" data-step="s2"><input type="checkbox" id="c-s2" aria-label="Step done"><div class="step-b">
+        <h3>Turn on sign-in codes (Supabase)</h3>
+        <ul><li><b>Authentication → Sign In / Providers → Email</b>: make sure it's on.</li>
+        <li><b>Authentication → Email Templates → Magic Link</b>: replace the message with the text below, then <b>Save</b>.</li></ul>
+        <div class="link" id="tpl">Your Regal Spritz sign-in code is {{ .Token }}</div>
+        <div class="btns"><button class="btn" type="button" data-copy="tpl">Copy message</button></div>
+        <p class="note">Supabase only sends a few emails an hour for free. Before inviting the whole team, connect a free Resend account under <b>Authentication → Emails → SMTP Settings</b>.</p>
+      </div></li>
+      <li class="step" data-step="s3"><input type="checkbox" id="c-s3" aria-label="Step done"><div class="step-b">
+        <h3>Put it online (Vercel)</h3>
+        <ul><li>Sign up with <b>GitHub</b> → import <b>build-day</b>.</li>
+        <li><b>Root Directory</b> → Edit → pick <b>projects/business-os-app</b>. Framework: <b>Other</b>.</li>
+        <li>Open <b>Environment Variables</b> and add these three. The two Supabase values are in Supabase → <b>Project Settings → API</b>.</li></ul>
+        <div class="kv"><code>SUPABASE_URL</code><span>Project URL</span><code>SUPABASE_ANON_KEY</code><span>anon public key</span><code>SHOPIFY_SHOP</code><span><code id="shop">tjs1uz-4a.myshopify.com</code></span></div>
+        <ul><li>Tap <b>Deploy</b>. When it's done, copy your site address (like <b>regal-spritz.vercel.app</b>).</li></ul>
+        <div class="btns"><a class="btn primary" href="https://vercel.com/new/import?s=https%3A%2F%2Fgithub.com%2Fkristuvwxyz%2Fbuild-day" target="_blank" rel="noopener">Open Vercel</a><button class="btn" type="button" data-copy="shop">Copy shop name</button></div>
+      </div></li>
+      <li class="step" data-step="s4"><input type="checkbox" id="c-s4" aria-label="Step done"><div class="step-b">
+        <h3>Link the address back (Supabase)</h3>
+        <ul><li><b>Authentication → URL Configuration</b> → paste your Vercel address as the <b>Site URL</b> → <b>Save</b>.</li></ul>
+      </div></li>
+      <li class="step" data-step="s5"><input type="checkbox" id="c-s5" aria-label="Step done"><div class="step-b">
+        <h3>Move your data</h3>
+        <ul><li>In the claude.ai dashboard: <b>My account → Access &amp; security → Developer options → Download full backup</b>. Keep the file private.</li>
+        <li>Open your new site, sign in with your email and the code you get.</li>
+        <li><b>My account → Access &amp; security → Import backup</b> → pick the file → wait for “Imported … records”.</li></ul>
+        <p class="note">From then on, the team uses the new app. The claude.ai page keeps its old copy and stops matching.</p>
+      </div></li>
+      <li class="step" data-step="s6"><input type="checkbox" id="c-s6" aria-label="Step done"><div class="step-b">
+        <h3>Connect Shopify orders <span class="muted" style="font-weight:500">(can be done later)</span></h3>
+        <ul><li>In <b>dev.shopify.com</b>, create an app named Regal Spritz OS, tick the access scopes, release and install it.</li>
+        <li>Add its <b>Client ID</b> and <b>Client secret</b> in Vercel → Settings → Environment Variables as <code>SHOPIFY_CLIENT_ID</code> and <code>SHOPIFY_CLIENT_SECRET</code>, then <b>Redeploy</b>.</li></ul>
+        <div class="btns"><a class="btn" href="https://github.com/kristuvwxyz/build-day/blob/claude/vibrant-shannon-n2cw0j/projects/business-os-app/README.md#3-shopify-connect-orders" target="_blank" rel="noopener">Full scope list</a></div>
+      </div></li>
+    </ol>
+
+    <div class="share" aria-labelledby="sh-h">
+      <h3 id="sh-h" style="margin:0;font-size:15.5px">Install it and share with the team</h3>
+      <div class="field"><label for="site">Your site address from Vercel</label><input id="site" type="url" inputmode="url" placeholder="regal-spritz.vercel.app"></div>
+      <div class="qr-row" id="site-row" hidden>
+        <div class="qr" id="qr-site" aria-label="QR code for your app"></div>
+        <div class="qr-t">
+          <p><b>Scan to install.</b> Send this to the team. Each person opens it once, signs in with the email in the Directory, then installs it:</p>
+          <ul style="margin:0;padding-left:18px">
+            <li><b>iPhone:</b> Safari → Share → Add to Home Screen</li>
+            <li><b>Android:</b> Chrome → ⬇ Install app</li>
+            <li><b>Windows / Mac:</b> Chrome or Edge → ⬇ Install app. Mac Safari: File → Add to Dock</li>
+          </ul>
+          <div class="link" id="share-msg"></div>
+          <div class="btns"><button class="btn primary" type="button" data-copy="share-msg">Copy message for the team</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(() => {
+  const SCHEMA = "-- Regal Spritz PH: database for the standalone app.\n-- How to use: Supabase dashboard -> SQL Editor -> New query -> paste ALL of this -> Run.\n-- Before running, change YOUR-EMAIL@example.com (near the bottom) to the email you will sign in with as owner.\n\n-- Every record lives in one table, addressed like a folder path: \"orders/sh-123\", \"config/home\", \"team/m-000001\".\ncreate table if not exists public.docs (\n  path text primary key,\n  col text not null,\n  id text not null,\n  data jsonb not null default '{}'::jsonb,\n  updated_at timestamptz not null default now()\n);\ncreate index if not exists docs_col_idx on public.docs (col);\nalter table public.docs replica identity full;\n\ncreate table if not exists public.app_settings (\n  id int primary key default 1 check (id = 1),\n  owner_email text not null\n);\n\n-- Who is signed in, matched to the team directory (by linked account, email, or mobile number).\ncreate or replace function public.my_member() returns jsonb\nlanguage sql stable security definer set search_path = public as $$\n  select d.data || jsonb_build_object('_id', d.id) from public.docs d\n  where d.col = 'team' and coalesce(d.data->>'status', 'active') <> 'inactive' and (\n    d.data->>'uid' = auth.uid()::text\n    or (coalesce(auth.jwt()->>'email', '') <> '' and lower(auth.jwt()->>'email') = any (regexp_split_to_array(lower(coalesce(d.data->>'email', '')), '[\\s,;]+')))\n    or (length(regexp_replace(coalesce(auth.jwt()->>'phone', ''), '\\D', '', 'g')) >= 10\n        and right(regexp_replace(coalesce(d.data->>'phone', ''), '\\D', '', 'g'), 10) = right(regexp_replace(auth.jwt()->>'phone', '\\D', '', 'g'), 10))\n  ) limit 1\n$$;\ncreate or replace function public.is_owner() returns boolean\nlanguage sql stable security definer set search_path = public as $$\n  select exists (select 1 from public.app_settings s where lower(s.owner_email) = lower(coalesce(auth.jwt()->>'email', '')))\n$$;\ncreate or replace function public.is_member() returns boolean\nlanguage sql stable security definer set search_path = public as $$\n  select public.is_owner() or public.my_member() is not null\n$$;\ncreate or replace function public.is_admin() returns boolean\nlanguage sql stable security definer set search_path = public as $$\n  select public.is_owner() or coalesce(public.my_member()->>'department', '') in ('CEO', 'ADMIN')\n$$;\ncreate or replace function public.owner_email() returns text\nlanguage sql stable security definer set search_path = public as $$\n  select owner_email from public.app_settings where id = 1 and auth.uid() is not null\n$$;\n\n-- Merge fields into a record (like \"update\"), creating it if needed. Runs with the signed-in person's rights.\ncreate or replace function public.doc_merge(p_path text, p_patch jsonb) returns void\nlanguage sql security invoker set search_path = public as $$\n  insert into public.docs (path, col, id, data) values (p_path, regexp_replace(p_path, '/[^/]+$', ''), regexp_replace(p_path, '^.*/', ''), p_patch)\n  on conflict (path) do update set data = public.docs.data || excluded.data, updated_at = now();\n$$;\n\n-- Access rules (row level security): only team members see data; private per-person data stays private.\nalter table public.docs enable row level security;\nalter table public.app_settings enable row level security;\ndrop policy if exists docs_read on public.docs;\ndrop policy if exists docs_insert on public.docs;\ndrop policy if exists docs_update on public.docs;\ndrop policy if exists docs_delete on public.docs;\ncreate policy docs_read on public.docs for select to authenticated using (\n  (path like 'data/users/' || auth.uid()::text || '/%')\n  or (path not like 'data/users/%' and public.is_member())\n);\ncreate policy docs_insert on public.docs for insert to authenticated with check (\n  (path like 'data/users/' || auth.uid()::text || '/%')\n  or (col = 'accessreq' and id = auth.uid()::text)\n  or (col in ('config', 'team') and public.is_admin())\n  or (col not in ('config', 'team', 'accessreq') and path not like 'data/users/%' and public.is_member())\n);\ncreate policy docs_update on public.docs for update to authenticated\nusing (\n  (path like 'data/users/' || auth.uid()::text || '/%')\n  or (col = 'accessreq' and (id = auth.uid()::text or public.is_admin()))\n  or (col in ('config', 'team') and public.is_admin())\n  or (col not in ('config', 'team', 'accessreq') and path not like 'data/users/%' and public.is_member())\n)\nwith check (\n  (path like 'data/users/' || auth.uid()::text || '/%')\n  or (col = 'accessreq' and (id = auth.uid()::text or public.is_admin()))\n  or (col in ('config', 'team') and public.is_admin())\n  or (col not in ('config', 'team', 'accessreq') and path not like 'data/users/%' and public.is_member())\n);\ncreate policy docs_delete on public.docs for delete to authenticated using (\n  (path like 'data/users/' || auth.uid()::text || '/%')\n  or (col in ('config', 'team', 'accessreq') and public.is_admin())\n  or (col not in ('config', 'team', 'accessreq') and path not like 'data/users/%' and public.is_member())\n);\n\ngrant usage on schema public to authenticated;\ngrant select, insert, update, delete on public.docs to authenticated;\ngrant execute on function public.doc_merge(text, jsonb), public.is_member(), public.is_admin(), public.is_owner(), public.my_member(), public.owner_email() to authenticated;\nrevoke all on public.app_settings from anon, authenticated;\n\n-- Live updates (so everyone sees changes instantly).\ndo $$ begin\n  alter publication supabase_realtime add table public.docs;\nexception when duplicate_object then null; when undefined_object then null; end $$;\n\n-- >>> CHANGE THIS to your own email before you press Run <<<\ninsert into public.app_settings (id, owner_email) values (1, 'YOUR-EMAIL@example.com')\non conflict (id) do update set owner_email = excluded.owner_email;\n";
+  const $ = s => document.querySelector(s);
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  let tt; const toast = m => { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2200); };
+  const copy = (text, msg) => {
+    const fallback = () => { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (e) {} ta.remove(); toast(ok ? msg : "Couldn't copy. Press and hold the text to copy it."); };
+    try { navigator.clipboard.writeText(text).then(() => toast(msg), fallback); } catch (e) { fallback(); }
+  };
+  const qr = (el, text) => {
+    if (typeof window.qrcode !== "function") { el.innerHTML = `<small style="line-height:1.4;display:block;width:148px">QR code didn't load. Use the link instead.</small>`; return; }
+    const q = window.qrcode(0, "M"); q.addData(text); q.make();
+    el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+  };
+  qr($("#qr-now"), "https://claude.ai/artifact/RbUQpD5J8M2dKELDEEKoyp");
+
+  const HOW = {
+    ios: ["Open the link in <b>Safari</b> (not inside another app).", "Sign in to claude.ai if asked.", "Tap <b>Share</b> (square with an arrow) → <b>Add to Home Screen</b> → <b>Add</b>.", "Open it from the new icon on your Home Screen."],
+    android: ["Open the link in <b>Chrome</b>.", "Sign in to claude.ai if asked.", "Tap <b>⋮</b> (top right) → <b>Add to Home screen</b> → <b>Add</b>.", "Open it from the new icon on your home screen."]
+  };
+  const setOs = os => { document.querySelectorAll("[data-os]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.os === os))); $("#how-now").innerHTML = HOW[os].map(s => `<li>${s}</li>`).join(""); };
+  setOs(/android/i.test(navigator.userAgent) ? "android" : "ios");
+  document.querySelectorAll("[data-os]").forEach(b => b.addEventListener("click", () => setOs(b.dataset.os)));
+
+  document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copy($("#" + b.dataset.copy).textContent.trim(), "Copied")));
+
+  $("#copy-sql").addEventListener("click", () => {
+    const em = $("#own-email").value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { $("#own-email").focus(); toast("Type your sign-in email first."); return; }
+    copy(SCHEMA.replace(/YOUR-EMAIL@example\.com/g, em.replace(/'/g, "''")), "Database script copied. Paste it in Supabase.");
+  });
+
+  const steps = [...document.querySelectorAll(".step")];
+  const upd = () => { const n = steps.filter(s => s.querySelector("input").checked).length; $("#prog").style.width = (n / steps.length * 100) + "%"; $("#prog-t").textContent = `${n} of ${steps.length} done`; steps.forEach(s => s.classList.toggle("done", s.querySelector("input").checked)); };
+  steps.forEach(s => { const c = s.querySelector("input"), k = "rs-setup-" + s.dataset.step; c.checked = store.get(k) === "1"; c.addEventListener("change", () => { store.set(k, c.checked ? "1" : "0"); upd(); }); });
+  upd();
+
+  const site = $("#site");
+  const showSite = () => {
+    let v = site.value.trim().replace(/\s+/g, ""); store.set("rs-setup-site", v);
+    if (!/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/.*)?$/i.test(v)) { $("#site-row").hidden = true; return; }
+    if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+    qr($("#qr-site"), v);
+    $("#share-msg").textContent = `Hi team! Our Regal Spritz app is ready: ${v}\nOpen it on your phone, sign in with your email, then install it (iPhone: Safari → Share → Add to Home Screen. Android: Chrome → Install app).`;
+    $("#site-row").hidden = false;
+  };
+  site.value = store.get("rs-setup-site") || ""; site.addEventListener("input", showSite); showSite();
+})();
+</script>
