@@ -181,3 +181,6 @@ The brand colors and fonts are at the top of `index.html` under `BRAND TOKENS`.
 - Logo opens Home; tagline is now "The Scent Atelier".
 - Department passwords removed (Admin → Passwords tab gone); access follows each person's department.
 - Home banner uses a fixed deep plum with light text in both light and dark mode.
+
+## Batch 10: backup for the standalone app
+- Developer options → Download full backup (claude.ai) / Import backup (standalone app in ../business-os-app).
