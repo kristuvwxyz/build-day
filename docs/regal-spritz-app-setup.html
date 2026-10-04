@@ -78,7 +78,7 @@ ol.how b { font-weight: 700; }
         <div class="btns"><button class="btn" type="button" data-copy="now-link">Copy link</button><a class="btn" href="https://claude.ai/artifact/RbUQpD5J8M2dKELDEEKoyp" target="_blank" rel="noopener">Open</a></div>
       </div>
     </div>
-    <div class="seg" role="group" aria-label="Phone type"><button type="button" data-os="ios" aria-pressed="true">iPhone</button><button type="button" data-os="android" aria-pressed="false">Android</button></div>
+    <div class="seg" role="group" aria-label="Device"><button type="button" data-os="ios" aria-pressed="true">iPhone</button><button type="button" data-os="android" aria-pressed="false">Android</button><button type="button" data-os="win" aria-pressed="false">Windows</button><button type="button" data-os="mac" aria-pressed="false">MacBook</button></div>
     <ol class="how" id="how-now"></ol>
     <p class="note">This is a shortcut to the claude.ai page, so it needs a claude.ai sign-in, and each staff member must be shared on the page (Share menu). For a proper app that staff sign into with an email code, use option 2.</p>
   </section>
@@ -142,7 +142,8 @@ ol.how b { font-weight: 700; }
           <ul style="margin:0;padding-left:18px">
             <li><b>iPhone:</b> Safari → Share → Add to Home Screen</li>
             <li><b>Android:</b> Chrome → ⬇ Install app</li>
-            <li><b>Windows / Mac:</b> Chrome or Edge → ⬇ Install app. Mac Safari: File → Add to Dock</li>
+            <li><b>Windows PC (Chrome):</b> click the install icon at the right end of the address bar, or the app's <b>⬇ Install app</b> button → <b>Install</b>. Then right-click it in the taskbar → Pin to taskbar</li>
+            <li><b>MacBook (Chrome):</b> same install icon or <b>⬇ Install app</b> → <b>Install</b>. Then right-click its Dock icon → Options → Keep in Dock</li>
           </ul>
           <div class="link" id="share-msg"></div>
           <div class="btns"><button class="btn primary" type="button" data-copy="share-msg">Copy message for the team</button></div>
@@ -173,10 +174,12 @@ ol.how b { font-weight: 700; }
 
   const HOW = {
     ios: ["Open the link in <b>Safari</b> (not inside another app).", "Sign in to claude.ai if asked.", "Tap <b>Share</b> (square with an arrow) → <b>Add to Home Screen</b> → <b>Add</b>.", "Open it from the new icon on your Home Screen."],
-    android: ["Open the link in <b>Chrome</b>.", "Sign in to claude.ai if asked.", "Tap <b>⋮</b> (top right) → <b>Add to Home screen</b> → <b>Add</b>.", "Open it from the new icon on your home screen."]
+    android: ["Open the link in <b>Chrome</b>.", "Sign in to claude.ai if asked.", "Tap <b>⋮</b> (top right) → <b>Add to Home screen</b> → <b>Add</b>.", "Open it from the new icon on your home screen."],
+    win: ["Open the link in <b>Chrome</b> and sign in to claude.ai if asked.", "Click <b>⋮</b> (top right) → <b>Cast, save, and share</b> → <b>Install page as app…</b> (older Chrome: <b>Create shortcut…</b> and tick <b>Open as window</b>) → <b>Install</b>.", "It opens in its own window. To keep it handy, right-click its icon in the taskbar → <b>Pin to taskbar</b>.", "You'll also find it in the <b>Start</b> menu and on the desktop."],
+    mac: ["Open the link in <b>Chrome</b> and sign in to claude.ai if asked.", "Click <b>⋮</b> (top right) → <b>Cast, save, and share</b> → <b>Install page as app…</b> (older Chrome: <b>Create shortcut…</b> and tick <b>Open as window</b>) → <b>Install</b>.", "It opens in its own window. To keep it in the Dock, right-click its Dock icon → <b>Options</b> → <b>Keep in Dock</b>.", "You'll also find it in <b>Launchpad</b> and in <b>Applications → Chrome Apps</b>."]
   };
   const setOs = os => { document.querySelectorAll("[data-os]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.os === os))); $("#how-now").innerHTML = HOW[os].map(s => `<li>${s}</li>`).join(""); };
-  setOs(/android/i.test(navigator.userAgent) ? "android" : "ios");
+  const ua = navigator.userAgent; setOs(/android/i.test(ua) ? "android" : /iphone|ipad/i.test(ua) ? "ios" : /windows/i.test(ua) ? "win" : /macintosh/i.test(ua) && navigator.maxTouchPoints < 2 ? "mac" : "ios");
   document.querySelectorAll("[data-os]").forEach(b => b.addEventListener("click", () => setOs(b.dataset.os)));
 
   document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copy($("#" + b.dataset.copy).textContent.trim(), "Copied")));
@@ -198,7 +201,7 @@ ol.how b { font-weight: 700; }
     if (!/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/.*)?$/i.test(v)) { $("#site-row").hidden = true; return; }
     if (!/^https?:\/\//i.test(v)) v = "https://" + v;
     qr($("#qr-site"), v);
-    $("#share-msg").textContent = `Hi team! Our Regal Spritz app is ready: ${v}\nOpen it on your phone, sign in with your email, then install it (iPhone: Safari → Share → Add to Home Screen. Android: Chrome → Install app).`;
+    $("#share-msg").textContent = `Hi team! Our Regal Spritz app is ready: ${v}\nOpen it on your phone, sign in with your email, then install it (iPhone: Safari → Share → Add to Home Screen. Android: Chrome → Install app. Windows or Mac: open it in Chrome → click the install icon in the address bar → Install).`;
     $("#site-row").hidden = false;
   };
   site.value = store.get("rs-setup-site") || ""; site.addEventListener("input", showSite); showSite();
