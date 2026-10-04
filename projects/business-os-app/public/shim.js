@@ -198,4 +198,18 @@
 
   // Installable app (works offline for the app shell)
   if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  // "Install app" button for Chrome / Edge on Windows, Mac, Android and Chromebook.
+  // Safari (iPhone, iPad, Mac) has no install prompt: use Share → Add to Home Screen / Add to Dock.
+  let installEvt = null;
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault(); installEvt = e;
+    if (document.getElementById("rs-install")) return;
+    const b = document.createElement("button");
+    b.id = "rs-install"; b.type = "button"; b.textContent = "⬇ Install app";
+    b.style.cssText = "position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:80;padding:10px 16px;border:0;border-radius:999px;background:#4A2545;color:#fff;font:600 14px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer";
+    if (matchMedia("(max-width: 720px)").matches) b.style.bottom = "calc(80px + env(safe-area-inset-bottom))";
+    b.onclick = async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (err) {} installEvt = null; b.remove(); };
+    document.body.appendChild(b);
+  });
+  window.addEventListener("appinstalled", () => { const b = document.getElementById("rs-install"); if (b) b.remove(); });
 })();

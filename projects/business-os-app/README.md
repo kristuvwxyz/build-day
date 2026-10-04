@@ -1,6 +1,6 @@
 # Regal Spritz PH: standalone app (phones + computers)
 
-The same app as the claude.ai version, running on its own website, so the team can install it like an app on iPhone and Android.
+The same app as the claude.ai version, running on its own website, so the team can install it like an app on iPhone, Android, Windows PC and Mac.
 
 **How it fits together**
 
@@ -76,18 +76,41 @@ If Shopify says *shop_not_permitted*, your store isn't in the same Dev Dashboard
 3. My account → **Access & security** → **Import backup** → pick the file. Wait for "Imported … records".
 4. Check Orders, Tasks and the Directory. Each person's own settings (work style) start fresh.
 
-### 5. Put it on phones
-- **iPhone:** open the site in **Safari** → **Share** → **Add to Home Screen**.
-- **Android:** open the site in **Chrome** → **Install app** (or ⋮ → **Add to Home screen**).
+### 5. Install it on every device
+Send the team your site address (e.g. `regal-spritz.vercel.app`). Each person opens it once, signs in, then installs it:
 
-It opens full-screen with the Regal Spritz icon, like a normal app.
+| Device | How to install | Opens from |
+|---|---|---|
+| **iPhone / iPad** | Open in **Safari** → **Share** (square with arrow) → **Add to Home Screen** → **Add** | Home Screen icon |
+| **Android** | Open in **Chrome** → tap **⬇ Install app** at the bottom (or ⋮ → **Install app**) | Home screen / app drawer |
+| **Windows PC** | Open in **Edge** or **Chrome** → click **⬇ Install app** (or the install icon ⊕ at the right of the address bar) → **Install** | Start menu, taskbar, desktop shortcut |
+| **MacBook (Chrome / Edge)** | Open in Chrome or Edge → **⬇ Install app** (or the install icon in the address bar) → **Install** | Launchpad, Dock, Applications folder |
+| **MacBook (Safari, macOS 14+)** | Open in Safari → **File** → **Add to Dock** → **Add** | Dock, Launchpad |
+
+It opens in its own window with the Regal Spritz icon, like a normal app, with no browser bars. It updates by itself: when you change the app, everyone gets the new version the next time they open it.
+
+Tips:
+- To pin on Windows: right-click the app in the taskbar → **Pin to taskbar**.
+- To pin on a Mac: right-click the Dock icon → **Options** → **Keep in Dock**.
+- The **⬇ Install app** button only shows in Chrome and Edge, and disappears once installed.
+
+### Setup checklist
+- [ ] Supabase project made, `schema.sql` run with your email (step 1)
+- [ ] Email code template saved (step 1.6)
+- [ ] Vercel deployed, 3 variables added, production branch set (step 2)
+- [ ] Supabase Site URL set to your Vercel address (step 2.7)
+- [ ] Shopify app made, 2 keys added to Vercel, redeployed (step 3)
+- [ ] Backup downloaded from claude.ai and imported (step 4)
+- [ ] Resend email connected before inviting the team (step 1 note)
+- [ ] Team installed it on their phones / computers (step 5)
 
 ---
 
 ## Optional later
 - **Sign in by mobile number:** Supabase → Authentication → Providers → **Phone** → connect an SMS service (e.g. Twilio, paid per text). The app's "Mobile number" tab then works. Numbers must match the Directory.
-- **App Store / Google Play listing:** wrap this site with Capacitor or PWABuilder (pwabuilder.com).
-  - Apple developer account: $99 a year. Google Play: $25 one time.
+- **App Store / Google Play / Microsoft Store listing:** paste your site address into **pwabuilder.com**. It makes the store packages for you.
+  - Apple developer account: $99 a year. Google Play: $25 one time. Microsoft Store: free for individuals.
+  - Store listing is not needed for the team: installing from the website (step 5) works on every device.
   - Apple reviews new apps, usually within 1–2 weeks.
 
 ## Files

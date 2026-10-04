@@ -2,6 +2,7 @@
   "name": "Regal Spritz PH",
   "short_name": "Regal Spritz",
   "description": "Regal Spritz PH team workspace: orders, tasks, attendance and more.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

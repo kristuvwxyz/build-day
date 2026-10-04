@@ -268,6 +268,21 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .hero-q { margin: 0; max-width: 60ch; }
 .hero-q blockquote { margin: 0; font-family: var(--font-display); font-style: italic; font-size: clamp(16px, 2vw, 20px); line-height: 1.45; opacity: .95; text-wrap: pretty; }
 .hero-q figcaption { margin-top: 8px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .75; }
+.org { display: grid; justify-items: center; }
+.org-top { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.org-stem { width: 2px; height: 18px; background: var(--line); }
+.org-cols { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; border-top: 2px solid var(--line); padding-top: 14px; }
+.org-col { border: 1px solid var(--line); border-top: 4px solid var(--dc); border-radius: 12px; padding: 10px; background: var(--surface); display: grid; gap: 8px; align-content: start; min-width: 0; }
+.org-dept { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--dc); display: flex; justify-content: space-between; }
+.org-dept span { color: var(--muted); font-weight: 600; }
+.org-list { display: grid; gap: 6px; padding-left: 10px; border-left: 2px solid var(--line); }
+.org-node { display: flex; gap: 10px; align-items: center; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: var(--bg); color: var(--fg); min-width: 0; font: inherit; }
+button.org-node { cursor: pointer; } button.org-node:hover { border-color: var(--dc, var(--brand)); }
+.org-node.lead { border-color: var(--dc, var(--brand)); box-shadow: 0 1px 0 var(--line); }
+.org-top .org-node.lead { --dc: #8B5CF6; padding: 10px 16px; }
+.org-node > span { display: grid; min-width: 0; }
+.org-node b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.org-node small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .today > * { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; border: 0; border-left: 1px solid var(--line); background: none; text-align: left; color: inherit; font: inherit; min-width: 0; }
 .today > *:first-child { border-left: 0; }
@@ -731,14 +746,14 @@ const svg = (k, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none
 const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Has note"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
 const DEPTS = [
-  { id: "CEO", name: "CEO", tabs: ["overview", "orders", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orders", "disputes", "archived", "listings", "reviews", "logins", "homecontent", "dtasks"], blurb: "Directory, logins, Home page" },
-  { id: "FINANCE", name: "Finance", tabs: ["orders", "dues", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
-  { id: "SALES", name: "Sales", tabs: ["orders", "suppliers", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
+  { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "archived", "listings", "reviews", "logins", "homecontent", "dtasks"], blurb: "Directory, logins, Home page" },
+  { id: "FINANCE", name: "Finance", tabs: ["dues", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
+  { id: "SALES", name: "Sales", tabs: ["suppliers", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
-  { id: "PACKING", name: "Packing", tabs: ["orders", "inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
+  { id: "PACKING", name: "Packing", tabs: ["inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -757,7 +772,7 @@ const S = {
   att: { mode: "day", date: "", month: "", dept: "" },
   loaded: { colprefs: false, products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false, reviews: false, eom: false, eomvotes: false },
   pay: { month: "", half: 1 }, paySettings: {},
-  view: "home", dept: "SALES", tab: "orders", period: "month",
+  view: "home", dept: "SALES", tab: "overview", period: "month",
   of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
   page: 0, sel: new Set(),
   pq: "", cq: "", cpage: 0,
@@ -1500,7 +1515,7 @@ function renderNav() {
     (() => { const m = member(myMemberId()) || {}; return `<button type="button" class="me-chip desktop-only" data-nav="account" ${S.view === "account" ? 'aria-current="page"' : ""}>${m.id ? avatar(m, 32, false) : svg("account")}<span class="me-t"><b>${esc(m.nickname || m.name || "My account")}</b><small>${esc(m.role || (dept(m.department) || {}).name || "My account")}</small></span><span class="me-go">›</span></button>`; })();
 }
 
-function moduleKey() { return S.view === "dept" ? S.tab : S.view === "orders" ? "ordersMain" : S.view; }
+function moduleKey() { return S.view === "dept" ? S.tab : S.view; }
 
 function headActions() {
   const can = !S.readOnly;
@@ -1509,8 +1524,7 @@ function headActions() {
   if (S.loggedOut) return "";
   const lockBtn = "";
   const map = {
-    ordersMain: S.view === "orders" ? (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + (S.dl ? `<button class="btn" type="button" data-act="export" data-col="orders">Export</button>` : "") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : "") : null,
-    home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
+        home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
     tasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
     attendance: ex("attendance"),
     eom: "",
@@ -1607,7 +1621,7 @@ function renderInner() {
   if (!dtabs.includes(S.tab)) S.tab = dtabs[0];
   const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
   const body = ({
-    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
+    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
     dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
@@ -1618,6 +1632,11 @@ function renderInner() {
 const member = id => S.team.find(m => m.id === id);
 const memberName = id => { const m = member(id); return m ? (m.nickname || m.name) : "Unassigned"; };
 const activeTeam = () => S.team.filter(m => m.status !== "inactive");
+// Organization order: department (CEO → Admin → Finance → Sales → Marketing → Packing), then seniority from the role title, then ID.
+const roleRank = r => { r = String(r || "").toLowerCase(); return /\b(ceo|founder|owner|president)\b/.test(r) ? 0 : /\b(director|head|chief)\b/.test(r) ? 1 : /manager/.test(r) ? 2 : /\b(lead|supervisor|senior|officer)\b/.test(r) ? 3 : /\b(assistant|associate|staff|intern|trainee|helper)\b/.test(r) ? 5 : 4; };
+const deptRank = d => { const i = DEPTS.findIndex(x => x.id === d); return i < 0 ? 99 : i; };
+const byHierarchy = (a, b) => deptRank(a.department) - deptRank(b.department) || roleRank(a.role) - roleRank(b.role) || String(a.idNumber || "zzz").localeCompare(String(b.idNumber || "zzz")) || (a.name || "").localeCompare(b.name || "");
+const teamByRank = () => activeTeam().slice().sort(byHierarchy);
 const initials = n => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
 // Sign-in binding: the owner is always Kristin H Sumiran; everyone else is matched by the
 // claude.ai account the owner linked, or by the sign-in email listed in Admin → Team.
@@ -1641,14 +1660,14 @@ function viewAsBar() {
   if (!S.viewAs) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement("div"); el.id = "viewas-bar"; document.body.prepend(el); }
   const m = member(S.viewAs) || {};
-  const opts = activeTeam().filter(x => x.id !== (ownerMember() || {}).id).map(x => `<option value="${x.id}" ${x.id === S.viewAs ? "selected" : ""}>${esc(x.name)} · ${esc((dept(x.department) || {}).name || "")}</option>`).join("");
+  const opts = teamByRank().filter(x => x.id !== (ownerMember() || {}).id).map(x => `<option value="${x.id}" ${x.id === S.viewAs ? "selected" : ""}>${esc(x.name)} · ${esc((dept(x.department) || {}).name || "")}</option>`).join("");
   const h = `👁 Viewing as <select id="viewas-pick" aria-label="View as">${opts || `<option>${esc(m.name || "Loading…")}</option>`}</select> Preview only: nothing is saved. <button type="button" class="btn sm" data-act="viewas-stop">Stop viewing as</button>`;
   if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
 }
 function devPanel() {
   if (!S.realOwner || S.viewAs) return "";
   return `<section class="panel"><h2>Developer options</h2>
-    <div class="field"><label for="dev-viewas">View as</label><select id="dev-viewas"><option value="">Myself (owner)</option>${activeTeam().filter(m => m.id !== (ownerMember() || {}).id).map(m => `<option value="${m.id}" ${S.viewAs === m.id ? "selected" : ""}>${esc(m.name)} · ${esc((dept(m.department) || {}).name || "")}</option>`).join("")}</select></div>
+    <div class="field"><label for="dev-viewas">View as</label><select id="dev-viewas"><option value="">Myself (owner)</option>${teamByRank().filter(m => m.id !== (ownerMember() || {}).id).map(m => `<option value="${m.id}" ${S.viewAs === m.id ? "selected" : ""}>${esc(m.name)} · ${esc((dept(m.department) || {}).name || "")}</option>`).join("")}</select></div>
     <div style="font-size:12px;color:var(--muted)">See the app exactly as that person does: their menu, departments, tasks and buttons. It's a preview: anything you try to save is blocked.</div>
     <div class="field"><label>Backup</label><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${S.dl ? `<button class="btn" type="button" data-act="backup-dl">Download full backup</button>` : ""}${window.RS_STANDALONE ? `<label class="btn" for="bk-file" style="cursor:pointer">Import backup</label><input id="bk-file" type="file" accept="application/json,.json" hidden>` : ""}</div>
       <div id="bk-status" class="acct-note">${S.bkMsg ? esc(S.bkMsg) : window.RS_STANDALONE ? "Import a backup file downloaded from the claude.ai version. Records with the same ID are replaced." : "Downloads every shared record (orders, team, tasks, settings…) as one file, to move into the standalone app. Keep it private."}</div></div></section>`;
@@ -2001,7 +2020,23 @@ function viewHome() {
     ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 5).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
       : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your tasks here.</div>`}
   </section>
-  ${goals.length ? `<div class="goals-line"><b>Our goals</b>${goals.map(esc).join(" · ")}</div>` : ""}`;
+  ${goals.length ? `<div class="goals-line"><b>Our goals</b>${goals.map(esc).join(" · ")}</div>` : ""}
+  ${orgChart(false)}`;
+}
+// Organization chart: the CEO on top, then one column per department, most senior first.
+function orgChart(full) {
+  const team = teamByRank(); if (!team.length) return full ? `<div class="empty">Add team members in Directory to build the chart.</div>` : "";
+  const own = ownerMember();
+  const top = team.filter(m => m.department === "CEO" || (own && m.id === own.id));
+  const node = (m, lead) => `<${full && S.canEdit ? `button type="button" data-act="edit-member" data-id="${m.id}"` : "div"} class="org-node${lead ? " lead" : ""}">${avatar(m, lead ? 40 : 30, false)}<span><b>${esc(m.nickname || m.name)}</b><small>${esc(m.role || (dept(m.department) || {}).name || "")}</small>${full && m.nickname && m.nickname !== m.name ? `<small class="org-full">${esc(m.name)}</small>` : ""}</span></${full && S.canEdit ? "button" : "div"}>`;
+  const cols = DEPTS.filter(d => d.id !== "CEO").map(d => {
+    const ms = team.filter(m => m.department === d.id && !top.includes(m)); if (!ms.length) return "";
+    const head = roleRank(ms[0].role) <= 2 ? ms[0] : null;
+    return `<div class="org-col" style="--dc:${DEPT_COLORS[d.id]}"><div class="org-dept">${esc(d.name)}<span>${ms.length}</span></div>${head ? node(head, true) : ""}<div class="org-list">${ms.filter(m => m !== head).map(m => node(m, false)).join("")}</div></div>`;
+  }).join("");
+  const body = `<div class="org"><div class="org-top">${(top.length ? top : team.slice(0, 1)).map(m => node(m, true)).join("")}</div><div class="org-stem" aria-hidden="true"></div><div class="org-cols">${cols}</div></div>`;
+  if (full) return `<section class="panel"><div class="head"><h2>Organizational chart</h2><span style="font-size:12.5px;color:var(--muted)">From the Directory. Order follows department, then role title (Head → Manager → Lead → Staff).${S.canEdit ? " Click a person to edit." : ""}</span></div>${body}</section>`;
+  return `<section class="panel quiet"><div class="head"><h2>Our team</h2>${canSee("ADMIN") ? `<button class="btn ghost sm" type="button" data-orgchart>Open in Admin</button>` : ""}</div>${body}</section>`;
 }
 function applySlide() {}
 
@@ -2016,7 +2051,7 @@ function homeOrders() {
   return `<section class="panel orders-home" style="--dc:${DEPT_COLORS.SALES}"><div class="head"><h2>Orders</h2><span class="shop-slot">${shopChip()}</span><button class="btn sm" type="button" data-goorders="all">${sales ? "Open all orders" : "Open packing"} →</button></div>
     <div class="otiles">${tile(toPack.length, "To ship", "unfulfilled", toPack.length ? "hot" : "")}${tile(hold.length, "On hold", "on_hold", "")}${tile(unpaid.length, "Unpaid", "unpaid", "")}${tile(todays.length, "New today", "today", "")}</div>
     ${recent.length ? `<div class="olist">${recent.map(o => `<button type="button" class="orow" data-open="${o.id}"><span class="onum">#${esc(o.num)}</span><span class="ocust">${esc(o.customer || "No customer")}<small>${relTime(o.createdAt)} · ${itemCount(o)} item${itemCount(o) === 1 ? "" : "s"}</small></span><span class="ototal num">${peso(total(o))}</span>${badge(ful(o.fulfillment))}</button>`).join("")}</div>`
-      : `<div class="empty">${S.orders.length ? "Everything is packed. 🎉" : sales ? "No orders yet. Import them in Sales → Orders." : "No orders to pack."}</div>`}
+      : `<div class="empty">${S.orders.length ? "Everything is packed. 🎉" : sales ? "No orders yet. Import them in Orders." : "No orders to pack."}</div>`}
   </section>`;
 }
 function goOrders(view) {
@@ -2140,7 +2175,7 @@ function viewTeam() { return accessReqPanel() + viewTeamDir(); }
 function viewTeamDir() {
   const q = (S.tq || "").trim().toLowerCase(), sf = S.tstatus || "active";
   const rows = [...S.team].filter(m => (sf === "all" || (sf === "active" ? m.status !== "inactive" : m.status === "inactive")) && (!q || [m.idNumber, m.nickname, m.name, m.phone, m.email, m.address, m.role, scentOf(m.id), (dept(m.department) || {}).name].join(" ").toLowerCase().includes(q)))
-    .sort((a, b) => String(a.idNumber || "zzz").localeCompare(String(b.idNumber || "zzz")) || (a.name || "").localeCompare(b.name || ""));
+    .sort(byHierarchy);
   const active = S.team.filter(m => m.status !== "inactive").length;
   return `<div class="kpis">
       <div class="kpi"><span class="label">Active members</span><span class="value">${active}</span></div>
@@ -2550,8 +2585,8 @@ function viewOrders() {
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
   return `
   <div class="shop-slot shop-line">${shopChip()}</div>
-  ${S.view === "dept" && S.dept === "CEO" ? statsStrip() : ""}
-  ${ctxDept() === "PACKING" ? packTools() : ""}
+  ${ctxDept() === "CEO" ? statsStrip() : ""}
+  ${ctxDept() === "PACKING" || ctxDept() === "CEO" ? packTools() : ""}
   <div class="bigsearch">${svg("search")}<input id="of-q" type="search" placeholder="Search order #, customer, phone, product, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
   <div class="toolbar">
     ${monthSelect()}
@@ -4776,6 +4811,7 @@ document.addEventListener("click", guard(async ev => {
   if (pm) { const [y, m] = S.pay.month.split("-").map(Number); S.pay.month = dstr(new Date(y, m - 1 + Number(pm.dataset.pmonth), 1).getTime()).slice(0, 7); render(); return; }
   const ip = ev.target.closest("[data-invpay]");
   if (ip) { await setInvPaid(ip.dataset.invpay, ip.dataset.ym, ip.dataset.paid === "1"); if (ip.dataset.insheet) openInvForm(ip.dataset.invpay); else toast(ip.dataset.paid === "1" ? "Marked paid." : "Marked unpaid."); return; }
+  if (ev.target.closest("[data-orgchart]")) { S.view = "dept"; S.dept = "ADMIN"; S.tab = "orgchart"; saveNav(); render(); window.scrollTo(0, 0); return; }
   const go = ev.target.closest("[data-goorders]");
   if (go) return goOrders(go.dataset.goorders);
   const smo = ev.target.closest("[data-scanmode]");
