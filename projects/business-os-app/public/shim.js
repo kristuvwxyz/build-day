@@ -125,7 +125,8 @@
     const fail = e => { const err = { code: /row-level security|permission|42501/i.test((e && (e.message || e.code)) || "") ? "permission_denied" : "unavailable", message: (e && e.message) || String(e) }; throw err; };
     const docRef = p => ({
       id: leafOf(p), path: p,
-      async get() { await loadCol(parentOf(p)).catch(() => {}); if (docVal(p) === undefined) { const { data } = await sb.from("docs").select("data").eq("path", p).maybeSingle(); if (data) put(p, data.data); } return snapD(p); },
+      async get() { if (parentOf(p) !== "invfiles") await loadCol(parentOf(p)).catch(() => {}); // invoice file pieces load one by one
+        if (docVal(p) === undefined) { const { data } = await sb.from("docs").select("data").eq("path", p).maybeSingle(); if (data) put(p, data.data); } return snapD(p); },
       onSnapshot(next, error) {
         if (!docs.has(p)) docs.set(p, { subs: new Set() }); docs.get(p).subs.add(next);
         sb.from("docs").select("data").eq("path", p).maybeSingle().then(({ data, error: e }) => { if (e) { error && error(e); return; } put(p, data ? data.data : undefined); next(snapD(p)); });

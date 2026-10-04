@@ -268,6 +268,33 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .hero-q { margin: 0; max-width: 60ch; }
 .hero-q blockquote { margin: 0; font-family: var(--font-display); font-style: italic; font-size: clamp(16px, 2vw, 20px); line-height: 1.45; opacity: .95; text-wrap: pretty; }
 .hero-q figcaption { margin-top: 8px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .75; }
+.tpill.u-overdue { background: var(--bad-bg); --c: var(--bad); font-weight: 700; box-shadow: inset 0 0 0 1px var(--bad); }
+.tpill.u-today { background: var(--orange-bg); --c: var(--orange); font-weight: 700; }
+.tpill.u-soon { background: var(--amber-bg); --c: var(--amber); }
+.tpill.u-overdue .ini { background: var(--bad); color: #fff; }
+.cal-d.u-overdue { box-shadow: inset 0 0 0 2px var(--bad); }
+.cal-d.u-today { box-shadow: inset 0 0 0 2px var(--orange); }
+.cal-d.u-soon { box-shadow: inset 0 0 0 2px var(--amber); }
+.chip.orange { background: var(--orange-bg); color: var(--orange); }
+.chip.amber { background: var(--amber-bg); color: var(--amber); }
+.chip.urg { font-weight: 700; white-space: nowrap; }
+tr.u-row.u-overdue td:first-child { box-shadow: inset 4px 0 0 var(--bad); }
+tr.u-row.u-today td:first-child { box-shadow: inset 4px 0 0 var(--orange); }
+tr.u-row.u-soon td:first-child { box-shadow: inset 4px 0 0 var(--amber); }
+.dues-alert { border-left: 4px solid var(--amber); }
+.dues-alert.has-today { border-left-color: var(--orange); }
+.dues-alert.has-over { border-left-color: var(--bad); background: linear-gradient(90deg, var(--bad-bg), var(--surface) 40%); }
+.dues-alert .urg-sum { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.nbadge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 800; display: inline-grid; place-items: center; }
+.seg .nbadge { margin-left: 4px; }
+.sp-mode { margin-bottom: 4px; }
+th.ck, td.ck { width: 36px; }
+tr.selrow td { background: var(--surface-2); }
+.inv-file { display: grid; gap: 8px; }
+.inv-file img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+.inv-file iframe { width: 100%; height: 60vh; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 13.5px; }
+.kv span { color: var(--muted); }
 .org { display: grid; justify-items: center; }
 .org-top { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .org-stem { width: 2px; height: 18px; background: var(--line); }
@@ -612,7 +639,7 @@ main > .gs.mobile-only { margin-bottom: 12px; }
 
 <div class="app">
   <aside class="rail">
-    <button type="button" class="mark" data-nav="home" aria-label="Go to Home">Regal Spritz PH<small>The Scent Atelier</small></button>
+    <button type="button" class="mark" data-nav="home" aria-label="Go to Home">Regal Spritz PH</button>
     <div class="gs desktop-only"><span class="gs-ico"></span><input class="gs-in" type="search" placeholder="Search orders…" aria-label="Search orders" autocomplete="off"><div class="gs-res" hidden></div></div>
     <nav class="nav" id="nav"></nav>
     <div class="rail-foot"><div id="theme-slot"></div><div id="sync">Connecting…</div></div>
@@ -697,8 +724,11 @@ const canShip = () => ["all", "pack"].includes(orderRole());
 const actor = () => { const m = member(myMemberId()); if (m) return `${m.nickname || m.name}, the ${m.role || (dept(m.department) || {}).name || "team"}`; return ((S.me && S.me.name) || "Owner") + (S.isOwner ? ", the owner" : ""); };
 const logAdd = (o, msgs, by) => [...(o.log || []), ...msgs.map(msg => ({ at: Date.now(), by: by || actor(), msg }))].slice(-80);
 const salesTeam = () => activeTeam().filter(m => m.department === "SALES");
-const canSuppliers = () => S.isOwner || myDept() === "CEO" || myMemberId() === "m-000005";
-const tabAllowed = t => t === "orders" || t === "archived" ? canOrders() && (t === "orders" || canAll()) : t === "suppliers" ? canSuppliers() : t === "archived" ? canAll() : true;
+const isSeniorSales = () => myDept() === "SALES" && roleRank((boundMember() || {}).role) <= 3;
+const canSuppliers = () => S.isOwner || myDept() === "CEO" || isSeniorSales();
+// Supplier invoices and budget requests: CEO, Senior Sales and Finance only.
+const canInvoices = () => S.isOwner || myDept() === "CEO" || myDept() === "FINANCE" || isSeniorSales();
+const tabAllowed = t => t === "budget" ? canInvoices() : t === "orders" || t === "archived" ? canOrders() && (t === "orders" || canAll()) : t === "suppliers" ? canSuppliers() : t === "archived" ? canAll() : true;
 const ctxDept = () => S.view === "dept" ? S.dept : (myDept() || "SALES");
 const COURIER_LABEL = { "J&T": "J&T", SDD: "SDD / Pickup" };
 const clsKey = st => String(st.cls || "").split(" ")[0] || "grey";
@@ -748,12 +778,12 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
   { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "archived", "listings", "reviews", "logins", "homecontent", "dtasks"], blurb: "Directory, logins, Home page" },
-  { id: "FINANCE", name: "Finance", tabs: ["dues", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
+  { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["suppliers", "archived", "listings", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "listings", "customers", "dtasks"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -765,7 +795,7 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
-  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
@@ -1510,7 +1540,7 @@ function renderNav() {
     (isCEO() ? item('data-nav="eom"', "award", "Awards", S.view === "eom") : "") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
-    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")), "desktop-only dept-item")).join("") +
+    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : ""), "desktop-only dept-item")).join("") +
     item('data-nav="account"', "account", "My account", S.view === "account", "", "account-item mobile-only") +
     (() => { const m = member(myMemberId()) || {}; return `<button type="button" class="me-chip desktop-only" data-nav="account" ${S.view === "account" ? 'aria-current="page"' : ""}>${m.id ? avatar(m, 32, false) : svg("account")}<span class="me-t"><b>${esc(m.nickname || m.name || "My account")}</b><small>${esc(m.role || (dept(m.department) || {}).name || "My account")}</small></span><span class="me-go">›</span></button>`; })();
 }
@@ -1540,7 +1570,8 @@ function headActions() {
     bir: ex("bir") + (can ? `<button class="btn primary" type="button" data-act="new-bir">Add sale</button>` : ""),
     investors: ex("investments") + (can ? `<button class="btn primary" type="button" data-act="new-inv">Add investment</button>` : ""),
     orders: (ctxDept() === "PACKING" && canShip() ? `<button class="btn" type="button" data-act="jnt-file">J&T VIP booking file</button>` : "") + (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
-    suppliers: "",
+    suppliers: S.sp && S.sp.mode === "invoices" && canInvoices() && can ? `<button class="btn primary" type="button" data-act="new-invoice">Upload invoice</button>` : "",
+    budget: can && canInvoices() ? `<button class="btn" type="button" data-act="new-invoice">Upload supplier invoice</button><button class="btn primary" type="button" data-act="new-budget">New budget request</button>` : "",
     archived: "",
     packing: (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
@@ -1621,11 +1652,11 @@ function renderInner() {
   if (!dtabs.includes(S.tab)) S.tab = dtabs[0];
   const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
   const body = ({
-    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
+    overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), budget: viewBudget, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
     dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
-  v.innerHTML = tabs + body;
+  v.innerHTML = (S.dept === "FINANCE" && S.tab !== "budget" ? duesAlert() : "") + tabs + body;
 }
 
 /* ---------- people & tasks helpers ---------- */
@@ -1844,14 +1875,14 @@ function workload(list, by) {
 }
 function taskPill(t) {
   const a = t.assigneeId ? member(t.assigneeId) : null, o = t.orderId ? findOrder(t.orderId) : null;
-  return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}" ${o ? `data-open="${o.id}"` : `data-task="${t.id}"`} title="${o ? esc(onum(o)) + " · " : ""}${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${o ? `<span class="ini">📦</span>` : a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${o ? "#" + esc(o.num) + " " : ""}${esc(t.title)}</span></button>`;
+  return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}${taskUrg(t) ? " u-" + taskUrg(t) : ""}" ${o ? `data-open="${o.id}"` : `data-task="${t.id}"`} title="${o ? esc(onum(o)) + " · " : ""}${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${o ? `<span class="ini">📦</span>` : a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${o ? "#" + esc(o.num) + " " : ""}${esc(t.title)}</span></button>`;
 }
 function taskRow(t) {
   return `<tr data-task="${t.id}" style="cursor:pointer">
     <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}${t.orderId && findOrder(t.orderId) ? ` <button type="button" class="chip" data-open="${t.orderId}">📦 #${esc(findOrder(t.orderId).num)}</button>` : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
     <td class="nowrap">${esc(memberName(t.assigneeId))}</td>
     <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc((dept(t.department) || { name: "–" }).name)}</span>` : "–"}</td>
-    <td class="nowrap" style="color:${isOverdue(t) ? "var(--bad)" : "inherit"}">${t.due ? fmtDate(t.due) : "No date"}${isOverdue(t) ? " · overdue" : ""}</td>
+    <td class="nowrap">${t.due ? fmtDate(t.due) : "No date"} ${taskUrg(t) ? urgChip(taskUrg(t)) : ""}</td>
     <td style="min-width:120px"><div style="display:flex;gap:8px;align-items:center">${pbar(t.status === "done" ? 100 : t.progress)}<span class="num" style="font-size:12px;color:var(--muted)">${t.status === "done" ? 100 : Number(t.progress) || 0}%</span></div></td>
     <td><span class="chip ${tstat(t.status).cls}">${tstat(t.status).name}</span></td></tr>`;
 }
@@ -1881,12 +1912,13 @@ function viewTasks(forceDept) {
     const dayTasks = scoped.filter(t => onDay(t, S.t.day));
     const pPerson = !forceDept && S.t.scope === "person" ? S.t.person : "";
     const showMoney = (finOpen() || DUE_PEOPLE.includes(myMemberId())) && (!forceDept || forceDept === "FINANCE");
-    const money = showMoney ? moneyEvents(cells[0], cells[cells.length - 1]).filter(e => !pPerson || e.who.includes(pPerson)) : [];
+    const showInv = canInvoices() && (!forceDept || forceDept === "FINANCE" || forceDept === "SALES");
+    const money = [...(showMoney ? moneyEvents(cells[0], cells[cells.length - 1]) : []), ...(showInv ? invoiceEvents(cells[0], cells[cells.length - 1]) : [])].filter(e => !pPerson || e.who.includes(pPerson));
     const moneyOn = d => money.filter(e => e.date === d);
     const dayMoney = moneyOn(S.t.day);
     main = `<div class="cal">
       ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => `<div class="cal-h">${d}</div>`).join("")}
-      ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)); const out = d.slice(0, 7) !== ym; return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
+      ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)); const out = d.slice(0, 7) !== ym; const uc = moneyOn(d).map(moneyUrg).concat(ts.map(taskUrg)); return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${uc.includes("overdue") ? " u-overdue" : uc.includes("today") ? " u-today" : uc.includes("soon") ? " u-soon" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
         <div class="cal-n"><span>${Number(d.slice(8))}</span>${S.readOnly ? "" : `<button type="button" class="cal-add" data-act="new-task" data-date="${d}" aria-label="Add task on ${fmtDate(d)}">+</button>`}</div>
         <div class="cal-items">${moneyOn(d).slice(0, 2).map(moneyPill).join("")}${moneyOn(d).length > 2 ? `<span class="cal-more">+${moneyOn(d).length - 2} payments</span>` : ""}${ts.slice(0, 3).map(taskPill).join("")}${ts.length > 3 ? `<span class="cal-more">+${ts.length - 3} more</span>` : ""}</div>
         ${ts.length || moneyOn(d).length ? `<div class="cal-dots" aria-hidden="true">${moneyOn(d).slice(0, 2).map(() => `<i class="s-money"></i>`).join("")}${ts.slice(0, 4).map(t => `<i class="s-${t.status}"${DEPT_COLORS[t.department] ? ` style="background:${DEPT_COLORS[t.department]}"` : ""}></i>`).join("")}</div>` : ""}
@@ -1894,7 +1926,7 @@ function viewTasks(forceDept) {
     </div>
     <section class="panel"><div class="head"><h2>${longDate(S.t.day)}</h2>${S.readOnly ? "" : `<button class="btn sm" type="button" data-act="new-task" data-date="${S.t.day}">+ Add task for this day</button>`}</div>
       ${dayTasks.length ? `<div class="table-wrap" style="border:0"><table><tbody>${dayTasks.map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">No tasks due this day.</div>`}
-      ${dayMoney.length ? `<h2 style="margin-top:6px">Payments due · ${peso(dayMoney.reduce((a, e) => a + e.amount, 0))}</h2><div class="table-wrap" style="border:0"><table><tbody>${dayMoney.map(e => `<tr><td style="font-weight:600">${esc(e.title)}</td><td class="nowrap">${esc(e.sub)}</td><td class="r num nowrap">${peso(e.amount)}</td><td class="r">${e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">${CHECK_STATUS[e.status].name}</button>` : `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">${e.paid ? "Paid ✓" : "Mark paid"}</button>`}</td></tr>`).join("")}</tbody></table></div>` : ""}
+      ${dayMoney.length ? `<h2 style="margin-top:6px">Payments due · ${peso(dayMoney.reduce((a, e) => a + e.amount, 0))}</h2><div class="table-wrap" style="border:0"><table><tbody>${dayMoney.map(e => `<tr><td style="font-weight:600">${esc(e.title)}</td><td class="nowrap">${esc(e.sub)}</td><td class="r num nowrap">${peso(e.amount)}</td><td class="r">${moneyUrg(e) ? urgChip(moneyUrg(e)) + " " : ""}${e.kind === "invoice" ? `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${e.id}">${e.paid ? "Paid ✓" : "Mark paid"}</button>` : e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">${CHECK_STATUS[e.status].name}</button>` : `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">${e.paid ? "Paid ✓" : "Mark paid"}</button>`}</td></tr>`).join("")}</tbody></table></div>` : ""}
     </section>
     ${showMoney ? "" : canSee("FINANCE") ? `<div style="font-size:12px;color:var(--muted)">Unlock Finance to see investor, credit card and check due dates on this calendar.</div>` : ""}`;
   } else {
@@ -1908,7 +1940,7 @@ function viewTasks(forceDept) {
     : S.t.scope === "dept" && !S.t.dept ? workload(monthTasks, "dept")
     : S.t.scope === "dept" ? workload(monthTasks, "person") : "";
   const noTeam = !S.team.length ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span>Add your team in <strong>Admin → Team</strong> so you can assign tasks to people.</span></div>` : "";
-  return `${noTeam}${taskSummary(monthTasks, `${monthLabel(ym)} · ${esc(scopeName)}`)}${controls}${monthNav}${main}
+  return `${noTeam}${forceDept && forceDept !== "FINANCE" ? "" : duesAlert()}${taskSummary(monthTasks, `${monthLabel(ym)} · ${esc(scopeName)}`)}${controls}${monthNav}${main}
     ${undated.length ? `<section class="panel"><h2>No due date</h2><div class="table-wrap" style="border:0"><table><tbody>${undated.map(taskRow).join("")}</tbody></table></div></section>` : ""}
     ${extra}`;
 }
@@ -2015,6 +2047,7 @@ function viewHome() {
     <div>${st ? `<b style="font-size:20px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
       : `<b style="font-size:20px">–</b><span>Attendance</span><span style="font-size:12px">Not linked</span>`}</div>
   </section>
+  ${duesAlert()}
   ${isCEO() ? eomHomeCard() : ""}
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
     ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 5).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
@@ -2606,14 +2639,17 @@ function viewOrders() {
 }
 
 function viewSuppliers() {
-  if (!canSuppliers()) return `<div class="panel"><div class="empty">Suppliers is only for the CEO and Senior Sales (Eve).</div></div>`;
-  const sp = S.sp || (S.sp = { sup: "all", ful: "all", pay: "all", q: "" });
+  if (!canSuppliers()) return `<div class="panel"><div class="empty">Suppliers is only for the CEO and Senior Sales.</div></div>`;
+  const sp = S.sp || (S.sp = { sup: "all", ful: "all", pay: "all", q: "", mode: "orders" });
+  const modeBar = canInvoices() ? `<div class="seg sp-mode" role="group" aria-label="Suppliers section">${[["orders", "Order list"], ["invoices", "Supplier invoices"]].map(([k, l]) => `<button type="button" data-spmode="${k}" aria-pressed="${(sp.mode || "orders") === k}">${l}${k === "invoices" && S.invoices.filter(x => x.kind !== "request" && x.status !== "paid").length ? ` <span class="nbadge">${S.invoices.filter(x => x.kind !== "request" && x.status !== "paid").length}</span>` : ""}</button>`).join("")}</div>` : "";
+  if (sp.mode === "invoices" && canInvoices()) return modeBar + viewInvoices();
   const m = new Map(); for (const o of S.orders) for (const t of o.tags || []) if (/^S-/i.test(t)) m.set(t.toUpperCase(), (m.get(t.toUpperCase()) || 0) + 1);
   const q = sp.q.trim().toLowerCase();
   const os = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)) && (sp.ful === "all" || o.fulfillment === sp.ful)
     && (!q || [o.num, ...(o.merged || []), o.customer, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q))).sort(orderSorter());
   const agg = new Map();
-  for (const o of os) for (const i of o.items || []) { const k = i.name || "?"; const a = agg.get(k) || { name: k, qty: 0, orders: [] }; a.qty += Number(i.qty) || 0; a.orders.push(i.from || o.num); agg.set(k, a); }
+  for (const o of os) for (const i of o.items || []) { const k = i.name || "?"; const a = agg.get(k) || { name: k, qty: 0, orders: [], ids: new Set() }; a.qty += Number(i.qty) || 0; a.orders.push(i.from || o.num); a.ids.add(o.id); agg.set(k, a); }
+  S.spOs = os.map(o => o.id); S.spAgg = agg;
   const rows = [...agg.values()].sort((a, b) => a.name.localeCompare(b.name));
   const label = sp.sup === "all" ? "all suppliers" : sp.sup;
   S.supText = `ORDER LIST · ${label} · ${mToday()}\n` + rows.map(r => `${r.qty}x ${r.name}  (${[...new Set(r.orders)].map(n => "#" + n).join(", ")})`).join("\n") + `\n\nTotal pcs: ${rows.reduce((a, r) => a + r.qty, 0)}`;
@@ -2622,14 +2658,22 @@ function viewSuppliers() {
   const active = sp.sup !== "all" || sp.ful !== "all" || sp.q;
   const sAll = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)));
   const fc = new Map(); sAll.forEach(o => fc.set(o.fulfillment, (fc.get(o.fulfillment) || 0) + 1));
-  return `<div class="bigsearch">${svg("search")}<input id="spq" type="search" placeholder="Search item, order # or customer" value="${esc(sp.q)}" aria-label="Search supplier orders" autocomplete="off"></div>
+  for (const id of [...S.sel]) if (!S.orders.some(o => o.id === id)) S.sel.delete(id);
+  const isSel = r => [...r.ids].every(id => S.sel.has(id));
+  const allSel = os.length > 0 && os.every(o => S.sel.has(o.id));
+  const bulk = S.sel.size ? `<div class="bulk"><strong>${S.sel.size} order${S.sel.size === 1 ? "" : "s"} selected</strong>
+      ${canFul() ? `<select id="sp-bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
+      ${canPay() ? `<select id="sp-bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
+      <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
+  return `${modeBar}<div class="bigsearch">${svg("search")}<input id="spq" type="search" placeholder="Search item, order # or customer" value="${esc(sp.q)}" aria-label="Search supplier orders" autocomplete="off"></div>
   <div class="supbar"><span class="lab">Supplier</span><button type="button" data-spsup="all" aria-pressed="${sp.sup === "all"}">All <span>${S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t))).length}</span></button>${[...m].sort().map(([t, n]) => `<button type="button" data-spsup="${esc(t)}" aria-pressed="${sp.sup === t}">${esc(t)} <span>${n}</span></button>`).join("")}</div>
   <div class="supbar"><span class="lab">Status</span><button type="button" data-spful="all" aria-pressed="${sp.ful === "all"}">All <span>${sAll.length}</span></button>${FULFILLMENTS.filter(f => fc.get(f.id)).map(f => `<button type="button" data-spful="${f.id}" aria-pressed="${sp.ful === f.id}">${esc(f.name)} <span>${fc.get(f.id)}</span></button>`).join("")}${active ? `<button type="button" data-act="sp-clear">✕ Clear</button>` : ""}</div>
   <section class="panel"><div class="head"><h2>Order list · ${esc(label)} · ${rows.reduce((a, r) => a + r.qty, 0)} pcs from ${os.length} order${os.length === 1 ? "" : "s"}</h2><div style="display:flex;gap:6px">${S.dl ? `<button class="btn sm" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn sm primary" type="button" data-act="sup-copy">Copy list</button></div></div>
-    <div class="table-wrap"><table><thead><tr><th class="r">Qty</th><th>Item</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr><td class="r num" style="font-weight:700">${r.qty}</td><td>${esc(r.name)}</td><td style="font-size:12px">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody></table>${rows.length ? "" : `<div class="empty" style="padding:16px">No orders match. Supplier tags look like S-JEFF, S-GAL, S-MEI.</div>`}</div>
-    <div style="font-size:12px;color:var(--muted)">Supplier invoices will link here next.</div></section>
+    ${bulk}
+    <div class="table-wrap"><table><thead><tr><th class="ck"><input type="checkbox" id="sp-all" aria-label="Select all items" ${allSel ? "checked" : ""}></th><th class="r">Qty</th><th>Item</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr class="${isSel(r) ? "selrow" : ""}"><td class="ck"><input type="checkbox" data-spitem="${esc(r.name)}" aria-label="Select ${esc(r.name)}" ${isSel(r) ? "checked" : ""}></td><td class="r num" style="font-weight:700">${r.qty}</td><td>${esc(r.name)}</td><td style="font-size:12px">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody></table>${rows.length ? "" : `<div class="empty" style="padding:16px">No orders match. Supplier tags look like S-JEFF, S-GAL, S-MEI.</div>`}</div>
+    <div style="font-size:12px;color:var(--muted)">Tick items (or all) to select their orders, then set the fulfillment status. It updates the main Orders list too.</div></section>
   <h2 style="margin:4px 0 -8px">Orders</h2>
-  ${ordersTable(os.slice(0, 200), "orders", S.of, "osort", "sel-all")}`;
+  ${ordersTable(os.slice(0, 200), "orders", S.of, "osort", "spsel-all")}`;
 }
 function viewGate() {
   const em = (S.me && S.me.email) || "", sent = S.accessreq.some(r => r.id === S.uid);
@@ -2638,7 +2682,7 @@ function viewGate() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${sent ? `<span class="chip good">Request sent. The owner will link you.</span>` : `<button class="btn primary" type="button" data-act="req-access">Ask the owner for access</button>`}<a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign in with another account</a></div></div>`;
 }
 S.reqProf = {}; S.raw = {};
-const BACKUP_COLS = ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq"];
+const BACKUP_COLS = ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices"];
 const BACKUP_DOCS = ["config/home", "config/payroll", "config/attendance", "config/eom", "config/reviews", "config/vault", "config/security"];
 // Full copy of the shared data (not anyone's private settings), for moving to the standalone app.
 async function downloadBackup() {
@@ -2646,6 +2690,8 @@ async function downloadBackup() {
   const rows = [];
   for (const c of BACKUP_COLS) for (const d of S.raw[c] || []) rows.push({ path: c + "/" + d.id, data: d.data() });
   for (const p of BACKUP_DOCS) { try { const s = await S.db.doc(p).get(); if (s.exists) rows.push({ path: p, data: s.data() }); } catch (e) {} }
+  // Invoice files saved in the database (in pieces) travel with the backup.
+  for (const x of S.invoices) { const f = x.file; if (f && f.fid) for (let i = 0; i < f.chunks; i++) { try { const sn = await S.db.doc(`invfiles/${f.fid}-${i}`).get(); if (sn.exists) rows.push({ path: `invfiles/${f.fid}-${i}`, data: sn.data() }); } catch (e) {} } }
   const json = JSON.stringify({ app: "regal-spritz-os", version: 1, exportedAt: new Date().toISOString(), rows });
   try { await S.dl.save({ filename: `regal-spritz-backup-${mToday()}.json`, data: json }); toast(`Backup ready: ${rows.length.toLocaleString("en-PH")} records.`); } catch (e) { toast("Download was cancelled."); }
 }
@@ -4158,7 +4204,207 @@ function moneyEvents(from, to) {
   for (const c of S.checks) if (c.checkDate && c.checkDate >= from && c.checkDate <= to && c.status !== "cancelled") out.push({ who: dueWho(c), kind: "check", id: c.id, date: c.checkDate, title: `Check #${c.checkNo || "–"} · ${c.payee || ""}`, sub: c.bank || "Check", amount: Number(c.amount) || 0, status: c.status || "pending", paid: c.status === "cleared" });
   return out;
 }
-const moneyPill = e => `<button type="button" class="tpill s-money${e.paid ? " paid" : ""}" data-act="${e.kind === "check" ? "edit-check" : "edit-due"}" data-id="${e.id}" title="${esc(e.title)} · ${peso(e.amount)}"><span class="ini">₱</span><span class="tt">${esc(e.title)}</span></button>`;
+const moneyPill = e => { const u = moneyUrg(e); return `<button type="button" class="tpill s-money${e.paid ? " paid" : ""}${u ? " u-" + u : ""}" data-act="${e.kind === "check" ? "edit-check" : e.kind === "invoice" ? "view-invoice" : "edit-due"}" data-id="${e.id}" title="${u ? URG[u].name + " · " : ""}${esc(e.title)} · ${peso(e.amount)}"><span class="ini">${u === "overdue" ? "!" : e.kind === "invoice" ? "🧾" : "₱"}</span><span class="tt">${esc(e.title)}</span></button>`; };
+// Due-date emphasis: overdue, due today, due in the next 1–2 days (unpaid only). Used on Home, Tasks, the calendar and Finance.
+const URG = { overdue: { name: "Overdue", cls: "bad" }, today: { name: "Due today", cls: "orange" }, soon: { name: "Due in 1–2 days", cls: "amber" } };
+const plusDays = n => dstr(Date.parse(today() + "T12:00:00+08:00") + n * 864e5);
+const urgOf = date => !date ? "" : date < today() ? "overdue" : date === today() ? "today" : date <= plusDays(2) ? "soon" : "";
+const moneyUrg = e => e.paid || e.status === "cleared" || e.status === "bounced" ? "" : urgOf(e.date);
+const taskUrg = t => t.status === "done" || t.status === "cancelled" ? "" : urgOf(t.due);
+const urgChip = u => u ? `<span class="chip urg ${URG[u].cls}">${u === "overdue" ? "⚠ " : ""}${URG[u].name}</span>` : "";
+const moneyAccess = () => finOpen() || DUE_PEOPLE.includes(myMemberId()) || isCEO();
+function urgentMoney() {
+  // This month, plus the last 7 days so early-month items from late last month still show.
+  const ms = mToday().slice(0, 7) + "-01", w = plusDays(-7), from = w < ms ? w : ms, to = plusDays(2);
+  const list = [...(moneyAccess() ? moneyEvents(from, to) : []), ...(canInvoices() ? invoiceEvents(from, to) : [])].filter(e => moneyUrg(e));
+  if (!S.isOwner && !isCEO() && !finOpen()) { const me = myMemberId(); return list.filter(e => e.kind === "invoice" || e.who.includes(me)); }
+  return list;
+}
+const urgentBadge = () => { const n = urgentMoney().filter(e => moneyUrg(e) !== "soon").length; return n ? `<span class="nbadge" title="${n} overdue or due today">${n}</span>` : ""; };
+function duesAlert() {
+  const list = urgentMoney().sort((a, b) => a.date.localeCompare(b.date)); if (!list.length) return "";
+  const n = k => list.filter(e => moneyUrg(e) === k).length;
+  const sum = list.reduce((a, e) => a + e.amount, 0);
+  const btn = e => e.kind === "invoice" ? `<button class="btn sm primary" type="button" data-act="inv-paid" data-id="${e.id}">Mark paid</button>`
+    : e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">Update</button>`
+    : `<button class="btn sm primary" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">Mark paid</button>`;
+  return `<section class="panel dues-alert${n("overdue") ? " has-over" : n("today") ? " has-today" : ""}" aria-label="Payments needing attention">
+    <div class="head"><h2>💸 Payments needing attention · ${peso(sum)}</h2><span class="urg-sum">${n("overdue") ? urgChip("overdue") + ` <b>${n("overdue")}</b>` : ""} ${n("today") ? urgChip("today") + ` <b>${n("today")}</b>` : ""} ${n("soon") ? urgChip("soon") + ` <b>${n("soon")}</b>` : ""}</span></div>
+    <div class="table-wrap" style="border:0"><table><tbody>${list.slice(0, 8).map(e => `<tr class="u-row u-${moneyUrg(e)}"><td style="font-weight:600">${esc(e.title)}<div class="s">${esc(e.sub || "")}</div></td><td class="nowrap">${fmtDate(e.date)}</td><td>${urgChip(moneyUrg(e))}</td><td class="r num nowrap">${peso(e.amount)}</td><td class="r">${S.readOnly ? "" : btn(e)}</td></tr>`).join("")}</tbody></table></div>
+    ${list.length > 8 ? `<div style="font-size:12px;color:var(--muted)">+${list.length - 8} more on the Tasks calendar.</div>` : ""}</section>`;
+}
+
+/* ---------- supplier invoices & budget requests ---------- */
+// One collection: an uploaded supplier invoice ("invoice") or a plain budget request ("request").
+// Status: topay / paid. Budget: pending → approved / declined (Finance or CEO decides).
+const INV_STATUS = { topay: { name: "To pay", cls: "warn" }, paid: { name: "Paid", cls: "good" } };
+const BUDGET = { pending: { name: "Waiting for Finance", cls: "info" }, approved: { name: "Approved", cls: "good" }, declined: { name: "Declined", cls: "bad" } };
+const canDecide = () => S.isOwner || myDept() === "CEO" || myDept() === "FINANCE";
+const invTitle = x => x.kind === "request" ? (x.title || "Budget request") : `${x.supplier || "Supplier"}${x.invNo ? " · Inv " + x.invNo : ""}`;
+function invoiceEvents(from, to) {
+  return S.invoices.filter(x => x.dueDate && x.dueDate >= from && x.dueDate <= to && x.budget !== "declined")
+    .map(x => ({ who: [...DUE_PEOPLE, x.createdById].filter(Boolean), kind: "invoice", id: x.id, date: x.dueDate, title: (x.kind === "request" ? "Budget · " : "Invoice · ") + invTitle(x), sub: BUDGET[x.budget || "pending"].name, amount: Number(x.amount) || 0, paid: x.status === "paid" }));
+}
+function supplierNames() {
+  const set = new Set(); for (const o of S.orders) for (const t of o.tags || []) if (/^S-/i.test(t)) set.add(t.toUpperCase());
+  for (const x of S.invoices) if (x.supplier) set.add(x.supplier); return [...set].sort();
+}
+function invRow(x, finance) {
+  const u = x.status === "paid" || x.budget === "declined" ? "" : urgOf(x.dueDate);
+  return `<tr data-act="view-invoice" data-id="${x.id}" class="${u ? "u-row u-" + u : ""}">
+    <td class="nowrap">${fmtDate(x.invDate || dstr(x.createdAt || Date.now()))}</td>
+    <td style="font-weight:600">${esc(invTitle(x))}${x.file ? ' <span title="Has attachment">📎</span>' : ""}<div class="s">${esc(x.kind === "request" ? (x.purpose || "") : (x.orders || x.notes || ""))}</div></td>
+    <td class="r num nowrap">${peso2(x.amount)}</td>
+    <td class="nowrap">${x.dueDate ? fmtDate(x.dueDate) : "–"} ${urgChip(u)}</td>
+    <td>${badge(BUDGET[x.budget || "pending"])}</td>
+    <td>${badge(INV_STATUS[x.status || "topay"])}</td>
+    <td class="nowrap" style="font-size:12px;color:var(--muted)">${esc(x.createdByName || "")}</td>
+    <td class="r nowrap">${S.readOnly ? "" : (finance && canDecide() && (x.budget || "pending") === "pending" ? `<button class="btn sm" type="button" data-act="inv-approve" data-id="${x.id}">Approve</button> ` : "") + (x.budget === "declined" ? "" : `<button class="btn sm ${x.status === "paid" ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${x.id}">${x.status === "paid" ? "Paid ✓" : "Mark paid"}</button>`)}</td></tr>`;
+}
+const invHead = `<thead><tr><th>Date</th><th>Invoice / request</th><th class="r">Amount</th><th>Due</th><th>Budget</th><th>Status</th><th>By</th><th></th></tr></thead>`;
+function viewInvoices() {
+  if (!canInvoices()) return `<div class="panel"><div class="empty">Supplier invoices are for the CEO, Senior Sales and Finance.</div></div>`;
+  const f = S.invF || (S.invF = { st: "topay", sup: "all", q: "" });
+  const q = f.q.trim().toLowerCase();
+  const all = S.invoices.filter(x => x.kind !== "request");
+  const rows = all.filter(x => (f.st === "all" || (x.status || "topay") === f.st) && (f.sup === "all" || x.supplier === f.sup) && (!q || [x.supplier, x.invNo, x.notes, x.orders, x.amount].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => (a.status === "paid") - (b.status === "paid") || String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")));
+  const tot = st => all.filter(x => (x.status || "topay") === st && x.budget !== "declined").reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  const sups = [...new Set(all.map(x => x.supplier).filter(Boolean))].sort();
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">To pay</span><span class="value">${peso(tot("topay"))}</span><span class="sub">${all.filter(x => (x.status || "topay") === "topay").length} invoices</span></div>
+      <div class="kpi"><span class="label">Waiting for Finance</span><span class="value">${all.filter(x => (x.budget || "pending") === "pending" && x.status !== "paid").length}</span><span class="sub">sent as budget requests</span></div>
+      <div class="kpi"><span class="label">Paid</span><span class="value">${peso(tot("paid"))}</span><span class="sub">${all.filter(x => x.status === "paid").length} invoices</span></div>
+    </div>
+    <div class="toolbar"><input id="inv-q" type="search" placeholder="Search supplier, invoice # or order #" value="${esc(f.q)}" aria-label="Search invoices" autocomplete="off">
+      <div class="seg" role="group" aria-label="Status">${[["topay", "To pay"], ["paid", "Paid"], ["all", "All"]].map(([k, l]) => `<button type="button" data-invst="${k}" aria-pressed="${f.st === k}">${l}</button>`).join("")}</div>
+      <select id="inv-sup" aria-label="Supplier"><option value="all">All suppliers</option>${sups.map(x => `<option value="${esc(x)}" ${f.sup === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+    <div class="table-wrap"><table class="otable">${invHead}<tbody>${rows.map(x => invRow(x, false)).join("")}</tbody></table>${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No invoices match." : "No supplier invoices yet. Click “Upload invoice” to add a PDF or photo."}</div>`}</div>
+    <div style="font-size:12px;color:var(--muted)">Every invoice marked “To pay” goes to Finance → Budget requests and shows on the Tasks calendar on its due date.</div>`;
+}
+function viewBudget() {
+  const open = S.invoices.filter(x => x.status !== "paid" && x.budget !== "declined");
+  const pend = open.filter(x => (x.budget || "pending") === "pending"), appr = open.filter(x => x.budget === "approved");
+  const ym = mToday().slice(0, 7), paidM = S.invoices.filter(x => x.status === "paid" && x.paidAt && dstr(x.paidAt).slice(0, 7) === ym);
+  const done = S.invoices.filter(x => x.status === "paid" || x.budget === "declined").sort((a, b) => (b.paidAt || b.decidedAt || 0) - (a.paidAt || a.decidedAt || 0)).slice(0, 30);
+  const sum = l => peso(l.reduce((a, x) => a + (Number(x.amount) || 0), 0));
+  const sort = l => [...l].sort((a, b) => String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")));
+  const table = (l, empty) => l.length ? `<div class="table-wrap"><table class="otable">${invHead}<tbody>${sort(l).map(x => invRow(x, true)).join("")}</tbody></table></div>` : `<div class="empty">${empty}</div>`;
+  return `${duesAlert()}<div class="kpis">
+      <div class="kpi"><span class="label">Waiting for approval</span><span class="value">${sum(pend)}</span><span class="sub">${pend.length} request${pend.length === 1 ? "" : "s"}</span></div>
+      <div class="kpi"><span class="label">Approved, to release</span><span class="value">${sum(appr)}</span><span class="sub">${appr.length} to pay</span></div>
+      <div class="kpi"><span class="label">Released in ${monthLabel(ym)}</span><span class="value">${sum(paidM)}</span><span class="sub">${paidM.length} paid</span></div>
+      <div class="kpi"><span class="label">Overdue</span><span class="value">${open.filter(x => urgOf(x.dueDate) === "overdue").length}</span><span class="sub">past the due date</span></div>
+    </div>
+    <section class="panel"><h2>Waiting for approval</h2>${table(pend, "Nothing waiting. Supplier invoices from Sales land here.")}</section>
+    <section class="panel"><h2>Approved · to pay</h2>${table(appr, "No approved requests waiting for payment.")}</section>
+    <section class="panel quiet"><h2>Recently paid or declined</h2>${table(done, "Nothing yet.")}</section>`;
+}
+// Files: the artifact's file storage when this person can use it, otherwise saved in the database in pieces.
+const FILE_CHUNK = 180000, FILE_MAX = 3 * 1024 * 1024;
+async function shrinkImage(file) {
+  if (!/^image\/(jpeg|png|webp|heic|heif)/i.test(file.type)) return file;
+  try {
+    const bmp = await createImageBitmap(file); const k = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const b = await new Promise(r => c.toBlob(r, "image/jpeg", 0.82)); return b && b.size < file.size ? new File([b], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+  } catch (e) { return file; }
+}
+const blobToDataUrl = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(b); });
+async function storeFile(file) {
+  if (S.viewAs) throw VIEWAS_ERR;
+  const f = await shrinkImage(file);
+  if (!/^(image\/|application\/pdf)/.test(f.type)) throw new Error("Use a PDF or a photo (JPG, PNG).");
+  if (f.size > FILE_MAX) throw new Error("That file is over 3 MB. Take a smaller photo or compress the PDF.");
+  const meta = { name: f.name, type: f.type, size: f.size };
+  if (S.assets) { try { const r = await S.assets.upload(f); return { ...meta, asset: r.id, url: r.url }; } catch (e) { /* fall back below */ } }
+  const data = await blobToDataUrl(f), fid = uid("f"), n = Math.ceil(data.length / FILE_CHUNK);
+  for (let i = 0; i < n; i++) await wdb().collection("invfiles").doc(`${fid}-${i}`).set({ d: data.slice(i * FILE_CHUNK, (i + 1) * FILE_CHUNK), i, n });
+  return { ...meta, fid, chunks: n };
+}
+async function fileBlobUrl(meta) {
+  if (meta.url || meta.asset) return meta.url || "/_blob/" + meta.asset;
+  S.fileCache = S.fileCache || {}; if (S.fileCache[meta.fid]) return S.fileCache[meta.fid];
+  let data = ""; for (let i = 0; i < meta.chunks; i++) { const sn = await S.db.doc(`invfiles/${meta.fid}-${i}`).get(); if (!sn.exists) throw new Error("missing"); data += sn.data().d; }
+  const blob = await (await fetch(data)).blob(); return (S.fileCache[meta.fid] = URL.createObjectURL(blob));
+}
+async function removeFile(meta) {
+  if (!meta) return;
+  try { if (meta.asset && S.assets) await S.assets.delete(meta.asset); else if (meta.fid) for (let i = 0; i < meta.chunks; i++) await wdb().collection("invfiles").doc(`${meta.fid}-${i}`).delete(); } catch (e) {}
+}
+function openInvoiceForm(id, kind) {
+  const x = id ? S.invoices.find(r => r.id === id) : { kind: kind || "invoice", status: "topay", invDate: today(), budget: "pending" };
+  if (!x) return; const req = x.kind === "request";
+  S.invFile = null;
+  openSheet(`<h3>${id ? "Edit " : ""}${req ? "budget request" : "supplier invoice"}</h3>
+    ${req ? `<div class="field"><label for="iv-title">What is it for?</label><input id="iv-title" value="${esc(x.title || "")}" placeholder="e.g. Bubble wrap and boxes, Lalamove for supplier pickup"></div>
+      <div class="field"><label for="iv-purpose">Details</label><textarea id="iv-purpose" rows="2">${esc(x.purpose || "")}</textarea></div>`
+    : `<div class="row"><div class="field"><label for="iv-sup">Supplier</label><input id="iv-sup" list="iv-sups" value="${esc(x.supplier || "")}" placeholder="e.g. S-JEFF" autocomplete="off"><datalist id="iv-sups">${supplierNames().map(n => `<option value="${esc(n)}">`).join("")}</datalist></div>
+      <div class="field"><label for="iv-no">Invoice #</label><input id="iv-no" value="${esc(x.invNo || "")}"></div></div>
+      <div class="field"><label for="iv-orders">Orders covered <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input id="iv-orders" value="${esc(x.orders || "")}" placeholder="#RS9991, #RS9990"></div>`}
+    <div class="row"><div class="field"><label for="iv-amt">Amount (₱)</label><input id="iv-amt" type="number" step="0.01" min="0" value="${esc(x.amount ?? "")}"></div>
+      <div class="field"><label for="iv-due">${req ? "Needed by" : "Due date"}</label><input id="iv-due" type="date" value="${esc(x.dueDate || "")}"></div></div>
+    ${req ? "" : `<div class="field"><label for="iv-date">Invoice date</label><input id="iv-date" type="date" value="${esc(x.invDate || "")}"></div>`}
+    <div class="field"><label>Status</label><div class="seg" role="group">${Object.entries(INV_STATUS).map(([k, v]) => `<button type="button" data-ivst="${k}" aria-pressed="${(x.status || "topay") === k}">${v.name}</button>`).join("")}</div><input type="hidden" id="iv-st" value="${esc(x.status || "topay")}"></div>
+    <div class="field"><label for="iv-file">${req ? "Attachment (optional)" : "Invoice file (PDF or photo)"}</label><input id="iv-file" type="file" accept="application/pdf,image/*">
+      ${x.file ? `<div style="font-size:12.5px;color:var(--muted)">Current: 📎 ${esc(x.file.name || "file")}. Pick a new file to replace it.</div>` : ""}</div>
+    <div class="field"><label for="iv-notes">Notes</label><textarea id="iv-notes" rows="2">${esc(x.notes || "")}</textarea></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id && !S.readOnly ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-invoice" data-id="${id}">Delete</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">${id ? "Save" : req ? "Send to Finance" : "Save invoice"}</button></div>`,
+  async () => {
+    const amount = numv("iv-amt");
+    if (req && !val("iv-title")) return sheetError("Say what the budget is for.");
+    if (!req && !val("iv-sup")) return sheetError("Add the supplier.");
+    if (!amount) return sheetError("Add the amount.");
+    const fileIn = $("#iv-file").files[0];
+    if (!req && !id && !fileIn) return sheetError("Attach the invoice PDF or photo.");
+    const sb = $("#sheet [type=submit]"); if (sb) { sb.disabled = true; sb.textContent = fileIn ? "Uploading…" : "Saving…"; }
+    let file = x.file || null;
+    try { if (fileIn) { const nf = await storeFile(fileIn); if (x.file) await removeFile(x.file); file = nf; } }
+    catch (e) { if (sb) { sb.disabled = false; sb.textContent = "Save"; } if (e === VIEWAS_ERR) throw e; return sheetError(e.message || "Upload failed. Try again."); }
+    const st = val("iv-st") || "topay", me = member(myMemberId()) || {};
+    const data = { ...(id ? clean(x) : {}), kind: x.kind, amount, dueDate: val("iv-due"), status: st, notes: val("iv-notes"), file, updatedAt: Date.now(),
+      ...(req ? { title: val("iv-title"), purpose: val("iv-purpose") } : { supplier: val("iv-sup").toUpperCase(), invNo: val("iv-no"), orders: val("iv-orders"), invDate: val("iv-date") }) };
+    if (!id) { Object.assign(data, { createdAt: Date.now(), createdById: myMemberId() || "", createdByName: me.nickname || me.name || "", budget: canDecide() && st === "paid" ? "approved" : "pending" }); }
+    if (st === "paid" && x.status !== "paid") Object.assign(data, { paidAt: Date.now(), paidBy: me.nickname || me.name || "" });
+    await save("invoices", id || uid("iv"), data);
+    closeSheet(); toast(id ? "Saved." : st === "paid" ? "Saved as paid." : "Saved and sent to Finance → Budget requests.");
+  });
+}
+async function openInvoiceView(id) {
+  const x = S.invoices.find(r => r.id === id); if (!x) return;
+  S.sheetReopen = () => openInvoiceView(id);
+  const f = x.file, pending = (x.budget || "pending") === "pending";
+  openSheet(`<h3>${esc(invTitle(x))}</h3>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${badge(INV_STATUS[x.status || "topay"])}${badge(BUDGET[x.budget || "pending"])}${urgChip(x.status === "paid" || x.budget === "declined" ? "" : urgOf(x.dueDate))}</div>
+    <div class="kv"><span>Amount</span><b class="num">${peso2(x.amount)}</b><span>${x.kind === "request" ? "Needed by" : "Due"}</span><b>${x.dueDate ? fmtDate(x.dueDate) : "–"}</b>${x.invDate ? `<span>Invoice date</span><b>${fmtDate(x.invDate)}</b>` : ""}<span>Sent by</span><b>${esc(x.createdByName || "–")}</b>${x.decidedBy ? `<span>${x.budget === "declined" ? "Declined" : "Approved"} by</span><b>${esc(x.decidedBy)}</b>` : ""}${x.paidBy ? `<span>Paid by</span><b>${esc(x.paidBy)}${x.paidAt ? " · " + fmtDate(dstr(x.paidAt)) : ""}</b>` : ""}</div>
+    ${x.orders ? `<div style="font-size:13px">Orders: ${esc(x.orders)}</div>` : ""}${x.purpose ? `<div style="font-size:13px;white-space:pre-line">${esc(x.purpose)}</div>` : ""}${x.notes ? `<div style="font-size:13px;white-space:pre-line;color:var(--muted)">${esc(x.notes)}</div>` : ""}${x.budgetNote ? `<div class="notice">Finance: ${esc(x.budgetNote)}</div>` : ""}
+    ${f ? `<div id="inv-file-box" class="inv-file"><div class="empty">Loading ${esc(f.name || "file")}…</div></div>` : ""}
+    ${!S.readOnly && canDecide() && pending && x.status !== "paid" ? `<div class="field"><label for="iv-bnote">Note to Sales (optional)</label><input id="iv-bnote" placeholder="e.g. Release on Friday"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-act="inv-approve" data-id="${id}">Approve budget</button><button class="btn danger" type="button" data-act="inv-decline" data-id="${id}">Decline</button></div>` : ""}
+    <div class="sheet-foot">${S.readOnly ? "" : `<button class="btn" type="button" data-act="edit-invoice" data-id="${id}">Edit</button>${x.budget === "declined" ? "" : `<button class="btn ${x.status === "paid" ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${id}">${x.status === "paid" ? "Mark as to pay" : "Mark paid"}</button>`}`}<button class="btn" type="button" data-act="close">Close</button></div>`);
+  if (f) {
+    try {
+      const url = await fileBlobUrl(f), box = $("#inv-file-box"); if (!box) return;
+      box.innerHTML = (/^image\//.test(f.type) ? `<img src="${esc(url)}" alt="Invoice ${esc(x.invNo || "")}">` : `<iframe src="${esc(url)}" title="Invoice PDF"></iframe>`)
+        + `<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">Open full size</a>${S.dl ? `<button class="btn sm" type="button" data-act="inv-dl" data-id="${id}">Download</button>` : ""}</div>`;
+    } catch (e) { const box = $("#inv-file-box"); if (box) box.innerHTML = `<div class="empty">The file couldn't be loaded.</div>`; }
+  }
+}
+async function invSetPaid(id) {
+  const x = S.invoices.find(r => r.id === id); if (!x) return; const me = member(myMemberId()) || {};
+  const paid = x.status !== "paid";
+  await patch("invoices", id, paid ? { status: "paid", paidAt: Date.now(), paidBy: me.nickname || me.name || "", budget: x.budget === "declined" ? "declined" : "approved" } : { status: "topay", paidAt: 0, paidBy: "" });
+  toast(paid ? `${invTitle(x)} marked paid.` : "Marked as to pay again.");
+  if (!$("#scrim").hidden) { S.sheetNoPush = true; openInvoiceView(id); }
+}
+async function invDecide(id, ok) {
+  const x = S.invoices.find(r => r.id === id); if (!x) return; const me = member(myMemberId()) || {};
+  await patch("invoices", id, { budget: ok ? "approved" : "declined", decidedBy: me.nickname || me.name || "", decidedAt: Date.now(), budgetNote: val("iv-bnote") || x.budgetNote || "" });
+  toast(ok ? "Budget approved." : "Request declined."); if (!$("#scrim").hidden) { S.sheetNoPush = true; openInvoiceView(id); }
+}
 
 function viewFixed() {
   const list = [...S.fixedexp].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
@@ -4812,6 +5058,9 @@ document.addEventListener("click", guard(async ev => {
   const ip = ev.target.closest("[data-invpay]");
   if (ip) { await setInvPaid(ip.dataset.invpay, ip.dataset.ym, ip.dataset.paid === "1"); if (ip.dataset.insheet) openInvForm(ip.dataset.invpay); else toast(ip.dataset.paid === "1" ? "Marked paid." : "Marked unpaid."); return; }
   if (ev.target.closest("[data-orgchart]")) { S.view = "dept"; S.dept = "ADMIN"; S.tab = "orgchart"; saveNav(); render(); window.scrollTo(0, 0); return; }
+  const spm = ev.target.closest("[data-spmode]"); if (spm) { S.sp.mode = spm.dataset.spmode; S.sel.clear(); render(); return; }
+  const ivs = ev.target.closest("[data-invst]"); if (ivs) { S.invF.st = ivs.dataset.invst; render(); return; }
+  const ivst = ev.target.closest("[data-ivst]"); if (ivst) { $("#iv-st").value = ivst.dataset.ivst; ivst.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === ivst)); return; }
   const go = ev.target.closest("[data-goorders]");
   if (go) return goOrders(go.dataset.goorders);
   const smo = ev.target.closest("[data-scanmode]");
@@ -4909,6 +5158,16 @@ document.addEventListener("click", guard(async ev => {
     case "new-fixed": return openFixedForm();
     case "edit-fixed": return openFixedForm(id);
     case "del-fixed": await remove("fixedexp", id); closeSheet(); toast("Deleted."); return;
+    case "new-invoice": return openInvoiceForm(null, "invoice");
+    case "new-budget": return openInvoiceForm(null, "request");
+    case "edit-invoice": return openInvoiceForm(id);
+    case "view-invoice": return openInvoiceView(id);
+    case "inv-paid": return invSetPaid(id);
+    case "inv-approve": return invDecide(id, true);
+    case "inv-decline": return invDecide(id, false);
+    case "inv-dl": { const x = S.invoices.find(r => r.id === id); if (!x || !x.file) return; try { const blob = await (await fetch(await fileBlobUrl(x.file))).blob(); await S.dl.save({ filename: x.file.name || "invoice", data: blob }); } catch (e) { toast("Download was cancelled."); } return; }
+    case "ask-del-invoice": $("#del-slot").innerHTML = `<div class="confirm">Delete this and its file? <button class="btn danger sm" type="button" data-act="del-invoice" data-id="${id}">Yes, delete</button></div>`; return;
+    case "del-invoice": { const x = S.invoices.find(r => r.id === id); if (x && x.file) await removeFile(x.file); await remove("invoices", id); closeSheet(); toast("Deleted."); return; }
     case "new-due": return openDueForm();
     case "edit-due": return openDueForm(id);
     case "del-due": await remove("dues", id); closeSheet(); toast("Deleted."); return;
@@ -5010,6 +5269,10 @@ document.addEventListener("click", guard(async ev => {
 document.addEventListener("change", guard(async ev => {
   const t = ev.target;
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); render(); return; }
+  if (t.id === "sp-all" || t.id === "spsel-all") { (S.spOs || []).slice(0, t.id === "spsel-all" ? 200 : 1e9).forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
+  if (t.dataset && t.dataset.spitem != null) { const a = S.spAgg && S.spAgg.get(t.dataset.spitem); if (a) a.ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
+  if ((t.id === "sp-bulk-ful" || t.id === "sp-bulk-pay") && t.value) return bulkAction((t.id === "sp-bulk-pay" ? "pay:" : "ful:") + t.value);
+  if (t.id === "inv-sup") { S.invF.sup = t.value; render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
   if (t.id === "p-photo-file" && t.files[0]) { try { const d = await resizeImage(t.files[0], 600, false); $("#p-photo").value = d; $("#p-photo-prev").innerHTML = `<img src="${d}" alt="">`; } catch (e) { sheetError(e.message); } return; }
@@ -5282,6 +5545,7 @@ render();
     c?.use ? c.use("downloads").catch(() => null) : null,
   ]);
   S.db = db; S.dl = dl; S.user = user; S.dbChecked = true;
+  if (c?.use) c.use("assets").then(a => { S.assets = a; }).catch(() => {});
   if (user) {
     try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {}
     try { S.me = await user.me(); S.uid = S.me.id; S.isOwner = !!S.me.isOwner; S.canEdit = !!S.me.canEdit; } catch (e) {}
@@ -5299,7 +5563,7 @@ render();
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices"]) {
       db.collection(col).onSnapshot(snap => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         S.raw[col] = snap.docs;

@@ -60,7 +60,7 @@ Who can use it:
 Shopify no longer lets stores create keys from the admin, so you make a small private app once:
 1. Go to **dev.shopify.com** (Dev Dashboard) and sign in with your store login. Open **Apps → Create app**, name it `Regal Spritz OS`.
 2. Under **Versions → Create version → Access scopes**, tick these and **Release**:
-   - `read_orders`, `write_orders`, `read_customers`, `read_products`
+   - `read_orders`, `write_orders`, `read_customers`, `write_customers`, `read_products`
    - `read_merchant_managed_fulfillment_orders`, `write_merchant_managed_fulfillment_orders`
    - `read_fulfillments`, `write_fulfillments`
    - `read_metaobjects`, `write_metaobjects`
