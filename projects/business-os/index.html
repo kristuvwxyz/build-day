@@ -273,7 +273,8 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .rf-btn.spin .btn-ico { animation: rf-spin .8s linear infinite; }
 @keyframes rf-spin { to { transform: rotate(360deg); } }
 .rf-btn { gap: 6px; }
-@media (max-width: 640px) { .rf-btn span { display: none; } .rf-btn { padding-inline: 9px; } }
+.rf-btn { border-color: var(--brand); color: var(--brand); font-weight: 700; gap: 6px; }
+.rf-btn .btn-ico { margin-right: 2px; }
 @media (prefers-reduced-motion: reduce) { .rf-btn.spin .btn-ico { animation: none; } }
 .linkish { border: 0; background: none; padding: 0; color: var(--brand); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -900,11 +901,11 @@ const S = {
   unlocked: new Set(),
   accessreq: [], db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
 };
-try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom", "listings", "gallery"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab }); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom", "listings", "gallery"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab, oSrc: v.oSrc === "web" ? "web" : "all" }); } catch (e) {}
 try { const y = Number(sessionStorage.getItem("rs-refresh-y")); sessionStorage.removeItem("rs-refresh-y"); if (y > 0) [700, 1600].forEach(ms => setTimeout(() => window.scrollTo(0, y), ms)); } catch (e) {}
 try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
 const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account", "eom"].includes(hv)) S.view = hv;
-const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab })); } catch (e) {} };
+const saveNav = () => { try { localStorage.setItem("rs-nav", JSON.stringify({ view: S.view, dept: S.dept, tab: S.tab, oSrc: S.oSrc })); } catch (e) {} };
 const saveUnlocked = () => { try { sessionStorage.setItem("rs-unlocked", JSON.stringify([...S.unlocked])); } catch (e) {} };
 // Department passwords are retired: access now follows each person's department (allowedDepts).
 const isUnlocked = () => true;
@@ -1670,7 +1671,7 @@ function headActions() {
   const ex = col => S.dl ? `<button class="btn" type="button" data-act="export" data-col="${col}">Export</button>` : "";
   if (S.view === "dept" && !isUnlocked(S.dept)) return "";
   if (S.loggedOut) return "";
-  const lockBtn = `<button class="btn ghost rf-btn" type="button" data-act="refresh" title="Refresh this page" aria-label="Refresh this page">${svg("refresh", "btn-ico")}<span>Refresh</span></button>`;
+  const lockBtn = `<button class="btn rf-btn" type="button" data-act="refresh" title="Refresh this page" aria-label="Refresh this page">${svg("refresh", "btn-ico")}<span>Refresh</span></button>`;
   const map = {
         home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
     tasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
@@ -1687,14 +1688,14 @@ function headActions() {
     payrecords: ex("payrecords") + (can ? `<button class="btn primary" type="button" data-act="new-pr">Add record</button>` : ""),
     bir: ex("bir") + (can ? `<button class="btn primary" type="button" data-act="new-bir">Add sale</button>` : ""),
     investors: ex("investments") + (can ? `<button class="btn primary" type="button" data-act="new-inv">Add investment</button>` : ""),
-    orders: (ctxDept() === "PACKING" && canShip() ? `<button class="btn" type="button" data-act="jnt-file">J&T VIP booking file</button>` : "") + (canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
+    orders: (ctxDept() === "PACKING" && canShip() ? `<button class="btn" type="button" data-act="jnt-file">J&T VIP booking file</button>` : "") + (SHOPIFY_ON && canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
     suppliers: S.sp && S.sp.mode === "invoices" && canInvoices() && can ? `<button class="btn primary" type="button" data-act="new-invoice">Upload invoice</button>` : "",
     budget: can && canInvoices() ? `<button class="btn" type="button" data-act="new-invoice">Upload supplier invoice</button><button class="btn primary" type="button" data-act="new-budget">New budget request</button>` : "",
     archived: "",
     gallery: can && S.mcp ? `<button class="btn" type="button" data-act="gal-load">${S.gallery.length ? "Refresh from Shopify" : "Load photos from Shopify"}</button>` : "",
     packing: (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
-    customers: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
+    customers: (SHOPIFY_ON && can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
     channels: ex("customers"),
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
@@ -2256,17 +2257,23 @@ function webRows() {
   return S.web.orders.filter(o => (f === "all" || (f === "unpaid" ? !o.paid && !/cancel/i.test(o.status || "") : f === "paid" ? o.paid : f === "toship" ? o.paid && !webDone(o) : webPayKind(o) === f))
     && (!q || squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(q)));
 }
+function webFindPanel() {
+  const q = (S.of.q || "").trim(); if (!S.site || !q || !S.web.loaded) return "";
+  const qq = squash(q).replace(/rs/g, ""), m = S.web.orders.filter(o => squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(qq)).slice(0, 10);
+  if (!m.length) return "";
+  return `<div class="panel shopfind"><div class="head"><h2>On the website</h2><span class="s">${m.length} match${m.length === 1 ? "" : "es"}</span></div>${m.map(o => `<button type="button" class="orow" data-webo="${esc(o.ref)}"><span class="onum">${esc(o.ref)}</span><span class="ocust">${esc(o.name || "")}<small>${esc(webTime(o.date))} · ${esc(webItems(o))}</small></span><span class="ototal num">${peso(o.total)}</span>${webBadge(o)}</button>`).join("")}</div>`;
+}
 function srcSeg() {
   if (!S.site) return "";
   const un = S.web.orders.filter(o => !o.paid && !/cancel/i.test(o.status || "")).length;
-  return `<div class="seg" role="group" aria-label="Which orders"><button type="button" data-osrc="all" aria-pressed="${S.oSrc !== "web"}">All orders</button><button type="button" data-osrc="web" aria-pressed="${S.oSrc === "web"}">Website · live${un ? ` <span class="badge amber" style="margin-left:4px">${un} unpaid</span>` : ""}</button></div>`;
+  return `<div class="seg" role="group" aria-label="Which orders"><button type="button" data-osrc="all" aria-pressed="${S.oSrc !== "web"}">All orders</button><button type="button" data-osrc="web" aria-pressed="${S.oSrc === "web"}">Website · live${S.web.err && !S.web.loaded ? ` <span class="badge red" style="margin-left:4px">not connected</span>` : ""}${un ? ` <span class="badge amber" style="margin-left:4px">${un} unpaid</span>` : ""}</button></div>`;
 }
 function viewWebOrders() {
   const rows = webRows(), n = k => S.web.orders.filter(o => k === "all" || (k === "unpaid" ? !o.paid && !/cancel/i.test(o.status || "") : k === "paid" ? o.paid : k === "toship" ? o.paid && !webDone(o) : webPayKind(o) === k)).length;
   const head = `<div class="toolbar">
     <div class="osearch">${svg("search")}<input id="wf-q" type="search" placeholder="Order # or name" value="${esc(S.wf.q)}" aria-label="Search website orders" autocomplete="off"></div>
     <div class="seg wseg" role="group" aria-label="Show">${[["all", "All"], ["unpaid", "Unpaid"], ["paid", "Paid"], ["toship", "To ship"], ["maya", "Maya"], ["bdo", "BDO"]].map(([k, l]) => `<button type="button" data-wf="${k}" aria-pressed="${S.wf.f === k}">${l} <small class="num">${n(k)}</small></button>`).join("")}</div>
-    <button class="btn" type="button" data-act="web-refresh">${svg("refresh", "btn-ico")} Refresh</button><small id="web-state" style="color:var(--muted)">${S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""}</small>
+    <small id="web-state" style="color:var(--muted)">${S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""}</small>
   </div>`;
   if (S.web.err && !S.web.loaded) return head + `<div class="panel"><div class="empty" style="padding:22px">${esc(S.web.err)}</div></div>`;
   if (!S.web.loaded) return head + `<div class="panel"><div class="empty" style="padding:22px">Loading website orders…</div></div>`;
@@ -2648,6 +2655,7 @@ function queueShopFind(q, now) {
   shopFindTimer = setTimeout(() => shopFind(q), now ? 0 : 700);
 }
 async function shopFind(q) {
+  if (!SHOPIFY_ON) return null;
   S.shopFind = { q, state: "loading", list: [] }; paintShopFind();
   try {
     const raw = q.replace(/^#/, "").trim(), digits = raw.replace(/^rs\s*/i, "");
@@ -2660,6 +2668,7 @@ async function shopFind(q) {
   return S.shopFind.list;
 }
 function shopFindPanel() {
+  if (!SHOPIFY_ON) return "";
   const f = S.shopFind, q = (S.of.q || "").trim();
   if (!q || f.q !== q || !f.state) return "";
   if (f.state === "loading") return `<div class="panel shopfind"><div class="empty">Searching Shopify for “${esc(q)}”…</div></div>`;
@@ -2901,6 +2910,7 @@ function viewOrders() {
   </div>
   ${S.of.q && !all.length && ofActive() && (S.of.month || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all") && S.orders.some(o => orderMatchesQ(o, S.of.q.trim().toLowerCase())) ? `<div class="notice">Some orders match “${esc(S.of.q)}” but your filters hide them. <button class="btn sm" type="button" data-act="of-clear-keepq">Show them</button></div>` : ""}
   ${(() => { const q = (S.of.q || "").trim().toLowerCase(); if (!q) return ""; const am = S.archived.filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10); return am.length ? `<div class="panel shopfind"><div class="head"><h2>In Archived orders</h2><span class="s">${am.length} match${am.length === 1 ? "" : "es"}</span></div>${am.map(o => `<div class="sf-row"><div style="min-width:0"><b>${esc(onum(o))}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date || dstr(o.createdAt || 0))}${o.archivedReason ? " · " + esc(o.archivedReason) : ""} · archived ${esc(relTime(o.archivedAt))}</div></div><button class="btn sm" type="button" data-open="${o.id}">Open</button></div>`).join("")}</div>` : ""; })()}
+  ${webFindPanel()}
   <div id="shopfind-slot">${shopFindPanel()}</div>
   ${bulk}
   ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
@@ -5447,7 +5457,7 @@ document.addEventListener("click", guard(async ev => {
   const go = ev.target.closest("[data-goorders]");
   if (go) { S.oSrc = "all"; return goOrders(go.dataset.goorders); }
   const gw = ev.target.closest("[data-goweb]"); if (gw) { S.oSrc = "web"; S.wf.f = gw.dataset.goweb; S.view = "orders"; saveNav(); render(); window.scrollTo(0, 0); return; }
-  const osrc = ev.target.closest("[data-osrc]"); if (osrc) { S.oSrc = osrc.dataset.osrc; if (S.oSrc === "web" && !S.web.loaded) webLoad(); render(); return; }
+  const osrc = ev.target.closest("[data-osrc]"); if (osrc) { S.oSrc = osrc.dataset.osrc; saveNav(); if (S.oSrc === "web" && !S.web.loaded) webLoad(); render(); return; }
   const wf = ev.target.closest("[data-wf]"); if (wf) { S.wf.f = wf.dataset.wf; render(); return; }
   const wo = ev.target.closest("[data-webo]"); if (wo) { openWebOrder(wo.dataset.webo); return; }
   const smo = ev.target.closest("[data-scanmode]");
@@ -6010,7 +6020,10 @@ async function shopSync(manual) {
     if (manual) toast(msg);
   } finally { shopBusy = false; paintShop(); }
 }
+// The Shopify plan is cancelled (Oct 2026): hide every Shopify control until it's reopened.
+const SHOPIFY_ON = false;
 function shopChip() {
+  if (!SHOPIFY_ON) return "";
   if (!canSee("SALES") && !canSee("PACKING")) return "";
   const st = S.shop;
   if (st.state === "off") return S.mcp === null ? `<span class="shop-chip off" title="Live Shopify sync works when the app is open in claude.ai">Shopify sync off in this view</span>` : "";
@@ -6029,6 +6042,7 @@ async function reconcileStages() {
 }
 async function startShopSync(c) {
   reconcileStages();
+  if (!SHOPIFY_ON) return;
   S.mcp = c?.use ? await c.use("mcp").catch(() => null) : null;
   if (!S.mcp) { paintShop(); return; }
   S.shop.state = "syncing"; paintShop();
