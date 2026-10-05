@@ -24,24 +24,24 @@
   #rs-login .code{letter-spacing:.4em;text-align:center;font-size:22px;font-weight:700}`;
   function loginScreen(sb, note) {
     return new Promise(resolve => {
-      const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
+      if (!document.getElementById("rs-login-css")) { const st = document.createElement("style"); st.id = "rs-login-css"; st.textContent = CSS; document.head.appendChild(st); }
       const box = document.createElement("div"); box.id = "rs-login"; document.body.appendChild(box);
-      let mode = "email", sentTo = "", busy = false;
+      let mode = "password", sentTo = "", busy = false;
+      const esc = v => String(v || "").replace(/[<>&"]/g, "");
       const draw = (msg = "", err = "") => {
         box.innerHTML = `<form class="card" novalidate>
           <div><h1>Regal Spritz PH</h1><small>Team workspace</small></div>
-          ${sentTo ? `<div class="msg">We emailed <b>${sentTo.replace(/[<>&]/g, "")}</b>. Tap <b>Sign in</b> in that email (open it on this device), or type the code if the email shows one.</div>
-            <label for="rs-code">Code</label><input id="rs-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required>
-            <button type="submit">Sign in</button><button type="button" class="alt" data-x="back">Use a different ${mode === "phone" ? "number" : "email"}</button>`
-          : `<div class="seg"><button type="button" data-m="email" aria-pressed="${mode === "email"}">Email</button><button type="button" data-m="phone" aria-pressed="${mode === "phone"}">Mobile number</button></div>
-            <label for="rs-id">${mode === "phone" ? "Mobile number" : "Work email"}</label>
-            <input id="rs-id" ${mode === "phone" ? 'type="tel" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="tel"' : 'type="email" placeholder="you@email.com" autocomplete="email"'} required>
-            <button type="submit">Email me a sign-in link</button>
-            <div class="msg">Use the ${mode === "phone" ? "number" : "email"} listed for you in the team directory.</div>`}
+          ${sentTo ? `<div class="msg">We emailed <b>${esc(sentTo)}</b>. Tap <b>Sign in</b> in that email on this device, or type the code if the email shows one.</div>
+            <label for="rs-code">Code (if your email has one)</label><input id="rs-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+            <button type="submit">Sign in</button><button type="button" class="alt" data-x="back">Back</button>`
+          : `<div class="seg"><button type="button" data-m="password" aria-pressed="${mode === "password"}">Password</button><button type="button" data-m="link" aria-pressed="${mode === "link"}">Email me a link</button></div>
+            <label for="rs-id">Work email</label><input id="rs-id" type="email" placeholder="you@email.com" autocomplete="username" required>
+            ${mode === "password" ? `<label for="rs-pw">Password</label><input id="rs-pw" type="password" autocomplete="current-password" required>
+            <button type="submit">Sign in</button><div class="msg">First time? Use the temporary password from your manager. You'll choose your own next.</div>`
+            : `<button type="submit">Email me a sign-in link</button><div class="msg">Use the email listed for you in the team directory.</div>`}`}
           ${msg || note ? `<div class="msg">${msg || note}</div>` : ""}${err ? `<div class="err">${err}</div>` : ""}</form>`;
         const f = box.querySelector("input"); if (f) f.focus();
       };
-      const phoneE164 = v => { let d = v.replace(/\D/g, ""); if (d.startsWith("0")) d = "63" + d.slice(1); if (d.length === 10 && d.startsWith("9")) d = "63" + d; return "+" + d; };
       box.addEventListener("click", e => {
         const m = e.target.closest("[data-m]"); if (m) { mode = m.dataset.m; draw(); }
         if (e.target.closest("[data-x=back]")) { sentTo = ""; draw(); }
@@ -49,21 +49,28 @@
       box.addEventListener("submit", async e => {
         e.preventDefault(); if (busy) return; busy = true;
         try {
-          if (!sentTo) {
-            const v = box.querySelector("#rs-id").value.trim(); if (!v) { busy = false; return draw("", "Type your " + (mode === "phone" ? "mobile number." : "email.")); }
-            const who = mode === "phone" ? { phone: phoneE164(v) } : { email: v.toLowerCase() };
-            const { error } = await sb.auth.signInWithOtp({ ...who, options: { shouldCreateUser: true, ...(who.email ? { emailRedirectTo: location.origin + "/" } : {}) } });
-            if (error) throw error;
-            sentTo = who.phone || who.email; draw();
-          } else {
+          if (sentTo) {
             const token = box.querySelector("#rs-code").value.replace(/\s/g, "");
-            const { data, error } = await sb.auth.verifyOtp(mode === "phone" ? { phone: sentTo, token, type: "sms" } : { email: sentTo, token, type: "email" });
+            if (!token) { busy = false; return draw("Tap the link in the email, or type the code here."); }
+            const { data, error } = await sb.auth.verifyOtp({ email: sentTo, token, type: "email" });
             if (error) throw error;
             box.remove(); resolve(data.session);
+          } else {
+            const email = box.querySelector("#rs-id").value.trim().toLowerCase();
+            if (!email) { busy = false; return draw("", "Type your email."); }
+            if (mode === "password") {
+              const { data, error } = await sb.auth.signInWithPassword({ email, password: box.querySelector("#rs-pw").value });
+              if (error) throw error;
+              box.remove(); resolve(data.session);
+            } else {
+              const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + "/" } });
+              if (error) throw error;
+              sentTo = email; draw();
+            }
           }
         } catch (err) {
           const m = String((err && err.message) || err);
-          draw("", /sms|phone provider/i.test(m) ? "Text-message codes aren't switched on yet. Use your email for now." : /expired|invalid/i.test(m) ? "That code is wrong or expired. Try again or request a new one." : /rate|seconds/i.test(m) ? "Please wait a minute before asking for another code." : m);
+          draw("", /invalid login|credentials/i.test(m) ? "Wrong email or password. Check with your manager, or use “Email me a link”." : /expired|invalid/i.test(m) ? "That code is wrong or expired. Try again or ask for a new link." : /rate|seconds|limit/i.test(m) ? "Too many emails sent just now. Use your password, or try again in an hour." : m);
         }
         busy = false;
       });
@@ -72,7 +79,30 @@
       draw();
     });
   }
-
+  // First sign-in with a temporary password: choose your own.
+  function newPasswordScreen(sb) {
+    return new Promise(resolve => {
+      if (!document.getElementById("rs-login-css")) { const st = document.createElement("style"); st.id = "rs-login-css"; st.textContent = CSS; document.head.appendChild(st); }
+      const box = document.createElement("div"); box.id = "rs-login"; document.body.appendChild(box);
+      const draw = (err = "") => {
+        box.innerHTML = `<form class="card" novalidate><div><h1>Welcome!</h1><small>Choose your own password</small></div>
+          <label for="rs-np">New password (at least 8 characters)</label><input id="rs-np" type="password" autocomplete="new-password" minlength="8" required>
+          <label for="rs-np2">Type it again</label><input id="rs-np2" type="password" autocomplete="new-password" required>
+          <button type="submit">Save and continue</button>${err ? `<div class="err">${err}</div>` : ""}</form>`;
+        box.querySelector("input").focus();
+      };
+      box.addEventListener("submit", async e => {
+        e.preventDefault();
+        const a = box.querySelector("#rs-np").value, b = box.querySelector("#rs-np2").value;
+        if (a.length < 8) return draw("Use at least 8 characters.");
+        if (a !== b) return draw("The two passwords don't match.");
+        const { error } = await sb.auth.updateUser({ password: a, data: { temp: false } });
+        if (error) return draw(String(error.message || error));
+        box.remove(); resolve();
+      });
+      draw();
+    });
+  }
   /* ---------- start-up: config, client, session ---------- */
   const ready = (async () => {
     const cfg = await fetch("/api/config").then(r => r.json());
@@ -80,6 +110,7 @@
     const sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
     let { data: { session } } = await sb.auth.getSession();
     if (!session) { await new Promise(r => (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", r) : r())); session = await loginScreen(sb); }
+    if (session.user && session.user.user_metadata && session.user.user_metadata.temp) await newPasswordScreen(sb);
     const user = session.user;
     const [{ data: owner }, { data: mem }] = await Promise.all([sb.rpc("owner_email"), sb.rpc("my_member")]);
     const email = (user.email || "").toLowerCase();
