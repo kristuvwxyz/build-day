@@ -1,0 +1,136 @@
+<title>Get the RS App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one narrow column; QR + link first, then device tabs with numbered install steps, then sign-in steps. */
+:root {
+  --bg: #F7F4F6; --surface: #FFFFFF; --surface-2: #F1EBEF; --fg: #23161F; --muted: #6E5E69; --line: #E4DAE1;
+  --brand: #4A2545; --brand-ink: #FFFFFF; --gold: #A9814A; --good: #2F7A4F; --good-bg: #E5F2EA;
+  --font-display: "Marcellus", "Cormorant Garamond", Georgia, serif;
+  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161014; --surface: #201820; --surface-2: #2A2029; --fg: #F2EAF0; --muted: #B3A3AE; --line: #3A2E38;
+  --brand: #C9A3C2; --brand-ink: #1E141D; --gold: #D2B07A; --good: #7CCB9A; --good-bg: #1D3326; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #161014; --surface: #201820; --surface-2: #2A2029; --fg: #F2EAF0; --muted: #B3A3AE; --line: #3A2E38;
+  --brand: #C9A3C2; --brand-ink: #1E141D; --gold: #D2B07A; --good: #7CCB9A; --good-bg: #1D3326; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; padding: 0 16px; }
+.wrap { max-width: 680px; margin: 0 auto; padding-block: 28px 64px; display: flex; flex-direction: column; gap: 22px; }
+header .eyebrow { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 7vw, 40px); line-height: 1.1; margin: 6px 0 8px; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0; line-height: 1.2; text-wrap: balance; }
+p { margin: 0; } .muted { color: var(--muted); } small { font-size: 12.5px; }
+.path { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.path-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tag { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.tag.good { background: var(--good-bg); color: var(--good); }
+.qr-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.qr { background: #FFFFFF; padding: 10px; border-radius: 12px; border: 1px solid var(--line); line-height: 0; flex: none; }
+.qr svg { width: 148px; height: 148px; display: block; }
+.qr-t { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.link { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 8px 10px; border-radius: 8px; overflow-wrap: anywhere; user-select: all; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; padding: 7px 12px; border-radius: 8px; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+ol.how { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+ol.how b { font-weight: 700; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 12px; padding: 16px 0; border-top: 1px solid var(--line); }
+.step:first-child { border-top: 0; padding-top: 4px; }
+.step input[type=checkbox] { width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--good); cursor: pointer; }
+.step-b { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.step h3 { margin: 0; font-size: 15.5px; font-weight: 700; }
+.step.done h3 { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--good); }
+.step ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; padding: 9px 14px; border-radius: 10px; text-decoration: none; cursor: pointer; }
+.btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.btn:focus-visible, input:focus-visible, .seg button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.field input { font: inherit; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); width: 100%; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; font-size: 13.5px; align-items: center; }
+.kv code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 3px 7px; border-radius: 6px; overflow-wrap: anywhere; }
+.note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--gold); padding-left: 10px; }
+.progress { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--good); transition: width .3s; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 600; z-index: 5; }
+.share { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 12px; background: var(--surface-2); }
+@media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
+</style>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Regal Spritz PH · Team app</div>
+    <h1>Get the RS App on your phone, iPad or laptop</h1>
+    <p class="muted">One app for iPhone, iPad, Android, Windows and Mac. Free, with no App Store needed, and it updates by itself.</p>
+  </header>
+
+  <section class="path" aria-labelledby="a-h">
+    <div class="path-h"><h2 id="a-h">1 · Open the app</h2><span class="tag good">Works now</span></div>
+    <div class="qr-row">
+      <div class="qr" id="qr" aria-label="QR code for the RS App"></div>
+      <div class="qr-t">
+        <p><b>Scan with your camera</b>, or open this link on the device you want the app on.</p>
+        <div class="link" id="app-link">https://regal-spritz-os.vercel.app</div>
+        <div class="btns"><button class="btn" type="button" data-copy="app-link">Copy link</button><a class="btn primary" href="https://regal-spritz-os.vercel.app" target="_blank" rel="noopener">Open the app</a></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="path" aria-labelledby="b-h">
+    <div class="path-h"><h2 id="b-h">2 · Install it</h2><span class="tag">About 1 min</span></div>
+    <div class="seg" role="group" aria-label="Device">
+      <button type="button" data-os="iphone" aria-pressed="true">iPhone</button><button type="button" data-os="ipad" aria-pressed="false">iPad</button><button type="button" data-os="android" aria-pressed="false">Android</button><button type="button" data-os="win" aria-pressed="false">Windows</button><button type="button" data-os="mac" aria-pressed="false">Mac</button>
+    </div>
+    <ol class="how" id="how"></ol>
+  </section>
+
+  <section class="path" aria-labelledby="c-h">
+    <div class="path-h"><h2 id="c-h">3 · Sign in</h2></div>
+    <ol class="how">
+      <li>Open the app from its new icon.</li>
+      <li>Type your <b>work email</b> and the <b>temporary password</b> Kristin gave you, then tap <b>Sign in</b>.</li>
+      <li>Make your own password when it asks. Use at least 8 characters, and don't reuse one from another account.</li>
+      <li>Forgot it? Tap <b>Email me a link</b> on the sign-in screen and open the link from your email.</li>
+    </ol>
+    <p class="note">You only see your own department's pages. If something's missing, ask Kristin.</p>
+  </section>
+
+  <section class="share" aria-labelledby="s-h">
+    <h3 id="s-h" style="margin:0;font-size:15.5px">Send this to the team</h3>
+    <div class="link" id="share-msg" style="white-space:pre-wrap">Hi team! Our Regal Spritz app is ready: https://regal-spritz-os.vercel.app
+Open it, install it (iPhone/iPad: Safari → Share → Add to Home Screen. Android: Chrome → ⋮ → Install app. Windows/Mac: Chrome → install icon in the address bar → Install), then sign in with your work email and the temporary password I sent you.</div>
+    <div class="btns"><button class="btn primary" type="button" data-copy="share-msg">Copy message</button></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  let tt; const toast = m => { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2200); };
+  const copy = (text, msg) => {
+    const fallback = () => { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (e) {} ta.remove(); toast(ok ? msg : "Couldn't copy. Press and hold the text to copy it."); };
+    try { navigator.clipboard.writeText(text).then(() => toast(msg), fallback); } catch (e) { fallback(); }
+  };
+  const el = $("#qr");
+  if (typeof window.qrcode === "function") { const q = window.qrcode(0, "M"); q.addData("https://regal-spritz-os.vercel.app"); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); }
+  else el.innerHTML = `<small style="line-height:1.4;display:block;width:148px">QR code didn't load. Use the link instead.</small>`;
+
+  const HOW = {
+    iphone: ["Open the link in <b>Safari</b>. Other browsers and in-app browsers (Messenger, Viber) can't install it.", "Tap <b>Share</b> (the square with an arrow) at the bottom.", "Scroll down → <b>Add to Home Screen</b> → <b>Add</b>.", "The Regal Spritz icon is now on your Home Screen. Open the app from there."],
+    ipad: ["Open the link in <b>Safari</b>.", "Tap <b>Share</b> (the square with an arrow) at the <b>top right</b>, next to the address bar.", "Tap <b>Add to Home Screen</b> → <b>Add</b>.", "Open the app from the new icon. It works in both portrait and landscape."],
+    android: ["Open the link in <b>Chrome</b>.", "Tap <b>⋮</b> (top right) → <b>Install app</b> (or <b>Add to Home screen</b>) → <b>Install</b>.", "The Regal Spritz icon appears on your home screen and in your app list."],
+    win: ["Open the link in <b>Chrome</b>.", "Click the <b>install icon</b> at the right end of the address bar (a small screen with an arrow), then <b>Install</b>. No icon? Use <b>⋮</b> → <b>Cast, save, and share</b> → <b>Install page as app…</b>", "To keep it handy, right-click its taskbar icon → <b>Pin to taskbar</b>."],
+    mac: ["Open the link in <b>Chrome</b>.", "Click the <b>install icon</b> at the right end of the address bar, then <b>Install</b>. No icon? Use <b>⋮</b> → <b>Cast, save, and share</b> → <b>Install page as app…</b>", "To keep it in the Dock, right-click its Dock icon → <b>Options</b> → <b>Keep in Dock</b>."]
+  };
+  const setOs = os => { document.querySelectorAll("[data-os]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.os === os))); $("#how").innerHTML = HOW[os].map(s => `<li>${s}</li>`).join(""); };
+  const ua = navigator.userAgent, touchMac = /macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+  setOs(/android/i.test(ua) ? "android" : /ipad/i.test(ua) || touchMac ? "ipad" : /iphone/i.test(ua) ? "iphone" : /windows/i.test(ua) ? "win" : /macintosh/i.test(ua) ? "mac" : "iphone");
+  document.querySelectorAll("[data-os]").forEach(b => b.addEventListener("click", () => setOs(b.dataset.os)));
+  document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copy($("#" + b.dataset.copy).textContent.trim(), "Copied")));
+})();
+</script>
