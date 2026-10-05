@@ -969,7 +969,7 @@ function expiryState(p) {
 
 function nextNum() {
   let max = 1000;
-  for (const o of S.orders) { const m = /(\d+)\s*$/.exec(o.num || ""); if (m) max = Math.max(max, Number(m[1])); }
+  for (const o of [...S.orders, ...S.archived]) { const m = /(\d+)\s*$/.exec(o.num || ""); if (m) max = Math.max(max, Number(m[1])); }
   return "RS" + (max + 1);
 }
 
