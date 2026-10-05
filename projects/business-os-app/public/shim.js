@@ -220,7 +220,7 @@
         if (!r.ok && !j.error) j.error = "Website request failed (" + r.status + ")";
         return j;
       };
-      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }) };
+      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }), pushProducts: products => call({ action: "pushProducts", products }) };
     },
     async mcp() {
       const { sb } = await ready;

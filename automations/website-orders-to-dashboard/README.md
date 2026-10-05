@@ -26,3 +26,19 @@ Answer: `{ "ok": true, "ref": "RS9996" }`. A wrong key gets `{ "ok": false, "err
 ## Database
 
 `rs_counter.sql` creates the sequence and the `next_rs_number` / `rs_counter_floor` functions. The key is stored in `app_settings.site_key` (same value as `RS_BACKEND_KEY` in Vercel); the copy here has a placeholder. The old `site_order()` inbox was removed: website orders are read live and customer details stay on the website.
+
+## Listings → website (`opsSetProducts`)
+
+RS OS Listings → **Send to website** sends the whole live catalog to the website backend (the same list the old WebCake code had as `window.PRODUCTS`). The website replaces its product list with it.
+
+Request (server to Apps Script, JSON as text/plain):
+```json
+{ "action": "opsSetProducts", "key": "<RS_BACKEND_KEY>", "by": "<staff name>", "products": [
+  { "id": "mj-daisy-eau-so-fresh-pop", "kind": "onhand", "rank": 1, "brand": "Marc Jacobs", "name": "Daisy Eau So Fresh Pop",
+    "size": "50ml", "cond": "Sealed", "cat": "women", "price": 3605, "was": null, "imgs": ["https://…"], "notes": {},
+    "isNew": true, "badges": ["New arrival"], "eta": "", "vac": false, "created": "2026-10-01T00:00:00+00:00" } ] }
+```
+Answer: `{ "ok": true, "count": 526 }` (or `{ "ok": false, "error": "…" }`).
+
+- `kind`: `onhand` or `preorder`. Sold-out on-hand items and inactive listings are left out of the list (hide anything missing).
+- `id` stays the same for a listing over time; use it as the product key.

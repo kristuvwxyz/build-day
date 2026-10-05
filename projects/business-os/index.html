@@ -1709,7 +1709,7 @@ function headActions() {
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
     logins: S.vaultKey && can ? `<button class="btn ghost" type="button" data-act="vault-lock">${svg("lock", "btn-ico")} Lock logins</button><button class="btn primary" type="button" data-act="new-login">Add login</button>` : "",
-    listings: `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
+    listings: (S.site && can && canListings() ? `<button class="btn primary" type="button" data-act="web-push">${svg("refresh", "btn-ico")} Send to website${S.products.some(p => p.webSync === "pending") ? ` (${S.products.filter(p => p.webSync === "pending").length})` : ""}</button>` : "") + `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
   return lockBtn + (map[moduleKey()] || "");
@@ -3758,7 +3758,7 @@ const sizeKey = s => { const m = String(s).match(/^([\d.]+)\s*(ml|g)$/i); return
 function listOptions(field, base = []) { const c = {}; for (const p of S.products) { const v = String(p[field] || "").trim(); if (v) c[v] = (c[v] || 0) + 1; } return [...new Set([...base, ...Object.keys(c)])]; }
 const LIST_TYPES = ["Sealed", "Tester", "Partial", "Unsealed, New", "Boxed, New", "Set", "Mini", "Vial", "Decant", "Other"];
 const WEB_CATS = [["her", "For her"], ["him", "For him"], ["unisex", "Unisex"], ["arabian", "Arabian"], ["beauty", "Beauty"]];
-const SITE = "https://regal.famcoventures.com/";
+const SITE = "https://www.regalspritz.com/";
 const LIST_STATUS = { active: { name: "Active", cls: "good" }, draft: { name: "Draft", cls: "" }, hidden: { name: "Inactive", cls: "warn" } };
 function openProductForm(id, preset = {}) {
   const p = id ? S.products.find(x => x.id === id) : { status: "active", reorder: 1, stock: 0, ...preset };
@@ -3835,7 +3835,7 @@ function viewListings() {
   const can = !S.readOnly;
   const th = (k, l, c) => sortTh(k, l, c || "", ls, "lsort");
   const etaOpts = p => { const opts2 = [...new Set([...MONTHS, p.eta].filter(Boolean))]; return `<option value="">–</option>${opts2.map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}`; };
-  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending ? `${counts.pending} change${counts.pending === 1 ? "" : "s"} not on <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet. Click <strong>Website code</strong>, then paste it into WebCake and publish.` : `Everything here matches <a href="${SITE}" target="_blank" rel="noopener">your website</a>.`}</span></div>
+  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending ? `${counts.pending} change${counts.pending === 1 ? "" : "s"} not on <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet. ${S.site ? `Click <strong>Send to website</strong> to put them live.` : `Open the RS App and click <strong>Send to website</strong>.`}` : `Everything here matches <a href="${SITE}" target="_blank" rel="noopener">your website</a>.`}</span></div>
     <div class="bigsearch">${svg("search")}<input id="liq" type="search" placeholder="Search name, brand, SKU, barcode or ETA" value="${esc(S.liq || "")}" aria-label="Search listings" autocomplete="off"></div>
     <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"], ["pending", "To sync"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
       ${f !== "all" || q ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}</div>
@@ -3916,6 +3916,20 @@ async function copyWebCode() {
   catch (e) { const ta = $("#web-code"); ta.value = t; ta.select(); try { document.execCommand("copy"); toast("Website code copied."); } catch (e2) { toast("Select the text and copy it with Ctrl+C / ⌘C."); } }
 }
 async function downloadWebCode() { try { await S.dl.save({ filename: `regal-spritz-website-products-${mToday()}.html`, data: webCodeText() }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } }
+// Sends the whole catalog (same list as the Website code) straight to the website backend.
+let webPushBusy = false;
+async function pushListings(btn) {
+  if (!S.site || !S.site.pushProducts || webPushBusy) return;
+  const list = webProducts(), pend = S.products.filter(p => p.webSync === "pending");
+  webPushBusy = true; if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+  try {
+    const r = await S.site.pushProducts(list);
+    if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
+    for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
+    toast(`Website updated: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
+  } catch (e) { toast("Website: " + ((e && e.message) || "couldn't send.")); }
+  finally { webPushBusy = false; render(); }
+}
 async function markSynced() {
   const pend = S.products.filter(p => p.webSync === "pending");
   for (const p of pend) await patch("products", p.id, { webSync: "synced" });
@@ -5643,6 +5657,7 @@ document.addEventListener("click", guard(async ev => {
     case "new-login": return openLoginForm();
     case "import-listings": return openListingImport();
     case "web-code": return openWebCode();
+    case "web-push": return pushListings(b);
     case "web-copy": return copyWebCode();
     case "web-dl": return downloadWebCode();
     case "web-synced": return markSynced();

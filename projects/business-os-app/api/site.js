@@ -38,7 +38,7 @@ export default async function handler(req, res) {
   // Staff creating an order in RS OS take the next number from the same counter.
   if (body.action === "nextOrderNumber") return nextNumber();
 
-  // 2. Build the backend request. Only these two actions and these fields are allowed.
+  // 2. Build the backend request. Only these actions and these fields are allowed.
   let call;
   if (body.action === "list") {
     call = { action: "opsOrders", key: KEY, limit: Math.min(500, Math.max(1, Number(body.limit) || 200)) };
@@ -53,6 +53,11 @@ export default async function handler(req, res) {
     if (STATUSES.has(body.status)) call.status = body.status;
     if (typeof body.tracking === "string") call.tracking = body.tracking.trim().slice(0, 80);
     if (!("paid" in call) && !("status" in call) && !("tracking" in call)) return res.status(400).json({ ok: false, error: "Nothing to change." });
+  } else if (body.action === "pushProducts") {
+    // The full product catalog from RS OS Listings (same list the old WebCake code had). The website replaces its list.
+    if (!Array.isArray(body.products) || body.products.length > 3000) return res.status(400).json({ ok: false, error: "Send the product list." });
+    const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
+    call = { action: "opsSetProducts", key: KEY, products: body.products, by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
   } else return res.status(400).json({ ok: false, error: "That request isn't allowed." });
 
   // 3. Ask the website backend (Apps Script answers with a redirect, which fetch follows).
@@ -60,6 +65,7 @@ export default async function handler(req, res) {
     const r = await fetch(process.env.RS_BACKEND_URL || DEFAULT_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(call), redirect: "follow" });
     const j = await r.json().catch(() => null);
     if (!j) return res.status(502).json({ ok: false, error: "The website backend didn't answer (" + r.status + ")." });
+    if (!j.ok && call.action === "opsSetProducts" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website can't receive listings yet. Ask the website chat to add opsSetProducts." });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });
     // Keep the shared counter above every website order number seen (covers numbers the website made on its own).
     if (call.action === "opsOrders" && j.ok && Array.isArray(j.orders)) {
