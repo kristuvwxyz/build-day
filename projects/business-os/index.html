@@ -2769,7 +2769,7 @@ function packTools() {
     </div>
     <section class="panel scanbar" style="--dc:${DEPT_COLORS.PACKING}"><div class="scanrow"><input id="pack-scan" autocomplete="off" placeholder="Scan or type an order # (e.g. RS9978) to open it" aria-label="Order number">
       <label class="btn" for="pack-cam" style="cursor:pointer">📷 Camera</label><input id="pack-cam" type="file" accept="image/*" capture="environment" hidden></div>
-      <div class="wb-set"><label><input type="checkbox" id="pack-ship" ${S.wbShip !== false ? "checked" : ""}> After scanning a waybill, mark <strong>Shipped</strong> and send the tracking # to Shopify (buyer sees it in their Order History)</label>
+      <div class="wb-set"><label><input type="checkbox" id="pack-ship" ${S.wbShip !== false ? "checked" : ""}> After scanning a waybill, mark <strong>Shipped</strong></label>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file">J&T VIP booking file</button>` : ""}</div></section>`;
 }
 function viewOrders() {
@@ -3174,7 +3174,7 @@ function viewPacking() {
     </div>
     <section class="panel scanbar" style="--dc:${DEPT_COLORS.PACKING}"><div class="scanrow"><input id="pack-scan" autocomplete="off" placeholder="Scan or type an order # (e.g. RS9978) to open it" aria-label="Order number">
       <label class="btn" for="pack-cam" style="cursor:pointer">📷 Camera</label><input id="pack-cam" type="file" accept="image/*" capture="environment" hidden></div>
-      <div class="wb-set"><label><input type="checkbox" id="pack-ship" ${ship ? "checked" : ""}> After scanning a waybill, mark <strong>Shipped</strong> and send the tracking # to Shopify (buyer sees it in their Order History)</label></div></section>
+      <div class="wb-set"><label><input type="checkbox" id="pack-ship" ${ship ? "checked" : ""}> After scanning a waybill, mark <strong>Shipped</strong></label></div></section>
     <div class="toolbar"><select id="pack-filter" aria-label="Show">${[["unfulfilled", "To ship"], ["sorted", "Sorted"], ["arrived", "Arrived"], ["arrived_hold", "Arrived-Hold"], ["on_hold", "On hold"], ["all", "All of these"]].map(([k, l]) => `<option value="${k}" ${f === k ? "selected" : ""}>${l} (${k === "all" ? open.length : open.filter(o => o.fulfillment === k).length})</option>`).join("")}</select>
       <button class="btn" type="button" data-act="columns" data-table="packing">⚙︎ Columns</button>
       <span style="font-size:12.5px;color:var(--muted)">J&T booking: select orders (or none = all J&T in this list), then <b>Copy for J&T</b> or <b>J&T VIP booking file</b>.</span></div>
@@ -3464,8 +3464,7 @@ function openOrderDetails(id) {
     ${cp || cf ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)">Status: <span class="badge ${pay(o.payment).cls || ""}">${esc(pay(o.payment).name)}</span><span class="badge ${ful(o.fulfillment).cls || ""}">${esc(ful(o.fulfillment).name)}</span> · change these in the Orders table.</div>` : ""}
     ${all ? `${tagField(o.tags)}
     <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Delete moves the order to Archived orders.</div>` : ""}
-    ${cs ? `<div class="field"><label for="d-track">Tracking # (waybill) · ${esc(COURIER_LABEL[courierOf(o)] || "")}</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
-    ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}` : o.tracking ? `<div>🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}
+    ${cs ? `<div class="field"><label for="d-track">Tracking # (waybill) · ${esc(COURIER_LABEL[courierOf(o)] || "")}</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>${o.tracking ? `<div style="font-size:12.5px">🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${editable ? "Cancel" : "Close"}</button>${editable ? `<button class="btn primary" type="submit">Save changes</button>` : ""}</div>
     ${(o.log || []).length ? `<div class="olog"><div class="olog-h">Team activity</div>${[...o.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>` : ""}`,
@@ -3544,7 +3543,6 @@ async function saveWaybill(id, code) {
   if (S.wbShip !== false) {
     if (o.fulfillment !== "fulfilled" && o.fulfillment !== "delivered") await updateOrder(o, { fulfillment: "fulfilled" });
     toast(`#${o.num}: ${tracking} saved · shipped`);
-    if ((o.ref && /^\d+$/.test(o.ref)) || (o.mergedParts || []).some(p => /^\d+$/.test(p.ref || ""))) await shopifyShip(o, false);
   } else toast(`#${o.num}: tracking ${tracking} saved`);
 }
 const SHIP_FO_Q = `query RSFO($id: ID!) { order(id: $id) { id displayFulfillmentStatus fulfillmentOrders(first: 10) { nodes { id status requestStatus } } } }`;
@@ -5778,6 +5776,7 @@ function shopToOrder(n) {
   o.adjust = Math.round((money(n.totalPriceSet) - itemsTotal(o)) * 100) / 100;
   return o;
 }
+const SHOP_MERGE_UPDATES = true; // Shopify → dashboard updates on; the dashboard never writes back to Shopify
 async function shopApply(o, isNew) {
   const id = orderDocId(o), ex = S.orders.find(x => x.id === id);
   if (S.archived.some(x => x.id === id)) return 0;
@@ -5785,6 +5784,17 @@ async function shopApply(o, isNew) {
     const take = OPEN_FUL.has(o.fulfillment) && !isCancelled(o.payment, o.fulfillment) ? stockTake(o.items) : {};
     if (Object.keys(take).length) { o.noStock = false; o.stockTaken = take; o.log[0].msg += " · reserved " + Object.values(take).reduce((a, b) => a + b, 0) + " in stock"; }
     await save("orders", id, o); await applyStockMap(take, -1); return 1; } return 0; }
+  // Shopify only brings in NEW orders. Once an order is here, the dashboard is the master copy:
+  // Shopify changes never overwrite payment, fulfillment, tags or notes. Only missing details are filled in.
+  if (!SHOP_MERGE_UPDATES) {
+    const fill = {};
+    if (!ex.ship && o.ship) fill.ship = o.ship;
+    if (ex.courier === undefined) Object.assign(fill, { courier: o.courier, pickup: o.pickup, shipTitle: o.shipTitle });
+    if (o.comments && JSON.stringify(o.comments) !== JSON.stringify(ex.comments || [])) fill.comments = o.comments;
+    if (!ex.tracking && o.tracking) fill.tracking = o.tracking;
+    if (Object.keys(fill).length) await patch("orders", id, fill);
+    return 0;
+  }
   // 3-way merge: only what changed in Shopify since the last sync overrides edits made in the app
   const prevTags = ex.shopTags || ex.tags || [], shTags = o.shopTags || [];
   const added = shTags.filter(t => !prevTags.includes(t)), removed = prevTags.filter(t => !shTags.includes(t));
