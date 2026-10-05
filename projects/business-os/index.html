@@ -371,6 +371,9 @@ button.org-node { cursor: pointer; } button.org-node:hover { border-color: var(-
 .today b { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1; }
 .today span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
 .today .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.wseg button { white-space: nowrap; }
+.today.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.today.two > *:nth-child(2) { border-top: 0; border-left: 1px solid var(--line); }
 @media (max-width: 720px) { .today { grid-template-columns: repeat(2, minmax(0, 1fr)); } .today > *:nth-child(3) { border-left: 0; } .today > *:nth-child(n+3) { border-top: 1px solid var(--line); } }
 .quiet h2 { font-size: 11px; letter-spacing: .16em; }
 .goals-line { font-size: 13px; color: var(--muted); text-align: center; padding: 4px 8px; }
@@ -880,6 +883,7 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
+  web: { orders: [], at: "", err: "", loading: false, loaded: false }, oSrc: "all", wf: { f: "all", q: "" }, site: null,
   products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
@@ -1698,6 +1702,7 @@ function headActions() {
     listings: `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
+  if (S.view === "orders" && S.site && S.oSrc === "web") return lockBtn;
   return lockBtn + (map[moduleKey()] || "");
 }
 
@@ -2178,6 +2183,7 @@ function viewHome() {
     <div>${st ? `<b style="font-size:20px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
       : `<b style="font-size:20px">–</b><span>Attendance</span><span style="font-size:12px">Not linked</span>`}</div>
   </section>
+  ${S.site && S.web.loaded && canOrders() ? (() => { const wu = S.web.orders.filter(o => !o.paid && !/cancel/i.test(o.status || "")).length, ws = S.web.orders.filter(o => o.paid && !webDone(o)).length; return `<section class="today two" aria-label="Website orders"><button type="button" data-goweb="unpaid"><b class="num">${wu}</b><span>Unpaid website orders</span></button><button type="button" data-goweb="toship"><b class="num">${ws}</b><span>Website orders to ship</span></button></section>`; })() : ""}
   ${duesAlert()}
   ${isCEO() ? eomHomeCard() : ""}
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
@@ -2223,6 +2229,84 @@ function goOrders(view) {
   S.view = "orders"; S.page = 0;
   if (view === "today") { S.of.view = "all"; S.of.range = "today"; } else if (view === "all") { S.of.view = "all"; } else S.of.view = view;
   saveNav(); render(); window.scrollTo(0, 0);
+}
+
+/* ---------- website orders (regalspritz.com), read live from the website's backend ----------
+   Only in the RS App (it has the /api/site server route). Customer details are never saved here: fetched live each time. */
+const WEB_STATUSES = ["Placed", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"];
+const webDone = o => /^(shipped|delivered|cancelled)$/i.test(o.status || "");
+const webPayKind = o => /maya/i.test(o.payment || "") ? "maya" : /bdo/i.test(o.payment || "") ? "bdo" : "";
+const webBadge = o => o.paid ? `<span class="badge green">Paid${o.mayaPaid ? " via Maya" : ""}</span>` : `<span class="badge amber">Unpaid</span>`;
+const webTime = d => { const t = d ? new Date(d) : null; return t && !isNaN(t) ? t.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; };
+const webItems = o => (o.items || []).map(i => `${i.qty > 1 ? i.qty + "× " : ""}${i.title || ""}${i.variant ? " (" + i.variant + ")" : ""}`).join(", ");
+let webBusy = false;
+async function webLoad(quiet) {
+  if (!S.site || webBusy || !canOrders()) return;
+  webBusy = true; S.web.loading = true; if (!quiet) paintWebState();
+  try {
+    const r = await S.site.list({ limit: 300 });
+    if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't answer.");
+    S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true;
+  } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
+  finally { webBusy = false; S.web.loading = false; bgRender(); }
+}
+function paintWebState() { const el = $("#web-state"); if (el) el.textContent = S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""; }
+function webRows() {
+  const q = squash(S.wf.q || "").replace(/^rs/, ""), f = S.wf.f;
+  return S.web.orders.filter(o => (f === "all" || (f === "unpaid" ? !o.paid && !/cancel/i.test(o.status || "") : f === "paid" ? o.paid : f === "toship" ? o.paid && !webDone(o) : webPayKind(o) === f))
+    && (!q || squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(q)));
+}
+function srcSeg() {
+  if (!S.site) return "";
+  const un = S.web.orders.filter(o => !o.paid && !/cancel/i.test(o.status || "")).length;
+  return `<div class="seg" role="group" aria-label="Which orders"><button type="button" data-osrc="all" aria-pressed="${S.oSrc !== "web"}">All orders</button><button type="button" data-osrc="web" aria-pressed="${S.oSrc === "web"}">Website · live${un ? ` <span class="badge amber" style="margin-left:4px">${un} unpaid</span>` : ""}</button></div>`;
+}
+function viewWebOrders() {
+  const rows = webRows(), n = k => S.web.orders.filter(o => k === "all" || (k === "unpaid" ? !o.paid && !/cancel/i.test(o.status || "") : k === "paid" ? o.paid : k === "toship" ? o.paid && !webDone(o) : webPayKind(o) === k)).length;
+  const head = `<div class="toolbar">
+    <div class="osearch">${svg("search")}<input id="wf-q" type="search" placeholder="Order # or name" value="${esc(S.wf.q)}" aria-label="Search website orders" autocomplete="off"></div>
+    <div class="seg wseg" role="group" aria-label="Show">${[["all", "All"], ["unpaid", "Unpaid"], ["paid", "Paid"], ["toship", "To ship"], ["maya", "Maya"], ["bdo", "BDO"]].map(([k, l]) => `<button type="button" data-wf="${k}" aria-pressed="${S.wf.f === k}">${l} <small class="num">${n(k)}</small></button>`).join("")}</div>
+    <button class="btn" type="button" data-act="web-refresh">${svg("refresh", "btn-ico")} Refresh</button><small id="web-state" style="color:var(--muted)">${S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""}</small>
+  </div>`;
+  if (S.web.err && !S.web.loaded) return head + `<div class="panel"><div class="empty" style="padding:22px">${esc(S.web.err)}</div></div>`;
+  if (!S.web.loaded) return head + `<div class="panel"><div class="empty" style="padding:22px">Loading website orders…</div></div>`;
+  return head + (S.web.err ? `<div class="notice">${esc(S.web.err)} Showing the last list.</div>` : "") + `<div class="table-wrap"><table class="otable"><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th class="r">Total / due</th><th>Payment</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(o => `<tr data-webo="${esc(o.ref)}" style="cursor:pointer"><td class="nowrap"><b>${esc(o.ref)}</b></td><td class="nowrap">${esc(webTime(o.date))}</td><td>${esc(o.name || "")}</td><td style="min-width:180px;max-width:280px">${esc(webItems(o))}</td>
+      <td class="r num nowrap">${peso(o.total)}${Number(o.due) && Number(o.due) !== Number(o.total) ? `<br><small style="color:var(--muted)">due ${peso(o.due)}</small>` : ""}</td>
+      <td class="nowrap">${webBadge(o)}<br><small style="color:var(--muted)">${esc(o.payment || "")}</small></td><td class="nowrap">${esc(o.status || "")}${o.tracking ? `<br><small style="color:var(--muted)">${esc(o.tracking)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="7"><div class="empty">No website orders here.</div></td></tr>`}
+  </tbody></table></div>`;
+}
+function openWebOrder(ref) {
+  const o = S.web.orders.find(x => x.ref === ref); if (!o) return;
+  const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
+  openSheet(`<h2 style="margin:0">${esc(o.ref)} ${webBadge(o)}</h2>
+    <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date))} · ${esc(o.payment || "")}${o.payRef ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
+    <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
+      <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
+    </div>
+    <div class="table-wrap"><table class="otable"><tbody>${(o.items || []).map(i => `<tr><td>${esc(i.title || "")}${i.variant ? `<br><small style="color:var(--muted)">${esc(i.variant)}</small>` : ""}</td><td class="r num">${Number(i.qty) || 1} × ${peso(i.price)}</td></tr>`).join("")}
+      ${Number(o.shipping) ? `<tr><td>Shipping</td><td class="r num">${peso(o.shipping)}</td></tr>` : ""}
+      ${Number(o.voucherOff) ? `<tr><td>Voucher ${esc(o.voucher || "")}</td><td class="r num">−${peso(o.voucherOff)}</td></tr>` : ""}
+      ${Number(o.pointsUsed) ? `<tr><td>Royal Points used</td><td class="r num">${esc(String(o.pointsUsed))}</td></tr>` : ""}
+      <tr><td><b>Total</b></td><td class="r num"><b>${peso(o.total)}</b></td></tr>
+      ${Number(o.due) && Number(o.due) !== Number(o.total) ? `<tr><td>Due now</td><td class="r num">${peso(o.due)}</td></tr>` : ""}</tbody></table></div>
+    ${o.note ? `<div class="notice" style="white-space:pre-wrap">${esc(o.note)}</div>` : ""}
+    <p style="margin:0;font-size:12.5px;color:var(--muted)">Before shipping, check the amount paid matches <b>${peso(Number(o.due) || o.total)}</b>.</p>
+    ${canPay() ? `<div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ${o.paid ? "" : "primary"}" type="button" data-act="web-paid" data-ref="${esc(o.ref)}" data-paid="${o.paid ? "0" : "1"}">${o.paid ? "Mark unpaid" : "Mark paid"}</button></div>` : ""}
+    ${canFul() ? `<div class="field"><label for="web-status">Status</label><select id="web-status">${[...new Set([...WEB_STATUSES, o.status || "Placed"])].map(x => `<option ${x === (o.status || "Placed") ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+      <div class="field"><label for="web-track">Tracking number</label><input id="web-track" value="${esc(o.tracking || "")}" autocomplete="off" placeholder="e.g. JT0012345678"></div>
+      <div style="display:flex;gap:8px"><button class="btn primary" type="button" data-act="web-save" data-ref="${esc(o.ref)}">Save status</button><button class="btn ghost" type="button" data-act="close">Close</button></div>` : `<button class="btn ghost" type="button" data-act="close">Close</button>`}
+    <div class="sheet-err" id="sheet-err" hidden></div>`);
+}
+async function webUpdate(ref, patch, btn) {
+  if (!S.site) return;
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+  try {
+    const r = await S.site.update(ref, patch);
+    if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't save it.");
+    const i = S.web.orders.findIndex(x => x.ref === ref); if (i >= 0 && r.order) S.web.orders[i] = r.order;
+    toast(`${ref} updated on the website.`); S.sheetNoPush = true; openWebOrder(ref);
+  } catch (e) { sheetError((e && e.message) || "Couldn't save."); if (btn) { btn.disabled = false; btn.textContent = "Try again"; } }
 }
 
 function viewHomeContent() {
@@ -2786,6 +2870,7 @@ function packTools() {
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file">J&T VIP booking file</button>` : ""}</div></section>`;
 }
 function viewOrders() {
+  if (S.site && S.oSrc === "web") return srcSeg() + viewWebOrders();
   let all = filteredOrders();
   const dq = squash(S.of.q || "").replace(/^rs/, "");
   if (/^\d{2,}$/.test(dq)) { const rank = o => { const n = [o.num, ...(o.merged || [])].map(x => squash(x).replace(/^[a-z]+/, "")); return n.includes(dq) ? 0 : n.some(x => x.startsWith(dq)) ? 1 : 2; }; all = all.map((o, i) => [rank(o), i, o]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); }
@@ -2801,7 +2886,7 @@ function viewOrders() {
       <input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
-  return `
+  return `${srcSeg()}
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${ctxDept() === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
@@ -5360,7 +5445,11 @@ document.addEventListener("click", guard(async ev => {
   const ivs = ev.target.closest("[data-invst]"); if (ivs) { S.invF.st = ivs.dataset.invst; render(); return; }
   const ivst = ev.target.closest("[data-ivst]"); if (ivst) { $("#iv-st").value = ivst.dataset.ivst; ivst.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === ivst)); return; }
   const go = ev.target.closest("[data-goorders]");
-  if (go) return goOrders(go.dataset.goorders);
+  if (go) { S.oSrc = "all"; return goOrders(go.dataset.goorders); }
+  const gw = ev.target.closest("[data-goweb]"); if (gw) { S.oSrc = "web"; S.wf.f = gw.dataset.goweb; S.view = "orders"; saveNav(); render(); window.scrollTo(0, 0); return; }
+  const osrc = ev.target.closest("[data-osrc]"); if (osrc) { S.oSrc = osrc.dataset.osrc; if (S.oSrc === "web" && !S.web.loaded) webLoad(); render(); return; }
+  const wf = ev.target.closest("[data-wf]"); if (wf) { S.wf.f = wf.dataset.wf; render(); return; }
+  const wo = ev.target.closest("[data-webo]"); if (wo) { openWebOrder(wo.dataset.webo); return; }
   const smo = ev.target.closest("[data-scanmode]");
   if (smo) { S.scanMode = smo.dataset.scanmode; render(); setTimeout(() => { const s = $("#scan"); if (s) s.focus(); }, 0); return; }
   const lf = ev.target.closest("[data-lfilter]");
@@ -5571,6 +5660,9 @@ document.addEventListener("click", guard(async ev => {
     case "shop-find-open": await openShopFound(b.dataset.num); return;
     case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lpage = 0; render(); return;
+    case "web-refresh": webLoad(); return;
+    case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
+    case "web-save": return webUpdate(b.dataset.ref, { status: val("web-status"), tracking: val("web-track") }, b);
     case "refresh": saveNav(); try { sessionStorage.setItem("rs-refresh-y", String(Math.round(window.scrollY))); } catch (e) {} b.classList.add("spin"); location.reload(); return;
     case "log-out": S.unlocked.clear(); saveUnlocked(); S.loggedOut = true; try { localStorage.removeItem("rs-nav"); } catch (e) {} S.view = "home"; render(); toast("Logged out."); return;
     case "log-in": S.loggedOut = false; render(); return;
@@ -5681,6 +5773,7 @@ document.addEventListener("input", ev => {
   if (t.id === "aq") { S.aq = t.value; const pos = t.selectionStart; render(); const el = $("#aq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } return; }
   if (t.id === "li-paste") return loginImportPreview();
   if (t.id === "rvi-paste") return reviewImportPreview();
+  if (t.id === "wf-q") { S.wf.q = t.value; const pos = t.selectionStart; render(); const el = $("#wf-q"); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } return; }
   if (t.id === "galq") { S.galq = t.value; S.galpage = 0; const pos = t.selectionStart; render(); const el = $("#galq"); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } return; }
   const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq", rvq: "rvq" }[t.id];
   if (!key) return;
@@ -5961,6 +6054,7 @@ render();
   ]);
   S.db = db; S.dl = dl; S.user = user; S.dbChecked = true;
   if (c?.use) c.use("assets").then(a => { S.assets = a; }).catch(() => {});
+  if (c?.use) Promise.resolve().then(() => c.use("site")).then(si => { if (!si || !si.list) return; S.site = si; setTimeout(() => webLoad(true), 1500); setInterval(() => { if (document.visibilityState === "visible" && (S.view === "orders" || S.view === "home")) webLoad(true); }, 60000); }).catch(() => {});
   if (user) {
     try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {}
     try { S.me = await user.me(); S.uid = S.me.id; S.isOwner = !!S.me.isOwner; S.canEdit = !!S.me.canEdit; } catch (e) {}

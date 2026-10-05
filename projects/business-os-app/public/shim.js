@@ -210,6 +210,18 @@
     async downloads() {
       return { async save({ filename, data }) { const blob = data instanceof Blob ? data : new Blob([data], { type: /\.csv$/i.test(filename) ? "text/csv" : /\.json$/i.test(filename) ? "application/json" : "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); return { saved: true }; } };
     },
+    // Website orders (regalspritz.com), through our /api/site server route.
+    async site() {
+      const { sb } = await ready;
+      const call = async body => {
+        const { data: { session } } = await sb.auth.getSession();
+        const r = await fetch("/api/site", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (session && session.access_token) }, body: JSON.stringify(body) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok && !j.error) j.error = "Website request failed (" + r.status + ")";
+        return j;
+      };
+      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }) };
+    },
     async mcp() {
       const { sb } = await ready;
       const callTool = async (server, tool, input) => {
