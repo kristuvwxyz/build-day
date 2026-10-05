@@ -893,7 +893,7 @@ const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
   web: { orders: [], at: "", err: "", loading: false, loaded: false }, oSrc: "all", wf: { f: "all", q: "" }, site: null,
-  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
+  webmeta: [], products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
@@ -1034,6 +1034,7 @@ const reservedOf = p => p && p.kind !== "preorder" ? (reservedMap()[p.id] || 0) 
 
 /* Applies a payment/fulfillment/tag/note change and keeps stock + timestamps right. */
 async function updateOrder(o, ch) {
+  if (o.web) return webOrderUpdate(o, ch);
   ch = { ...ch };
   const upd = { ...ch }, now = Date.now();
   let stockDelta = 0;
@@ -2271,19 +2272,52 @@ const WEB_FUL = { placed: "unfulfilled", confirmed: "unfulfilled", packed: "on_h
 let webRowsMemo = { at: null, n: -1, rows: [] };
 function webAsOrders() {
   if (!S.site || !S.web.loaded) return [];
-  if (webRowsMemo.at === S.web.at && webRowsMemo.n === S.web.orders.length && !S.web.dirty) return webRowsMemo.rows;
+  if (webRowsMemo.at === S.web.at && webRowsMemo.n === S.web.orders.length && webRowsMemo.m === S.webmeta && !S.web.dirty) return webRowsMemo.rows;
   S.web.dirty = false;
+  const meta = new Map(S.webmeta.map(d => [d.ref, d]));
   const rows = S.web.orders.map(o => {
-    const t = new Date(o.date).getTime() || 0, cancel = /cancel/i.test(o.status || "");
+    const t = new Date(o.date).getTime() || 0, cancel = /cancel/i.test(o.status || ""), m = meta.get(o.ref) || {};
+    const sitePay = cancel ? "voided" : o.paid ? "paid" : "pending", siteFul = WEB_FUL[String(o.status || "placed").toLowerCase()] || "unfulfilled";
+    // The website decides paid / unpaid and shipped / delivered / cancelled; the team's finer choices show when they agree with it.
+    const payment = m.payment && (m.payment === "paid") === (sitePay === "paid") && !cancel ? m.payment : sitePay;
+    const fulfillment = ["fulfilled", "delivered", "cancelled"].includes(siteFul) || !m.fulfillment ? siteFul : m.fulfillment;
     return { id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
       items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0 })),
       adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
-      payment: cancel ? "voided" : o.paid ? "paid" : "pending", fulfillment: WEB_FUL[String(o.status || "placed").toLowerCase()] || "unfulfilled",
-      tracking: o.tracking || "", courier: "", tags: ["WEBSITE"], note: o.note || "", platform: "website", payMethod: o.payment || "",
-      log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }] };
+      payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || "",
+      tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "",
+      log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
   });
-  webRowsMemo = { at: S.web.at, n: S.web.orders.length, rows }; return rows;
+  webRowsMemo = { at: S.web.at, n: S.web.orders.length, m: S.webmeta, rows }; return rows;
+}
+// Edits on a website order: payment, status and tracking go to the website; assignee, courier, tags,
+// team note and the finer status choices are kept in RS OS under the order number (no customer details).
+const WEB_STATUS_OF = { unfulfilled: "Confirmed", on_hold: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
+async function webOrderUpdate(o, ch) {
+  const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
+  const site = {}, keep = {}, msgs = [];
+  if ("payment" in ch && ch.payment !== o.payment) {
+    keep.payment = ch.payment; msgs.push("Payment Status → " + pay(ch.payment).name);
+    if (VOIDPAY.has(ch.payment)) site.status = "Cancelled"; else if ((ch.payment === "paid") !== !!src.paid) site.paid = ch.payment === "paid";
+  }
+  if ("fulfillment" in ch && ch.fulfillment !== o.fulfillment) {
+    keep.fulfillment = ch.fulfillment; msgs.push("Fulfillment Status → " + ful(ch.fulfillment).name);
+    const st = WEB_STATUS_OF[ch.fulfillment] || (STAGE_IDS.has(ch.fulfillment) ? "Confirmed" : ""); if (st && st !== src.status) site.status = st;
+  }
+  if ("tracking" in ch && String(ch.tracking || "") !== String(src.tracking || "")) { site.tracking = String(ch.tracking || ""); msgs.push("tracking → " + (ch.tracking || "none")); }
+  for (const k of ["assignee", "courier", "note"]) if (k in ch && ch[k] !== o[k]) { keep[k] = ch[k]; msgs.push(k === "assignee" ? "assigned to " + (memberName(ch[k]) || "nobody") : k + " updated"); }
+  if ("tags" in ch) { keep.tags = stripStage(ch.tags || []); msgs.push("tags updated"); }
+  if (!msgs.length) return;
+  if (Object.keys(site).length) {
+    if (!S.site) { toast("Website orders can only be changed in the RS App."); return; }
+    const r = await S.site.update(o.ref, site).catch(e => ({ ok: false, error: e && e.message }));
+    if (!r || !r.ok) { toast("Website: " + ((r && r.error) || "couldn't save.")); render(); return; }
+    const i = S.web.orders.findIndex(x => x.ref === o.ref); if (i >= 0 && r.order) S.web.orders[i] = r.order;
+  }
+  const id = String(o.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {};
+  await save("webmeta", id, { ...clean(cur), ...keep, ref: o.ref, log: [...(cur.log || []), { at: Date.now(), by: actor(), msg: "changed " + msgs.join(", ") }].slice(-50), at: Date.now() });
+  S.web.dirty = true; bgRender();
 }
 const allOrderRows = () => [...S.orders, ...webAsOrders()];
 function webFindPanel() {
@@ -2820,17 +2854,7 @@ function openColumns(table) {
 
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
-  if (o.web) switch (k) {
-    case "num": return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span> <span class="chip" title="Website order · ${esc(o.payMethod)}">Website</span></td>`;
-    case "assigned": return `<td><span style="color:var(--muted)">–</span></td>`;
-    case "payment": return `<td>${badge(pay(o.payment))}${o.payMethod ? `<br><small style="color:var(--muted)">${esc(o.payMethod)}</small>` : ""}</td>`;
-    case "fulfillment": return `<td>${badge(ful(o.fulfillment))}</td>`;
-    case "courier": return `<td><span style="color:var(--muted)">–</span></td>`;
-    case "note": return `<td>${o.note ? `<div class="note-t">${esc(o.note)}</div>` : ""}</td>`;
-    case "tags": return `<td>${tagCell(o.tags)}</td>`;
-    case "waybill": return `<td class="num" style="font-size:12.5px">${esc(o.tracking || "")}</td>`;
-    case "actions": return `<td class="nowrap"><button class="btn ghost sm" type="button" data-open="${o.id}">Open</button></td>`;
-  }
+  if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span> <span class="chip" title="Website order · ${esc(o.payMethod)}">Website</span>${o.siteNote ? ` <span title="${esc(o.siteNote)}" style="color:var(--muted)">${NOTE_ICON}</span>` : ""}</td>`;
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
     case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}${noteIcons(o)}${exChip(o)}</td>`;
@@ -2875,7 +2899,7 @@ function ordersTable(rows, table, st, attr, selAllId) {
   return `<div class="table-wrap"><table class="otable" data-own="1">
     <thead><tr>${selectable ? `<th class="cb"><input type="checkbox" id="${selAllId}" aria-label="Select all" ${allSel ? "checked" : ""}></th>` : ""}${cols.map(k => ORDER_COLS[k].nosort ? `<th>${ORDER_COLS[k].label}</th>` : sortTh(k, ORDER_COLS[k].label, ORDER_COLS[k].cls || "", st, attr)).join("")}</tr></thead>
     <tbody>${rows.map(o => { const v = isVoid(o) && o.payment === "voided"; const done = !v && (isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)));
-      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? (o.web ? `<td class="cb"></td>` : `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>`) : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
+      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>` : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.orders.length ? "No orders match these filters." : "No orders yet."}</div>`}</div>`;
 }
 function supplierBar(list) {
@@ -2925,7 +2949,7 @@ function viewOrders() {
   const pages = Math.max(1, Math.ceil(all.length / PAGE));
   if (S.page >= pages) S.page = pages - 1;
   const rows = all.slice(S.page * PAGE, S.page * PAGE + PAGE);
-  for (const id of [...S.sel]) if (!S.orders.some(o => o.id === id)) S.sel.delete(id);
+  for (const id of [...S.sel]) if (!allOrderRows().some(o => o.id === id)) S.sel.delete(id);
   const bulk = S.sel.size && (canPay() || canShip()) ? `<div class="bulk"><strong>${S.sel.size} selected</strong>
       ${canPay() ? `<select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
       ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
@@ -2979,7 +3003,7 @@ function viewSuppliers() {
   const active = sp.sup !== "all" || sp.ful !== "all" || sp.q;
   const sAll = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)));
   const fc = new Map(); sAll.forEach(o => fc.set(o.fulfillment, (fc.get(o.fulfillment) || 0) + 1));
-  for (const id of [...S.sel]) if (!S.orders.some(o => o.id === id)) S.sel.delete(id);
+  for (const id of [...S.sel]) if (!allOrderRows().some(o => o.id === id)) S.sel.delete(id);
   const isSel = r => [...r.ids].every(id => S.sel.has(id));
   const allSel = os.length > 0 && os.every(o => S.sel.has(o.id));
   const bulk = S.sel.size ? `<div class="bulk"><strong>${S.sel.size} order${S.sel.size === 1 ? "" : "s"} selected</strong>
@@ -3328,9 +3352,9 @@ function viewPacking() {
     ${ordersTable(q, "packing", S.pk, "psort", "psel-all")}`;
 }
 async function bulkAction(kind) {
-  const targets = S.orders.filter(o => S.sel.has(o.id));
+  const targets = allOrderRows().filter(o => S.sel.has(o.id));
   if (kind === "clear") { S.sel.clear(); render(); return; }
-  if (kind === "archive") { for (const o of targets) await archiveOrder(o, ""); toast(`Archived ${targets.length} order${targets.length === 1 ? "" : "s"}.`); S.sel.clear(); render(); return; }
+  if (kind === "archive") { const own = targets.filter(o => !o.web); for (const o of own) await archiveOrder(o, ""); toast(`Archived ${own.length} order${own.length === 1 ? "" : "s"}.` + (own.length < targets.length ? " Website orders stay on the website." : "")); S.sel.clear(); render(); return; }
   if (kind === "tag") {
     const t = val("bulk-tag").toUpperCase(); if (!t) { toast("Type a tag first."); return; }
     for (const o of targets) if (!(o.tags || []).includes(t)) await updateOrder(o, { tags: [...(o.tags || []), t] });
@@ -6128,14 +6152,14 @@ render();
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery", "webmeta"]) {
       db.collection(col).onSnapshot(snap => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         S.raw[col] = snap.docs;
         if (col === "orders") { S.orders = docs.filter(r => !r.archived).map(norm); S.archived = docs.filter(r => r.archived); }
         else S[col] = docs;
         S.loaded[col] = true;
-        if (col === "orders") S.web.dirty = true;
+        if (col === "orders" || col === "webmeta") S.web.dirty = true;
         bgRender();
       }, () => { S.loaded[col] = true; $("#sync").textContent = "Connection lost · reload the page"; render(); });
     }
