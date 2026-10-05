@@ -616,6 +616,13 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
 table select.status, table select.lcell, .otable td select { text-align: center; text-align-last: center; }
 .osearch { display: flex; align-items: center; gap: 8px; flex: 1 1 280px; min-width: 220px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 0 10px; }
 .osearch:focus-within { border-color: var(--fg); }
+.osearch.big { flex: 1 1 100%; min-height: 48px; border: 2px solid var(--brand); border-radius: 12px; padding: 0 14px; box-shadow: 0 2px 10px rgba(74, 37, 69, .12); }
+.osearch.big svg { width: 20px; height: 20px; color: var(--brand); }
+.osearch.big input { font-size: 16px; font-weight: 500; padding: 12px 0; }
+.osearch.big:focus-within { box-shadow: 0 0 0 4px rgba(74, 37, 69, .15); }
+.head .rf-btn { flex: none; }
+.head #view-title { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 640px) { .head .rf-btn span { display: none; } .head .rf-btn { padding: 8px 10px; } }
 .osearch svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
 .osearch input { border: 0; background: none; font-size: 14px; padding: 8px 0; flex: 1; min-width: 0; outline: none; color: inherit; }
 .scanbar .scanrow input#pack-scan { font-size: 14px; padding: 8px 10px; }
@@ -730,6 +737,7 @@ main > .gs.mobile-only { margin-bottom: 12px; }
   <main>
     <div class="head">
       <button type="button" class="menu-btn mobile-only" data-act="menu" aria-label="Open main menu" aria-controls="drawer" aria-expanded="false"></button>
+      <button type="button" class="btn rf-btn" id="rf-btn" data-act="refresh" title="Refresh this page" aria-label="Refresh this page"><span>Refresh</span></button>
       <h1 id="view-title">Home</h1>
       <button type="button" id="wclock" class="wclock" data-act="tclock" hidden></button>
       <div class="actions" id="head-actions"></div>
@@ -1671,7 +1679,7 @@ function headActions() {
   const ex = col => S.dl ? `<button class="btn" type="button" data-act="export" data-col="${col}">Export</button>` : "";
   if (S.view === "dept" && !isUnlocked(S.dept)) return "";
   if (S.loggedOut) return "";
-  const lockBtn = `<button class="btn rf-btn" type="button" data-act="refresh" title="Refresh this page" aria-label="Refresh this page">${svg("refresh", "btn-ico")}<span>Refresh</span></button>`;
+  const lockBtn = "";
   const map = {
         home: S.canEdit ? `<button class="btn" type="button" data-act="edit-home">Edit Home page</button>` : "",
     tasks: can ? `<button class="btn primary" type="button" data-act="new-task">Add task</button>` : "",
@@ -1757,6 +1765,7 @@ function renderInner() {
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
   $("#view-title").classList.toggle("dept-title", !!dc);
   $("#head-actions").innerHTML = headActions();
+  const rf = $("#rf-btn"); if (rf) { if (!rf.querySelector("svg")) rf.insertAdjacentHTML("afterbegin", svg("refresh", "btn-ico")); rf.hidden = gated() || !!S.loggedOut; }
   document.querySelectorAll(".menu-btn").forEach(b => { if (!b.innerHTML) b.innerHTML = svg("menu") + "<span>Menu</span>"; b.hidden = gated(); });
   let n = "";
   if (!S.db && S.dbChecked) n += `<div class="notice">Saving is off in this view, so changes disappear when you close the page. Open it on claude.ai while signed in to save.</div>`;
@@ -2929,7 +2938,7 @@ function viewOrders() {
   ${ctxDept() === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
   <div class="toolbar">
-    <div class="osearch">${svg("search")}<input id="of-q" type="search" placeholder="Order # (e.g. 9978), name, phone, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
+    <div class="osearch big">${svg("search")}<input id="of-q" type="search" placeholder="Order # (e.g. 9978), name, phone, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
     ${monthSelect()}
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
     <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
