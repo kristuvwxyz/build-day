@@ -988,14 +988,17 @@ function nextNum() {
 
 /* ---------- data layer ---------- */
 async function save(col, id, data) {
+  if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).set(data); }
   else { const arr = S[col]; const i = arr.findIndex(r => r.id === id); const row = { id, ...data }; i >= 0 ? arr.splice(i, 1, row) : arr.push(row); render(); }
 }
 async function patch(col, id, data) {
+  if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).update(data); }
   else { const r = S[col].find(r => r.id === id); if (r) Object.assign(r, data); render(); }
 }
 async function remove(col, id) {
+  if (col === "products") scheduleWebPush(true);
   if (S.db) { await wdb().collection(col).doc(id).delete(); }
   else { S[col] = S[col].filter(r => r.id !== id); render(); }
 }
@@ -2256,9 +2259,13 @@ async function webLoad(quiet) {
   try {
     const r = await S.site.list({ limit: 300 });
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't answer.");
+    const seen = S.web.loaded ? new Set(S.web.orders.map(o => o.ref)) : null, fresh = seen ? (r.orders || []).filter(o => !seen.has(o.ref)) : [];
+    if (fresh.length) toast(fresh.length === 1 ? `New website order ${fresh[0].ref}${fresh[0].name ? " from " + fresh[0].name : ""}` : `${fresh.length} new website orders`);
     S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
+  webStockSync();
+  if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
 }
 
 function paintWebState() { const el = $("#web-state"); if (el) el.textContent = S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""; }
@@ -2320,6 +2327,65 @@ async function webOrderUpdate(o, ch) {
   S.web.dirty = true; bgRender();
 }
 const allOrderRows = () => [...S.orders, ...webAsOrders()];
+
+/* Website orders take on-hand stock off once, and give it back if the order is cancelled (or take it again if un-cancelled).
+   Only orders placed after the first run count; older ones were already handled by hand. What was taken is kept per
+   order number in webmeta (product ids and quantities only). A short claim makes sure only one open RS App moves stock. */
+const webMetaId = ref => String(ref).replace(/[^A-Za-z0-9_-]/g, "_");
+function webItemProduct(i) {
+  const key = i.id || i.h || i.handle || i.pid || "";
+  if (key) { const p = S.products.find(x => rvWebId(x) === key); if (p) return p; }
+  const t = squash(i.title || i.name), v = squash(i.variant), pre = /pre-?order/i.test(i.variant || "");
+  if (!t) return null;
+  const hits = S.products.filter(x => x.name && (squash((x.brand || "") + x.name) === t || squash(x.name) === t));
+  const score = x => (x.size && (v + t).includes(squash(x.size)) ? 2 : 0) + ((x.kind === "preorder") === pre ? 1 : 0) + ((x.status || "active") === "active" ? 1 : 0);
+  return hits.sort((a, b) => score(b) - score(a))[0] || null;
+}
+let webStockBusy = false;
+async function webStockSync() {
+  if (!S.site || !S.db || S.readOnly || !canOrders() || !S.web.loaded || !S.loaded.products || !S.loaded.webmeta || webStockBusy) return;
+  const cfg = S.webmeta.find(d => d.id === "_stock");
+  if (!cfg) { await save("webmeta", "_stock", { from: Date.now(), at: Date.now() }).catch(() => {}); return; }
+  const me = S.uid || myMemberId() || "rs", now = Date.now(), metaOf = o => S.webmeta.find(d => d.id === webMetaId(o.ref)) || {};
+  const todo = S.web.orders.filter(o => {
+    const t = new Date(o.date).getTime() || 0; if (!o.ref || !t || t < cfg.from) return false;
+    const m = metaOf(o), cancel = /cancel/i.test(o.status || ""), taken = m.stock === "taken";
+    if (cancel === !taken) return false;
+    return !(m.stockClaim && m.stockClaim.by !== me && now - m.stockClaim.at < 60000);
+  });
+  if (!todo.length) return;
+  webStockBusy = true;
+  try {
+    for (const o of todo) { const m = metaOf(o); await save("webmeta", webMetaId(o.ref), { ...clean(m), ref: o.ref, stockClaim: { by: me, at: now } }); }
+    await new Promise(r => setTimeout(r, 4000));
+    for (const o of todo) {
+      const m = metaOf(o); if (!m.stockClaim || m.stockClaim.by !== me) continue;
+      const cancel = /cancel/i.test(o.status || ""), upd = { ...clean(m), ref: o.ref, stockClaim: null, at: Date.now() };
+      let msg;
+      if (!cancel) {
+        const map = {}, miss = [];
+        for (const i of o.items || []) { const p = webItemProduct(i); if (p && p.kind !== "preorder") map[p.id] = (map[p.id] || 0) + (Number(i.qty) || 1); else if (!p) miss.push(i.title || i.name || "item"); }
+        await applyStockMap(map, -1);
+        upd.stock = "taken"; upd.stockMap = map; upd.stockMiss = miss;
+        msg = "stock taken off for " + (Object.keys(map).length ? Object.entries(map).map(([pid, q]) => q + "× " + ((S.products.find(x => x.id === pid) || {}).name || "item")).join(", ") : "nothing on hand") + (miss.length ? " · not found in Listings: " + miss.join(", ") : "");
+      } else {
+        await applyStockMap(m.stockMap || {}, 1);
+        upd.stock = "returned"; msg = "order cancelled · stock returned";
+      }
+      for (const pid of Object.keys(upd.stock === "taken" ? upd.stockMap : m.stockMap || {})) await patch("products", pid, { webSync: "pending" });
+      upd.log = [...(m.log || []), { at: Date.now(), by: "RS OS", msg }].slice(-50);
+      await save("webmeta", webMetaId(o.ref), upd);
+    }
+  } catch (e) { toast("Website stock: " + ((e && e.message) || "couldn't update.")); }
+  finally { webStockBusy = false; S.web.dirty = true; bgRender(); }
+}
+// Listing changes go to the website on their own, 45 seconds after the last edit (the Send to website button still works).
+let autoPushT = 0;
+function scheduleWebPush(force) {
+  if (!S.site || !S.site.pushProducts || S.readOnly) return;
+  clearTimeout(autoPushT);
+  autoPushT = setTimeout(() => { autoPushT = 0; if (webPushBusy) return scheduleWebPush(force); if (force || S.products.some(p => p.webSync === "pending")) pushListings(null, true); }, 45000);
+}
 function webFindPanel() {
   const q = (S.of.q || "").trim(); if (!S.site || !q || !S.web.loaded) return "";
   const qq = squash(q).replace(/rs/g, ""), m = S.web.orders.filter(o => squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(qq)).slice(0, 10);
@@ -3918,7 +3984,7 @@ async function copyWebCode() {
 async function downloadWebCode() { try { await S.dl.save({ filename: `regal-spritz-website-products-${mToday()}.html`, data: webCodeText() }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } }
 // Sends the whole catalog (same list as the Website code) straight to the website backend.
 let webPushBusy = false;
-async function pushListings(btn) {
+async function pushListings(btn, auto) {
   if (!S.site || !S.site.pushProducts || webPushBusy) return;
   const list = webProducts(), pend = S.products.filter(p => p.webSync === "pending");
   webPushBusy = true; if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
@@ -3926,9 +3992,9 @@ async function pushListings(btn) {
     const r = await S.site.pushProducts(list);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
     for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
-    toast(`Website updated: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
+    if (!auto || pend.length) toast(`Website updated${auto ? " automatically" : ""}: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
   } catch (e) { toast("Website: " + ((e && e.message) || "couldn't send.")); }
-  finally { webPushBusy = false; render(); }
+  finally { webPushBusy = false; auto ? bgRender() : render(); }
 }
 async function markSynced() {
   const pend = S.products.filter(p => p.webSync === "pending");
@@ -6149,7 +6215,7 @@ render();
   ]);
   S.db = db; S.dl = dl; S.user = user; S.dbChecked = true;
   if (c?.use) c.use("assets").then(a => { S.assets = a; }).catch(() => {});
-  if (c?.use) Promise.resolve().then(() => c.use("site")).then(si => { if (!si || !si.list) return; S.site = si; setTimeout(() => webLoad(true), 1500); setInterval(() => { if (document.visibilityState === "visible" && (S.view === "orders" || S.view === "home")) webLoad(true); }, 60000); }).catch(() => {});
+  if (c?.use) Promise.resolve().then(() => c.use("site")).then(si => { if (!si || !si.list) return; S.site = si; setTimeout(() => webLoad(true), 1500); let webTick = 0; setInterval(() => { webTick++; if (document.visibilityState === "visible" && (S.view === "orders" || S.view === "home" || webTick % 3 === 0)) webLoad(true); }, 60000); }).catch(() => {});
   if (user) {
     try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {}
     try { S.me = await user.me(); S.uid = S.me.id; S.isOwner = !!S.me.isOwner; S.canEdit = !!S.me.canEdit; } catch (e) {}

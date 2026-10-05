@@ -42,3 +42,10 @@ Answer: `{ "ok": true, "count": 526 }` (or `{ "ok": false, "error": "…" }`).
 
 - `kind`: `onhand` or `preorder`. Sold-out on-hand items and inactive listings are left out of the list (hide anything missing).
 - `id` stays the same for a listing over time; use it as the product key.
+
+## Automatic sync (RS OS side)
+
+- **Listings → website:** any listing edit (or a stock change) is sent to the website on its own about 45 seconds later. The **Send to website** button still works for an instant send.
+- **Website orders → stock:** each website order takes its on-hand items off RS OS stock once; a cancelled order puts them back. Pre-orders don't touch stock. Only orders placed after the first run count (stored in `webmeta/_stock.from`). What was taken is saved per order in `webmeta` (`stock`, `stockMap`, `stockMiss`), product ids and quantities only. Items RS OS can't match to a listing are named in the order's history.
+- Items are matched by `id`/`h`/`handle` on the website item (same `id` as in `opsSetProducts`), otherwise by title (`Brand Name` or `Name`) and size.
+- **New orders:** RS OS checks the website every minute on Orders and Home (every 3 minutes elsewhere) and shows a "New website order" alert.
