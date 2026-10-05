@@ -2268,7 +2268,7 @@ function webRows() {
     && (!q || squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(q)));
 }
 // Website orders shown as rows in the one Orders list. Built in memory from the live list, never saved.
-const WEB_FUL = { placed: "unfulfilled", confirmed: "unfulfilled", packed: "on_hold", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
+const WEB_FUL = { placed: "to_confirm", confirmed: "unfulfilled", packed: "on_hold", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
 let webRowsMemo = { at: null, n: -1, rows: [] };
 function webAsOrders() {
   if (!S.site || !S.web.loaded) return [];
@@ -2293,7 +2293,7 @@ function webAsOrders() {
 }
 // Edits on a website order: payment, status and tracking go to the website; assignee, courier, tags,
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
-const WEB_STATUS_OF = { unfulfilled: "Confirmed", on_hold: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
+const WEB_STATUS_OF = { to_confirm: "Placed", unfulfilled: "Confirmed", on_hold: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
   const site = {}, keep = {}, msgs = [];
@@ -2854,7 +2854,7 @@ function openColumns(table) {
 
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
-  if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span> <span class="chip" title="Website order · ${esc(o.payMethod)}">Website</span>${o.siteNote ? ` <span title="${esc(o.siteNote)}" style="color:var(--muted)">${NOTE_ICON}</span>` : ""}</td>`;
+  if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span> <span class="chip" title="Website order · ${esc(o.payMethod)}">Website</span>${o.siteNote ? `<span class="nicons" title="Website note: ${esc(o.siteNote)}"><span class="ni">${NOTE_ICON}</span></span>` : ""}</td>`;
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
     case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}${noteIcons(o)}${exChip(o)}</td>`;
@@ -3573,7 +3573,7 @@ function openOrderForm() {
     </div>
     <div class="row">
       <div class="field"><label for="o-pay">Payment status</label><select id="o-pay">${opts(PAYMENTS.filter(p => !VOIDPAY.has(p.id)), "pending")}</select></div>
-      <div class="field"><label for="o-ful">Fulfillment status</label><select id="o-ful">${opts(FULFILLMENTS.filter(f => f.id !== "delivered"), "unfulfilled")}</select></div>
+      <div class="field"><label for="o-ful">Fulfillment status</label><select id="o-ful">${opts(FULFILLMENTS.filter(f => f.id !== "delivered"), "to_confirm")}</select></div>
     </div>
     ${tagField([])}
     <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2"></textarea></div>
