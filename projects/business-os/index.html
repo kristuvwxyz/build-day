@@ -51,6 +51,25 @@ button { cursor: pointer; }
 
 .app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; }
 .rail { background: var(--surface); border-right: 1px solid var(--line); padding: 24px 14px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; }
+.note-cell { cursor: text; min-width: 140px; max-width: 240px; } .note-t { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+.note-cell:hover .note-t, .note-cell:hover .tag-add { outline: 1px dashed var(--line); outline-offset: 2px; }
+.hist-btn { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; max-width: 220px; }
+.hist-btn .hist-t { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hist-btn small { color: var(--muted); font-size: 11.5px; } .hist-btn:hover .hist-t { text-decoration: underline; text-decoration-color: var(--line); }
+a.btn { text-decoration: none; color: inherit; }
+.gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.gal-card { display: flex; flex-direction: column; gap: 4px; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 8px; cursor: pointer; font: inherit; color: inherit; min-width: 0; }
+.gal-card:hover { border-color: var(--gold); }
+.gal-img { position: relative; display: grid; place-items: center; aspect-ratio: 1; background: var(--surface-2); border-radius: 8px; overflow: hidden; }
+.gal-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gal-img svg { width: 34%; height: 34%; color: var(--muted); opacity: .5; }
+.gal-img.noimg img { display: none; }
+.gal-img.sm { width: 72px; flex: none; }
+.gal-t { font-size: 12.5px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.gal-card small { color: var(--muted); font-size: 11.5px; }
+.gal-list { display: flex; flex-direction: column; gap: 10px; }
+.gal-row { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.gal-u { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; user-select: all; }
 .tag-cell { cursor: text; } .tag-cell:hover .tags .tag, .tag-cell:hover .tag-add { outline: 1px dashed var(--line); }
 .tag-add { font-size: 12px; color: var(--muted); }
 .tag-in { font: inherit; font-size: 13px; width: 100%; min-width: 160px; border: 1px solid var(--gold); border-radius: 6px; padding: 4px 6px; background: var(--surface); color: inherit; }
@@ -568,10 +587,17 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
 .colrow label { display: flex; gap: 8px; align-items: center; font-weight: 600; }
 .radio-line { display: flex; gap: 8px; align-items: center; font-size: 13.5px; padding: 4px 0; font-weight: 400; }
 .wb-cell .wb-row { flex-wrap: nowrap; } .wb-cell .wb-in { min-width: 130px; }
+table select.status, table select.lcell, .otable td select { text-align: center; text-align-last: center; }
+.osearch { display: flex; align-items: center; gap: 8px; flex: 1 1 280px; min-width: 220px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 0 10px; }
+.osearch:focus-within { border-color: var(--fg); }
+.osearch svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.osearch input { border: 0; background: none; font-size: 14px; padding: 8px 0; flex: 1; min-width: 0; outline: none; color: inherit; }
+.scanbar .scanrow input#pack-scan { font-size: 14px; padding: 8px 10px; }
 .bigsearch { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 4px 14px; position: relative; }
 .bigsearch:focus-within { border-color: var(--fg); }
 .bigsearch svg { width: 20px; height: 20px; color: var(--muted); flex: none; }
 .bigsearch input { border: 0; background: none; font-size: 16px; padding: 10px 0; flex: 1; min-width: 0; outline: none; }
+input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .sx { border: 0; background: var(--surface-2); color: var(--fg); border-radius: 999px; width: 26px; height: 26px; font-size: 12px; cursor: pointer; flex: none; margin-left: -4px; }
 .toolbar .sx { align-self: center; }
 .cust-link { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
@@ -798,6 +824,7 @@ const ICONS = {
   orders: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
   tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   tasks: '<path d="M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8.5 15l2 2 4-4"/>',
   depts: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>',
@@ -830,7 +857,7 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
-  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
@@ -1598,6 +1625,7 @@ function renderNav() {
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
     (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders") : "") +
     (canListings() ? item('data-nav="listings"', "tag", "Listings", S.view === "listings", "", "desktop-only") : "") +
+    (canListings() ? item('data-nav="gallery"', "image", "Gallery", S.view === "gallery", "", "desktop-only") : "") +
     (canAttendance() ? item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', "award", "Awards", S.view === "eom") : "") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
@@ -1635,6 +1663,7 @@ function headActions() {
     suppliers: S.sp && S.sp.mode === "invoices" && canInvoices() && can ? `<button class="btn primary" type="button" data-act="new-invoice">Upload invoice</button>` : "",
     budget: can && canInvoices() ? `<button class="btn" type="button" data-act="new-invoice">Upload supplier invoice</button><button class="btn primary" type="button" data-act="new-budget">New budget request</button>` : "",
     archived: "",
+    gallery: can && S.mcp ? `<button class="btn" type="button" data-act="gal-load">${S.gallery.length ? "Refresh from Shopify" : "Load photos from Shopify"}</button>` : "",
     packing: (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
     customers: (can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
@@ -1680,14 +1709,14 @@ function enhanceSearch() {
 function globalSearch(inp) {
   const res = inp.parentElement.querySelector(".gs-res"); const q = inp.value.trim().toLowerCase().replace(/^#/, "");
   if (!q) { res.hidden = true; return; }
-  const list = [...S.orders, ...S.archived].filter(o => [o.num, ...(o.merged || []), o.customer, o.email, o.phone, o.tracking, o.ref].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 8);
+  const list = [...S.orders, ...S.archived].filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 8);
   res.innerHTML = list.length ? list.map(o => `<button type="button" data-gso="${o.id}"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span><small>${o.archived ? "Archived" : esc(ful(o.fulfillment).name)} · ${peso(total(o))}</small></button>`).join("") : `<div class="gs-empty">No orders match “${esc(inp.value)}”.</div>`;
   res.hidden = false;
 }
 function renderInner() {
   renderNav();
   const d = dept(S.dept);
-  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments", orders: "Orders", listings: "Listings", eom: "Employee of the Month" }[S.view] || d.name;
+  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments", orders: "Orders", listings: "Listings", gallery: "Photo gallery", eom: "Employee of the Month" }[S.view] || d.name;
   $("#view-title").textContent = title;
   const dc = S.view === "dept" ? DEPT_COLORS[S.dept] : "";
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
@@ -1709,6 +1738,7 @@ function renderInner() {
   if (S.view === "eom") { if (!isCEO()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewEom(); return; }
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
   if (S.view === "orders") { if (!canOrders()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewOrders(); return; }
+  if (S.view === "gallery") { if (!canListings()) { S.view = "home"; v.innerHTML = viewHome(); return; } v.innerHTML = viewGallery(); return; }
   if (S.view === "listings") {
     if (!canListings()) { S.view = "home"; v.innerHTML = viewHome(); return; }
     const ld = LISTING_DEPTS.find(x => canSee(x) && isUnlocked(x));
@@ -2487,7 +2517,8 @@ function orderMatchesQ(o, q) {
   const hay = [o.num, o.customer, o.email, o.ref, o.phone, o.tracking, ...(o.merged || []), o.assignee ? memberName(o.assignee) : "", plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase();
   if (hay.includes(q.replace(/^#/, ""))) return true;
   const sq = squash(q); if (sq.length < 3) return false;
-  return [o.num, ...(o.merged || []), o.tracking, o.ref, o.phone].some(v => squash(v).includes(sq)) || (/^\d+$/.test(sq) && squash(o.num).replace(/^[a-z]+/, "") === sq);
+  const dq = sq.replace(/^rs/, "");
+  return [o.num, ...(o.merged || []), o.tracking, o.ref, o.phone].some(v => squash(v).includes(sq)) || (/^\d+$/.test(dq) && [o.num, ...(o.merged || [])].some(n => squash(n).replace(/^[a-z]+/, "").includes(dq)));
 }
 // Orders not kept in the dashboard (e.g. already shipped) are looked up live in Shopify by order #, name, email or J&T tracking #.
 const SHOP_FIND_Q = `query RSFind($q: String!) { orders(first: 10, query: $q, sortKey: CREATED_AT, reverse: true) { nodes { ${"${SHOP_FIELDS}"} } } }`;
@@ -2503,7 +2534,8 @@ function queueShopFind(q, now) {
 async function shopFind(q) {
   S.shopFind = { q, state: "loading", list: [] }; paintShopFind();
   try {
-    const res = await shopCall(SHOP_FIND_Q, { q: q.replace(/^#/, "") }, 10);
+    const raw = q.replace(/^#/, "").trim(), digits = raw.replace(/^rs\s*/i, "");
+    const res = await shopCall(SHOP_FIND_Q, { q: /^\d{3,6}$/.test(digits) ? `name:RS${digits} OR name:${digits} OR ${raw}` : raw }, 10);
     const nodes = (dig(res, "orders") || {}).nodes || [];
     if (S.shopFind.q !== q) return;
     S.shopFind = { q, state: "done", list: nodes.map(shopToOrder) };
@@ -2549,7 +2581,7 @@ function filteredOrders() {
 const ORDER_SORTS = {
   num: o => Number(String(o.num).replace(/\D/g, "")) || 0, date: o => o.createdAt || 0, items: o => itemCount(o), customer: o => (o.customer || "").toLowerCase(),
   total: o => total(o), payment: o => PAYMENTS.findIndex(x => x.id === o.payment), fulfillment: o => FULFILLMENTS.findIndex(x => x.id === o.fulfillment),
-  tracking: o => (o.tracking || "").toLowerCase(), tags: o => (o.tags || []).join(",").toLowerCase(),
+  tracking: o => (o.tracking || "").toLowerCase(), tags: o => (o.tags || []).join(",").toLowerCase(), note: o => (o.note || "").toLowerCase() || "~", activity: o => { const l = o.log || []; return l.length ? l[l.length - 1].at || 0 : 0; },
   assigned: o => o.assignee ? memberName(o.assignee).toLowerCase() : "~", courier: o => courierOf(o), phone: o => o.phone || "", address: o => (o.address || "").toLowerCase(),
   waybill: o => (o.tracking || "").toLowerCase(),
 };
@@ -2597,10 +2629,10 @@ function tagCell(tags) {
 const ORDER_COLS = {
   num: { label: "Order" }, date: { label: "Date" }, items: { label: "Items" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
   total: { label: "Total", cls: "r" }, payment: { label: "Payment status" }, fulfillment: { label: "Fulfillment status" }, courier: { label: "Courier" },
-  tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
+  tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, note: { label: "Note" }, activity: { label: "History" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
 const TABLE_COLS = {
-  orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "phone", "address", "actions"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags"],
+  orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
@@ -2648,6 +2680,8 @@ function orderCell(k, o, table) {
     case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
+    case "note": return canAll() && !o.archived ? `<td class="note-cell" data-noteedit="${o.id}" title="Click to edit the note">${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span class="tag-add">+ Note</span>`}</td>` : `<td>${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span style="color:var(--muted)">–</span>`}</td>`;
+    case "activity": { const l = o.log || [], last = l[l.length - 1]; return `<td>${last ? `<button type="button" class="hist-btn" data-hist="${o.id}" title="Show full history"><span class="hist-t"><b>${esc(last.by || "")}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length} updates` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "tags": return canAll() && !o.archived ? `<td class="tag-cell" data-tagedit="${o.id}" title="Click to edit tags">${tagCell(o.tags)}${(o.tags || []).length ? "" : `<span class="tag-add">+ Tag</span>`}</td>` : `<td>${tagCell(o.tags)}</td>`;
     case "phone": return `<td class="nowrap" style="user-select:all">${esc(o.phone || (o.ship || {}).phone || "")}</td>`;
     case "address": { const sh = shipOf(o); return `<td style="min-width:200px;font-size:12.5px">${esc([sh.address1, sh.address2, sh.city, sh.province].filter(Boolean).join(", ") || (o.pickup ? "Pickup" : ""))}</td>`; }
@@ -2720,7 +2754,9 @@ function packTools() {
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file">J&T VIP booking file</button>` : ""}</div></section>`;
 }
 function viewOrders() {
-  const all = filteredOrders();
+  let all = filteredOrders();
+  const dq = squash(S.of.q || "").replace(/^rs/, "");
+  if (/^\d{2,}$/.test(dq)) { const rank = o => { const n = [o.num, ...(o.merged || [])].map(x => squash(x).replace(/^[a-z]+/, "")); return n.includes(dq) ? 0 : n.some(x => x.startsWith(dq)) ? 1 : 2; }; all = all.map((o, i) => [rank(o), i, o]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); }
   const pages = Math.max(1, Math.ceil(all.length / PAGE));
   if (S.page >= pages) S.page = pages - 1;
   const rows = all.slice(S.page * PAGE, S.page * PAGE + PAGE);
@@ -2736,9 +2772,9 @@ function viewOrders() {
   return `
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${ctxDept() === "CEO" ? statsStrip() : ""}
-  ${ctxDept() === "PACKING" || ctxDept() === "CEO" ? packTools() : ""}
-  <div class="bigsearch">${svg("search")}<input id="of-q" type="search" placeholder="Search order #, customer, phone, product, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
+  ${ctxDept() === "PACKING" ? packTools() : ""}
   <div class="toolbar">
+    <div class="osearch">${svg("search")}<input id="of-q" type="search" placeholder="Order # (e.g. 9978), name, phone, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
     ${monthSelect()}
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
     <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
@@ -2951,6 +2987,16 @@ function itemsPop(btn) {
   const r = btn.getBoundingClientRect();
   const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop"; el.setAttribute("role", "dialog");
   el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${custLink(o)}</span></div>${(o.items || []).map(i => `<div class="ipop-i"><span class="num">${esc(i.qty)}×</span><span>${esc(i.name)}${i.from && (o.merged || []).length ? ` <span class="from">#${esc(i.from)}</span>` : ""}</span><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("") || `<div class="ipop-i">No items</div>`}<div class="ipop-t"><span>Total</span><b class="num">${peso2(total(o))}</b></div><button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
+  document.body.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
+  el.style.top = (r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px";
+}
+function histPop(btn) {
+  closePop(); const o = findOrder(btn.dataset.hist); if (!o) return;
+  const r = btn.getBoundingClientRect();
+  const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop"; el.setAttribute("role", "dialog");
+  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>Team activity</span></div><div class="olog" style="max-height:300px;overflow:auto;border:0;padding-top:4px">${[...(o.log || [])].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
   el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
@@ -3397,7 +3443,6 @@ function openOrderDetails(id) {
     ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
     ${cp || cf ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)">Status: <span class="badge ${pay(o.payment).cls || ""}">${esc(pay(o.payment).name)}</span><span class="badge ${ful(o.fulfillment).cls || ""}">${esc(ful(o.fulfillment).name)}</span> · change these in the Orders table.</div>` : ""}
     ${all ? `${tagField(o.tags)}
-    <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2">${esc(o.note || "")}</textarea></div>
     <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Delete moves the order to Archived orders.</div>` : ""}
     ${cs ? `<div class="field"><label for="d-track">Tracking # (waybill) · ${esc(COURIER_LABEL[courierOf(o)] || "")}</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
     ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}` : o.tracking ? `<div>🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}
@@ -3406,7 +3451,7 @@ function openOrderDetails(id) {
     ${(o.log || []).length ? `<div class="olog"><div class="olog-h">Team activity</div>${[...o.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>` : ""}`,
   editable ? async () => {
     const ch = {};
-    if (all) Object.assign(ch, { tags: parseTags(val("o-tags")), note: val("o-note"), assignee: val("d-assign") });
+    if (all) Object.assign(ch, { tags: parseTags(val("o-tags")), assignee: val("d-assign") });
     if (cs) { const tr = val("d-track").trim(); if (tr !== (o.tracking || "")) Object.assign(ch, { tracking: tr, trackingAt: tr ? Date.now() : 0 }); }
     const disp = (ch.tags || o.tags || []).some(t => normTag(t) === "DISPUTE");
     if (disp && ["unfulfilled", "fulfilled"].includes(ch.fulfillment) && ch.fulfillment !== o.fulfillment && !S.dispOk) { S.dispOk = true; return sheetError(`⚠️ This order has a DISPUTE tag. Make sure it's resolved before it goes to ${ful(ch.fulfillment).name}. Press Save again to continue.`); }
@@ -3683,6 +3728,66 @@ async function markSynced() {
   const pend = S.products.filter(p => p.webSync === "pending");
   for (const p of pend) await patch("products", p.id, { webSync: "synced" });
   closeSheet(); toast(`${pend.length} change${pend.length === 1 ? "" : "s"} marked as on the website.`);
+}
+
+/* ---------- photo gallery (product photos from Shopify, saved for reuse) ---------- */
+const GAL_BASE = "https://cdn.shopify.com/s/files/1/0574/1772/8133/files/";
+const galUrl = u => /^https?:/.test(u) ? u : GAL_BASE + u;
+const galThumb = u => { const x = galUrl(u); return /cdn\.shopify\.com/.test(x) ? x + (x.includes("?") ? "&" : "?") + "width=360" : x; };
+const galItems = () => S.gallery.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))).flatMap(d => d.items || []);
+const SHOP_GAL_Q = `query RSGallery($first: Int!, $after: String) { products(first: $first, after: $after, sortKey: TITLE) { pageInfo { hasNextPage endCursor } nodes { handle title status media(first: 12) { nodes { ... on MediaImage { image { url } } } } } } }`;
+let galBusy = false;
+async function loadGallery() {
+  if (!S.mcp) { toast("Open the app in claude.ai with Shopify connected to load photos."); return; }
+  if (galBusy) return; galBusy = true; S.galState = "Loading photos from Shopify…"; render();
+  try {
+    const items = []; let after = null, pages = 0;
+    do {
+      const res = await shopCall(SHOP_GAL_Q, after ? { first: 50, after } : { first: 50 }, 50);
+      const conn = dig(res, "products"); if (!conn) throw { code: "tool_error", message: "Shopify sent back an unexpected answer." };
+      for (const n of conn.nodes || []) { const imgs = ((n.media || {}).nodes || []).map(m => m && m.image && m.image.url).filter(Boolean).map(u => u.startsWith(GAL_BASE) ? u.slice(GAL_BASE.length) : u); if (imgs.length) items.push({ t: n.title || "", h: n.handle || "", st: String(n.status || "").toLowerCase(), imgs }); }
+      S.galState = `Loading photos from Shopify… ${items.length} products so far`; paintGalState();
+      const pi = conn.pageInfo || {}; after = pi.hasNextPage ? pi.endCursor : null;
+    } while (after && ++pages < 60);
+    const CH = 150, n = Math.ceil(items.length / CH), at = Date.now();
+    for (let i = 0; i < n; i++) await save("gallery", "c" + String(i).padStart(2, "0"), { items: items.slice(i * CH, i * CH + CH), at, by: actor() });
+    for (const d of S.gallery) if (Number(String(d.id).slice(1)) >= n) await remove("gallery", d.id);
+    S.galState = ""; toast(`Gallery ready: ${items.reduce((a, x) => a + x.imgs.length, 0)} photos from ${items.length} products.`);
+  } catch (e) { S.galState = ""; toast("Shopify: " + ((e && e.message) || "couldn't load photos.")); }
+  finally { galBusy = false; render(); }
+}
+function paintGalState() { const el = $("#gal-state"); if (el) el.textContent = S.galState || ""; }
+function viewGallery() {
+  const q = (S.galq || "").trim().toLowerCase(), all = galItems(), f = S.galf || "all";
+  const listed = new Set(S.products.map(p => p.webId).filter(Boolean));
+  const rows = all.filter(x => (!q || (x.t + " " + x.h).toLowerCase().includes(q)) && (f === "all" || (f === "active" ? x.st === "active" : f === "listed" ? listed.has(x.h) : true)));
+  const pg = Math.max(0, Math.min(S.galpage || 0, Math.ceil(rows.length / 60) - 1)); S.galpage = pg;
+  const page = rows.slice(pg * 60, pg * 60 + 60);
+  const at = Math.max(0, ...S.gallery.map(d => d.at || 0));
+  if (!all.length) return `<div class="panel"><div class="empty" style="padding:22px">${S.galState ? `<span id="gal-state">${esc(S.galState)}</span>` : `No photos saved yet. ${S.mcp && !S.readOnly ? `Click <b>Load photos from Shopify</b> to bring in every product photo, so the team can reuse them anytime.` : "Ask the owner to load them from Shopify in claude.ai."}`}</div></div>`;
+  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span>${all.reduce((a, x) => a + x.imgs.length, 0)} photos from ${all.length} Shopify products${at ? ` · saved ${esc(relTime(at))}` : ""}. Click a product to copy a photo link, open it full size to save it, or use it on a listing. <span id="gal-state">${esc(S.galState || "")}</span></span></div>
+    <div class="toolbar"><div class="osearch">${svg("search")}<input id="galq" type="search" placeholder="Search product or brand" value="${esc(S.galq || "")}" aria-label="Search photos" autocomplete="off"></div>
+      <div class="seg" role="group" aria-label="Show">${[["all", "All"], ["active", "Active in Shopify"], ["listed", "In Listings"]].map(([k, l]) => `<button type="button" data-galf="${k}" aria-pressed="${f === k}">${l}</button>`).join("")}</div></div>
+    <div class="gal-grid">${page.map(x => `<button type="button" class="gal-card" data-gal="${esc(x.h)}"><span class="gal-img"><img src="${esc(galThumb(x.imgs[0]))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg')">${BOTTLE}</span><span class="gal-t">${esc(x.t)}</span><small>${x.imgs.length} photo${x.imgs.length === 1 ? "" : "s"}${x.st && x.st !== "active" ? " · " + esc(x.st) : ""}</small></button>`).join("") || `<div class="empty">No products match.</div>`}</div>
+    ${rows.length > 60 ? `<div class="pager"><button class="btn sm" type="button" data-galpage="-1" ${pg ? "" : "disabled"}>‹</button><span>${pg * 60 + 1}–${Math.min(rows.length, pg * 60 + 60)} of ${rows.length}</span><button class="btn sm" type="button" data-galpage="1" ${pg * 60 + 60 < rows.length ? "" : "disabled"}>›</button></div>` : ""}`;
+}
+function openGalleryItem(h) {
+  const x = galItems().find(i => i.h === h); if (!x) return;
+  const p = S.products.find(pp => pp.webId === h);
+  openSheet(`<h3>${esc(x.t)}</h3>
+    <div style="font-size:13px;color:var(--muted)">${x.imgs.length} photo${x.imgs.length === 1 ? "" : "s"} · Shopify handle <code>${esc(x.h)}</code>${p ? ` · listing: ${esc(p.brand || "")} ${esc(p.name)}` : ""}</div>
+    <div class="gal-list">${x.imgs.map((u, k) => `<div class="gal-row"><span class="gal-img sm"><img src="${esc(galThumb(u))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg')">${BOTTLE}</span>
+      <div style="min-width:0;flex:1"><div class="gal-u" id="gal-u-${k}">${esc(galUrl(u))}</div>
+      <div class="btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" type="button" data-act="gal-copy" data-k="${k}">Copy link</button><a class="btn sm" href="${esc(galUrl(u))}" target="_blank" rel="noopener">Open full size</a>${p && !S.readOnly ? `<button class="btn sm" type="button" data-act="gal-use" data-h="${esc(h)}" data-k="${k}">${p.photo === galUrl(u) ? "✓ Listing photo" : "Use as listing photo"}</button>` : ""}</div></div></div>`).join("")}</div>
+    <div style="font-size:12px;color:var(--muted)">Previews may not show inside claude.ai, which blocks photos from other sites. "Open full size" always works: press and hold (phone) or right-click (computer) to save the photo.</div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null);
+}
+async function galCopy(k) { const t = ($("#gal-u-" + k) || {}).textContent || ""; try { await navigator.clipboard.writeText(t); toast("Photo link copied."); } catch (e) { toast("Press and hold the link to copy it."); } }
+async function galUse(h, k) {
+  const x = galItems().find(i => i.h === h), p = S.products.find(pp => pp.webId === h); if (!x || !p) return;
+  const url = galUrl(x.imgs[k]);
+  await patch("products", p.id, { photo: url, imgs: [url, ...(p.imgs || []).filter(u => u !== url)], webSync: "pending", editedAt: Date.now(), editedBy: actor() });
+  toast("Listing photo updated · marked To sync"); openGalleryItem(h);
 }
 
 /* ---------- barcode scanning ---------- */
@@ -5120,6 +5225,7 @@ function openDrawer() {
     item('data-nav="tasks"', ic("tasks"), "Tasks", S.view === "tasks") +
     (canOrders() ? item('data-nav="orders"', ic("orders"), "Orders", S.view === "orders") : "") +
     (canListings() ? item('data-nav="listings"', ic("tag"), "Listings", S.view === "listings") : "") +
+    (canListings() ? item('data-nav="gallery"', ic("image"), "Gallery", S.view === "gallery") : "") +
     (canAttendance() ? item('data-nav="attendance"', ic("clock"), "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', ic("award"), "Awards", S.view === "eom") : "") +
     `<div class="drawer-l">Departments</div>` +
@@ -5177,7 +5283,7 @@ document.addEventListener("click", guard(async ev => {
   if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
   const dy = ev.target.closest("[data-day]");
   if (dy) { S.t.day = dy.dataset.day; render(); return; }
-  if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]") && !ev.target.closest("[data-notes]")) closePop();
+  if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]") && !ev.target.closest("[data-notes]") && !ev.target.closest("[data-hist]")) closePop();
   if (!ev.target.closest(".gs")) document.querySelectorAll(".gs-res").forEach(r => r.hidden = true);
   const gsr = ev.target.closest("[data-gso]");
   if (gsr) { document.querySelectorAll(".gs-res").forEach(r => r.hidden = true); document.querySelectorAll(".gs-in").forEach(i => i.value = ""); return openOrderDetails(gsr.dataset.gso); }
@@ -5267,6 +5373,26 @@ document.addEventListener("click", guard(async ev => {
   if (pg) { S.page += Number(pg.dataset.page); render(); return; }
   const bk = ev.target.closest("[data-bulk]");
   if (bk) return bulkAction(bk.dataset.bulk);
+  const ne = ev.target.closest("[data-noteedit]");
+  if (ne && !ne.querySelector("textarea")) {
+    const o = findOrder(ne.dataset.noteedit); if (!o) return;
+    ne.innerHTML = `<textarea class="tag-in" rows="2" placeholder="Note for the team" aria-label="Order note">${esc(o.note || "")}</textarea><small style="color:var(--muted)">Enter saves · Shift+Enter new line</small>`;
+    const ta = ne.querySelector("textarea"); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+    let done = false;
+    const finish = async keep => { if (done) return; done = true; const v = ta.value.trim(); if (keep && v !== (o.note || "")) { await updateOrder(o, { note: v }); toast(`${onum(o)}: note saved.`); } render(); };
+    ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); finish(true); } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); } });
+    ta.addEventListener("blur", () => finish(true));
+    return;
+  }
+  if (ne) return;
+  const gc = ev.target.closest("[data-gal]");
+  if (gc) return openGalleryItem(gc.dataset.gal);
+  const gf = ev.target.closest("[data-galf]");
+  if (gf) { S.galf = gf.dataset.galf; S.galpage = 0; render(); return; }
+  const gp = ev.target.closest("[data-galpage]");
+  if (gp) { S.galpage = (S.galpage || 0) + Number(gp.dataset.galpage); render(); window.scrollTo(0, 0); return; }
+  const hb = ev.target.closest("[data-hist]");
+  if (hb) { if ($("#ipop") && S.popFor === "h" + hb.dataset.hist) { closePop(); S.popFor = ""; return; } S.popFor = "h" + hb.dataset.hist; histPop(hb); return; }
   const te = ev.target.closest("[data-tagedit]");
   if (te && !te.querySelector("input")) {
     const o = findOrder(te.dataset.tagedit); if (!o) return;
@@ -5408,6 +5534,9 @@ document.addEventListener("click", guard(async ev => {
     case "viewas-stop": try { sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return;
     case "sp-clear": S.sp = { sup: "all", ful: "all", pay: "all", q: "" }; render(); return;
     case "import-committed": await importCommitted(); return;
+    case "gal-load": await loadGallery(); return;
+    case "gal-copy": await galCopy(b.dataset.k); return;
+    case "gal-use": await galUse(b.dataset.h, Number(b.dataset.k)); return;
     case "shop-find-open": await openShopFound(b.dataset.num); return;
     case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lpage = 0; render(); return;
@@ -5520,6 +5649,7 @@ document.addEventListener("input", ev => {
   if (t.id === "aq") { S.aq = t.value; const pos = t.selectionStart; render(); const el = $("#aq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } return; }
   if (t.id === "li-paste") return loginImportPreview();
   if (t.id === "rvi-paste") return reviewImportPreview();
+  if (t.id === "galq") { S.galq = t.value; S.galpage = 0; const pos = t.selectionStart; render(); const el = $("#galq"); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } return; }
   const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq", rvq: "rvq" }[t.id];
   if (!key) return;
   if (key === "of") { S.of.q = t.value; S.page = 0; const q0 = t.value.trim(); if (q0 && !S.orders.some(o => orderMatchesQ(o, q0.toLowerCase()))) queueShopFind(q0); else queueShopFind(""); } else { S[key] = t.value; S.cpage = 0; if (key === "liq") S.lpage = 0; }
@@ -5804,7 +5934,7 @@ render();
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery"]) {
       db.collection(col).onSnapshot(snap => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         S.raw[col] = snap.docs;
