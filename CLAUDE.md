@@ -21,6 +21,10 @@ This file is my profile. Read it at the start of every session and follow it.
 - **Ship fast, MVP first.** Get a working version first and polish later. Don't over-engineer.
 - **Pick the tech stack yourself.** Choose the simplest tool that fits, and say why in one line. For web apps, default to something easy to deploy and widely used.
 
+## Dashboard (Regal Spritz OS) preferences
+- Shared features (Orders, Listings) live once in the main Workspace menu, not repeated as department tabs.
+- Website and listing edits are marked "To sync"; I paste the Website code into WebCake myself.
+
 ## Writing for me (emails, docs, content)
 - Match the voice to the context and audience: casual for social posts, professional and warm for clients, crisp for internal notes.
 - If the audience isn't clear, assume professional but warm.
