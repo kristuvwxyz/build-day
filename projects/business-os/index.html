@@ -51,6 +51,10 @@ button { cursor: pointer; }
 
 .app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; }
 .rail { background: var(--surface); border-right: 1px solid var(--line); padding: 24px 14px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; }
+.tag-cell { cursor: text; } .tag-cell:hover .tags .tag, .tag-cell:hover .tag-add { outline: 1px dashed var(--line); }
+.tag-add { font-size: 12px; color: var(--muted); }
+.tag-in { font: inherit; font-size: 13px; width: 100%; min-width: 160px; border: 1px solid var(--gold); border-radius: 6px; padding: 4px 6px; background: var(--surface); color: inherit; }
+.shopfind .sf-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
 .lcell { font: inherit; font-size: 13px; border: 1px solid transparent; background: transparent; color: inherit; border-radius: 6px; padding: 4px 6px; }
 select.lcell { width: auto; max-width: 118px; padding-right: 2px; }
 .lcell:hover { border-color: var(--line); background: var(--surface); }
@@ -2478,6 +2482,52 @@ function statsStrip() {
 }
 
 /* ---------- orders: table ---------- */
+const squash = x => String(x || "").toLowerCase().replace(/[\s#\-]/g, "");
+function orderMatchesQ(o, q) {
+  const hay = [o.num, o.customer, o.email, o.ref, o.phone, o.tracking, ...(o.merged || []), o.assignee ? memberName(o.assignee) : "", plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase();
+  if (hay.includes(q.replace(/^#/, ""))) return true;
+  const sq = squash(q); if (sq.length < 3) return false;
+  return [o.num, ...(o.merged || []), o.tracking, o.ref, o.phone].some(v => squash(v).includes(sq)) || (/^\d+$/.test(sq) && squash(o.num).replace(/^[a-z]+/, "") === sq);
+}
+// Orders not kept in the dashboard (e.g. already shipped) are looked up live in Shopify by order #, name, email or J&T tracking #.
+const SHOP_FIND_Q = `query RSFind($q: String!) { orders(first: 10, query: $q, sortKey: CREATED_AT, reverse: true) { nodes { ${"${SHOP_FIELDS}"} } } }`;
+S.shopFind = { q: "", state: "", list: [] };
+let shopFindTimer = 0;
+function queueShopFind(q, now) {
+  clearTimeout(shopFindTimer);
+  q = String(q || "").trim();
+  if (!S.mcp || q.length < 4) { if (S.shopFind.q) { S.shopFind = { q: "", state: "", list: [] }; } return; }
+  if (S.shopFind.q === q && S.shopFind.state) return;
+  shopFindTimer = setTimeout(() => shopFind(q), now ? 0 : 700);
+}
+async function shopFind(q) {
+  S.shopFind = { q, state: "loading", list: [] }; paintShopFind();
+  try {
+    const res = await shopCall(SHOP_FIND_Q, { q: q.replace(/^#/, "") }, 10);
+    const nodes = (dig(res, "orders") || {}).nodes || [];
+    if (S.shopFind.q !== q) return;
+    S.shopFind = { q, state: "done", list: nodes.map(shopToOrder) };
+  } catch (e) { if (S.shopFind.q === q) S.shopFind = { q, state: "error", list: [], msg: (e && e.message) || "" }; }
+  paintShopFind();
+  return S.shopFind.list;
+}
+function shopFindPanel() {
+  const f = S.shopFind, q = (S.of.q || "").trim();
+  if (!q || f.q !== q || !f.state) return "";
+  if (f.state === "loading") return `<div class="panel shopfind"><div class="empty">Searching Shopify for “${esc(q)}”…</div></div>`;
+  if (f.state === "error") return `<div class="panel shopfind"><div class="empty">Couldn't search Shopify${f.msg ? ": " + esc(f.msg) : ""}.</div></div>`;
+  const list = f.list.filter(o => !filteredOrders().some(x => x.id === orderDocId(o)));
+  if (!list.length) return filteredOrders().length ? "" : `<div class="panel shopfind"><div class="empty">No order in Shopify matches “${esc(q)}” either.</div></div>`;
+  return `<div class="panel shopfind"><div class="head"><h2>Found in Shopify</h2><span class="s">Older or shipped orders that aren't in this list</span></div>
+    ${list.map(o => `<div class="sf-row"><div style="min-width:0"><b>#${esc(o.num)}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date)} · ${esc(ful(o.fulfillment).name)} · ${esc(pay(o.payment).name)}${o.tracking ? " · " + esc(o.tracking) : ""}</div></div><button class="btn sm primary" type="button" data-act="shop-find-open" data-num="${esc(o.num)}">Open</button></div>`).join("")}</div>`;
+}
+function paintShopFind() { const el = $("#shopfind-slot"); if (el) el.innerHTML = shopFindPanel(); }
+async function openShopFound(num) {
+  const o = (S.shopFind.list || []).find(x => x.num === num); if (!o) return;
+  const id = orderDocId(o);
+  if (!findOrder(id)) await shopApply(o, true);
+  setTimeout(() => openOrderDetails(id), 300);
+}
 function filteredOrders() {
   const q = S.of.q.trim().toLowerCase();
   const vw = S.of.view;
@@ -2491,7 +2541,7 @@ function filteredOrders() {
     if (vw === "on_hold" && o.fulfillment !== "on_hold") return false;
     if (vw === "open" && (isVoid(o) || !(OPEN_FUL.has(o.fulfillment) || o.payment !== "paid"))) return false;
     if (vw === "archived" && !(isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)))) return false;
-    if (q && ![o.num, "#" + o.num, o.customer, o.email, o.ref, o.phone, o.tracking, ...(o.merged || []), memberName(o.assignee), plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)) return false;
+    if (q && !orderMatchesQ(o, q)) return false;
     return true;
   }).sort(orderSorter());
 }
@@ -2598,7 +2648,7 @@ function orderCell(k, o, table) {
     case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
-    case "tags": return `<td>${tagCell(o.tags)}</td>`;
+    case "tags": return canAll() && !o.archived ? `<td class="tag-cell" data-tagedit="${o.id}" title="Click to edit tags">${tagCell(o.tags)}${(o.tags || []).length ? "" : `<span class="tag-add">+ Tag</span>`}</td>` : `<td>${tagCell(o.tags)}</td>`;
     case "phone": return `<td class="nowrap" style="user-select:all">${esc(o.phone || (o.ship || {}).phone || "")}</td>`;
     case "address": { const sh = shipOf(o); return `<td style="min-width:200px;font-size:12.5px">${esc([sh.address1, sh.address2, sh.city, sh.province].filter(Boolean).join(", ") || (o.pickup ? "Pickup" : ""))}</td>`; }
     case "actions": return `<td class="nowrap">${canShip() && o.fulfillment !== "fulfilled" ? `<button class="btn primary sm" type="button" data-ful="${o.id}" data-to="fulfilled">Shipped</button>` : ""} <button class="btn ghost sm" type="button" data-open="${o.id}">Details</button></td>`;
@@ -2696,6 +2746,8 @@ function viewOrders() {
     ${ofActive() ? `<button class="btn ghost" type="button" data-act="of-clear">✕ Clear filters</button>` : ""}
     <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
   </div>
+  ${S.of.q && !all.length && ofActive() && (S.of.month || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all") && S.orders.some(o => orderMatchesQ(o, S.of.q.trim().toLowerCase())) ? `<div class="notice">Some orders match “${esc(S.of.q)}” but your filters hide them. <button class="btn sm" type="button" data-act="of-clear-keepq">Show them</button></div>` : ""}
+  <div id="shopfind-slot">${shopFindPanel()}</div>
   ${bulk}
   ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
   <div class="head"><div class="pager">
@@ -3246,7 +3298,8 @@ const parseTags = s => [...new Set(s.split(",").map(t => t.trim().toUpperCase())
 const opts = (list, sel) => list.map(s => `<option value="${s.id}" ${sel === s.id ? "selected" : ""}>${s.name}</option>`).join("");
 function allTags() { const m = new Map(); for (const o of S.orders) for (const t of o.tags || []) m.set(t, (m.get(t) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]); }
 function tagField(tags) {
-  const sug = ["DISPUTE", ...allTags().filter(t => t !== "DISPUTE").slice(0, 14)];
+  const have = new Set((tags || []).map(normTag));
+  const sug = ["DISPUTE", ...allTags().filter(t => t !== "DISPUTE").slice(0, 14)].filter(t => !have.has(normTag(t)));
   return `<div class="field"><label for="o-tags">Tags (comma separated)</label><input id="o-tags" value="${esc((tags || []).join(", "))}" placeholder="e.g. DISPUTE, S-JEFF" autocomplete="off"><div style="font-size:12px;color:var(--muted)">Stage tags like 8.FWD or 6.BILLED set the Fulfillment Status instead of staying as tags.</div>
     ${sug.length ? `<div class="tags" style="flex-wrap:wrap;margin-top:4px">${sug.map(t => `<button type="button" class="tag" data-addtag="${esc(t)}">+ ${esc(t)}</button>`).join("")}</div>` : ""}</div>`;
 }
@@ -3342,27 +3395,19 @@ function openOrderDetails(id) {
       <div class="li"><span style="font-weight:700">Profit</span><span class="num" style="font-weight:700;color:${profit(o) < 0 ? "var(--bad)" : "var(--good)"}">${isVoid(o) || arch ? "–" : peso2(profit(o))}</span></div>
     </div>
     ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
-    ${cp || cf ? `<div class="row">
-      ${cp ? `<div class="field"><label for="d-pay">Payment status</label><select id="d-pay">${opts(PAYMENTS, o.payment)}</select></div>` : ""}
-      ${cf ? `<div class="field"><label for="d-ful">Fulfillment status</label><select id="d-ful">${opts(FULFILLMENTS, o.fulfillment)}</select></div>` : ""}
-    </div>` : ""}
+    ${cp || cf ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)">Status: <span class="badge ${pay(o.payment).cls || ""}">${esc(pay(o.payment).name)}</span><span class="badge ${ful(o.fulfillment).cls || ""}">${esc(ful(o.fulfillment).name)}</span> · change these in the Orders table.</div>` : ""}
     ${all ? `${tagField(o.tags)}
     <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2">${esc(o.note || "")}</textarea></div>
     <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Delete moves the order to Archived orders.</div>` : ""}
-    ${cs ? `<div class="row">
-      <div class="field"><label for="d-track">Tracking # (waybill)</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
-      <div class="field"><label for="d-courier">Courier</label><select id="d-courier">${COURIERS.map(c => `<option value="${c}" ${c === courierOf(o) ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select></div>
-    </div>
+    ${cs ? `<div class="field"><label for="d-track">Tracking # (waybill) · ${esc(COURIER_LABEL[courierOf(o)] || "")}</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>
     ${o.tracking && o.ref && !o.shopShippedAt ? `<button class="btn sm" type="button" data-act="ship-shopify" data-id="${o.id}" style="align-self:flex-start">Send tracking to Shopify</button>${o.shopShipErr ? `<div style="font-size:12px;color:var(--bad)">${esc(o.shopShipErr)}</div>` : ""}` : o.shopShippedAt ? `<div style="font-size:12px;color:var(--good)">Tracking sent to Shopify ${relTime(o.shopShippedAt)} ✓ (shows in the buyer's Order History)</div>` : ""}` : o.tracking ? `<div>🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${editable ? "Cancel" : "Close"}</button>${editable ? `<button class="btn primary" type="submit">Save changes</button>` : ""}</div>
     ${(o.log || []).length ? `<div class="olog"><div class="olog-h">Team activity</div>${[...o.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>` : ""}`,
   editable ? async () => {
     const ch = {};
-    if (cp) ch.payment = val("d-pay");
-    if (cf) ch.fulfillment = val("d-ful");
     if (all) Object.assign(ch, { tags: parseTags(val("o-tags")), note: val("o-note"), assignee: val("d-assign") });
-    if (cs) { const tr = val("d-track").trim(); if (tr !== (o.tracking || "")) Object.assign(ch, { tracking: tr, trackingAt: tr ? Date.now() : 0 }); if (val("d-courier") !== courierOf(o) || o.courier === undefined) ch.courier = val("d-courier"); }
+    if (cs) { const tr = val("d-track").trim(); if (tr !== (o.tracking || "")) Object.assign(ch, { tracking: tr, trackingAt: tr ? Date.now() : 0 }); }
     const disp = (ch.tags || o.tags || []).some(t => normTag(t) === "DISPUTE");
     if (disp && ["unfulfilled", "fulfilled"].includes(ch.fulfillment) && ch.fulfillment !== o.fulfillment && !S.dispOk) { S.dispOk = true; return sheetError(`⚠️ This order has a DISPUTE tag. Make sure it's resolved before it goes to ${ful(ch.fulfillment).name}. Press Save again to continue.`); }
     S.dispOk = false;
@@ -3676,12 +3721,20 @@ async function scanUndo() {
   const l = S.lastScan; if (!l || !l.delta) return;
   await adjustStock(l.id, -l.delta); S.lastScan = null; render(); toast("Undone.");
 }
-function handlePackScan(code) {
-  const c = String(code).replace(/^#/, "").replace(/\s+/g, "").toUpperCase();
-  const o = S.orders.find(x => [x.num, ...(x.merged || [])].some(n => String(n).replace(/\s+/g, "").toUpperCase() === c) || String(x.ref || "").toUpperCase() === c || String(x.tracking || "").toUpperCase() === c);
+async function handlePackScan(code) {
+  const c = squash(code);
+  const pool = [...S.orders, ...S.archived];
+  const o = pool.find(x => [x.num, ...(x.merged || [])].some(n => squash(n) === c) || squash(x.ref) === c || String(x.tracking || "").split(/\s+/).some(t => squash(t) === c))
+    || (/^\d{3,6}$/.test(c) ? pool.find(x => squash(x.num).replace(/^[a-z]+/, "") === c) : null);
   if (o) return openOrderDetails(o.id);
   const p = findByCode(code);
-  toast(p ? `${p.name}: ${Number(p.stock) || 0} in stock` : `No order or product found for “${code}”.`);
+  if (p) return toast(`${p.name}: ${Number(p.stock) || 0} in stock`);
+  if (!S.mcp) return toast(`No order or product found for “${code}”.`);
+  toast(`Looking up “${code}” in Shopify…`);
+  const list = await shopFind(String(code).trim()) || [];
+  const hit = list.find(x => squash(x.num) === c || String(x.tracking || "").split(/\s+/).some(t => squash(t) === c)) || (list.length === 1 ? list[0] : null);
+  if (hit) return openShopFound(hit.num);
+  toast(list.length ? `${list.length} Shopify orders match “${code}”. Type it in the order search to pick one.` : `No order found for “${code}”, here or in Shopify.`);
 }
 function scanBar() {
   const mode = S.scanMode || "in", l = S.lastScan, p = l && l.id ? S.products.find(x => x.id === l.id) : null;
@@ -5214,8 +5267,20 @@ document.addEventListener("click", guard(async ev => {
   if (pg) { S.page += Number(pg.dataset.page); render(); return; }
   const bk = ev.target.closest("[data-bulk]");
   if (bk) return bulkAction(bk.dataset.bulk);
+  const te = ev.target.closest("[data-tagedit]");
+  if (te && !te.querySelector("input")) {
+    const o = findOrder(te.dataset.tagedit); if (!o) return;
+    te.innerHTML = `<input class="tag-in" list="tag-list" value="${esc((o.tags || []).join(", "))}" placeholder="e.g. PO, S-JEFF" aria-label="Tags, comma separated"><datalist id="tag-list">${allTags().map(t => `<option value="${esc(t)}"></option>`).join("")}</datalist>`;
+    const inp = te.querySelector("input"); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+    let done = false;
+    const finish = async keep => { if (done) return; done = true; const next = parseTags(inp.value); if (keep && next.join(",") !== (o.tags || []).join(",")) { await updateOrder(o, { tags: next }); toast(`${onum(o)}: tags saved.`); } render(); };
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); finish(true); } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); } });
+    inp.addEventListener("blur", () => finish(true));
+    return;
+  }
+  if (te) return;
   const at = ev.target.closest("[data-addtag]");
-  if (at) { const el = $("#o-tags"); const cur = parseTags(el.value); if (!cur.includes(at.dataset.addtag)) cur.push(at.dataset.addtag); el.value = cur.join(", "); return; }
+  if (at) { const el = $("#o-tags"); const cur = parseTags(el.value); if (!cur.includes(at.dataset.addtag)) cur.push(at.dataset.addtag); el.value = cur.join(", "); at.remove(); return; }
   if (ev.target.matches("input[type=checkbox]")) return;
   const op = ev.target.closest("[data-open]");
   if (op) return openOrderDetails(op.dataset.open);
@@ -5343,6 +5408,8 @@ document.addEventListener("click", guard(async ev => {
     case "viewas-stop": try { sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return;
     case "sp-clear": S.sp = { sup: "all", ful: "all", pay: "all", q: "" }; render(); return;
     case "import-committed": await importCommitted(); return;
+    case "shop-find-open": await openShopFound(b.dataset.num); return;
+    case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lpage = 0; render(); return;
     case "log-out": S.unlocked.clear(); saveUnlocked(); S.loggedOut = true; try { localStorage.removeItem("rs-nav"); } catch (e) {} S.view = "home"; render(); toast("Logged out."); return;
     case "log-in": S.loggedOut = false; render(); return;
@@ -5455,7 +5522,7 @@ document.addEventListener("input", ev => {
   if (t.id === "rvi-paste") return reviewImportPreview();
   const key = { "of-q": "of", pq: "pq", cq: "cq", tq: "tq", lq: "lq", liq: "liq", rvq: "rvq" }[t.id];
   if (!key) return;
-  if (key === "of") { S.of.q = t.value; S.page = 0; } else { S[key] = t.value; S.cpage = 0; if (key === "liq") S.lpage = 0; }
+  if (key === "of") { S.of.q = t.value; S.page = 0; const q0 = t.value.trim(); if (q0 && !S.orders.some(o => orderMatchesQ(o, q0.toLowerCase()))) queueShopFind(q0); else queueShopFind(""); } else { S[key] = t.value; S.cpage = 0; if (key === "liq") S.lpage = 0; }
   const pos = t.selectionStart; render();
   const el = document.getElementById(t.id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} }
 });
@@ -5503,7 +5570,8 @@ const SHOP_FIELDS = `id name createdAt cancelledAt displayFinancialStatus displa
   events(first: 25, sortKey: CREATED_AT, reverse: true) { nodes { __typename ... on CommentEvent { id createdAt rawMessage } } }
   shippingAddress { name phone address1 address2 city province zip country }
   totalPriceSet { shopMoney { amount } }
-  lineItems(first: 50) { nodes { name sku quantity product { handle } originalUnitPriceSet { shopMoney { amount } } } }`;
+  lineItems(first: 50) { nodes { name sku quantity product { handle } originalUnitPriceSet { shopMoney { amount } } } }
+  fulfillments(first: 5) { trackingInfo(first: 3) { number } }`;
 const SHOP_LIST_Q = `query RSOpenOrders($first: Int!, $after: String) { orders(first: $first, after: $after, query: "-fulfillment_status:fulfilled -status:cancelled", sortKey: CREATED_AT, reverse: true) { pageInfo { hasNextPage endCursor } nodes { ${SHOP_FIELDS} } } }`;
 const SHOP_NODES_Q = `query RSOrderStatus($ids: [ID!]!) { nodes(ids: $ids) { ... on Order { ${SHOP_FIELDS} } } }`;
 const SHOP_OPEN = new Set(["UNFULFILLED", "PARTIALLY_FULFILLED", "ON_HOLD", "SCHEDULED", "IN_PROGRESS", "OPEN", "PENDING_FULFILLMENT"]);
@@ -5537,6 +5605,7 @@ function shopToOrder(n) {
   const tags0 = Array.isArray(n.tags) ? n.tags : parseTags(n.tags || "");
   const fulfillment = n.cancelledAt ? "cancelled" : fs === "FULFILLED" ? "fulfilled" : fs === "ON_HOLD" ? "on_hold" : SHOP_OPEN.has(fs) ? "unfulfilled" : "not_required";
   const a = n.shippingAddress || {}, c = n.customer || {};
+  const shopTracking = (n.fulfillments || []).flatMap(f => (f.trackingInfo || []).map(t => t.number)).filter(Boolean).join(" ");
   const items = ((n.lineItems && n.lineItems.nodes) || []).filter(i => i.quantity).map(i => {
     const h = (i.product && i.product.handle) || "";
     const p = (h && S.products.find(x => x.webId === h)) || S.products.find(x => (i.sku && x.sku && x.sku.toLowerCase() === i.sku.toLowerCase()) || (x.name || "").toLowerCase() === (i.name || "").toLowerCase());
@@ -5552,7 +5621,7 @@ function shopToOrder(n) {
     ship: { name: a.name || c.displayName || "", phone: a.phone || n.phone || "", address1: a.address1 || "", address2: a.address2 || "", city: a.city || "", province: a.province || "", zip: a.zip || "", country: a.country || "" },
     shipTitle: (n.shippingLine && n.shippingLine.title) || "",
     comments: (((n.events || {}).nodes) || []).filter(e => e && e.__typename === "CommentEvent" && e.rawMessage).map(e => ({ id: String(e.id || "").split("/").pop(), at: Date.parse(e.createdAt) || 0, text: String(e.rawMessage).slice(0, 2000) })), pickup: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress) === "SDD", courier: pickCourier((n.shippingLine || {}).title, !!n.shippingAddress),
-    imported: true, noStock: true, restocked: false, source: "shopify-live",
+    imported: true, noStock: true, restocked: false, source: "shopify-live", ...(shopTracking ? { tracking: shopTracking, shopShippedAt: Date.now() } : {}),
     fulfilledAt: fulfillment === "fulfilled" ? Date.now() : 0, deliveredAt: 0,
     voidedAt: VOIDPAY.has(payment) || n.cancelledAt ? (Date.parse(n.cancelledAt) || createdAt) : 0,
   };
@@ -5581,6 +5650,7 @@ async function shopApply(o, isNew) {
   const marks = o.shopPay !== ex.shopPay || o.shopFul !== ex.shopFul || o.shopNote !== ex.shopNote || shTags.join() !== (ex.shopTags || []).join();
   const backfill = {};
   if (!ex.ship && o.ship) backfill.ship = o.ship;
+  if (!ex.tracking && o.tracking) Object.assign(backfill, { tracking: o.tracking, shopShippedAt: ex.shopShippedAt || Date.now() });
   if (ex.courier === undefined) Object.assign(backfill, { courier: o.courier, pickup: o.pickup, shipTitle: o.shipTitle });
   if (o.comments && JSON.stringify(o.comments) !== JSON.stringify(ex.comments || [])) backfill.comments = o.comments;
   if (changed) { const ms = []; if (ch.payment !== ex.payment) ms.push(`changed Payment Status → ${pay(ch.payment).name}`); if (ch.fulfillment !== ex.fulfillment) ms.push(`changed Fulfillment Status → ${ful(ch.fulfillment).name}`); if (tags.join() !== (ex.tags || []).join()) ms.push("updated tags"); if (ms.length) ch.log = logAdd(ex, ms, "Shopify"); }
