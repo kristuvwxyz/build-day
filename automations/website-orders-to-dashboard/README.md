@@ -1,50 +1,28 @@
-# Website orders → RS Dashboard
+# RS order numbers: one counter for every channel
 
-regalspritz.com sends every new order to the RS App (dashboard) database. The dashboard gives back the order's **RS number** (continuing the old Shopify numbering: RS9995, RS9996…). The website shows that number to the customer.
+RS OS is the single counter for RS order numbers (website, Messenger, IG, walk-in). Format: `RS` + number, no dash (e.g. `RS9996`).
 
-## The call
+## Website backend asks for a number
 
-`POST https://juxtihdvwlyqusdtdokq.supabase.co/rest/v1/rpc/site_order`
+`POST https://regal-spritz-os.vercel.app/api/site`
 
-Headers:
-- `apikey: <SUPABASE_ANON_KEY>` (public key, same one the RS App uses)
-- `Authorization: Bearer <SUPABASE_ANON_KEY>`
-- `Content-Type: application/json`
-
-Body:
+Body (JSON):
 ```json
-{
-  "p_key": "<RS_SITE_KEY (secret)>",
-  "p_order": {
-    "siteRef": "RS-638480",
-    "customer": "Juan Dela Cruz",
-    "email": "juan@example.com",
-    "phone": "09171234567",
-    "address": "123 Street, Barangay, City, Province, 1234",
-    "ship": { "address1": "123 Street", "address2": "Barangay", "city": "City", "province": "Province", "zip": "1234" },
-    "courier": "J&T",
-    "pickup": false,
-    "items": [{ "name": "YSL MYSLF EDP | 3ML - MINI", "qty": 1, "price": 390, "sku": "" }],
-    "shipping": 0,
-    "discount": 0,
-    "payMethod": "Maya",
-    "payment": "pending",
-    "fulfillment": "unfulfilled",
-    "note": "",
-    "createdAt": 1791190000000
-  }
-}
+{ "action": "nextOrderNumber", "key": "<RS_BACKEND_KEY>", "source": "website" }
 ```
 
-Answer: `{ "ok": true, "orderNumber": "RS9995", "new": true }`
+Answer: `{ "ok": true, "ref": "RS9996" }`. A wrong key gets `{ "ok": false, "error": "Not allowed." }` (HTTP 403).
 
-- `siteRef` = the website's own order ID. Sending the same `siteRef` again never makes a duplicate: it returns the same RS number.
-- To update an order later (Maya payment confirmed, customer cancelled), send the same `siteRef` with only `payment` and/or `fulfillment`:
-  - `payment`: `pending`, `paid`, `partially_paid`, `refunded`, `voided` (voided = cancelled)
-  - `fulfillment`: `unfulfilled`, `on_hold`, `fulfilled`, `delivered`, `cancelled`
-- A wrong `p_key` is refused. The website key can't read anything from the dashboard.
-- Keep `RS_SITE_KEY` secret: only call this from server code (an API route or server function), never from browser JavaScript.
+- Call it from the server (Apps Script `UrlFetchApp`), never from the browser.
+- Numbers are handed out atomically by a Postgres sequence (`rs_order_seq`), so two orders never share a number.
+- Staff creating an order in RS OS take their number from the same counter.
 
-## Setup
+## Keeping one count
 
-`site_order.sql` is the database function (already installed). The real key is stored in `app_settings.site_key`; the copy here has a placeholder.
+- The counter never goes below the highest RS number in RS OS orders.
+- Each time RS OS loads website orders (`opsOrders`), it raises the counter above the highest website `ref` too, so numbers the website made on its own are never reused.
+- Website orders keep their `ref` as-is inside RS OS; nothing renumbers them.
+
+## Database
+
+`rs_counter.sql` creates the sequence and the `next_rs_number` / `rs_counter_floor` functions. The key is stored in `app_settings.site_key` (same value as `RS_BACKEND_KEY` in Vercel); the copy here has a placeholder. The old `site_order()` inbox was removed: website orders are read live and customer details stay on the website.

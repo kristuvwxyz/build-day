@@ -893,7 +893,7 @@ const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
   web: { orders: [], at: "", err: "", loading: false, loaded: false }, oSrc: "all", wf: { f: "all", q: "" }, site: null,
-  webnums: [], products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
+  products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
@@ -2258,23 +2258,8 @@ async function webLoad(quiet) {
     S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
-  assignWebNums();
 }
-// Website orders get the next number in our RS series (RS9995, RS9996…) the first time the dashboard sees them.
-// Only the pairing (website number → RS number) is saved; no customer details.
-let webNumBusy = false;
-async function assignWebNums() {
-  if (webNumBusy || !S.db || S.readOnly || !S.loaded.webnums || !S.loaded.orders) return;
-  const have = new Set(S.webnums.map(d => d.ref));
-  const todo = S.web.orders.filter(o => o.ref && !have.has(o.ref) && !/^RS\d+$/i.test(o.ref)).sort((a, b) => (new Date(a.date) - new Date(b.date)) || String(a.ref).localeCompare(String(b.ref)));
-  if (!todo.length) return;
-  webNumBusy = true;
-  try {
-    let n = Number(nextNum().slice(2));
-    for (const o of todo) { await save("webnums", String(o.ref).replace(/[^A-Za-z0-9_-]/g, "_"), { ref: o.ref, num: "RS" + n, at: Date.now(), by: actor() }); n++; }
-    S.web.dirty = true; bgRender();
-  } finally { webNumBusy = false; }
-}
+
 function paintWebState() { const el = $("#web-state"); if (el) el.textContent = S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""; }
 function webRows() {
   const q = squash(S.wf.q || "").replace(/^rs/, ""), f = S.wf.f;
@@ -2286,12 +2271,11 @@ const WEB_FUL = { placed: "unfulfilled", confirmed: "unfulfilled", packed: "on_h
 let webRowsMemo = { at: null, n: -1, rows: [] };
 function webAsOrders() {
   if (!S.site || !S.web.loaded) return [];
-  if (webRowsMemo.at === S.web.at && webRowsMemo.n === S.web.orders.length && webRowsMemo.m === S.webnums && !S.web.dirty) return webRowsMemo.rows;
-  const nm = new Map(S.webnums.map(d => [d.ref, d.num]));
+  if (webRowsMemo.at === S.web.at && webRowsMemo.n === S.web.orders.length && !S.web.dirty) return webRowsMemo.rows;
   S.web.dirty = false;
   const rows = S.web.orders.map(o => {
     const t = new Date(o.date).getTime() || 0, cancel = /cancel/i.test(o.status || "");
-    return { id: "web:" + o.ref, web: true, ref: o.ref, num: nm.get(o.ref) || String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
+    return { id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
       items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0 })),
       adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
@@ -2299,7 +2283,7 @@ function webAsOrders() {
       tracking: o.tracking || "", courier: "", tags: ["WEBSITE"], note: o.note || "", platform: "website", payMethod: o.payment || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }] };
   });
-  webRowsMemo = { at: S.web.at, n: S.web.orders.length, m: S.webnums, rows }; return rows;
+  webRowsMemo = { at: S.web.at, n: S.web.orders.length, rows }; return rows;
 }
 const allOrderRows = () => [...S.orders, ...webAsOrders()];
 function webFindPanel() {
@@ -2331,8 +2315,7 @@ function viewWebOrders() {
 function openWebOrder(ref) {
   const o = S.web.orders.find(x => x.ref === ref); if (!o) return;
   const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
-  const rsn = (S.webnums.find(d => d.ref === o.ref) || {}).num;
-  openSheet(`<h2 style="margin:0">${esc(rsn ? "#" + rsn : o.ref)} ${webBadge(o)}</h2>${rsn ? `<p style="margin:0;font-size:12.5px;color:var(--muted)">Website order no. ${esc(o.ref)}</p>` : ""}
+  openSheet(`<h2 style="margin:0">#${esc(String(o.ref || "").replace(/^#/, ""))} ${webBadge(o)}</h2>
     <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date))} · ${esc(o.payment || "")}${o.payRef ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
     <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
       <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
@@ -3587,11 +3570,14 @@ function openOrderForm() {
     const date = val("o-date") || today();
     const createdAt = date === today() ? Date.now() : new Date(date + "T12:00:00").getTime();
     const fulfillment = val("o-ful");
-    const order = { num, createdAt, date, platform: val("o-platform"), customer: val("o-customer"), ref: val("o-ref"), phone: val("o-phone"), items, fees: numv("o-fees"), shipping: numv("o-ship"), adjust: 0, payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
+    const rsv = S.site && S.site.nextNumber ? await S.site.nextNumber().catch(() => null) : null;
+    if (S.site && S.site.nextNumber && !(rsv && rsv.ok && /^RS\d+$/.test(rsv.ref || ""))) return sheetError((rsv && rsv.error) || "Couldn't get the next RS number. Try again.");
+    const fnum = (rsv && rsv.ref) || num;
+    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: val("o-customer"), ref: val("o-ref"), phone: val("o-phone"), items, fees: numv("o-fees"), shipping: numv("o-ship"), adjust: 0, payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
     await save("orders", uid("o"), order);
     const qtyBy = {}; items.forEach(i => qtyBy[i.productId] = (qtyBy[i.productId] || 0) + i.qty);
     for (const [pid, q] of Object.entries(qtyBy)) await adjustStock(pid, -q);
-    closeSheet(); toast(`Order #${num} saved. Inventory updated.`);
+    closeSheet(); toast(`Order #${fnum} saved. Inventory updated.`);
   });
 }
 
@@ -6142,14 +6128,14 @@ render();
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery", "webnums"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery"]) {
       db.collection(col).onSnapshot(snap => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         S.raw[col] = snap.docs;
         if (col === "orders") { S.orders = docs.filter(r => !r.archived).map(norm); S.archived = docs.filter(r => r.archived); }
         else S[col] = docs;
         S.loaded[col] = true;
-        if (col === "webnums" || col === "orders") { S.web.dirty = true; if (S.web.loaded) assignWebNums(); }
+        if (col === "orders") S.web.dirty = true;
         bgRender();
       }, () => { S.loaded[col] = true; $("#sync").textContent = "Connection lost · reload the page"; render(); });
     }

@@ -1,4 +1,5 @@
 // Reads and updates regalspritz.com website orders for signed-in team members only.
+// Also hands out RS order numbers from the one shared counter (website backend with the key, or signed-in staff).
 // The website backend key (RS_BACKEND_KEY) stays here on the server, never in the browser.
 // Customer details pass straight through: nothing is saved or logged here.
 const DEFAULT_URL = "https://script.google.com/macros/s/AKfycby15yiWGn93Y6R826l_gT1R0IW9VTrv3CblFl5Plc7OYvEiWC_OOfdRuybAWyfrS2C0Ww/exec";
@@ -11,6 +12,20 @@ export default async function handler(req, res) {
   if (!SB || !ANON) return res.status(503).json({ ok: false, error: "Supabase isn't set up in Vercel yet." });
   if (!KEY) return res.status(503).json({ ok: false, error: "Website orders aren't connected yet. Add RS_BACKEND_KEY in Vercel." });
 
+  let body; try { body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {}); } catch (e) { return res.status(400).json({ ok: false, error: "Send JSON." }); }
+  const rpc = (fn, args) => fetch(`${SB}/rest/v1/rpc/${fn}`, { method: "POST", headers: { apikey: ANON, Authorization: "Bearer " + ANON, "Content-Type": "application/json" }, body: JSON.stringify(args) });
+  const nextNumber = async () => {
+    const r = await rpc("next_rs_number", { p_key: KEY });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || typeof j !== "string" || !/^RS\d+$/.test(j)) return res.status(502).json({ ok: false, error: "Couldn't get the next RS number." });
+    return res.status(200).json({ ok: true, ref: j });
+  };
+  // The website backend (no staff session) asks for a number with the shared key.
+  if (body.action === "nextOrderNumber" && body.key !== undefined) {
+    if (typeof body.key !== "string" || body.key !== KEY) return res.status(403).json({ ok: false, error: "Not allowed." });
+    return nextNumber();
+  }
+
   // 1. Who is asking? Must be signed in and in the team directory.
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ")) return res.status(401).json({ ok: false, error: "Sign in again." });
@@ -20,8 +35,10 @@ export default async function handler(req, res) {
   const mem = await fetch(`${SB}/rest/v1/rpc/is_member`, { method: "POST", headers: head, body: "{}" });
   if (!mem.ok || (await mem.json()) !== true) return res.status(403).json({ ok: false, error: "Only team members can see website orders." });
 
+  // Staff creating an order in RS OS take the next number from the same counter.
+  if (body.action === "nextOrderNumber") return nextNumber();
+
   // 2. Build the backend request. Only these two actions and these fields are allowed.
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
   let call;
   if (body.action === "list") {
     call = { action: "opsOrders", key: KEY, limit: Math.min(500, Math.max(1, Number(body.limit) || 200)) };
@@ -44,6 +61,11 @@ export default async function handler(req, res) {
     const j = await r.json().catch(() => null);
     if (!j) return res.status(502).json({ ok: false, error: "The website backend didn't answer (" + r.status + ")." });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });
+    // Keep the shared counter above every website order number seen (covers numbers the website made on its own).
+    if (call.action === "opsOrders" && j.ok && Array.isArray(j.orders)) {
+      const max = j.orders.reduce((m, o) => { const x = /^RS(\d+)$/i.exec(String(o.ref || "")); return x ? Math.max(m, Number(x[1])) : m; }, 0);
+      if (max) await rpc("rs_counter_floor", { p_key: KEY, p_min: max }).catch(() => {});
+    }
     return res.status(200).json(j);
   } catch (e) {
     return res.status(502).json({ ok: false, error: "Couldn't reach the website backend." });
