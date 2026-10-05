@@ -24,6 +24,7 @@ This file is my profile. Read it at the start of every session and follow it.
 ## Dashboard (Regal Spritz OS) preferences
 - Shared features (Orders, Listings) live once in the main Workspace menu, not repeated as department tabs.
 - Website and listing edits are marked "To sync"; I paste the Website code into WebCake myself.
+- Access: Admin sees every department except CEO, Finance and Marketing.
 
 ## Writing for me (emails, docs, content)
 - Match the voice to the context and audience: casual for social posts, professional and warm for clients, crisp for internal notes.
