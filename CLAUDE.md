@@ -8,7 +8,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - **Timezone:** Asia/Manila (PHT, UTC+8). Use it for anything time-based: schedules, cron jobs, deadlines.
 - **Main uses:** building apps and websites, writing and docs, automation and workflows.
 - **No developer:** I build and edit my sites myself (the online shop in `projects/shop`, Webcake pages). Write guides for me, not for a developer: click-by-click, in order.
-- **Live store:** my current shop runs on Shopify. Never suggest changes that could take it offline without warning me first.
+- **Store:** my Shopify plan is cancelled (Oct 2026), so the Shopify store is closed. Don't plan new work that depends on Shopify unless I reopen it.
 
 ## Communication
 - Short and direct. Lead with the answer, and use bullets where they help.
@@ -26,7 +26,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Shared features (Orders, Listings) live once in the main Workspace menu, not repeated as department tabs.
 - Website and listing edits are marked "To sync"; I paste the Website code into WebCake myself.
 - Access: Admin sees every department except CEO, Finance and Marketing.
-- Shopify is one-way: new orders and Shopify-side changes (status, tags, notes) come into the dashboard. Never send dashboard edits back to Shopify.
+- Shopify is one-way: new orders and Shopify-side changes (status, tags, notes) come into the dashboard. Never send dashboard edits back to Shopify. (On hold: the Shopify plan is cancelled.)
 
 ## Writing for me (emails, docs, content)
 - Match the voice to the context and audience: casual for social posts, professional and warm for clients, crisp for internal notes.
