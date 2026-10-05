@@ -2,7 +2,7 @@
 // Also hands out RS order numbers from the one shared counter (website backend with the key, or signed-in staff).
 // The website backend key (RS_BACKEND_KEY) stays here on the server, never in the browser.
 // Customer details pass straight through: nothing is saved or logged here.
-const DEFAULT_URL = "https://script.google.com/macros/s/AKfycby15yiWGn93Y6R826l_gT1R0IW9VTrv3CblFl5Plc7OYvEiWC_OOfdRuybAWyfrS2C0Ww/exec";
+const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbz7R17lKloaq_VaFMK-nDge-9AUXNFmNgaH7WZr2gWJjxRLMn1hEa6HubmeaDbaPzdU4g/exec";
 const STATUSES = new Set(["Placed", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"]);
 
 export default async function handler(req, res) {
