@@ -931,6 +931,30 @@ async function adjustStock(productId, delta) {
   await patch("products", productId, { stock: next });
 }
 
+/* Reserved stock: units in checked-out orders that haven't shipped yet.
+   "stock" is what's still free to sell; it drops at checkout and comes back if the order is cancelled. */
+const isCancelled = (pay, fl) => VOIDPAY.has(pay) || fl === "cancelled";
+const onHandProduct = pid => { const p = S.products.find(x => x.id === pid); return p && p.kind !== "preorder" ? p : null; };
+function stockTake(items) { const m = {}; for (const i of items || []) if (i.productId && onHandProduct(i.productId)) m[i.productId] = (m[i.productId] || 0) + (Number(i.qty) || 0); return m; }
+async function applyStockMap(m, sign) { for (const [pid, q] of Object.entries(m || {})) if (q) await adjustStock(pid, sign * q); }
+// Works out whether a status change cancels or un-cancels the order, and moves stock once either way.
+function stockTransition(o, nextPay, nextFul) {
+  if (o.noStock) return null;
+  const was = isCancelled(o.payment, o.fulfillment), will = isCancelled(nextPay ?? o.payment, nextFul ?? o.fulfillment);
+  if (!was && will && !o.restocked) return { restocked: true, sign: 1 };
+  if (was && !will && o.restocked) return { restocked: false, sign: -1 };
+  return null;
+}
+let resvCache = { ref: null, n: -1, map: {} };
+function reservedMap() {
+  const n = S.orders.reduce((a, o) => a + (o.items || []).length + (OPEN_FUL.has(o.fulfillment) ? 1 : 0) + (isVoid(o) ? 2 : 0), 0);
+  if (resvCache.ref === S.orders && resvCache.n === n) return resvCache.map;
+  const m = {};
+  for (const o of S.orders) { if (o.archived || !OPEN_FUL.has(o.fulfillment) || isVoid(o)) continue; for (const i of o.items || []) if (i.productId) m[i.productId] = (m[i.productId] || 0) + (Number(i.qty) || 0); }
+  resvCache = { ref: S.orders, n, map: m }; return m;
+}
+const reservedOf = p => p && p.kind !== "preorder" ? (reservedMap()[p.id] || 0) : 0;
+
 /* Applies a payment/fulfillment/tag/note change and keeps stock + timestamps right. */
 async function updateOrder(o, ch) {
   ch = { ...ch };
@@ -944,9 +968,11 @@ async function updateOrder(o, ch) {
   }
   if (ch.payment && ch.payment !== o.payment) {
     const was = isVoid(o), will = VOIDPAY.has(ch.payment);
-    if (!was && will) { upd.voidedAt = now; if (!o.noStock && !o.restocked) { upd.restocked = true; stockDelta = 1; } }
-    if (was && !will) { upd.voidedAt = 0; if (!o.noStock && o.restocked) { upd.restocked = false; stockDelta = -1; } }
+    if (!was && will) upd.voidedAt = now;
+    if (was && !will) upd.voidedAt = 0;
   }
+  const tr = stockTransition(o, upd.payment, upd.fulfillment);
+  if (tr) { upd.restocked = tr.restocked; stockDelta = tr.sign; }
   const L = { payment: ["Payment Status", v => pay(v).name], fulfillment: ["Fulfillment Status", v => ful(v).name], courier: ["Courier", v => v], tracking: ["Tracking #", v => v || "(cleared)"], assignee: ["Assigned to", v => v ? memberName(v) : "Unassigned"] };
   const msgs = [];
   for (const [k, [lab, f]] of Object.entries(L)) if (upd[k] !== undefined && upd[k] !== (o[k] ?? (k === "courier" ? courierOf(o) : undefined))) msgs.push(`changed ${lab} → ${f(upd[k])}`);
@@ -955,7 +981,7 @@ async function updateOrder(o, ch) {
   const by = upd._by; delete upd._by;
   if (msgs.length) upd.log = logAdd(o, msgs, by);
   await patch("orders", o.id, upd);
-  if (stockDelta) for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, stockDelta * (Number(i.qty) || 0));
+  if (stockDelta) { if (o.stockTaken) await applyStockMap(o.stockTaken, stockDelta); else for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, stockDelta * (Number(i.qty) || 0)); }
   return stockDelta;
 }
 
@@ -1602,7 +1628,7 @@ function headActions() {
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
     logins: S.vaultKey && can ? `<button class="btn ghost" type="button" data-act="vault-lock">${svg("lock", "btn-ico")} Lock logins</button><button class="btn primary" type="button" data-act="new-login">Add login</button>` : "",
-    listings: `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
+    listings: `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
   return lockBtn + (map[moduleKey()] || "");
@@ -3058,7 +3084,7 @@ function viewInventory() {
       <td class="r num">${peso(price)}</td>
       <td class="r num">${peso(cost)}</td>
       <td class="r num">${price ? Math.round((price - cost) / price * 100) + "%" : "–"}</td>
-      <td class="r"><div class="num" style="font-weight:700">${Number(p.stock) || 0}</div><span class="chip ${st.cls}">${st.label}</span></td>
+      <td class="r"><div class="num" style="font-weight:700">${Number(p.stock) || 0}</div>${reservedOf(p) ? `<div class="s num">+${reservedOf(p)} reserved</div>` : ""}<span class="chip ${st.cls}">${st.label}</span></td>
       <td><div>${esc(p.batch || "–")}</div><div class="s">${p.expiry ? fmtDate(p.expiry) + " " + new Date(p.expiry + "T00:00:00").getFullYear() : ""} ${ex ? `<span class="chip ${ex.cls}">${ex.label}</span>` : ""}</div></td>
       <td class="r" style="white-space:nowrap">${S.readOnly ? "" : `<button class="btn sm" type="button" data-act="restock" data-id="${p.id}">Restock</button> <button class="btn ghost sm" type="button" data-act="edit-product" data-id="${p.id}">Edit</button>`}</td>
     </tr>`; }).join("")}</tbody>
@@ -3425,6 +3451,11 @@ async function shopifyShip(o, manual) {
   }
 }
 
+const BADGES = ["New arrival", "Best seller", "Limited edition", "Last piece", "On sale", "Restocked", "Exclusive", "Gift pick"];
+const badgesOf = p => { const b = Array.isArray(p.badges) ? p.badges : []; return p.isNew && !b.includes("New arrival") ? ["New arrival", ...b] : b; };
+const COMMON_SIZES = ["1.5ml", "2ml", "5ml", "10ml", "15ml", "30ml", "40ml", "50ml", "60ml", "75ml", "80ml", "90ml", "100ml", "125ml", "150ml", "200ml"];
+const sizeKey = s => { const m = String(s).match(/^([\d.]+)\s*(ml|g)$/i); return m ? (m[2].toLowerCase() === "g" ? 1e4 : 0) + Number(m[1]) : 1e6; };
+function listOptions(field, base = []) { const c = {}; for (const p of S.products) { const v = String(p[field] || "").trim(); if (v) c[v] = (c[v] || 0) + 1; } return [...new Set([...base, ...Object.keys(c)])]; }
 const LIST_TYPES = ["Sealed", "Tester", "Partial", "Unsealed, New", "Boxed, New", "Set", "Mini", "Vial", "Decant", "Other"];
 const WEB_CATS = [["her", "For her"], ["him", "For him"], ["unisex", "Unisex"], ["arabian", "Arabian"], ["beauty", "Beauty"]];
 const SITE = "https://regal.famcoventures.com/";
@@ -3434,14 +3465,14 @@ function openProductForm(id, preset = {}) {
   openSheet(`
     <h3>${id ? "Edit listing" : "Add listing"}</h3>
     <div style="display:flex;gap:14px;align-items:flex-start">
-      <div class="lphoto" id="p-photo-prev">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : ""}</div>
+      <div class="lphoto" id="p-photo-prev">${p.photo ? `<img src="${esc(p.photo)}" alt="" referrerpolicy="no-referrer">` : ""}</div>
       <div style="display:flex;flex-direction:column;gap:6px"><label class="btn sm" for="p-photo-file" style="cursor:pointer">Upload photo</label><input id="p-photo-file" type="file" accept="image/*" hidden>
         ${p.photo ? `<button class="btn sm ghost" type="button" data-act="p-photo-clear">Remove photo</button>` : ""}<input type="hidden" id="p-photo" value="${esc(p.photo || "")}"></div>
     </div>
     <div class="field"><label for="p-name">Product name</label><input id="p-name" value="${esc(p.name || "")}" placeholder="e.g. Carolina Herrera Good Girl EDP 80ml"></div>
     <div class="row">
-      <div class="field"><label for="p-brand">Brand</label><input id="p-brand" value="${esc(p.brand || "")}"></div>
-      <div class="field"><label for="p-size">Size</label><input id="p-size" value="${esc(p.size || "")}" placeholder="100ml"></div>
+      <div class="field"><label for="p-brand">Brand</label><input id="p-brand" list="p-brand-list" value="${esc(p.brand || "")}" placeholder="Pick or type a brand" autocomplete="off"><datalist id="p-brand-list">${listOptions("brand").sort((a, b) => a.localeCompare(b)).map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
+      <div class="field"><label for="p-size">Size</label><input id="p-size" list="p-size-list" value="${esc(p.size || "")}" placeholder="Pick or type, e.g. 100ml" autocomplete="off"><datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist></div>
       <div class="field"><label for="p-type">Type</label><select id="p-type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
     </div>
     <div class="row">
@@ -3450,7 +3481,7 @@ function openProductForm(id, preset = {}) {
       <div class="field"><label for="p-cost">Cost per unit (₱)</label><input id="p-cost" type="number" min="0" step="0.01" value="${p.cost ?? ""}"></div>
     </div>
     <div class="row">
-      <div class="field"><label for="p-stock">Units in stock</label><input id="p-stock" type="number" step="1" value="${p.stock ?? 0}"></div>
+      <div class="field"><label for="p-stock">Units in stock <span style="font-weight:400">(free to sell)</span></label><input id="p-stock" type="number" step="1" value="${p.stock ?? 0}">${id && reservedOf(p) ? `<small style="color:var(--muted)">+ ${reservedOf(p)} reserved in checked-out orders · ${(Number(p.stock) || 0) + reservedOf(p)} on hand</small>` : ""}</div>
       <div class="field"><label for="p-reorder">Low-stock alert at</label><input id="p-reorder" type="number" min="0" step="1" value="${p.reorder ?? 1}"></div>
       <div class="field"><label for="p-status">Listing status</label><select id="p-status">${Object.entries(LIST_STATUS).map(([k, s]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>
     </div>
@@ -3461,9 +3492,10 @@ function openProductForm(id, preset = {}) {
     </div>
     <div class="row">
       <div class="field"><label for="p-kind">Availability</label><select id="p-kind"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand (ships in 24h)</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select></div>
-      <div class="field"><label for="p-eta">Pre-order arrival</label><input id="p-eta" value="${esc(p.eta || "")}" placeholder="e.g. October"></div>
-      <div class="field"><label for="p-new">Badges</label><label style="display:flex;gap:6px;align-items:center;font-size:13px;padding-top:8px"><input type="checkbox" id="p-new" ${p.isNew ? "checked" : ""}> New arrival</label></div>
+      <div class="field"><label for="p-eta">ETA</label><select id="p-eta"><option value="">–</option>${[...new Set([...MONTHS, p.eta].filter(Boolean))].map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div>
     </div>
+    <fieldset class="field" style="border:0;padding:0;margin:0"><legend style="font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px">Badges</legend>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 16px">${BADGES.map((b, k) => `<label style="display:flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer"><input type="checkbox" class="p-badge" id="p-badge-${k}" value="${esc(b)}" ${badgesOf(p).includes(b) ? "checked" : ""}> ${esc(b)}</label>`).join("")}</div></fieldset>
     <div class="row">
       <div class="field"><label for="p-ntop">Top notes</label><input id="p-ntop" value="${esc(((p.notes || {}).top || []).join(", "))}" placeholder="Lime, Cardamom"></div>
       <div class="field"><label for="p-nheart">Heart notes</label><input id="p-nheart" value="${esc(((p.notes || {}).heart || []).join(", "))}"></div>
@@ -3481,7 +3513,7 @@ function openProductForm(id, preset = {}) {
     if (!val("p-name")) return sheetError("Give the product a name.");
     const bc = val("p-barcode");
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
-    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: val("p-type"), sku: val("p-sku"), barcode: bc, category: val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: val("p-status"), kind: val("p-kind"), eta: val("p-eta"), isNew: $("#p-new").checked, notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), description: val("p-desc"), url: val("p-url"), batch: val("p-batch"), photo: document.getElementById("p-photo").value, imgs: (() => { const ph = document.getElementById("p-photo").value, rest = (p.imgs || []).filter(u => u !== p.photo); return ph && !ph.startsWith("data:") ? [ph, ...rest] : (p.imgs || []); })(), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: val("p-type"), sku: val("p-sku"), barcode: bc, category: val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: val("p-status"), kind: val("p-kind"), eta: val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), description: val("p-desc"), url: val("p-url"), batch: val("p-batch"), photo: document.getElementById("p-photo").value, imgs: (() => { const ph = document.getElementById("p-photo").value, rest = (p.imgs || []).filter(u => u !== p.photo); return ph && !ph.startsWith("data:") ? [ph, ...rest] : (p.imgs || []); })(), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     if (!id) data.createdAt = Date.now();
     await save("products", id || uid("p"), data);
     closeSheet(); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
@@ -3510,12 +3542,12 @@ function viewListings() {
     <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${th("size", "Size")}${th("type", "Type")}${th("kind", "On hand / Pre-order")}${th("eta", "ETA")}${th("price", "Price", "r")}${th("stock", "Stock", "r")}${th("status", "Status")}${th("web", "Website")}</tr></thead>
     <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}">
       <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
-      <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${p.isNew ? `<span class="chip warn">New</span>` : ""}</td>
+      <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>
       <td class="nowrap">${esc(p.size || "")}</td><td class="nowrap">${esc(p.ptype || "")}</td>
       <td class="nowrap">${p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>
       <td>${p.kind === "preorder" ? (can ? `<select class="status st-blue" data-lset="eta" data-id="${p.id}" aria-label="ETA">${etaOpts(p)}</select>` : esc(p.eta || "–")) : `<span style="color:var(--muted)">–</span>`}</td>
       <td class="r num nowrap">${peso(p.price)}${p.compareAt > p.price ? `<div><s class="num" style="font-size:11px;color:var(--muted)">${peso(p.compareAt)}</s></div>` : ""}</td>
-      <td class="r num nowrap">${p.kind === "preorder" ? "–" : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>
+      <td class="r num nowrap">${p.kind === "preorder" ? "–" : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>${reservedOf(p) ? `<div style="font-size:11px;color:var(--muted)">+${reservedOf(p)} reserved</div>` : ""}`}</td>
       <td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>
       <td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">To sync</span>` : `<span style="color:var(--muted);font-size:12px">On site</span>`}</td></tr>`; }).join("")}</tbody></table>
     ${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No listings match." : "No listings yet. Click “Add listing”."}</div>`}</div>
@@ -3563,7 +3595,7 @@ function webProducts() {
   const live = S.products.filter(p => (p.status || "active") === "active" && p.name && (p.kind === "preorder" || (Number(p.stock) || 0) > 0 || p.webId));
   return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
     .filter(p => p.kind === "preorder" || (Number(p.stock) || 0) > 0)
-    .map(p => ({ id: p.webId || slug([p.kind === "preorder" ? "preorder" : "", p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" ")), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, isNew: !!p.isNew, eta: p.eta || "", vac: !!p.vac, created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
+    .map(p => ({ id: p.webId || slug([p.kind === "preorder" ? "preorder" : "", p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" ")), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", vac: !!p.vac, created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
 }
 const webCodeText = () => "<script>\nwindow.PRODUCTS=" + JSON.stringify(webProducts()).replace(/<\//g, "<\\/") + ";\n</" + "script>";
 function openWebCode() {
@@ -5285,6 +5317,7 @@ document.addEventListener("click", guard(async ev => {
     case "item-inv": { const nm = (b.dataset.name || "").toLowerCase(); const p = S.products.find(x => x.id === b.dataset.pid) || S.products.find(x => (x.name || "").toLowerCase() === nm) || S.products.find(x => x.name && nm.includes(String(x.name).toLowerCase())); if (!p) return toast("This item isn't in the inventory yet. Add it in Inventory or Listings."); return openProductForm(p.id); }
     case "viewas-stop": try { sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return;
     case "sp-clear": S.sp = { sup: "all", ful: "all", pay: "all", q: "" }; render(); return;
+    case "import-committed": await importCommitted(); return;
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lpage = 0; render(); return;
     case "log-out": S.unlocked.clear(); saveUnlocked(); S.loggedOut = true; try { localStorage.removeItem("rs-nav"); } catch (e) {} S.view = "home"; render(); toast("Logged out."); return;
     case "log-in": S.loggedOut = false; render(); return;
@@ -5436,7 +5469,7 @@ const SHOP_FIELDS = `id name createdAt cancelledAt displayFinancialStatus displa
   events(first: 25, sortKey: CREATED_AT, reverse: true) { nodes { __typename ... on CommentEvent { id createdAt rawMessage } } }
   shippingAddress { name phone address1 address2 city province zip country }
   totalPriceSet { shopMoney { amount } }
-  lineItems(first: 50) { nodes { name sku quantity originalUnitPriceSet { shopMoney { amount } } } }`;
+  lineItems(first: 50) { nodes { name sku quantity product { handle } originalUnitPriceSet { shopMoney { amount } } } }`;
 const SHOP_LIST_Q = `query RSOpenOrders($first: Int!, $after: String) { orders(first: $first, after: $after, query: "-fulfillment_status:fulfilled -status:cancelled", sortKey: CREATED_AT, reverse: true) { pageInfo { hasNextPage endCursor } nodes { ${SHOP_FIELDS} } } }`;
 const SHOP_NODES_Q = `query RSOrderStatus($ids: [ID!]!) { nodes(ids: $ids) { ... on Order { ${SHOP_FIELDS} } } }`;
 const SHOP_OPEN = new Set(["UNFULFILLED", "PARTIALLY_FULFILLED", "ON_HOLD", "SCHEDULED", "IN_PROGRESS", "OPEN", "PENDING_FULFILLMENT"]);
@@ -5471,8 +5504,9 @@ function shopToOrder(n) {
   const fulfillment = n.cancelledAt ? "cancelled" : fs === "FULFILLED" ? "fulfilled" : fs === "ON_HOLD" ? "on_hold" : SHOP_OPEN.has(fs) ? "unfulfilled" : "not_required";
   const a = n.shippingAddress || {}, c = n.customer || {};
   const items = ((n.lineItems && n.lineItems.nodes) || []).filter(i => i.quantity).map(i => {
-    const p = S.products.find(x => (i.sku && x.sku && x.sku.toLowerCase() === i.sku.toLowerCase()) || (x.name || "").toLowerCase() === (i.name || "").toLowerCase());
-    return { productId: p ? p.id : "", name: i.name || "", sku: i.sku || "", qty: Number(i.quantity) || 0, price: money(i.originalUnitPriceSet), cost: p ? Number(p.cost) || 0 : 0 };
+    const h = (i.product && i.product.handle) || "";
+    const p = (h && S.products.find(x => x.webId === h)) || S.products.find(x => (i.sku && x.sku && x.sku.toLowerCase() === i.sku.toLowerCase()) || (x.name || "").toLowerCase() === (i.name || "").toLowerCase());
+    return { productId: p ? p.id : "", name: i.name || "", sku: i.sku || "", ...(h ? { handle: h } : {}), qty: Number(i.quantity) || 0, price: money(i.originalUnitPriceSet), cost: p ? Number(p.cost) || 0 : 0 };
   });
   const o = {
     num: String(n.name || "").replace(/^#/, ""), createdAt, date: dstr(createdAt), platform: "website",
@@ -5494,7 +5528,10 @@ function shopToOrder(n) {
 async function shopApply(o, isNew) {
   const id = orderDocId(o), ex = S.orders.find(x => x.id === id);
   if (S.archived.some(x => x.id === id)) return 0;
-  if (!ex) { if (isNew) { const prior = S.orders.find(x => x.assignee && ((o.email && x.email === o.email) || (o.phone && x.phone === o.phone))); if (prior) o.assignee = prior.assignee; o.log = [{ at: Date.now(), by: "Shopify", msg: "order came in from Shopify" }]; await save("orders", id, o); return 1; } return 0; }
+  if (!ex) { if (isNew) { const prior = S.orders.find(x => x.assignee && ((o.email && x.email === o.email) || (o.phone && x.phone === o.phone))); if (prior) o.assignee = prior.assignee; o.log = [{ at: Date.now(), by: "Shopify", msg: "order came in from Shopify" }];
+    const take = OPEN_FUL.has(o.fulfillment) && !isCancelled(o.payment, o.fulfillment) ? stockTake(o.items) : {};
+    if (Object.keys(take).length) { o.noStock = false; o.stockTaken = take; o.log[0].msg += " · reserved " + Object.values(take).reduce((a, b) => a + b, 0) + " in stock"; }
+    await save("orders", id, o); await applyStockMap(take, -1); return 1; } return 0; }
   // 3-way merge: only what changed in Shopify since the last sync overrides edits made in the app
   const prevTags = ex.shopTags || ex.tags || [], shTags = o.shopTags || [];
   const added = shTags.filter(t => !prevTags.includes(t)), removed = prevTags.filter(t => !shTags.includes(t));
@@ -5513,8 +5550,57 @@ async function shopApply(o, isNew) {
   if (ex.courier === undefined) Object.assign(backfill, { courier: o.courier, pickup: o.pickup, shipTitle: o.shipTitle });
   if (o.comments && JSON.stringify(o.comments) !== JSON.stringify(ex.comments || [])) backfill.comments = o.comments;
   if (changed) { const ms = []; if (ch.payment !== ex.payment) ms.push(`changed Payment Status → ${pay(ch.payment).name}`); if (ch.fulfillment !== ex.fulfillment) ms.push(`changed Fulfillment Status → ${ful(ch.fulfillment).name}`); if (tags.join() !== (ex.tags || []).join()) ms.push("updated tags"); if (ms.length) ch.log = logAdd(ex, ms, "Shopify"); }
-  if (changed || marks || Object.keys(backfill).length) { await patch("orders", id, { ...(changed ? ch : {}), ...backfill, shopPay: o.shopPay, shopFul: o.shopFul, shopTags: shTags, shopNote: o.shopNote }); return changed ? 1 : 0; }
+  const tr = changed ? stockTransition(ex, ch.payment, ch.fulfillment) : null;
+  if (tr) ch.restocked = tr.restocked;
+  if (changed || marks || Object.keys(backfill).length) { await patch("orders", id, { ...(changed ? ch : {}), ...backfill, shopPay: o.shopPay, shopFul: o.shopFul, shopTags: shTags, shopNote: o.shopNote }); if (tr) await applyStockMap(ex.stockTaken || stockTake(ex.items), tr.sign); return changed ? 1 : 0; }
   return 0;
+}
+const SHOP_INV_Q = `query RSInventory($q: String!) { products(first: 50, query: $q) { nodes { handle variants(first: 3) { nodes { inventoryItem { inventoryLevels(first: 3) { nodes { quantities(names: ["available", "committed", "on_hand"]) { name quantity } } } } } } } } }`;
+async function importCommitted() {
+  if (!S.mcp) { toast("Open the app in claude.ai with Shopify connected to import from Shopify."); return; }
+  toast("Reading stock and reserved items from Shopify…");
+  try {
+    const want = S.products.filter(p => p.webId && p.kind !== "preorder"), inv = {};
+    for (let i = 0; i < want.length; i += 40) {
+      const q = want.slice(i, i + 40).map(p => "handle:" + p.webId).join(" OR ");
+      const res = await shopCall(SHOP_INV_Q, { q }, 50);
+      const conn = dig(res, "products"); if (!conn) throw { code: "tool_error", message: "Shopify sent back an unexpected answer." };
+      for (const n of conn.nodes || []) { const t = { available: 0, committed: 0, on_hand: 0 }; for (const v of (n.variants || {}).nodes || []) for (const l of (((v.inventoryItem || {}).inventoryLevels || {}).nodes || [])) for (const qq of l.quantities || []) t[qq.name] = (t[qq.name] || 0) + (Number(qq.quantity) || 0); inv[n.handle] = t; }
+    }
+    // open Shopify orders, with their line items linked to inventory by product handle
+    const relink = []; let after = null, pages = 0;
+    do {
+      const res = await shopCall(SHOP_LIST_Q, after ? { first: 50, after } : { first: 50 }, 50);
+      const conn = dig(res, "orders"); if (!conn) break;
+      for (const n of conn.nodes || []) { const o = shopToOrder(n), ex = S.orders.find(x => x.id === orderDocId(o)); if (!ex || !OPEN_FUL.has(ex.fulfillment) || isCancelled(ex.payment, ex.fulfillment)) continue; relink.push({ ex, items: o.items }); }
+      const pi = conn.pageInfo || {}; after = pi.hasNextPage ? pi.endCursor : null;
+    } while (after && ++pages < 40);
+    S.commitImport = { inv, relink, at: Date.now() };
+    openCommitPreview();
+  } catch (e) { toast("Shopify: " + ((e && e.message) || "couldn't read inventory.")); }
+}
+function openCommitPreview() {
+  const { inv, relink } = S.commitImport;
+  const rows = S.products.filter(p => inv[p.webId]).map(p => ({ p, t: inv[p.webId] })).filter(({ p, t }) => t.committed || (Number(p.stock) || 0) !== t.available).sort((a, b) => b.t.committed - a.t.committed || (a.p.brand + a.p.name).localeCompare(b.p.brand + b.p.name));
+  const units = Object.values(inv).reduce((a, t) => a + t.committed, 0), linked = relink.reduce((a, r) => a + r.items.filter(i => i.productId).length, 0), missing = relink.reduce((a, r) => a + r.items.filter(i => !i.productId).length, 0);
+  openSheet(`<h3>Import reserved items from Shopify</h3>
+    <p style="margin:0">Shopify has <b>${units}</b> unit${units === 1 ? "" : "s"} reserved (checked out, not shipped yet) across ${relink.length} open order${relink.length === 1 ? "" : "s"}. ${Object.keys(inv).length} of your listings were found in Shopify.</p>
+    <div style="font-size:13px;color:var(--muted)">Applying sets each listing's <b>Units in stock</b> to what Shopify says is still free to sell, and links ${linked} order item${linked === 1 ? "" : "s"} to your inventory. From then on, stock goes down when a customer checks out and comes back when an order is cancelled.${missing ? ` ${missing} order item${missing === 1 ? "" : "s"} couldn't be matched to a listing and stay unlinked.` : ""}</div>
+    <div class="table-wrap" style="max-height:50vh"><table><thead><tr><th>Listing</th><th class="r">Stock now</th><th class="r">Shopify on hand</th><th class="r">Reserved</th><th class="r">New stock</th></tr></thead>
+    <tbody>${rows.length ? rows.map(({ p, t }) => `<tr><td><div class="s" style="font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase">${esc(p.brand || "")}</div>${esc(p.name)} <span class="s">${esc([p.size, p.ptype].filter(Boolean).join(" · "))}</span></td><td class="r num">${Number(p.stock) || 0}</td><td class="r num">${t.on_hand}</td><td class="r num">${t.committed ? `<b>${t.committed}</b>` : "0"}</td><td class="r num"><b>${t.available}</b></td></tr>`).join("") : `<tr><td colspan="5" class="empty">Every listing already matches Shopify.</td></tr>`}</tbody></table></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Use Shopify numbers</button></div>`,
+  async () => {
+    let n = 0, o = 0;
+    for (const { p, t } of rows) { await patch("products", p.id, { stock: t.available, shopOnHand: t.on_hand, shopCommitted: t.committed, shopInvAt: Date.now() }); n++; }
+    for (const { ex, items } of relink) {
+      const merged = (ex.items || []).map((it, k) => { const m = items.find(x => (x.name || "") === (it.name || "")) || items[k]; return m && m.productId && !it.productId ? { ...it, productId: m.productId, ...(m.handle ? { handle: m.handle } : {}) } : it; });
+      const take = stockTake(merged);
+      if (!Object.keys(take).length || (!ex.noStock && ex.stockTaken)) continue;
+      // Shopify's "available" already leaves these out, so stock isn't moved again here
+      await patch("orders", ex.id, { items: merged, noStock: false, stockTaken: take, restocked: false }); o++;
+    }
+    closeSheet(); toast(`Updated ${n} listing${n === 1 ? "" : "s"} and linked ${o} open order${o === 1 ? "" : "s"} to inventory.`);
+  });
 }
 async function shopSync(manual) {
   if (!S.mcp || shopBusy || S.readOnly || S.viewAs) return;
