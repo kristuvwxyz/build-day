@@ -54,7 +54,8 @@ button { cursor: pointer; }
 .note-cell { cursor: text; min-width: 140px; max-width: 240px; } .note-t { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
 .note-cell:hover .note-t, .note-cell:hover .tag-add { outline: 1px dashed var(--line); outline-offset: 2px; }
 .hist-btn { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; max-width: 220px; }
-.hist-btn .hist-t { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hist-btn .hist-t { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.hist-btn small { white-space: nowrap; }
 .hist-btn small { color: var(--muted); font-size: 11.5px; } .hist-btn:hover .hist-t { text-decoration: underline; text-decoration-color: var(--line); }
 a.btn { text-decoration: none; color: inherit; }
 .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
@@ -218,7 +219,11 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
 .spark polyline { fill: none; stroke: var(--brand); stroke-width: 1.5; stroke-linejoin: round; }
 .spark line { stroke: var(--line); stroke-dasharray: 2 2; }
 
-.otable td, .otable th { padding: 9px 12px; }
+.otable td, .otable th { padding: 7px 10px; }
+#shopfind-slot:empty { display: none; }
+.otable td.cust-td { white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.otable td .tags { flex-wrap: nowrap; }
+.otable td.note-cell { max-width: 200px; }
 .otable th { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--muted); font-weight: 600; background: var(--surface-2); }
 .otable tbody tr { cursor: pointer; }
 .otable.dir td { vertical-align: top; }
@@ -722,7 +727,7 @@ main > .gs.mobile-only { margin-bottom: 12px; }
     </div>
     <div class="gs mobile-only"><span class="gs-ico"></span><input class="gs-in" type="search" placeholder="Search orders by #, name, phone or tracking" aria-label="Search orders" autocomplete="off"><div class="gs-res" hidden></div></div>
     <div id="notice"></div>
-    <div id="view" style="display:flex;flex-direction:column;gap:20px;min-width:0"></div>
+    <div id="view" style="display:flex;flex-direction:column;gap:14px;min-width:0"></div>
   </main>
 </div>
 <div class="scrim" id="scrim" hidden><form class="sheet" id="sheet" novalidate></form></div>
@@ -2526,6 +2531,8 @@ function statsStrip() {
 /* ---------- orders: table ---------- */
 const squash = x => String(x || "").toLowerCase().replace(/[\s#\-]/g, "");
 function orderMatchesQ(o, q) {
+  const dq0 = squash(q).replace(/^rs/, "");
+  if (/^\d{1,6}$/.test(dq0)) return [o.num, ...(o.merged || [])].some(n => squash(n).replace(/^[a-z]+/, "").includes(dq0)) || String(o.tracking || "").includes(dq0);
   const hay = [o.num, o.customer, o.email, o.ref, o.phone, o.tracking, ...(o.merged || []), o.assignee ? memberName(o.assignee) : "", plat(o.platform), ...(o.tags || []), ...(o.items || []).map(i => i.name)].join(" ").toLowerCase();
   if (hay.includes(q.replace(/^#/, ""))) return true;
   const sq = squash(q); if (sq.length < 3) return false;
@@ -2560,7 +2567,7 @@ function shopFindPanel() {
   if (!q || f.q !== q || !f.state) return "";
   if (f.state === "loading") return `<div class="panel shopfind"><div class="empty">Searching Shopify for “${esc(q)}”…</div></div>`;
   if (f.state === "error") return `<div class="panel shopfind"><div class="empty">Couldn't search Shopify${f.msg ? ": " + esc(f.msg) : ""}.</div></div>`;
-  const list = f.list.filter(o => !filteredOrders().some(x => x.id === orderDocId(o)));
+  const list = f.list.filter(o => !filteredOrders().some(x => x.id === orderDocId(o)) && !S.archived.some(x => x.id === orderDocId(o)));
   if (!list.length) return filteredOrders().length ? "" : `<div class="panel shopfind"><div class="empty">No order in Shopify matches “${esc(q)}” either.</div></div>`;
   return `<div class="panel shopfind"><div class="head"><h2>Found in Shopify</h2><span class="s">Older or shipped orders that aren't in this list</span></div>
     ${list.map(o => `<div class="sf-row"><div style="min-width:0"><b>#${esc(o.num)}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date)} · ${esc(ful(o.fulfillment).name)} · ${esc(pay(o.payment).name)}${o.tracking ? " · " + esc(o.tracking) : ""}</div></div><button class="btn sm primary" type="button" data-act="shop-find-open" data-num="${esc(o.num)}">Open</button></div>`).join("")}</div>`;
@@ -2683,7 +2690,7 @@ function orderCell(k, o, table) {
     case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}${noteIcons(o)}${exChip(o)}</td>`;
     case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
     case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
-    case "customer": return `<td class="strike">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
+    case "customer": return `<td class="strike cust-td">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
     case "assigned": { const team = salesTeam(); const cur = o.assignee && !team.some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [];
       return canAll() ? `<td><select class="status st-grey" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "total": return `<td class="r num strike nowrap">${peso2(total(o))}</td>`;
@@ -2693,7 +2700,7 @@ function orderCell(k, o, table) {
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
     case "note": return canAll() && !o.archived ? `<td class="note-cell" data-noteedit="${o.id}" title="Click to edit the note">${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span class="tag-add">+ Note</span>`}</td>` : `<td>${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span style="color:var(--muted)">–</span>`}</td>`;
-    case "activity": { const l = o.log || [], last = l[l.length - 1]; return `<td>${last ? `<button type="button" class="hist-btn" data-hist="${o.id}" title="Show full history"><span class="hist-t"><b>${esc(last.by || "")}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length} updates` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; }
+    case "activity": { const l = o.log || [], last = l[l.length - 1]; return `<td>${last ? `<button type="button" class="hist-btn" data-hist="${o.id}" title="${esc((last.by || "") + " " + (last.msg || ""))} · click for full history"><span class="hist-t"><b>${esc(String(last.by || "").split(",")[0])}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length}` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "tags": return canAll() && !o.archived ? `<td class="tag-cell" data-tagedit="${o.id}" title="Click to edit tags">${tagCell(o.tags)}${(o.tags || []).length ? "" : `<span class="tag-add">+ Tag</span>`}</td>` : `<td>${tagCell(o.tags)}</td>`;
     case "phone": return `<td class="nowrap" style="user-select:all">${esc(o.phone || (o.ship || {}).phone || "")}</td>`;
     case "address": { const sh = shipOf(o); return `<td style="min-width:200px;font-size:12.5px">${esc([sh.address1, sh.address2, sh.city, sh.province].filter(Boolean).join(", ") || (o.pickup ? "Pickup" : ""))}</td>`; }
@@ -2795,6 +2802,7 @@ function viewOrders() {
     <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
   </div>
   ${S.of.q && !all.length && ofActive() && (S.of.month || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all") && S.orders.some(o => orderMatchesQ(o, S.of.q.trim().toLowerCase())) ? `<div class="notice">Some orders match “${esc(S.of.q)}” but your filters hide them. <button class="btn sm" type="button" data-act="of-clear-keepq">Show them</button></div>` : ""}
+  ${(() => { const q = (S.of.q || "").trim().toLowerCase(); if (!q) return ""; const am = S.archived.filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10); return am.length ? `<div class="panel shopfind"><div class="head"><h2>In Archived orders</h2><span class="s">${am.length} match${am.length === 1 ? "" : "es"}</span></div>${am.map(o => `<div class="sf-row"><div style="min-width:0"><b>${esc(onum(o))}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date || dstr(o.createdAt || 0))}${o.archivedReason ? " · " + esc(o.archivedReason) : ""} · archived ${esc(relTime(o.archivedAt))}</div></div><button class="btn sm" type="button" data-open="${o.id}">Open</button></div>`).join("")}</div>` : ""; })()}
   <div id="shopfind-slot">${shopFindPanel()}</div>
   ${bulk}
   ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
