@@ -798,7 +798,7 @@ const SHOP_COMPANY = { "J&T": "J&T Express", SDD: "Other" };
 const courierOf = o => { const c = o.courier || ""; if (/j\s*&?\s*t|jnt/i.test(c)) return "J&T"; if (c === "SDD") return "SDD"; return o.pickup ? "SDD" : "J&T"; };
 const pickCourier = (title, hasAddr) => /j\s*&\s*t|jnt|j\s*n\s*t/i.test(title || "") ? "J&T" : (!hasAddr || /pick ?up|branch|sdd|same ?day/i.test(title || "")) ? "SDD" : "J&T";
 const onum = o => [o.num, ...(o.merged || [])].map(n => "#" + n).join(" ");
-const findOrder = id => S.orders.find(o => o.id === id) || S.archived.find(o => o.id === id);
+const findOrder = id => S.orders.find(o => o.id === id) || S.archived.find(o => o.id === id) || (String(id).startsWith("web:") ? webAsOrders().find(o => o.id === id) : undefined);
 /* who can do what on orders: CEO, Sales, Admin everything · Finance payment + fulfillment · Packing fulfillment + shipping · others view */
 const myDept = () => S.isOwner ? "CEO" : ((boundMember() || {}).department || "");
 const orderRole = () => S.readOnly ? "view" : (S.isOwner || ["CEO", "SALES", "ADMIN"].includes(myDept())) ? "all" : myDept() === "FINANCE" ? "status" : myDept() === "PACKING" ? "pack" : "view";
@@ -974,7 +974,7 @@ function expiryState(p) {
 
 function nextNum() {
   let max = 1000;
-  for (const o of [...S.orders, ...S.archived]) { const m = /(\d+)\s*$/.exec(o.num || ""); if (m) max = Math.max(max, Number(m[1])); }
+  for (const o of [...S.orders, ...S.archived, ...webAsOrders().filter(o => /^RS\d+$/i.test(o.num))]) { const m = /(\d+)\s*$/.exec(o.num || ""); if (m) max = Math.max(max, Number(m[1])); }
   return "RS" + (max + 1);
 }
 
@@ -1703,7 +1703,6 @@ function headActions() {
     listings: `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
-  if (S.view === "orders" && S.site && S.oSrc === "web") return lockBtn;
   return lockBtn + (map[moduleKey()] || "");
 }
 
@@ -2247,7 +2246,7 @@ async function webLoad(quiet) {
   try {
     const r = await S.site.list({ limit: 300 });
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't answer.");
-    S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true;
+    S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
 }
@@ -2257,6 +2256,26 @@ function webRows() {
   return S.web.orders.filter(o => (f === "all" || (f === "unpaid" ? !o.paid && !/cancel/i.test(o.status || "") : f === "paid" ? o.paid : f === "toship" ? o.paid && !webDone(o) : webPayKind(o) === f))
     && (!q || squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(q)));
 }
+// Website orders shown as rows in the one Orders list. Built in memory from the live list, never saved.
+const WEB_FUL = { placed: "unfulfilled", confirmed: "unfulfilled", packed: "on_hold", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
+let webRowsMemo = { at: null, n: -1, rows: [] };
+function webAsOrders() {
+  if (!S.site || !S.web.loaded) return [];
+  if (webRowsMemo.at === S.web.at && webRowsMemo.n === S.web.orders.length && !S.web.dirty) return webRowsMemo.rows;
+  S.web.dirty = false;
+  const rows = S.web.orders.map(o => {
+    const t = new Date(o.date).getTime() || 0, cancel = /cancel/i.test(o.status || "");
+    return { id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
+      phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
+      items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0 })),
+      adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
+      payment: cancel ? "voided" : o.paid ? "paid" : "pending", fulfillment: WEB_FUL[String(o.status || "placed").toLowerCase()] || "unfulfilled",
+      tracking: o.tracking || "", courier: "", tags: ["WEBSITE"], note: o.note || "", platform: "website", payMethod: o.payment || "",
+      log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }] };
+  });
+  webRowsMemo = { at: S.web.at, n: S.web.orders.length, rows }; return rows;
+}
+const allOrderRows = () => [...S.orders, ...webAsOrders()];
 function webFindPanel() {
   const q = (S.of.q || "").trim(); if (!S.site || !q || !S.web.loaded) return "";
   const qq = squash(q).replace(/rs/g, ""), m = S.web.orders.filter(o => squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(qq)).slice(0, 10);
@@ -2311,7 +2330,7 @@ async function webUpdate(ref, patch, btn) {
   try {
     const r = await S.site.update(ref, patch);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't save it.");
-    const i = S.web.orders.findIndex(x => x.ref === ref); if (i >= 0 && r.order) S.web.orders[i] = r.order;
+    const i = S.web.orders.findIndex(x => x.ref === ref); if (i >= 0 && r.order) { S.web.orders[i] = r.order; S.web.dirty = true; }
     toast(`${ref} updated on the website.`); S.sheetNoPush = true; openWebOrder(ref);
   } catch (e) { sheetError((e && e.message) || "Couldn't save."); if (btn) { btn.disabled = false; btn.textContent = "Try again"; } }
 }
@@ -2688,7 +2707,7 @@ async function openShopFound(num) {
 function filteredOrders() {
   const q = S.of.q.trim().toLowerCase();
   const vw = S.of.view;
-  return S.orders.filter(o => {
+  return allOrderRows().filter(o => {
     if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
     if (S.of.sup && S.of.sup !== "all" && !(o.tags || []).some(t => t.toUpperCase() === S.of.sup)) return false;
     if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
@@ -2791,6 +2810,17 @@ function openColumns(table) {
 
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
+  if (o.web) switch (k) {
+    case "num": return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span> <span class="chip" title="Website order · ${esc(o.payMethod)}">Website</span></td>`;
+    case "assigned": return `<td><span style="color:var(--muted)">–</span></td>`;
+    case "payment": return `<td>${badge(pay(o.payment))}${o.payMethod ? `<br><small style="color:var(--muted)">${esc(o.payMethod)}</small>` : ""}</td>`;
+    case "fulfillment": return `<td>${badge(ful(o.fulfillment))}</td>`;
+    case "courier": return `<td><span style="color:var(--muted)">–</span></td>`;
+    case "note": return `<td>${o.note ? `<div class="note-t">${esc(o.note)}</div>` : ""}</td>`;
+    case "tags": return `<td>${tagCell(o.tags)}</td>`;
+    case "waybill": return `<td class="num" style="font-size:12.5px">${esc(o.tracking || "")}</td>`;
+    case "actions": return `<td class="nowrap"><button class="btn ghost sm" type="button" data-open="${o.id}">Open</button></td>`;
+  }
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
     case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}${noteIcons(o)}${exChip(o)}</td>`;
@@ -2835,7 +2865,7 @@ function ordersTable(rows, table, st, attr, selAllId) {
   return `<div class="table-wrap"><table class="otable" data-own="1">
     <thead><tr>${selectable ? `<th class="cb"><input type="checkbox" id="${selAllId}" aria-label="Select all" ${allSel ? "checked" : ""}></th>` : ""}${cols.map(k => ORDER_COLS[k].nosort ? `<th>${ORDER_COLS[k].label}</th>` : sortTh(k, ORDER_COLS[k].label, ORDER_COLS[k].cls || "", st, attr)).join("")}</tr></thead>
     <tbody>${rows.map(o => { const v = isVoid(o) && o.payment === "voided"; const done = !v && (isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)));
-      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>` : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
+      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? (o.web ? `<td class="cb"></td>` : `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>`) : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.orders.length ? "No orders match these filters." : "No orders yet."}</div>`}</div>`;
 }
 function supplierBar(list) {
@@ -2879,7 +2909,6 @@ function packTools() {
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file">J&T VIP booking file</button>` : ""}</div></section>`;
 }
 function viewOrders() {
-  if (S.site && S.oSrc === "web") return srcSeg() + viewWebOrders();
   let all = filteredOrders();
   const dq = squash(S.of.q || "").replace(/^rs/, "");
   if (/^\d{2,}$/.test(dq)) { const rank = o => { const n = [o.num, ...(o.merged || [])].map(x => squash(x).replace(/^[a-z]+/, "")); return n.includes(dq) ? 0 : n.some(x => x.startsWith(dq)) ? 1 : 2; }; all = all.map((o, i) => [rank(o), i, o]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]); }
@@ -2895,7 +2924,7 @@ function viewOrders() {
       <input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
-  return `${srcSeg()}
+  return `
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${ctxDept() === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
@@ -2910,7 +2939,6 @@ function viewOrders() {
   </div>
   ${S.of.q && !all.length && ofActive() && (S.of.month || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all") && S.orders.some(o => orderMatchesQ(o, S.of.q.trim().toLowerCase())) ? `<div class="notice">Some orders match “${esc(S.of.q)}” but your filters hide them. <button class="btn sm" type="button" data-act="of-clear-keepq">Show them</button></div>` : ""}
   ${(() => { const q = (S.of.q || "").trim().toLowerCase(); if (!q) return ""; const am = S.archived.filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10); return am.length ? `<div class="panel shopfind"><div class="head"><h2>In Archived orders</h2><span class="s">${am.length} match${am.length === 1 ? "" : "es"}</span></div>${am.map(o => `<div class="sf-row"><div style="min-width:0"><b>${esc(onum(o))}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date || dstr(o.createdAt || 0))}${o.archivedReason ? " · " + esc(o.archivedReason) : ""} · archived ${esc(relTime(o.archivedAt))}</div></div><button class="btn sm" type="button" data-open="${o.id}">Open</button></div>`).join("")}</div>` : ""; })()}
-  ${webFindPanel()}
   <div id="shopfind-slot">${shopFindPanel()}</div>
   ${bulk}
   ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
@@ -3541,6 +3569,7 @@ function openOrderForm() {
 }
 
 function openOrderDetails(id) {
+  if (String(id).startsWith("web:")) return openWebOrder(String(id).slice(4));
   const o = findOrder(id); if (!o) return;
   closePop(); S.dispOk = false; S.sheetReopen = () => openOrderDetails(id);
   const arch = !!o.archived, all = canAll() && !arch, cp = canPay() && !arch, cf = canFul() && !arch, cs = canShip() && !arch;
@@ -5456,7 +5485,7 @@ document.addEventListener("click", guard(async ev => {
   const ivst = ev.target.closest("[data-ivst]"); if (ivst) { $("#iv-st").value = ivst.dataset.ivst; ivst.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === ivst)); return; }
   const go = ev.target.closest("[data-goorders]");
   if (go) { S.oSrc = "all"; return goOrders(go.dataset.goorders); }
-  const gw = ev.target.closest("[data-goweb]"); if (gw) { S.oSrc = "web"; S.wf.f = gw.dataset.goweb; S.view = "orders"; saveNav(); render(); window.scrollTo(0, 0); return; }
+  const gw = ev.target.closest("[data-goweb]"); if (gw) { S.of.q = ""; return goOrders(gw.dataset.goweb === "unpaid" ? "unpaid" : "unfulfilled"); }
   const osrc = ev.target.closest("[data-osrc]"); if (osrc) { S.oSrc = osrc.dataset.osrc; saveNav(); if (S.oSrc === "web" && !S.web.loaded) webLoad(); render(); return; }
   const wf = ev.target.closest("[data-wf]"); if (wf) { S.wf.f = wf.dataset.wf; render(); return; }
   const wo = ev.target.closest("[data-webo]"); if (wo) { openWebOrder(wo.dataset.webo); return; }
