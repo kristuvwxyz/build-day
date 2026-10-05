@@ -2266,6 +2266,9 @@ async function webLoad(quiet) {
   finally { webBusy = false; S.web.loading = false; bgRender(); }
   webStockSync();
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
+  // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
+  const last = S.webmeta.find(d => d.id === "_push");
+  if (S.loaded.products && S.loaded.webmeta && S.products.length && !autoPushT && !webPushBusy && Date.now() - webPushFailAt > 30 * 60e3 && (!last || Date.now() - (last.at || 0) > 6 * 3600e3)) scheduleWebPush(true);
 }
 
 function paintWebState() { const el = $("#web-state"); if (el) el.textContent = S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""; }
@@ -3983,7 +3986,7 @@ async function copyWebCode() {
 }
 async function downloadWebCode() { try { await S.dl.save({ filename: `regal-spritz-website-products-${mToday()}.html`, data: webCodeText() }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } }
 // Sends the whole catalog (same list as the Website code) straight to the website backend.
-let webPushBusy = false, webPushErr = "";   // automatic sends show the same error only once
+let webPushBusy = false, webPushErr = "", webPushFailAt = 0;   // automatic sends show the same error only once
 async function pushListings(btn, auto) {
   if (!S.site || !S.site.pushProducts || webPushBusy) return;
   const list = webProducts(), pend = S.products.filter(p => p.webSync === "pending");
@@ -3992,8 +3995,9 @@ async function pushListings(btn, auto) {
     const r = await S.site.pushProducts(list);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
     for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
+    if (S.db) await save("webmeta", "_push", { at: Date.now(), count: list.length }).catch(() => {});
     if (!auto || pend.length) toast(`Website updated${auto ? " automatically" : ""}: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
-  } catch (e) { const m = (e && e.message) || "couldn't send."; if (!auto || m !== webPushErr) toast("Website: " + m); if (auto) webPushErr = m; }
+  } catch (e) { const m = (e && e.message) || "couldn't send."; if (!auto || m !== webPushErr) toast("Website: " + m); if (auto) { webPushErr = m; webPushFailAt = Date.now(); } }
   finally { webPushBusy = false; auto ? bgRender() : render(); }
 }
 async function markSynced() {
