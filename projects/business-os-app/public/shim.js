@@ -29,14 +29,14 @@
       let mode = "email", sentTo = "", busy = false;
       const draw = (msg = "", err = "") => {
         box.innerHTML = `<form class="card" novalidate>
-          <div><h1>Regal Spritz PH</h1><small>The Scent Atelier</small></div>
-          ${sentTo ? `<div class="msg">We sent a 6-digit code to <b>${sentTo.replace(/[<>&]/g, "")}</b>. It expires in a few minutes.</div>
+          <div><h1>Regal Spritz PH</h1><small>Team workspace</small></div>
+          ${sentTo ? `<div class="msg">We emailed <b>${sentTo.replace(/[<>&]/g, "")}</b>. Tap <b>Sign in</b> in that email (open it on this device), or type the code if the email shows one.</div>
             <label for="rs-code">Code</label><input id="rs-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required>
             <button type="submit">Sign in</button><button type="button" class="alt" data-x="back">Use a different ${mode === "phone" ? "number" : "email"}</button>`
           : `<div class="seg"><button type="button" data-m="email" aria-pressed="${mode === "email"}">Email</button><button type="button" data-m="phone" aria-pressed="${mode === "phone"}">Mobile number</button></div>
             <label for="rs-id">${mode === "phone" ? "Mobile number" : "Work email"}</label>
             <input id="rs-id" ${mode === "phone" ? 'type="tel" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="tel"' : 'type="email" placeholder="you@email.com" autocomplete="email"'} required>
-            <button type="submit">Send me a code</button>
+            <button type="submit">Email me a sign-in link</button>
             <div class="msg">Use the ${mode === "phone" ? "number" : "email"} listed for you in the team directory.</div>`}
           ${msg || note ? `<div class="msg">${msg || note}</div>` : ""}${err ? `<div class="err">${err}</div>` : ""}</form>`;
         const f = box.querySelector("input"); if (f) f.focus();
@@ -52,7 +52,7 @@
           if (!sentTo) {
             const v = box.querySelector("#rs-id").value.trim(); if (!v) { busy = false; return draw("", "Type your " + (mode === "phone" ? "mobile number." : "email.")); }
             const who = mode === "phone" ? { phone: phoneE164(v) } : { email: v.toLowerCase() };
-            const { error } = await sb.auth.signInWithOtp({ ...who, options: { shouldCreateUser: true } });
+            const { error } = await sb.auth.signInWithOtp({ ...who, options: { shouldCreateUser: true, ...(who.email ? { emailRedirectTo: location.origin + "/" } : {}) } });
             if (error) throw error;
             sentTo = who.phone || who.email; draw();
           } else {
@@ -67,6 +67,8 @@
         }
         busy = false;
       });
+      // signed in from the email link (in this tab or another one on this device)
+      const { data: sub } = sb.auth.onAuthStateChange((ev, s) => { if (s && box.isConnected) { box.remove(); sub.subscription.unsubscribe(); resolve(s); } });
       draw();
     });
   }
