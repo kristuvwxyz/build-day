@@ -15,6 +15,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Leave out filler, long preambles and repeated context.
 - Use plain language. Explain jargon briefly the first time it comes up.
 - When I need to choose, always give me easy click-to-pick options (buttons), not "reply A or B".
+- When I need to do something myself, give super easy numbered steps with a direct link to the exact page. Keep it to the fewest steps possible.
 
 ## How to work
 - **Just do it.** Make sensible decisions yourself and tell me what you did afterward.
