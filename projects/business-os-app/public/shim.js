@@ -138,12 +138,12 @@
     async function loadCol(c) {
       const x = colOf(c); if (x.loading) return x.loading;
       x.loading = (async () => {
-        let from = 0; const page = 1000;
-        for (;;) {
-          const { data, error } = await sb.from("docs").select("id,data").eq("col", c).order("id").range(from, from + page - 1);
-          if (error) throw error;
-          data.forEach(r => x.rows.set(r.id, r.data));
-          if (data.length < page) break; from += page;
+        // Big collections (Orders has ~9,000) load 4 pages of 1,000 at a time instead of one after another.
+        const page = 1000, get = from => sb.from("docs").select("id,data").eq("col", c).order("id").range(from, from + page - 1);
+        const first = await get(0); if (first.error) throw first.error; first.data.forEach(r => x.rows.set(r.id, r.data));
+        for (let from = page, more = first.data.length === page; more; from += page * 4) {
+          const res = await Promise.all([0, 1, 2, 3].map(k => get(from + k * page)));
+          for (const { data, error } of res) { if (error) throw error; data.forEach(r => x.rows.set(r.id, r.data)); if (data.length < page) more = false; }
         }
         x.loaded = true;
       })();
