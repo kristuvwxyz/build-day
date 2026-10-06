@@ -16,6 +16,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Use plain language. Explain jargon briefly the first time it comes up.
 - When I need to choose, always give me easy click-to-pick options (buttons), not "reply A or B".
 - When I need to do something myself, give super easy numbered steps with a direct link to the exact page. Keep it to the fewest steps possible.
+- Any step in WebCake starts with a direct link that opens WebCake (the site editor if known), never "go to WebCake".
 
 ## How to work
 - **Just do it.** Make sensible decisions yourself and tell me what you did afterward.
