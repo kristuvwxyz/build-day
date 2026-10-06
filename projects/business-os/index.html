@@ -1769,7 +1769,7 @@ function renderInner() {
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
   $("#view-title").classList.toggle("dept-title", !!dc);
   $("#head-actions").innerHTML = headActions();
-  const rf = $("#rf-btn"); if (rf) { if (!rf.querySelector("svg")) rf.insertAdjacentHTML("afterbegin", svg("refresh", "btn-ico")); rf.hidden = gated() || !!S.loggedOut || S.view === "listings"; }
+  const rf = $("#rf-btn"); if (rf) { if (!rf.querySelector("svg")) rf.insertAdjacentHTML("afterbegin", svg("refresh", "btn-ico")); rf.hidden = gated() || !!S.loggedOut; }
   document.querySelectorAll(".menu-btn").forEach(b => { if (!b.innerHTML) b.innerHTML = svg("menu") + "<span>Menu</span>"; b.hidden = gated(); });
   let n = "";
   if (!S.db && S.dbChecked) n += `<div class="notice">Saving is off in this view, so changes disappear when you close the page. Open it on claude.ai while signed in to save.</div>`;
