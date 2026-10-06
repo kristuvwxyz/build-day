@@ -200,6 +200,9 @@ td { padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: midd
 tr:first-child td { border-top: 0; }
 td.r, th.r { text-align: right; }
 td .s { font-size: 12px; color: var(--muted); }
+select.tq-st.info { color: var(--info); } select.tq-st.good { color: var(--good); } select.tq-st.bad { color: var(--bad); }
+input.tq-date { width: auto; padding: 3px 6px; font-size: 12.5px; border: 1px solid transparent; background: transparent; }
+input.tq-date:hover, input.tq-date:focus { border-color: var(--line); background: var(--surface); }
 select.status { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 3px 6px; font-size: 12px; font-weight: 600; }
 
 .notice { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--radius); background: var(--warn-bg); color: var(--warn); font-size: 13px; font-weight: 600; }
@@ -2223,13 +2226,25 @@ function taskPill(t) {
   return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}${taskUrg(t) ? " u-" + taskUrg(t) : ""}" ${o ? `data-open="${o.id}"` : `data-task="${t.id}"`} title="${o ? esc(onum(o)) + " · " : ""}${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${o ? `<span class="ini">📦</span>` : a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${o ? "#" + esc(o.num) + " " : ""}${esc(t.title)}</span></button>`;
 }
 function taskRow(t) {
+  const ed = !S.readOnly, pr = t.status === "done" ? 100 : Number(t.progress) || 0;
   return `<tr data-task="${t.id}" style="cursor:pointer">
     <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}${t.orderId && findOrder(t.orderId) ? ` <button type="button" class="chip" data-open="${t.orderId}">📦 #${esc(findOrder(t.orderId).num)}</button>` : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
     <td class="nowrap">${esc(memberName(t.assigneeId))}</td>
     <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc((dept(t.department) || { name: "–" }).name)}</span>` : "–"}</td>
-    <td class="nowrap">${t.due ? fmtDate(t.due) : "No date"} ${taskUrg(t) ? urgChip(taskUrg(t)) : ""}</td>
-    <td style="min-width:120px"><div style="display:flex;gap:8px;align-items:center">${pbar(t.status === "done" ? 100 : t.progress)}<span class="num" style="font-size:12px;color:var(--muted)">${t.status === "done" ? 100 : Number(t.progress) || 0}%</span></div></td>
-    <td><span class="chip ${tstat(t.status).cls}">${tstat(t.status).name}</span></td></tr>`;
+    <td class="nowrap">${ed ? `<input type="date" class="tq-date" data-tq="due" data-id="${t.id}" value="${esc(t.due || "")}" aria-label="Due date">` : t.due ? fmtDate(t.due) : "No date"} ${taskUrg(t) ? urgChip(taskUrg(t)) : ""}</td>
+    <td style="min-width:120px"><div style="display:flex;gap:8px;align-items:center">${pbar(pr)}${ed ? `<select class="status" data-tq="progress" data-id="${t.id}" aria-label="Progress">${[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(n => `<option value="${n}" ${n === Math.round(pr / 10) * 10 ? "selected" : ""}>${n}%</option>`).join("")}</select>` : `<span class="num" style="font-size:12px;color:var(--muted)">${pr}%</span>`}</div></td>
+    <td class="nowrap">${ed ? `<select class="status tq-st ${tstat(t.status).cls}" data-tq="status" data-id="${t.id}" aria-label="Status">${TASK_STATUS.map(x => `<option value="${x.id}" ${t.status === x.id ? "selected" : ""}>${x.name}</option>`).join("")}</select> <select class="status" data-tq="priority" data-id="${t.id}" aria-label="Priority">${PRIORITIES.map(x => `<option value="${x.id}" ${(t.priority || "normal") === x.id ? "selected" : ""}>${x.name}</option>`).join("")}</select>` : `<span class="chip ${tstat(t.status).cls}">${tstat(t.status).name}</span>`}</td></tr>`;
+}
+// Quick edits straight from the task list (status, priority, progress, due date) without opening the task.
+async function taskQuick(el) {
+  const t = S.tasks.find(x => x.id === el.dataset.id); if (!t || S.readOnly) return;
+  const k = el.dataset.tq, v = el.value, upd = { updatedAt: Date.now() };
+  if (k === "progress") { upd.progress = Number(v) || 0; if (upd.progress === 100) upd.status = "done"; else if (t.status === "done") upd.status = "in_progress"; else if (t.status === "todo" && upd.progress) upd.status = "in_progress"; }
+  else if (k === "status") { upd.status = v; if (v === "done") upd.progress = 100; else if (t.status === "done" && Number(t.progress) === 100) upd.progress = v === "todo" ? 0 : 90; }
+  else if (k === "due") upd.due = v;
+  else if (k === "priority") upd.priority = v;
+  await save("tasks", t.id, { ...clean(t), ...upd });
+  toast("Task updated.");
 }
 
 function viewTasks(forceDept) {
@@ -2272,7 +2287,7 @@ function viewTasks(forceDept) {
     } else {
       const rows = groupBy ? groups.filter(r => r.ts.length).map(r => `<tr class="tgrp"><td colspan="6">${esc(r.name)} · ${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? `, ${r.ts.length - openCount(r.ts)} done` : ""}</td></tr>${r.ts.map(taskRow).join("")}`).join("") : (groups[0] ? groups[0].ts.map(taskRow).join("") : "");
       main = `<div class="table-wrap"><table>
-      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
+      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
       <tbody>${rows}</tbody></table>${todayTasks.length ? "" : `<div class="empty" style="padding:16px">No tasks for today.</div>`}</div>`;
     }
     main = note + main;
@@ -2305,7 +2320,7 @@ function viewTasks(forceDept) {
   } else {
     const sorted = [...monthTasks].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
     main = `<div class="table-wrap"><table>
-      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
+      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
       <tbody>${sorted.map(taskRow).join("")}</tbody></table>${sorted.length ? "" : `<div class="empty" style="padding:16px">No tasks due in ${monthLabel(ym)}.</div>`}</div>`;
   }
   const extra = isToday ? "" : forceDept ? workload(monthTasks, "person")
@@ -6147,6 +6162,7 @@ document.addEventListener("click", guard(async ev => {
   if (wp) { if (S.view === "dept") { S.view = "tasks"; saveNav(); } S.t.scope = "person"; S.t.person = wp.dataset.wperson; render(); return; }
   const wd = ev.target.closest("[data-wdept]");
   if (wd) { if (S.view === "dept") { S.view = "tasks"; saveNav(); } S.t.scope = "dept"; S.t.dept = wd.dataset.wdept; render(); return; }
+  if (ev.target.closest("[data-tq]")) return;
   const opk = ev.target.closest("[data-open]"), tk = ev.target.closest("[data-task]");
   if (opk && tk && tk.contains(opk)) return openOrderDetails(opk.dataset.open);
   if (tk) return openTaskForm(tk.dataset.task);
@@ -6483,6 +6499,7 @@ document.addEventListener("click", guard(async ev => {
 
 document.addEventListener("change", guard(async ev => {
   const t = ev.target;
+  if (t.dataset.tq) return taskQuick(t);
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); render(); return; }
   if (t.id === "sp-all" || t.id === "spsel-all") { (S.spOs || []).slice(0, t.id === "spsel-all" ? 200 : 1e9).forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.dataset && t.dataset.spitem != null) { const a = S.spAgg && S.spAgg.get(t.dataset.spitem); if (a) a.ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
