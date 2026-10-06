@@ -4,3 +4,4 @@ public/jnt-address.json
 node_modules/
 .vercel/
 public/site-addons.js
+public/build.txt

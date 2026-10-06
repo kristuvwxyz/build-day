@@ -1841,6 +1841,19 @@ function render() {
 // dropdown is open so it doesn't snap shut under the user's finger.
 let bgT = 0; S.lastAct = 0;
 const pickerOpen = () => { const a = document.activeElement; return !!(a && a.tagName === "SELECT" && a.closest("#view")) && Date.now() - S.lastAct > 800; };
+// RS App only: a long-open app loads new versions on its own (checks /build.txt), keeping the page, filters and scroll.
+const APP_BUILD = (document.querySelector('meta[name="rs-build"]') || {}).content || "";
+let appUpdT = 0;
+async function appUpdateCheck(force) {
+  if (!APP_BUILD) return false;
+  let v = ""; try { v = (await (await fetch("/build.txt?t=" + Date.now(), { cache: "no-store" })).text()).trim(); } catch (e) { return false; }
+  if (!/^[0-9a-f]{6,}$/.test(v) || v === APP_BUILD) return false;
+  const busy = !$("#scrim").hidden || Date.now() - (S.lastAct || 0) < 60e3;
+  if (!force && busy) { if (!appUpdT) { appUpdT = 1; toast("A new version of RS OS is ready. Tap Refresh to load it."); } return false; }
+  saveNav(); try { sessionStorage.setItem("rs-refresh-y", String(Math.round(window.scrollY))); } catch (e) {}
+  location.reload(); return true;
+}
+if (APP_BUILD) { setInterval(() => appUpdateCheck(false), 5 * 60e3); document.addEventListener("visibilitychange", () => { if (!document.hidden) appUpdateCheck(false); }); }
 function bgRender() {
   if (bgT) return;
   bgT = setTimeout(() => { bgT = 0; if (!$("#scrim").hidden) { renderNav(); return; } if (pickerOpen()) { S.renderPending = true; return; } render(); }, 120);
@@ -6303,6 +6316,7 @@ document.addEventListener("click", guard(async ev => {
     case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
       await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
     case "refresh": {
+      if (await appUpdateCheck(true)) return; // a newer RS App version is out: load it (same page)
       // Re-reads the data and redraws the same page: same tab, filters, search, page number, scroll and open form.
       if (S.baseDb && S.baseDb._refresh) { if (b.classList.contains("spin")) return; b.classList.add("spin");
         try { await Promise.all([S.baseDb._refresh(), S.site ? webLoad(true) : null]); toast("Up to date."); } catch (e) { toast("Couldn't refresh. Check the internet and try again."); }

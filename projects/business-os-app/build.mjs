@@ -1,6 +1,7 @@
 // Builds the standalone app from the same source as the claude.ai version (projects/business-os/index.html).
 // Run: node build.mjs   (Vercel runs this automatically on every deploy)
 import { readFileSync, writeFileSync, copyFileSync } from "fs";
+import { createHash } from "crypto";
 const SRC = new URL("../business-os/", import.meta.url), OUT = new URL("./public/", import.meta.url);
 const app = readFileSync(new URL("index.html", SRC), "utf8");
 const head = `<!doctype html>
@@ -22,7 +23,10 @@ const head = `<!doctype html>
 </head>
 <body>
 `;
-writeFileSync(new URL("index.html", OUT), head + app + "\n</body>\n</html>\n");
+// Version stamp: the open app checks /build.txt and loads the new version when it changes (it keeps the page you're on).
+const BUILD = createHash("sha256").update(app + readFileSync(new URL("./public/shim.js", import.meta.url), "utf8")).digest("hex").slice(0, 12);
+writeFileSync(new URL("index.html", OUT), head.replace("<head>\n", `<head>\n<meta name="rs-build" content="${BUILD}">\n`) + app + "\n</body>\n</html>\n");
+writeFileSync(new URL("build.txt", OUT), BUILD + "\n");
 for (const f of ["website-reviews.json", "jnt-address.json"]) copyFileSync(new URL(f, SRC), new URL(f, OUT));
 console.log("Built public/index.html from business-os/index.html");
 
