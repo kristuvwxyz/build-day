@@ -30,9 +30,9 @@ export default async function handler(req, res) {
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ")) return res.status(401).json({ ok: false, error: "Sign in again." });
   const head = { Authorization: auth, apikey: ANON, "Content-Type": "application/json" };
-  const who = await fetch(`${SB}/auth/v1/user`, { headers: head });
+  // Both checks run at the same time (saves a round trip on every load).
+  const [who, mem] = await Promise.all([fetch(`${SB}/auth/v1/user`, { headers: head }), fetch(`${SB}/rest/v1/rpc/is_member`, { method: "POST", headers: head, body: "{}" })]);
   if (!who.ok) return res.status(401).json({ ok: false, error: "Sign in again." });
-  const mem = await fetch(`${SB}/rest/v1/rpc/is_member`, { method: "POST", headers: head, body: "{}" });
   if (!mem.ok || (await mem.json()) !== true) return res.status(403).json({ ok: false, error: "Only team members can see website orders." });
 
   // Staff creating an order in RS OS take the next number from the same counter.
@@ -65,8 +65,11 @@ export default async function handler(req, res) {
 
   // 3. Ask the website backend (Apps Script answers with a redirect, which fetch follows).
   try {
+    const t0 = Date.now();
     const r = await fetch(process.env.RS_BACKEND_URL || DEFAULT_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(call), redirect: "follow" });
     const j = await r.json().catch(() => null);
+    res.setHeader("Server-Timing", `backend;dur=${Date.now() - t0}`);
+    if (j && call.action === "opsOrders") j.backendMs = Date.now() - t0;
     if (!j) return res.status(502).json({ ok: false, error: "The website backend didn't answer (" + r.status + ")." });
     if (!j.ok && call.action === "opsSetProducts" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website can't receive listings yet. Update the website backend to v15 (see the setup guide)." });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });

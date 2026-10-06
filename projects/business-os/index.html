@@ -2487,14 +2487,14 @@ function navRefresh() {
 }
 async function webLoad(quiet) {
   if (!S.site || webBusy || !canOrders()) return;
-  webBusy = true; S.web.loading = true; if (!quiet) paintWebState();
+  webBusy = true; S.web.loading = true; S.web.t0 = Date.now(); if (!quiet) paintWebState();
   try {
     let r = await S.site.list({ limit: 300 });
     if (!r || !r.ok) { await new Promise(res => setTimeout(res, 2000)); r = await S.site.list({ limit: 300 }); }
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't answer.");
     const seen = S.web.loaded ? new Set(S.web.orders.map(o => o.ref)) : null, fresh = seen ? (r.orders || []).filter(o => !seen.has(o.ref)) : [];
     if (fresh.length) toast(fresh.length === 1 ? `New website order ${fresh[0].ref}${fresh[0].name ? " from " + fresh[0].name : ""}` : `${fresh.length} new website orders`);
-    S.web.orders = r.orders || []; S.web.cancelRequests = Number(r.cancelRequests) || (r.orders || []).filter(o => o.cancel && o.cancel.status === "Pending").length; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
+    S.web.orders = r.orders || []; S.web.cancelRequests = Number(r.cancelRequests) || (r.orders || []).filter(o => o.cancel && o.cancel.status === "Pending").length; S.web.at = r.at || new Date().toISOString(); S.web.ms = Date.now() - S.web.t0; S.web.backendMs = Number(r.backendMs) || 0; S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
   webStockSync(); scheduleOwnerSync(); webStatusSync();
@@ -2521,7 +2521,7 @@ function webErrNotice() {
   if (!S.site || !S.web.err || S.web.loading) return "";
   return `<div class="notice" style="background:var(--bad-bg, #fde8e8);color:var(--bad)"><span><strong>Website orders didn't load:</strong> ${esc(S.web.err)}${S.web.loaded ? " Showing the last list." : ""}</span><button class="btn sm" type="button" data-act="web-retry">Try again</button></div>`;
 }
-function paintWebState() { const el = $("#web-state"); if (el) el.textContent = S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""; }
+function paintWebState() { const el = $("#web-state"); if (el) { el.textContent = S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) + (S.web.ms ? ` · ${(S.web.ms / 1e3).toFixed(1)}s` : "") : ""; el.title = S.web.backendMs ? `The website backend took ${(S.web.backendMs / 1e3).toFixed(1)}s of ${(S.web.ms / 1e3).toFixed(1)}s.` : ""; } }
 function webRows() {
   const q = squash(S.wf.q || "").replace(/^rs/, ""), f = S.wf.f;
   return S.web.orders.filter(o => (f === "all" || (f === "unpaid" ? !o.paid && !/cancel/i.test(o.status || "") : f === "paid" ? o.paid : f === "toship" ? o.paid && !webDone(o) : webPayKind(o) === f))
@@ -3351,6 +3351,7 @@ function viewOrders() {
   const bdoNote = nBdo && S.of.view !== "bdo" ? `<div class="notice" style="background:var(--warn-bg);color:var(--warn, #8a5a00)"><span><strong>${nBdo} BDO order${nBdo > 1 ? "s need" : " needs"} a payment link.</strong> Make the link in BDO Checkout and paste it in the order.</span><button class="btn sm" type="button" data-bdoview="1">Show ${nBdo > 1 ? "them" : "it"}</button></div>` : "";
   return `${webErrNotice()}${cxTabs}${bdoNote}
   <div class="shop-slot shop-line">${shopChip()}</div>
+  ${S.site && canOrders() ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 4px">Website orders: <span id="web-state">${S.web.loading || !S.web.loaded ? "Loading…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) + (S.web.ms ? ` · ${(S.web.ms / 1e3).toFixed(1)}s` : "") : ""}</span></div>` : ""}
   ${ctxDept() === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
   <div class="toolbar">
@@ -6894,7 +6895,7 @@ render();
   ]);
   S.db = db; S.baseDb = db; S.dl = dl; S.user = user; S.dbChecked = true;
   if (c?.use) c.use("assets").then(a => { S.assets = a; }).catch(() => {});
-  if (c?.use) Promise.resolve().then(() => c.use("site")).then(si => { if (!si || !si.list) return; S.site = si; setTimeout(() => webLoad(true), 1500); let webTick = 0; setInterval(() => { webTick++; if (document.visibilityState === "visible" && (S.view === "orders" || S.view === "home" || webTick % 3 === 0)) webLoad(true); }, 60000); }).catch(() => {});
+  if (c?.use) Promise.resolve().then(() => c.use("site")).then(si => { if (!si || !si.list) return; S.site = si; webLoad(true); let webTick = 0; setInterval(() => { webTick++; if (document.visibilityState === "visible" && (S.view === "orders" || S.view === "home" || webTick % 3 === 0)) webLoad(true); }, 60000); }).catch(() => {});
   if (user) {
     try { const w = await user.can("data.write"); if (w === false) S.readOnly = true; } catch (e) {}
     try { S.me = await user.me(); S.uid = S.me.id; S.isOwner = !!S.me.isOwner; S.canEdit = !!S.me.canEdit; } catch (e) {}
