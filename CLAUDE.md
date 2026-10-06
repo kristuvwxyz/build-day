@@ -26,7 +26,7 @@ This file is my profile. Read it at the start of every session and follow it.
 
 ## Dashboard (Regal Spritz OS) preferences
 - Shared features (Orders, Listings) live once in the main Workspace menu, not repeated as department tabs.
-- Website and listing edits are marked "To sync"; I paste the Website code into WebCake myself.
+- Listing edits go to regalspritz.com automatically a few seconds after saving (no Send to website button, no "To sync" banner, no WebCake paste). The site loads listings from the Apps Script backend (`?action=products.js`).
 - New orders (pre-order or on-hand, any channel) start at Fulfillment status **To Confirm**.
 - Access: Admin sees every department except CEO, Finance and Marketing.
 - Website orders (regalspritz.com) are read live from the website's Apps Script backend through the RS App's `/api/site` route (key `RS_BACKEND_KEY` in Vercel only). Don't copy customer details into the dashboard database; only team fields (assignee, courier, tags, team note) are saved per order number in `webmeta`. RS OS is the single RS number counter (`/api/site` nextOrderNumber).

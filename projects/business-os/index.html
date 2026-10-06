@@ -1712,7 +1712,7 @@ function headActions() {
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
     logins: S.vaultKey && can ? `<button class="btn ghost" type="button" data-act="vault-lock">${svg("lock", "btn-ico")} Lock logins</button><button class="btn primary" type="button" data-act="new-login">Add login</button>` : "",
-    listings: (S.site && can && canListings() ? `<button class="btn primary" type="button" data-act="web-push">${svg("refresh", "btn-ico")} Send to website${S.products.some(p => p.webSync === "pending") ? ` (${S.products.filter(p => p.webSync === "pending").length})` : ""}</button>` : "") + `<button class="btn" type="button" data-act="web-code">Website code</button>` + (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.products.some(onSiteUnisex) ? `<button class="btn" type="button" data-act="unisex-check">Check Unisex${unisexFixes().length ? ` (${unisexFixes().length})` : ""}</button>` : "") + (can ? `<button class="btn" type="button" data-act="photo-check">Check photos${photoFixes().length ? ` (${photoFixes().length})` : ""}</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
+    listings: (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.products.some(onSiteUnisex) ? `<button class="btn" type="button" data-act="unisex-check">Check Unisex${unisexFixes().length ? ` (${unisexFixes().length})` : ""}</button>` : "") + (can ? `<button class="btn" type="button" data-act="photo-check">Check photos${photoFixes().length ? ` (${photoFixes().length})` : ""}</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
   return lockBtn + (map[moduleKey()] || "");
@@ -1769,7 +1769,7 @@ function renderInner() {
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
   $("#view-title").classList.toggle("dept-title", !!dc);
   $("#head-actions").innerHTML = headActions();
-  const rf = $("#rf-btn"); if (rf) { if (!rf.querySelector("svg")) rf.insertAdjacentHTML("afterbegin", svg("refresh", "btn-ico")); rf.hidden = gated() || !!S.loggedOut; }
+  const rf = $("#rf-btn"); if (rf) { if (!rf.querySelector("svg")) rf.insertAdjacentHTML("afterbegin", svg("refresh", "btn-ico")); rf.hidden = gated() || !!S.loggedOut || S.view === "listings"; }
   document.querySelectorAll(".menu-btn").forEach(b => { if (!b.innerHTML) b.innerHTML = svg("menu") + "<span>Menu</span>"; b.hidden = gated(); });
   let n = "";
   if (!S.db && S.dbChecked) n += `<div class="notice">Saving is off in this view, so changes disappear when you close the page. Open it on claude.ai while signed in to save.</div>`;
@@ -2382,12 +2382,12 @@ async function webStockSync() {
   } catch (e) { toast("Website stock: " + ((e && e.message) || "couldn't update.")); }
   finally { webStockBusy = false; S.web.dirty = true; bgRender(); }
 }
-// Listing changes go to the website on their own, 45 seconds after the last edit (the Send to website button still works).
+// Listing changes go to the website on their own, 3 seconds after the last edit. Failed sends retry quietly.
 let autoPushT = 0;
 function scheduleWebPush(force) {
   if (!S.site || !S.site.pushProducts || S.readOnly) return;
   clearTimeout(autoPushT);
-  autoPushT = setTimeout(() => { autoPushT = 0; if (webPushBusy) return scheduleWebPush(force); if (force || S.products.some(p => p.webSync === "pending")) pushListings(null, true); }, 45000);
+  autoPushT = setTimeout(() => { autoPushT = 0; if (webPushBusy) return scheduleWebPush(force); if (force || S.products.some(p => p.webSync === "pending")) pushListings(null, true); }, 3000);
 }
 function webFindPanel() {
   const q = (S.of.q || "").trim(); if (!S.site || !q || !S.web.loaded) return "";
@@ -3963,7 +3963,7 @@ function openProductForm(id, preset = {}) {
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
-  const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter || "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
+  const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products;
   const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(p => p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
   const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
@@ -3975,9 +3975,9 @@ function viewListings() {
   const can = !S.readOnly;
   const th = (k, l, c) => sortTh(k, l, c || "", ls, "lsort");
   const etaOpts = p => { const opts2 = [...new Set([...MONTHS, p.eta].filter(Boolean))]; return `<option value="">–</option>${opts2.map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}`; };
-  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending ? `${counts.pending} change${counts.pending === 1 ? "" : "s"} not on <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet. ${S.site ? `Click <strong>Send to website</strong> to put them live.` : `Open the RS App and click <strong>Send to website</strong>.`}` : `Everything here matches <a href="${SITE}" target="_blank" rel="noopener">your website</a>.`}</span></div>
+  return `${webPushErr && counts.pending ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending} change${counts.pending === 1 ? "" : "s"} couldn’t reach <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet (${esc(webPushErr)}). RS OS keeps trying on its own.</span></div>` : ""}
     <div class="bigsearch">${svg("search")}<input id="liq" type="search" placeholder="Search name, brand, SKU, barcode or ETA" value="${esc(S.liq || "")}" aria-label="Search listings" autocomplete="off"></div>
-    <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"], ["pending", "To sync"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
+    <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
       ${f !== "all" || q ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}</div>
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
     <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${th("size", "Size")}${th("type", "Type")}${th("cat", "Collection")}${th("kind", "On hand / Pre-order")}${th("eta", "ETA")}${th("price", "Price", "r")}${th("stock", "Stock", "r")}${th("status", "Status")}${th("web", "Website")}</tr></thead>
@@ -3992,7 +3992,7 @@ function viewListings() {
       <td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="price" data-id="${p.id}" value="${p.price ?? ""}" aria-label="Price" style="width:80px;text-align:right">` : peso(p.price)}${p.compareAt > p.price ? `<div><s class="num" style="font-size:11px;color:var(--muted)">${peso(p.compareAt)}</s></div>` : ""}</td>
       <td class="r num nowrap">${p.kind === "preorder" ? "–" : can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>${reservedOf(p) ? `<div style="font-size:11px;color:var(--muted)">+${reservedOf(p)} reserved</div>` : ""}`}</td>
       <td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>
-      <td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">To sync</span>` : `<span style="color:var(--muted);font-size:12px">On site</span>`}</td></tr>`; }).join("")}</tbody></table>
+      <td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : `<span style="color:var(--muted);font-size:12px">On site</span>`}</td></tr>`; }).join("")}</tbody></table>
     ${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No listings match." : "No listings yet. Click “Add listing”."}</div>`}</div>
     <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${rows.length ? `${S.lpage * PAGE + 1}–${Math.min(rows.length, S.lpage * PAGE + PAGE)} of ${rows.length}` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
 }
@@ -4068,7 +4068,8 @@ async function pushListings(btn, auto) {
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
     for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
     if (S.db) await save("webmeta", "_push", { at: Date.now(), count: list.length }).catch(() => {});
-    if (!auto || pend.length) toast(`Website updated${auto ? " automatically" : ""}: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
+    webPushErr = ""; webPushFailAt = 0;
+    if (!auto) toast(`Website updated: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
   } catch (e) { const m = (e && e.message) || "couldn't send."; if (!auto || m !== webPushErr) toast("Website: " + m); if (auto) { webPushErr = m; webPushFailAt = Date.now(); } }
   finally { webPushBusy = false; auto ? bgRender() : render(); }
 }
