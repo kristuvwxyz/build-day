@@ -52,7 +52,8 @@ export default async function handler(req, res) {
     if (typeof body.paid === "boolean") call.paid = body.paid;
     if (STATUSES.has(body.status)) call.status = body.status;
     if (typeof body.tracking === "string") call.tracking = body.tracking.trim().slice(0, 80);
-    if (!("paid" in call) && !("status" in call) && !("tracking" in call)) return res.status(400).json({ ok: false, error: "Nothing to change." });
+    if (body.cancel === "Approved" || body.cancel === "Declined") call.cancel = body.cancel;
+    if (!("paid" in call) && !("status" in call) && !("tracking" in call) && !("cancel" in call)) return res.status(400).json({ ok: false, error: "Nothing to change." });
   } else if (body.action === "pushProducts") {
     // The full product catalog from RS OS Listings (same list the old WebCake code had). The website replaces its list.
     if (!Array.isArray(body.products) || body.products.length > 3000) return res.status(400).json({ ok: false, error: "Send the product list." });

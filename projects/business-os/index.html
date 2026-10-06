@@ -261,6 +261,14 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .badge.orange { background: var(--orange-bg); color: var(--orange); }
 .badge.amber { background: var(--amber-bg); color: var(--amber); }
 .badge.red { background: var(--bad-bg); color: var(--bad); }
+.badge.cx-n, .badge.red.cx-n { margin-left: 6px; padding: 1px 7px; background: var(--bad); color: #fff; font-weight: 700; } .badge.cx-n::before { display: none; }
+.nav button .cx-n { margin-left: auto; }
+.cx-seg { margin: 0 0 12px; } .cx-seg button[aria-pressed="false"] .cx-n { animation: cxpulse 1.6s ease-in-out infinite; }
+@keyframes cxpulse { 50% { opacity: .55; } } @media (prefers-reduced-motion: reduce) { .cx-seg .cx-n { animation: none; } }
+.cx-list { display: flex; flex-direction: column; gap: 10px; }
+.cx-card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; } .cx-card.pend { border-left: 4px solid var(--bad); }
+.cx-top, .cx-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .cx-when { color: var(--muted); font-size: 13px; }
+.cx-reason { font-size: 14px; white-space: pre-wrap; }
 .badge.grey { background: var(--surface-2); color: var(--muted); }
 .badge.green { background: var(--good-bg); color: var(--good); }
 .badge.violet { background: color-mix(in srgb, #8B5CF6 14%, var(--surface)); color: #7C3AED; }
@@ -785,6 +793,8 @@ const PLATFORMS = [
   { id: "social", name: "FB / IG" },
   { id: "other", name: "Other" },
 ];
+// Where an order came from (Order column shows only the ID; this goes in the Source column).
+const orderSource = o => o.web ? "Website" : /^shopify/.test(o.source || "") ? "Shopify" : o.platform && o.platform !== "website" ? (PLATFORMS.find(p => p.id === o.platform) || {}).name || "Other" : "RS OS";
 const PAYMENTS = [
   { id: "pending", name: "Unpaid", cls: "orange hollow" },
   { id: "partial", name: "Partially paid (DP+SF)", cls: "amber hollow" },
@@ -916,7 +926,7 @@ const dept = id => DEPTS.find(d => d.id === id);
 const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
-  web: { orders: [], at: "", err: "", loading: false, loaded: false }, oSrc: "all", wf: { f: "all", q: "" }, site: null,
+  web: { orders: [], at: "", err: "", loading: false, loaded: false }, oSrc: "all", wf: { f: "all", q: "" }, site: null, cx: { show: false, f: "pending" },
   webmeta: [], products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
@@ -1739,7 +1749,7 @@ function renderNav() {
     timeNavItem() +
     item('data-nav="home"', "home", "Home", S.view === "home") +
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
-    (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders") : "") +
+    (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders", cxBadge()) : "") +
     (canListings() ? item('data-nav="listings"', "tag", "Listings", S.view === "listings", "", "desktop-only") : "") +
     (canListings() ? item('data-nav="gallery"', "image", "Gallery", S.view === "gallery", "", "desktop-only") : "") +
     (canAttendance() ? item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") : "") +
@@ -2384,7 +2394,7 @@ async function webLoad(quiet) {
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't answer.");
     const seen = S.web.loaded ? new Set(S.web.orders.map(o => o.ref)) : null, fresh = seen ? (r.orders || []).filter(o => !seen.has(o.ref)) : [];
     if (fresh.length) toast(fresh.length === 1 ? `New website order ${fresh[0].ref}${fresh[0].name ? " from " + fresh[0].name : ""}` : `${fresh.length} new website orders`);
-    S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
+    S.web.orders = r.orders || []; S.web.cancelRequests = Number(r.cancelRequests) || (r.orders || []).filter(o => o.cancel && o.cancel.status === "Pending").length; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
   webStockSync(); scheduleOwnerSync(); webStatusSync();
@@ -2436,7 +2446,7 @@ function webAsOrders() {
       items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0 })),
       adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
       payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
-      tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "",
+      tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", cancel: o.cancel || null,
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
   });
   webRowsMemo = { at: S.web.at, n: S.web.orders.length, m: S.webmeta, rows }; return rows;
@@ -2556,6 +2566,29 @@ function viewWebOrders() {
       <td class="r num nowrap">${peso(o.total)}${Number(o.due) && Number(o.due) !== Number(o.total) ? `<br><small style="color:var(--muted)">due ${peso(o.due)}</small>` : ""}</td>
       <td class="nowrap">${webBadge(o)}<br><small style="color:var(--muted)">${esc(o.payment || "")}</small></td><td class="nowrap">${esc(o.status || "")}${o.tracking ? `<br><small style="color:var(--muted)">${esc(o.tracking)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="7"><div class="empty">No website orders here.</div></td></tr>`}
   </tbody></table></div>`;
+}
+// Customer cancellation requests from regalspritz.com (website backend v16). Pending ones are urgent: red count on Orders.
+const cxPending = () => S.web.orders.filter(o => o.cancel && o.cancel.status === "Pending").length;
+const cxBadge = () => { const n = S.web.loaded ? (S.web.cancelRequests || cxPending()) : 0; return n ? `<span class="badge red cx-n" title="${n} cancellation request${n > 1 ? "s" : ""} waiting">${n}</span>` : ""; };
+function cancelPanel() {
+  const all = S.web.orders.filter(o => o.cancel && o.cancel.status), f = S.cx.f;
+  const list = all.filter(o => f === "pending" ? o.cancel.status === "Pending" : o.cancel.status !== "Pending").sort((a, b) => String(b.cancel.date || "").localeCompare(String(a.cancel.date || "")));
+  const nP = all.filter(o => o.cancel.status === "Pending").length, can = canPay() || canFul();
+  return `<div class="seg" role="group" aria-label="Request filter" style="margin:4px 0 10px"><button type="button" data-cxf="pending" aria-pressed="${f === "pending"}">Pending (${nP})</button><button type="button" data-cxf="decided" aria-pressed="${f === "decided"}">Decided (${all.length - nP})</button></div>
+  ${!S.web.loaded ? `<div class="panel"><div class="empty">Loading website orders…</div></div>` : !list.length ? `<div class="panel"><div class="empty">${f === "pending" ? "No cancellation requests waiting." : "No decided requests yet."}</div></div>` :
+  `<div class="cx-list">${list.map(o => { const c = o.cancel, pend = c.status === "Pending";
+    return `<div class="panel cx-card${pend ? " pend" : ""}"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(String(o.ref || "").replace(/^#/, ""))}</button><span>${esc(o.name || "")}</span><span class="cx-when">Requested ${esc(c.date ? webTime(c.date) : "")}</span>
+      ${pend ? `<span class="badge red">Pending</span>` : `<span class="badge ${c.status === "Approved" ? "green" : ""}">${c.status === "Approved" ? "Cancelled" : "Declined"}${c.by ? " · " + esc(c.by) : ""}</span>`}</div>
+      <div class="cx-reason">${c.reason ? esc(c.reason) : `<span style="color:var(--muted)">No reason given</span>`}</div>
+      <div class="cx-foot"><span class="num">${peso(o.total)}</span> ${webBadge(o)}${o.paid && pend ? ` <span class="badge amber">Paid — refund needed</span>` : ""}
+      ${pend && can ? `<span style="flex:1"></span><button class="btn sm" type="button" data-cxdec="Declined" data-ref="${esc(o.ref)}">Decline</button><button class="btn primary sm" type="button" data-cxdec="Approved" data-ref="${esc(o.ref)}">Approve cancellation</button>` : ""}</div></div>`; }).join("")}</div>`}`;
+}
+async function cancelDecide(ref, decision, btn) {
+  if (!S.site) return; if (btn) btn.disabled = true;
+  const r = await S.site.update(ref, { cancel: decision }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok) { toast("Website: " + ((r && r.error) || "couldn't save.")); if (btn) btn.disabled = false; return; }
+  toast(decision === "Approved" ? `#${String(ref).replace(/^#/, "")} cancelled.` : `Cancellation for #${String(ref).replace(/^#/, "")} declined.`);
+  await webLoad(true); renderNav && renderNav();
 }
 function openWebOrder(ref) {
   const o = S.web.orders.find(x => x.ref === ref); if (!o) return;
@@ -3031,12 +3064,12 @@ function tagCell(tags) {
 
 /* ---------- order table columns (arrangeable per department) ---------- */
 const ORDER_COLS = {
-  num: { label: "Order" }, date: { label: "Date" }, items: { label: "Items" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
+  num: { label: "Order" }, source: { label: "Source" }, date: { label: "Date" }, items: { label: "Items" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
   total: { label: "Total", cls: "r" }, payment: { label: "Payment status" }, fulfillment: { label: "Fulfillment status" }, courier: { label: "Courier" },
   tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, note: { label: "Note" }, activity: { label: "History" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
 const TABLE_COLS = {
-  orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
+  orders: { all: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r pcell" }, compare: { label: "Compare at", cls: "r pcell" }, cost: { label: "Cost", cls: "r pcell" }, stock: { label: "In stock", cls: "r" }, committed: { label: "Committed", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
     all: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"], show: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"] },
@@ -3050,7 +3083,8 @@ function colOrder(table) {
   const T = TABLE_COLS[table], pr = colPref(table);
   const show = (T.byDept && T.byDept[ctxDept()]) || T.show;
   if (!pr) return { order: [...show, ...T.all.filter(k => !show.includes(k))], hidden: T.all.filter(k => !show.includes(k)) };
-  const order = [...(pr.order || []).filter(k => T.all.includes(k)), ...T.all.filter(k => !(pr.order || []).includes(k))];
+  const order = (pr.order || []).filter(k => T.all.includes(k));
+  T.all.forEach((k, i) => { if (order.includes(k)) return; const prev = T.all.slice(0, i).reverse().find(x => order.includes(x)); order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, k); });
   return { order, hidden: (pr.hidden || []).filter(k => T.all.includes(k)) };
 }
 const visCols = table => { const c = colOrder(table); return c.order.filter(k => !c.hidden.includes(k)); };
@@ -3075,10 +3109,11 @@ function openColumns(table) {
 
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
-  if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span> <span class="chip" title="Website order · ${esc(o.payMethod)}">Website</span>${o.siteNote ? `<span class="nicons" title="Website note: ${esc(o.siteNote)}"><span class="ni">${NOTE_ICON}</span></span>` : ""}</td>`;
+  if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
-    case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}${noteIcons(o)}${exChip(o)}</td>`;
+    case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
+    case "source": return `<td class="nowrap">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>${o.cancel && o.cancel.status === "Pending" ? ` <span class="badge red">Cancel request</span>` : ""}` : `<span class="chip">${esc(orderSource(o))}</span>`}${disputeChip(o)}${exChip(o)}</td>`;
     case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
     case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
     case "customer": return `<td class="strike cust-td">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
@@ -3090,7 +3125,8 @@ function orderCell(k, o, table) {
     case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
-    case "note": return canAll() && !o.archived ? `<td class="note-cell" data-noteedit="${o.id}" title="Click to edit the note">${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span class="tag-add">+ Note</span>`}</td>` : `<td>${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span style="color:var(--muted)">–</span>`}</td>`;
+    case "note": { const extra = `${o.siteNote ? `<div class="note-t" style="color:var(--muted)" title="Customer note: ${esc(o.siteNote)}">Customer: ${esc(o.siteNote)}</div>` : ""}${(o.comments || []).length ? noteIcons({ ...o, note: "" }) : ""}`;
+      return canAll() && !o.archived ? `<td class="note-cell" data-noteedit="${o.id}" title="Click to edit the note">${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span class="tag-add">+ Note</span>`}${extra}</td>` : `<td>${o.note ? `<div class="note-t">${esc(o.note)}</div>` : extra ? "" : `<span style="color:var(--muted)">–</span>`}${extra}</td>`; }
     case "activity": { const l = o.log || [], last = l[l.length - 1]; return `<td>${last ? `<button type="button" class="hist-btn" data-hist="${o.id}" title="${esc((last.by || "") + " " + (last.msg || ""))} · click for full history"><span class="hist-t"><b>${esc(String(last.by || "").split(",")[0])}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length}` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "tags": return canAll() && !o.archived ? `<td class="tag-cell" data-tagedit="${o.id}" title="Click to edit tags">${tagCell(o.tags)}${(o.tags || []).length ? "" : `<span class="tag-add">+ Tag</span>`}</td>` : `<td>${tagCell(o.tags)}</td>`;
     case "phone": return `<td class="nowrap" style="user-select:all">${esc(o.phone || (o.ship || {}).phone || "")}</td>`;
@@ -3179,7 +3215,9 @@ function viewOrders() {
       <input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
-  return `${webErrNotice()}
+  const cxTabs = S.site ? `<div class="seg cx-seg" role="group" aria-label="Orders or cancellation requests"><button type="button" data-cx="0" aria-pressed="${!S.cx.show}">Orders</button><button type="button" data-cx="1" aria-pressed="${S.cx.show}">Cancellation requests${cxBadge()}</button></div>` : "";
+  if (S.cx.show && S.site) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
+  return `${webErrNotice()}${cxTabs}
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${ctxDept() === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
@@ -5797,7 +5835,7 @@ function openDrawer() {
     `<div class="drawer-l">Workspace</div>` +
     item('data-nav="home"', ic("home"), "Home", S.view === "home") +
     item('data-nav="tasks"', ic("tasks"), "Tasks", S.view === "tasks") +
-    (canOrders() ? item('data-nav="orders"', ic("orders"), "Orders", S.view === "orders") : "") +
+    (canOrders() ? item('data-nav="orders"', ic("orders"), "Orders", S.view === "orders", cxBadge()) : "") +
     (canListings() ? item('data-nav="listings"', ic("tag"), "Listings", S.view === "listings") : "") +
     (canListings() ? item('data-nav="gallery"', ic("image"), "Gallery", S.view === "gallery") : "") +
     (canAttendance() ? item('data-nav="attendance"', ic("clock"), "Attendance", S.view === "attendance") : "") +
@@ -5907,6 +5945,12 @@ document.addEventListener("click", guard(async ev => {
   const go = ev.target.closest("[data-goorders]");
   if (go) { S.oSrc = "all"; return goOrders(go.dataset.goorders); }
   const gw = ev.target.closest("[data-goweb]"); if (gw) { S.of.q = ""; return goOrders(gw.dataset.goweb === "unpaid" ? "unpaid" : "unfulfilled"); }
+  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "1"; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
+  const cxf = ev.target.closest("[data-cxf]"); if (cxf) { S.cx.f = cxf.dataset.cxf; render(); return; }
+  const cxd = ev.target.closest("[data-cxdec]"); if (cxd) { const ref = cxd.dataset.ref, d = cxd.dataset.cxdec;
+    if (d === "Approved" && !confirm(`Cancel order #${String(ref).replace(/^#/, "")}? The customer will see it as Cancelled.`)) return;
+    await cancelDecide(ref, d, cxd); return; }
+  const wop = ev.target.closest("[data-webopen]"); if (wop) { openWebOrder(wop.dataset.webopen); return; }
   const osrc = ev.target.closest("[data-osrc]"); if (osrc) { S.oSrc = osrc.dataset.osrc; saveNav(); if (S.oSrc === "web" && !S.web.loaded) webLoad(); render(); return; }
   const wf = ev.target.closest("[data-wf]"); if (wf) { S.wf.f = wf.dataset.wf; render(); return; }
   const wo = ev.target.closest("[data-webo]"); if (wo) { openWebOrder(wo.dataset.webo); return; }
