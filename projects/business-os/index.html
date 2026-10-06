@@ -2631,6 +2631,9 @@ function openWebOrder(ref) {
 }
 // BDO Checkout has no API: staff make the link or email bill on BDO's site, then paste the link here (website backend v18 saves it as Pay Ref).
 const isBdo = o => !!o && /bdo/i.test(o.payment || "");
+const BDO_MIN = 3000, BDO_MAX = 10000; // BDO Checkout takes ₱3,000–₱10,000 per payment
+const bdoDue = o => Number(o.due) || Number(o.total) || 0;
+const bdoOut = o => { const d = bdoDue(o); return d < BDO_MIN ? "under" : d > BDO_MAX ? "over" : ""; };
 const bdoNeeds = o => isBdo(o) && !o.paid && !o.payRef && !/cancel/i.test(o.status || "");
 function bdoFields(o) {
   const due = Number(o.due) || Number(o.total) || 0, num = String(o.ref || "").replace(/^#/, "");
@@ -2640,7 +2643,10 @@ function bdoFields(o) {
 }
 function bdoBox(o) {
   if (!isBdo(o) || o.paid || !canPay()) return "";
-  const f = bdoFields(o), saved = /bdo\.com\.ph/i.test(o.payRef || "") ? o.payRef : "";
+  const f = bdoFields(o), saved = /bdo\.com\.ph/i.test(o.payRef || "") ? o.payRef : "", out = bdoOut(o);
+  if (out && !saved) return `<div class="panel bdo-box" style="border-left-color:var(--bad)"><div class="bdo-h"><b>BDO payment link</b><span class="badge red">Can't use BDO</span></div>
+    <div style="font-size:13.5px">Due today is <b>${peso(bdoDue(o))}</b>. BDO Checkout only takes <b>₱3,000 to ₱10,000</b> per payment.
+    ${out === "under" ? "Ask the customer to pay with Maya Checkout instead (or add items to reach ₱3,000)." : "Ask the customer to pay with Maya Checkout instead, or to split it into smaller orders of ₱10,000 or less."}</div></div>`;
   return `<div class="panel bdo-box"><div class="bdo-h"><b>BDO payment link</b>${saved ? `<span class="badge green">Link sent ✓</span>` : `<span class="badge amber">Link needed</span>`}</div>
     <div class="bdo-f">${f.map(([k, v], i) => `<div><span>${k}</span><b>${esc(v || "–")}</b>${v && k !== "Link Expiry" ? `<button type="button" class="btn ghost sm" data-copy="${esc(v)}" aria-label="Copy ${k}">Copy</button>` : ""}</div>`).join("")}</div>
     <div class="bdo-act"><button type="button" class="btn sm" data-copy="${esc(f.map(([k, v]) => k + ": " + v).join("\n"))}">Copy all</button>
