@@ -1754,6 +1754,7 @@ function bgRender() {
   bgT = setTimeout(() => { bgT = 0; if (!$("#scrim").hidden) { renderNav(); return; } if (pickerOpen()) { S.renderPending = true; return; } render(); }, 120);
 }
 document.addEventListener("change", () => { S.lastAct = Date.now(); }, true);
+document.addEventListener("focusout", e => { const t = e.target; if (t.classList && t.classList.contains("money") && t.value.trim()) { const n = Number(t.value.replace(/,/g, "")); if (!isNaN(n)) t.value = moneyFmt(n); } });
 document.addEventListener("focusout", e => { if (S.renderPending && e.target.tagName === "SELECT") setTimeout(() => { if (!S.renderPending || pickerOpen()) return; S.renderPending = false; if ($("#scrim").hidden) render(); }, 0); });
 function enhanceSearch() {
   document.querySelectorAll("#view input[type=search], #sheet input[type=search]").forEach(inp => {
@@ -3666,7 +3667,9 @@ function openSheet(html, onSubmit) {
 function closeSheet() {
   const sh0 = $("#sheet"); if (sh0) sh0.classList.remove("wide"); $("#scrim").hidden = true; $("#sheet").innerHTML = ""; sheetSubmit = null; S.sheetStack = []; S.sheetCur = null; render(); }
 const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
-const numv = id => Number(val(id)) || 0;
+const numv = id => Number(val(id).replace(/,/g, "")) || 0;
+// Peso amounts in inputs show thousands commas (10,500). numv and the Listings table strip them when saving.
+const moneyFmt = v => v === "" || v == null || isNaN(Number(v)) ? "" : Number(v).toLocaleString("en-PH", { maximumFractionDigits: 2 });
 function sheetError(msg) { const el = $("#sheet-err"); if (el) { el.textContent = msg; el.hidden = false; } }
 const parseTags = s => [...new Set(s.split(",").map(t => t.trim().toUpperCase()).filter(Boolean))];
 const opts = (list, sel) => list.map(s => `<option value="${s.id}" ${sel === s.id ? "selected" : ""}>${s.name}</option>`).join("");
@@ -3897,6 +3900,8 @@ function listOptions(field, base = []) { const c = {}; for (const p of S.product
 const LIST_TYPES = ["Sealed", "Tester", "Partial", "Unsealed, New", "Boxed, New", "Set", "Mini", "Vial", "Decant", "Other"];
 const WEB_CATS = [["her", "For her"], ["him", "For him"], ["unisex", "Unisex"], ["arabian", "Arabian"], ["beauty", "Beauty"]];
 const SITE = "https://www.regalspritz.com/";
+// Old links point to regal.famcoventures.com. Same page path, new domain.
+const webUrl = p => { const u = String((p && p.url) || "").trim(), m = /^(?:https?:\/\/)?(?:www\.)?regal\.famcoventures\.com\/?(.*)$/i.exec(u); return m ? SITE + m[1] : u; };
 const LIST_STATUS = { active: { name: "Active", cls: "good" }, draft: { name: "Draft", cls: "" }, hidden: { name: "Inactive", cls: "warn" } };
 /* ---------- Fragrantica: fill a listing's notes and main accords from its Fragrantica page ----------
    The RS App reads the page on the server (/api/fragrantica). If Fragrantica blocks it (or outside the RS App), the user pastes the page text. */
@@ -3940,22 +3945,22 @@ function openProductForm(id, preset = {}) {
     <div class="field"><label for="p-name">Product name</label><input id="p-name" value="${esc(p.name || "")}" placeholder="e.g. Carolina Herrera Good Girl EDP 80ml"></div>
     <div class="row">
       <div class="field"><label for="p-brand">Brand</label><input id="p-brand" list="p-brand-list" value="${esc(p.brand || "")}" placeholder="Pick or type a brand" autocomplete="off"><datalist id="p-brand-list">${listOptions("brand").sort((a, b) => a.localeCompare(b)).map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
-      <div class="field"><label for="p-size">Size</label><input id="p-size" list="p-size-list" value="${esc(p.size || "")}" placeholder="Pick or type, e.g. 100ml" autocomplete="off"><datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist></div>
+      ${id ? "" : `<div class="field"><label for="p-size">Size</label><input id="p-size" list="p-size-list" value="${esc(p.size || "")}" placeholder="Pick or type, e.g. 100ml" autocomplete="off"><datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist></div>`}
       ${id ? "" : `<div class="field"><label for="p-type">Type</label><select id="p-type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>`}
     </div>
+    ${id ? "" : `<div class="row">
+      <div class="field"><label for="p-price">Selling price (₱)</label><input id="p-price" class="money" inputmode="decimal" value="${moneyFmt(p.price)}"></div>
+      <div class="field"><label for="p-compare">Compare-at price (₱)</label><input id="p-compare" class="money" inputmode="decimal" value="${moneyFmt(p.compareAt)}"></div>
+      <div class="field"><label for="p-cost">Cost per unit (₱)</label><input id="p-cost" class="money" inputmode="decimal" value="${moneyFmt(p.cost)}"></div>
+    </div>`}
     <div class="row">
-      <div class="field"><label for="p-price">Selling price (₱)</label><input id="p-price" type="number" min="0" step="0.01" value="${p.price ?? ""}"></div>
-      <div class="field"><label for="p-compare">Compare-at price (₱)</label><input id="p-compare" type="number" min="0" step="0.01" value="${p.compareAt ?? ""}"></div>
-      <div class="field"><label for="p-cost">Cost per unit (₱)</label><input id="p-cost" type="number" min="0" step="0.01" value="${p.cost ?? ""}"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label for="p-stock">Units in stock <span style="font-weight:400">(free to sell)</span></label><input id="p-stock" type="number" step="1" value="${p.stock ?? 0}">${id && reservedOf(p) ? `<small style="color:var(--muted)">+ ${reservedOf(p)} reserved in checked-out orders · ${(Number(p.stock) || 0) + reservedOf(p)} on hand</small>` : ""}</div>
+      ${id ? "" : `<div class="field"><label for="p-stock">Units in stock <span style="font-weight:400">(free to sell)</span></label><input id="p-stock" type="number" step="1" value="${p.stock ?? 0}">${id && reservedOf(p) ? `<small style="color:var(--muted)">+ ${reservedOf(p)} reserved in checked-out orders · ${(Number(p.stock) || 0) + reservedOf(p)} on hand</small>` : ""}</div>`}
       <div class="field"><label for="p-reorder">Low-stock alert at</label><input id="p-reorder" type="number" min="0" step="1" value="${p.reorder ?? 1}"></div>
       ${id ? "" : `<div class="field"><label for="p-status">Listing status</label><select id="p-status">${Object.entries(LIST_STATUS).map(([k, s]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>`}
     </div>
     <div class="row">
       <div class="field"><label for="p-sku">SKU</label><input id="p-sku" value="${esc(p.sku || "")}"></div>
-      <div class="field"><label for="p-barcode">Barcode</label><div style="display:flex;gap:6px"><input id="p-barcode" value="${esc(p.barcode || "")}" style="flex:1;min-width:0"><label class="btn sm" for="p-bc-cam" title="Scan with camera" style="cursor:pointer">📷</label><input id="p-bc-cam" type="file" accept="image/*" capture="environment" hidden></div></div>
+      <div class="field"><label for="p-barcode">Barcode</label><div style="display:flex;gap:6px"><input id="p-barcode" value="${esc(p.barcode || "")}" style="flex:1;min-width:0"><button class="btn sm" type="button" data-act="p-bc-scan" title="Scan with camera" aria-label="Scan barcode with camera">📷 Scan</button><input id="p-bc-cam" type="file" accept="image/*" capture="environment" hidden></div></div>
       ${id ? "" : `<div class="field"><label for="p-cat">Collection</label><select id="p-cat"><option value="">–</option>${[...WEB_CATS, ...(p.category && !WEB_CATS.some(c => c[0] === p.category) ? [[p.category, p.category]] : [])].map(([k, l]) => `<option value="${esc(k)}" ${p.category === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`}
     </div>
     ${id ? "" : `<div class="row">
@@ -3975,18 +3980,24 @@ function openProductForm(id, preset = {}) {
     <div class="field"><label for="p-acc">Main accords</label><input id="p-acc" value="${esc((p.accords || []).join(", "))}" placeholder="Fresh spicy, Citrus, Woody"></div>
     <div class="field"><label for="p-desc">Description</label><textarea id="p-desc" rows="3">${esc(p.description || "")}</textarea></div>
     <div class="row">
-      <div class="field"><label for="p-url">Website link</label><input id="p-url" value="${esc(p.url || "")}" placeholder="https://regal.famcoventures.com/#/…"></div>
+      <div class="field"><label for="p-url">Website link${webUrl(p) ? ` · <a href="${esc(webUrl(p))}" target="_blank" rel="noopener">Open</a>` : ""}</label><input id="p-url" value="${esc(webUrl(p))}" placeholder="${SITE}#/…"></div>
       <div class="field"><label for="p-batch">Batch / lot no.</label><input id="p-batch" value="${esc(p.batch || "")}"></div>
     </div>
     <div id="sheet-err" class="confirm" hidden></div>
+    ${id && ((p.log || []).length || p.editedBy) ? `<div class="olog"><div class="olog-h">Team activity</div>${(p.log || []).length ? [...p.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("") : `<div><b>${esc(p.editedBy)}</b> last edited this <span>· ${relTime(p.editedAt)}</span></div>`}</div>` : ""}
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-product" data-id="${id}">Delete listing</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save listing</button></div>`,
   async () => {
     if (!val("p-name")) return sheetError("Give the product a name.");
     const bc = val("p-barcode");
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
-    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : val("p-status"), kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: val("p-url"), batch: val("p-batch"), photo: document.getElementById("p-photo").value, imgs: (() => { const ph = document.getElementById("p-photo").value, rest = (p.imgs || []).filter(u => u !== p.photo); return ph && !ph.startsWith("data:") ? [ph, ...rest] : (p.imgs || []); })(), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : val("p-status"), kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: webUrl({ url: val("p-url") }), batch: val("p-batch"), photo: document.getElementById("p-photo").value, imgs: (() => { const ph = document.getElementById("p-photo").value, rest = (p.imgs || []).filter(u => u !== p.photo); return ph && !ph.startsWith("data:") ? [ph, ...rest] : (p.imgs || []); })(), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    // Fields that are edited in the Listings table aren't in Edit listing: keep them as they are.
+    if (id) for (const k of ["size", "price", "compareAt", "cost", "stock"]) { if (k in p) data[k] = p[k]; else delete data[k]; }
     if (!id) data.createdAt = Date.now();
+    const PLAB = { name: "name", brand: "brand", size: "size", ptype: "type", sku: "SKU", barcode: "barcode", category: "collection", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", reorder: "low-stock alert", status: "status", kind: "availability", eta: "ETA", badges: "badges", notes: "notes", accords: "accords", fragrantica: "Fragrantica link", description: "description", url: "website link", batch: "batch no.", photo: "photo" };
+    const changed = id ? Object.keys(PLAB).filter(k => JSON.stringify(p[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !p[k]) && !(k === "notes" && !Object.keys(data.notes).length && !p.notes)) : [];
+    data.log = logAdd(p, [id ? (changed.length ? "changed " + changed.map(k => PLAB[k]).join(", ") : "saved with no changes") : "added this listing"]);
     await save("products", id || uid("p"), data);
     closeSheet(); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
   });
@@ -4027,9 +4038,9 @@ function viewListings() {
         cat: () => `<td class="nowrap">${(() => { const c = p.category || "unisex", opts = [...WEB_CATS, ...(WEB_CATS.some(x => x[0] === c) ? [] : [[c, c]])]; return can ? `<select class="lcell" data-lset="category" data-id="${p.id}" aria-label="Collection">${opts.map(([k, l]) => `<option value="${esc(k)}" ${c === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : esc((opts.find(x => x[0] === c) || [c, c])[1]); })()}</td>`,
         kind: () => `<td class="nowrap">${can ? `<select class="status ${p.kind === "preorder" ? "st-blue" : "st-grey"}" data-lset="kind" data-id="${p.id}" aria-label="On hand or pre-order"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select>` : p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>`,
         eta: () => `<td>${p.kind === "preorder" ? (can ? `<select class="status st-blue" data-lset="eta" data-id="${p.id}" aria-label="ETA">${etaOpts(p)}</select>` : esc(p.eta || "–")) : `<span style="color:var(--muted)">–</span>`}</td>`,
-        price: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="price" data-id="${p.id}" value="${p.price ?? ""}" placeholder="SRP" aria-label="SRP"></span>` : peso(p.price)}</td>`,
-        compare: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="compareAt" data-id="${p.id}" value="${Number(p.compareAt) ? p.compareAt : ""}" placeholder="Compare" aria-label="Compare-at price"></span>` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
-        cost: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="cost" data-id="${p.id}" value="${Number(p.cost) ? p.cost : ""}" placeholder="Cost" aria-label="Cost"></span>` : p.cost ? peso(p.cost) : "–"}</td>`,
+        price: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="price" data-id="${p.id}" value="${moneyFmt(p.price)}" placeholder="SRP" aria-label="SRP"></span>` : peso(p.price)}</td>`,
+        compare: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="compareAt" data-id="${p.id}" value="${Number(p.compareAt) ? moneyFmt(p.compareAt) : ""}" placeholder="Compare" aria-label="Compare-at price"></span>` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
+        cost: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="cost" data-id="${p.id}" value="${Number(p.cost) ? moneyFmt(p.cost) : ""}" placeholder="Cost" aria-label="Cost"></span>` : p.cost ? peso(p.cost) : "–"}</td>`,
         stock: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>`,
         committed: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : (() => { const c = committedOf(p); return c ? `<b>${c}</b>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
@@ -4193,6 +4204,29 @@ let zxingP = null;
 function loadZXing() {
   if (window.ZXing) return Promise.resolve(window.ZXing);
   return zxingP ||= new Promise((ok, bad) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"; s.onload = () => ok(window.ZXing); s.onerror = () => { zxingP = null; bad(new Error("Couldn't load the scanner. Check your internet and try again.")); }; document.head.appendChild(s); });
+}
+// Live camera scan for the Barcode field. Falls back to taking a photo when the camera can't be opened.
+async function scanBarcodeLive() {
+  const input = $("#p-barcode"); if (!input) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("#p-bc-cam").click(); return; }
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px";
+  ov.innerHTML = `<video playsinline muted style="width:min(480px,100%);max-height:60vh;border-radius:12px;background:#000"></video><div style="color:#fff;font-size:14px">Point the camera at the barcode</div><button class="btn" type="button">Cancel</button>`;
+  document.body.appendChild(ov);
+  const video = ov.querySelector("video"); let reader = null, done = false;
+  const close = () => { done = true; try { reader && reader.reset(); } catch (e) {} const st = video.srcObject; if (st) st.getTracks().forEach(t => t.stop()); ov.remove(); };
+  ov.querySelector("button").onclick = close;
+  try {
+    const Z = await loadZXing(); if (done) return;
+    reader = new Z.BrowserMultiFormatReader(new Map([[Z.DecodeHintType.TRY_HARDER, true]]));
+    const res = await reader.decodeOnceFromConstraints({ video: { facingMode: "environment" } }, video);
+    if (done) return; close();
+    input.value = res.getText(); toast("Barcode scanned: " + input.value);
+  } catch (e) {
+    if (done) return; close();
+    toast(/load the scanner/.test((e && e.message) || "") ? e.message : "Couldn't open the camera. Take a photo of the barcode instead.");
+    $("#p-bc-cam") && $("#p-bc-cam").click();
+  }
 }
 async function decodeBarcode(file) {
   try {
@@ -5621,7 +5655,7 @@ async function exportCol(col) {
   if (col === "team") rows = [["ID Number", "Nickname", "Full Name", "Phone", "Email", "Address", "Department", "Date Started", "Emergency contact", "Emergency relationship", "Emergency phone", "Status"], ...S.team.map(m => [m.idNumber, m.nickname, m.name, m.phone || m.contact, m.email, m.address, m.role || (dept(m.department) || {}).name || "", m.started, (m.emergency || {}).name || "", (m.emergency || {}).relation || "", (m.emergency || {}).phone || "", m.status === "inactive" ? "Inactive" : "Active"])];
   if (col === "payroll") { const per = payPeriod(); rows = [["Pay period", "ID Number", "Employee", "Position", "Rate / day", "Days worked", "Paid days", "Late days", "Late minutes", "Leave", "Absent", "Basic pay", ...ADD_FIELDS.map(f => f[1]), "Late deduction", ...DED_FIELDS.map(f => f[1]), "Net pay", "Status"], ...activeTeam().map(m => { const c = payCalc(m, per); return [per.label, m.idNumber, m.name, positionOf(m), c.rate, c.worked, c.paidDays, c.late, c.lateMin, c.leave, c.absent, c.basic, ...ADD_FIELDS.map(([k]) => Number(c.rec[k]) || 0), c.lateDed, ...DED_FIELDS.map(([k]) => Number(c.rec[k]) || 0), c.net, PAY_STATUS[c.status].name]; })]; }
   if (col === "investments") rows = [["Type", "Status", "INV Code", "Name", "FB Account", "Amount", "% Interest / Month", "Interest / Month", "Duration (Months)", "Total Interest", "Payment Start", "End Date", "Amount Due", "Status", "Payments Made", "Notes"], ...S.investments.map(v => [v.kind === "loan" ? "Loan" : "Investor", v.closed ? "Finished" : "Ongoing", v.code, v.name, v.fb, v.amount, v.rate, invMonthly(v), v.months, invTotalInterest(v), v.start, invEnd(v), v.kind === "loan" ? "" : invDue(v), invStatus(v).name, `${invSchedule(v).filter(p => p.paid).length}/${invSchedule(v).length}`, v.notes])];
-  if (col === "products") rows = [["Name", "Brand", "Size", "Type", "Price", "Compare at", "Cost", "Stock", "SKU", "Barcode", "Category", "Status", "Description", "Website link", "Needs website sync"], ...S.products.map(p => [p.name, p.brand, p.size, p.ptype, p.price, p.compareAt, p.cost, p.stock, p.sku, p.barcode, p.category, (LIST_STATUS[p.status || "active"] || {}).name, p.description, p.url, p.webSync === "pending" ? "Yes" : "No"])];
+  if (col === "products") rows = [["Name", "Brand", "Size", "Type", "Price", "Compare at", "Cost", "Stock", "SKU", "Barcode", "Category", "Status", "Description", "Website link", "Needs website sync"], ...S.products.map(p => [p.name, p.brand, p.size, p.ptype, p.price, p.compareAt, p.cost, p.stock, p.sku, p.barcode, p.category, (LIST_STATUS[p.status || "active"] || {}).name, p.description, webUrl(p), p.webSync === "pending" ? "Yes" : "No"])];
   if (col === "expenses") rows = [["Date", "Category", "Note", "Amount"], ...S.expenses.map(e => [e.date, e.category, e.note, e.amount])];
   if (col === "customers") rows = [["Name", "Email", "Phone", "Address", "Channels", "Orders", "Amount spent", "Last order", "Tags", "Note"], ...customerList().map(c => [c.name, c.email, c.phone, c.address, [...c.platforms].join("; "), c.orders, c.spent, c.last ? new Date(c.last).toLocaleDateString("en-CA") : "", (c.tags || []).join(", "), c.note])];
   if (col === "checks") rows = [["Check date", "Check no.", "Bank / account", "Payee", "Amount", "Purpose", "Status", "Issued", "Notes"], ...S.checks.map(c => [c.checkDate, c.checkNo, c.bank, c.payee, c.amount, c.purpose, CHECK_STATUS[c.status || "pending"].name, c.issued, c.notes])];
@@ -5883,6 +5917,7 @@ document.addEventListener("click", guard(async ev => {
     case "web-synced": return markSynced();
     case "scan-undo": return scanUndo();
     case "p-frag-get": return fragGet(b);
+    case "p-bc-scan": return scanBarcodeLive();
     case "p-photo-clear": $("#p-photo").value = ""; $("#p-photo-prev").innerHTML = ""; b.remove(); return;
     case "m-photo-clear": $("#m-photo").value = ""; $("#m-photo-prev").innerHTML = "<span>?</span>"; b.remove(); return;
     case "scent-web": { const q = val("sc-name"); window.open("https://www.google.com/search?tbm=isch&q=" + encodeURIComponent((q || "perfume") + " perfume bottle"), "_blank", "noopener"); return; }
@@ -6050,13 +6085,13 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "psel-all") { packList().forEach(o => t.checked ? S.sel.add(o.id) : S.sel.delete(o.id)); render(); return; }
   if (t.dataset.lset) {
     const pr = S.products.find(x => x.id === t.dataset.id); if (!pr) return; const f = t.dataset.lset;
-    let v = t.value.trim();
+    let v = t.value.trim(); if (t.classList.contains("money")) v = v.replace(/,/g, "");
     if (f === "price" || f === "stock") { if (v === "" || isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return; } v = f === "stock" ? Math.round(Number(v)) : Number(v); }
     if (f === "compareAt" || f === "cost") { if (v !== "" && isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return; } v = v === "" ? null : Number(v); }
     if (String(pr[f] ?? "") === String(v ?? "")) return;
-    await patch("products", pr.id, { [f]: v, ...(f === "cost" ? {} : { webSync: "pending" }), editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" });
     const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", category: "collection" }[f] || f;
     const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" || f === "compareAt" || f === "cost" ? (v == null ? "none" : peso(v)) : f === "category" ? (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : (v === "" ? "none" : v);
+    await patch("products", pr.id, { [f]: v, ...(f === "cost" ? {} : { webSync: "pending" }), editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(pr, [`changed ${lab} to ${shown}`]) });
     toast(`${pr.name}: ${lab} → ${shown}`); if (!S.db) render(); return;
   }
   if (t.id === "sp-ful") { S.sp.ful = t.value; render(); return; }
