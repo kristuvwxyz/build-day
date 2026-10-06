@@ -1624,7 +1624,8 @@ const workedMs = r => r && r.in ? Math.max(0, (r.out || Date.now()) - r.in - bre
 function timeNavItem() {
   if (!myMemberId()) return "";
   const r = myAtt(), on = r && r.in && !r.out, brk = on && onBreak(r);
-  const label = !r || !r.in || canResume(mToday(), myMemberId(), r) ? "Time in" : r.out ? "Done today" : brk ? "On break" : "Time out";
+  const mid0 = myMemberId(), nb = shiftBlocks(mToday(), mid0), si = shiftSegs(r).length - (r && r.in && !r.out ? 1 : 0), sn = nb.length > 1 && nb[si] ? " · " + fmtHM(nb[si][0]) : "";
+  const label = !r || !r.in || canResume(mToday(), mid0, r) ? "Time in" + sn : r.out ? "Done today" : brk ? "On break" : "Time out";
   return `<button type="button" class="tclock${on ? (brk ? " brk" : " on") : ""}" data-act="tclock">${svg("clock")}<span>${label}</span><span class="wt" data-wtime>${r && r.in ? hms(workedMs(r)) : ""}</span></button>`;
 }
 function tickWorkClock() {
@@ -4978,14 +4979,29 @@ async function clock(mid, dir) {
     toast(`${memberName(mid)} timed out at ${mTime(now)} · ${fmtHours(hoursOf({ ...r, ...upd }))} worked${canResume(date, mid, { ...r, ...upd }) ? ". Time in again for the next shift." : "."}`);
   }
 }
+// Split-shift days: each shift has its own time in / time out. Shifts are the parts between "gap" breaks.
+function shiftSegs(r) {
+  if (!r || !r.in) return [];
+  const g = (r.breaks || []).filter(b => b.gap).sort((a, b) => a.s - b.s), out = [];
+  let st = r.in; for (const b of g) { out.push({ in: st, out: b.s }); st = b.e; }
+  out.push({ in: st, out: r.out || 0 }); return out;
+}
+const shiftName = (date, mid, i) => { const b = shiftBlocks(date, mid); return b.length > 1 && b[i] ? fmtHM(b[i][0]) + " shift" : ""; };
+function shiftCells(date, mid, r, k) {
+  const b = shiftBlocks(date, mid), sg = shiftSegs(r);
+  const one = (x, i) => !x ? "–" : k === "in" ? mTime(x.in) : x.out ? mTime(x.out) : i === sg.length - 1 && !r.out ? '<span style="color:var(--muted)">still in</span>' : "–";
+  if (b.length < 2) return !r || !r.in ? "–" : k === "in" ? mTime(r.in) : r.out ? mTime(r.out) : '<span style="color:var(--muted)">still in</span>';
+  return b.map(([a, z], i) => `<div><small style="color:var(--muted);display:inline-block;min-width:38px">${fmtHM(a)}</small> ${one(sg[i], i)}</div>`).join("");
+}
 function clockButtons(mid, date) {
   if (S.readOnly || date !== mToday()) return "";
   const r = attRec(date, mid);
   if (r && r.status && !["present"].includes(r.status)) return "";
-  if (!r || !r.in) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in</button>`;
+  const nm = i => { const n = shiftName(date, mid, i); return n ? ` · ${n}` : ""; }, cur = shiftSegs(r).length - 1;
+  if (!r || !r.in) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in${nm(0)}</button>`;
   if (!r.out) return onBreak(r) ? `<button class="btn sm primary" type="button" data-clock="bend" data-mid="${mid}">End break</button>`
-    : `<button class="btn sm" type="button" data-clock="bstart" data-mid="${mid}">☕ Break</button><button class="btn sm" type="button" data-clock="out" data-mid="${mid}">Time out</button>`;
-  if (canResume(date, mid, r)) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in (next shift)</button>`;
+    : `<button class="btn sm" type="button" data-clock="bstart" data-mid="${mid}">☕ Break</button><button class="btn sm" type="button" data-clock="out" data-mid="${mid}">Time out${nm(cur)}</button>`;
+  if (canResume(date, mid, r)) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in${nm(cur + 1) || " (next shift)"}</button>`;
   return "";
 }
 function myClockCard() {
@@ -4993,7 +5009,7 @@ function myClockCard() {
   const r = attRec(mToday(), mid), st = attStatus(mToday(), mid);
   return `<section class="panel clock-card"><div class="head"><h2>My attendance today</h2><span class="chip ${onBreak(r) ? "warn" : astat(st).cls}">${onBreak(r) ? "On break" : astat(st).name}</span></div>
     <div class="clock-row"><div><div class="clock-big num" data-live-clock>${mTime(Date.now())}</div><div style="font-size:12px;color:var(--muted)">Manila time · shift ${esc(shiftLabel(mToday(), mid))}</div></div>
-    <div style="font-size:13px">${r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))} worked${ownBreakMs(r) ? ` · break ${fmtMin(ownBreakMs(r))} of ${attCfg().breakMin}m` : ""}` : "Not timed in yet"}</div>
+    <div style="font-size:13px">${r && r.in && shiftBlocks(mToday(), mid).length > 1 ? `<div style="display:flex;gap:14px"><div><small style="color:var(--muted)">In</small>${shiftCells(mToday(), mid, r, "in")}</div><div><small style="color:var(--muted)">Out</small>${shiftCells(mToday(), mid, r, "out")}</div></div>${fmtHours(hoursOf(r))} worked` : r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))} worked${ownBreakMs(r) ? ` · break ${fmtMin(ownBreakMs(r))} of ${attCfg().breakMin}m` : ""}` : "Not timed in yet"}</div>
     <div class="actions">${clockButtons(mid, mToday())}</div></div></section>`;
 }
 setInterval(() => document.querySelectorAll("[data-live-clock]").forEach(e => e.textContent = mTime(Date.now())), 20000);
@@ -5024,8 +5040,8 @@ function viewAttendance() {
         <td style="font-weight:600">${esc(m.name)}${m.id === myMemberId() ? ' <span class="chip">You</span>' : ""}</td>
         <td>${esc((dept(m.department) || { name: "–" }).name)}${schedOf(m) ? `<div style="font-size:11px;color:var(--muted)">${esc(shiftLabel(A.date, m.id))}</div>` : ""}</td>
         <td><span class="chip ${st.cls}">${st.name}</span>${onBreak(r) ? ' <span class="chip warn">On break</span>' : ""}</td>
-        <td class="num nowrap">${r && r.in ? mTime(r.in) : "–"}</td>
-        <td class="num nowrap">${r && r.out ? mTime(r.out) : r && r.in ? '<span style="color:var(--muted)">still in</span>' : "–"}</td>
+        <td class="num nowrap">${shiftCells(A.date, m.id, r, "in")}</td>
+        <td class="num nowrap">${shiftCells(A.date, m.id, r, "out")}</td>
         <td class="r num nowrap" data-sort="${Math.round(ownBreakMs(r) / 6e4)}" style="color:${ownBreakMs(r) > attCfg().breakMin * 6e4 ? "var(--warn)" : "inherit"}">${fmtMin(ownBreakMs(r))}${r && r.breaks && r.breaks.filter(b => !b.gap).length > 1 ? ` <small style="color:var(--muted)">×${r.breaks.filter(b => !b.gap).length}</small>` : ""}</td>
         <td class="r num">${fmtHours(hoursOf(r))}</td>
         <td style="max-width:200px;color:var(--muted)">${esc(r && r.note || "")}</td>
