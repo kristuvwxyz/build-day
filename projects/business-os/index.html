@@ -3493,8 +3493,11 @@ async function archiveOrder(o, reason, extra = {}) {
 }
 // Old-shop / RS OS orders also show in the customer's account on regalspritz.com. Archiving one marks it Cancelled there too.
 const legacyRef = o => { const n = String(o.num || "").replace(/^#/, "").trim(); return /^RS\d+$/i.test(n) ? n.toUpperCase() : ""; };
+// Never touch a number that is also a live order (a website order, or an open RS OS / Shopify order with the same RS number).
+const legacyClash = (o, ref) => (S.web.orders || []).some(w => String(w.ref || "").replace(/^#/, "").toUpperCase() === ref)
+  || S.orders.some(x => x.id !== o.id && legacyRef(x) === ref);
 async function legacyWebStatus(o, status) {
-  const ref = legacyRef(o); if (!S.site || !ref || S.readOnly) return false;
+  const ref = legacyRef(o); if (!S.site || !ref || S.readOnly || !S.web.loaded || legacyClash(o, ref)) return false;
   try {
     const r = await S.site.update(ref, { status });
     await patch("orders", o.id, r && r.ok ? { webStatusSent: status, webStatusAt: Date.now(), webStatusErr: "" } : { webStatusErr: String((r && r.error) || "no answer").slice(0, 120), webStatusAt: Date.now() });
