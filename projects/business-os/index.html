@@ -85,8 +85,10 @@ select.lcell { width: auto; max-width: 118px; padding-right: 2px; }
 .pbox:focus-within { border-color: var(--gold); }
 .ltable th, .ltable td { padding-left: 12px; padding-right: 12px; }
 .ltable th + th, .ltable td + td { border-left: 1px solid var(--line); }
-.ltable th:first-child + th, .ltable td:first-child + td { border-left: 0; }
-.ltable th:nth-child(n+3), .ltable td:nth-child(n+3) { text-align: center; }
+.ltable th:nth-child(-n+3), .ltable td:nth-child(-n+3) { border-left: 0; }
+.ltable th:nth-child(n+4), .ltable td:nth-child(n+4) { text-align: center; }
+.ltable .cb { width: 34px; padding-right: 0; }
+.bulk input.lb-num { width: 96px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; background: var(--bg); }
 .ltable input.lcell { text-align: center; } .ltable .pbox input.lcell { text-align: right; }
 @keyframes markTap { 0% { transform: scale(1); } 35% { transform: scale(.94); letter-spacing: .02em; } 100% { transform: scale(1); } }
 @keyframes homeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -1128,7 +1130,7 @@ async function updateOrderCore(o, ch) {
   return stockDelta;
 }
 
-function writeErr(e) {
+function writeErr(e) { try { console.warn("writeErr", e && (e.stack || e.message || e)); } catch (x) {}
   if (e && e.code === "viewas") { toast("Preview only: you're viewing as a team member, so nothing was saved."); return; }
   if (e && e.code === "invalid_argument") { S.readOnly = true; toast("You have view-only access. Ask the owner for Contributor access to make changes."); render(); }
   else if (e && e.code === "quota_exceeded") toast("Storage is full. Delete old records to add new ones.");
@@ -4086,6 +4088,8 @@ function viewListings() {
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
   const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
   const page = rows.slice(S.lpage * PAGE, S.lpage * PAGE + PAGE);
+  S.lrowIds = rows.map(p => p.id);
+  S.lsel = S.lsel || new Set(); for (const id of [...S.lsel]) if (!all.some(p => p.id === id)) S.lsel.delete(id);
   const can = !S.readOnly, cols = visCols("listings").filter(k => !(k === "eta" && f === "onhand"));
   const th = (k, l, c) => sortTh(k, l, c || "", ls, "lsort");
   const etaOpts = p => { const opts2 = [...new Set([...MONTHS, p.eta].filter(Boolean))]; return `<option value="">–</option>${opts2.map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}`; };
@@ -4096,9 +4100,19 @@ function viewListings() {
       <select id="l-cat" aria-label="Filter by collection"><option value="">All collections</option>${WEB_CATS.map(([k, l]) => `<option value="${k}" ${k === lc ? "selected" : ""}>${l}</option>`).join("")}</select>
       ${f !== "all" || q || lb || lc ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
       <button class="btn" type="button" data-act="columns" data-table="listings">⚙︎ Columns</button></div>
+    ${can && S.lsel.size ? (() => { const o = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`; return `<div class="bulk"><strong>${S.lsel.size} selected</strong>
+      <select data-lbulk="ptype" aria-label="Set type"><option value="">Set type…</option>${LIST_TYPES.map(t => o(t, t)).join("")}</select>
+      <select data-lbulk="category" aria-label="Set collection"><option value="">Set collection…</option>${WEB_CATS.map(([k, l]) => o(k, l)).join("")}</select>
+      <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}</select>
+      <select data-lbulk="eta" aria-label="Set ETA"><option value="">Set ETA (pre-orders)…</option>${MONTHS.map(m => o(m, m)).join("")}</select>
+      <select data-lbulk="status" aria-label="Set status"><option value="">Set status…</option>${Object.entries(LIST_STATUS).map(([k, st]) => o(k, k === "hidden" ? "Inactive" : st.name)).join("")}</select>
+      <input class="lb-num" id="lb-price" type="number" min="0" placeholder="SRP" aria-label="New SRP"><input class="lb-num" id="lb-compare" type="number" min="0" placeholder="Compare" aria-label="New compare-at price"><input class="lb-num" id="lb-cost" type="number" min="0" placeholder="Cost" aria-label="New cost">
+      <button class="btn sm" type="button" data-act="lb-prices">Apply prices</button>
+      <span id="lb-del-slot"><button class="btn sm danger" type="button" data-act="lb-ask-del">Delete…</button></span>
+      <button class="btn ghost sm" type="button" data-act="lb-clear">Clear selection</button></div>`; })() : ""}
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
-    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
-    <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}">
+    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th class="cb">${can ? `<input type="checkbox" id="l-selall" aria-label="Select all ${rows.length} listings in this view" ${rows.length && rows.every(p => S.lsel.has(p.id)) ? "checked" : ""}>` : ""}</th><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
+    <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}" class="${S.lsel.has(p.id) ? "sel" : ""}"><td class="cb">${can ? `<input type="checkbox" data-lsel="${p.id}" aria-label="Select ${esc(p.name)}" ${S.lsel.has(p.id) ? "checked" : ""}>` : ""}</td>
       <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
       <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>
       ${cols.map(k => ({
@@ -4117,6 +4131,23 @@ function viewListings() {
       })[k]()).join("")}</tr>`; }).join("")}</tbody></table>
     ${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No listings match." : "No listings yet. Click “Add listing”."}</div>`}</div>
     <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${rows.length ? `${S.lpage * PAGE + 1}–${Math.min(rows.length, S.lpage * PAGE + PAGE)} of ${rows.length}` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
+}
+
+// Bulk edit on Listings: same fields as the table, each listing logs the change and goes to the website as usual.
+async function listingsBulk(upd, label) {
+  const ids = [...(S.lsel || [])], by = (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "";
+  let n = 0;
+  for (const id of ids) {
+    const pr = S.products.find(x => x.id === id); if (!pr) continue;
+    const u = { ...upd }; if ("eta" in u && pr.kind !== "preorder" && u.kind !== "preorder") delete u.eta;
+    for (const k of Object.keys(u)) if (String(pr[k] ?? "") === String(u[k] ?? "")) delete u[k];
+    if (!Object.keys(u).length) continue;
+    const webSide = Object.keys(u).some(k => k !== "cost");
+    await patch("products", id, { ...u, ...(webSide ? { webSync: "pending" } : {}), editedAt: Date.now(), editedBy: by, log: logAdd(pr, ["bulk edit: " + label], by) });
+    n++;
+  }
+  toast(n ? `${label} · ${n} listing${n === 1 ? "" : "s"} updated.` : "Nothing to change.");
+  render();
 }
 
 let pendingListings = null;
@@ -6081,6 +6112,12 @@ document.addEventListener("click", guard(async ev => {
     case "gal-use": await galUse(b.dataset.h, Number(b.dataset.k)); return;
     case "shop-find-open": await openShopFound(b.dataset.num); return;
     case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
+    case "lb-clear": S.lsel.clear(); render(); return;
+    case "lb-prices": { const upd = {}, labs = []; for (const [id, k, l] of [["lb-price", "price", "SRP"], ["lb-compare", "compareAt", "compare at"], ["lb-cost", "cost", "cost"]]) { const v = val(id); if (v === "") continue; if (isNaN(Number(v))) { toast("Enter a number."); return; } upd[k] = Number(v); labs.push(l + " → " + peso(Number(v))); }
+      if (!labs.length) { toast("Type a price first."); return; } await listingsBulk(upd, labs.join(", ")); return; }
+    case "lb-ask-del": $("#lb-del-slot").innerHTML = `<span class="confirm">Delete ${S.lsel.size} listing${S.lsel.size === 1 ? "" : "s"}? This can't be undone. <button class="btn sm danger" type="button" data-act="lb-del">Yes, delete</button><button class="btn sm ghost" type="button" data-act="lb-clear-del">Cancel</button></span>`; return;
+    case "lb-clear-del": render(); return;
+    case "lb-del": { const ids = [...S.lsel]; for (const id of ids) await remove("products", id); S.lsel.clear(); toast(`Deleted ${ids.length} listing${ids.length === 1 ? "" : "s"}.`); render(); return; }
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
@@ -6125,6 +6162,11 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset && t.dataset.spitem != null) { const a = S.spAgg && S.spAgg.get(t.dataset.spitem); if (a) a.ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if ((t.id === "sp-bulk-ful" || t.id === "sp-bulk-pay") && t.value) return bulkAction((t.id === "sp-bulk-pay" ? "pay:" : "ful:") + t.value);
   if (t.id === "inv-sup") { S.invF.sup = t.value; render(); return; }
+  if (t.id === "l-selall") { const ids = S.lrowIds || []; ids.forEach(id => t.checked ? S.lsel.add(id) : S.lsel.delete(id)); render(); return; }
+  if (t.dataset.lsel) { t.checked ? S.lsel.add(t.dataset.lsel) : S.lsel.delete(t.dataset.lsel); render(); return; }
+  if (t.dataset.lbulk) { const f = t.dataset.lbulk, v = t.value; if (!v) return;
+    const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "status" ? "status → " + (v === "hidden" ? "Inactive" : (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
+    await listingsBulk({ [f]: v }, lab); return; }
   if (t.id === "l-brand" || t.id === "l-cat") { S[t.id === "l-brand" ? "lbrand" : "lcat"] = t.value; S.lpage = 0; render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
