@@ -2933,8 +2933,8 @@ const ORDER_COLS = {
 const TABLE_COLS = {
   orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
-  listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "Price", cls: "r" }, stock: { label: "Stock", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
-    all: ["size", "type", "cat", "kind", "eta", "price", "stock", "status", "web"], show: ["size", "type", "cat", "kind", "eta", "price", "stock", "status", "web"] },
+  listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r" }, compare: { label: "Compare at", cls: "r" }, cost: { label: "Cost", cls: "r" }, stock: { label: "Stock", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
+    all: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "status", "web"], show: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "status", "web"] },
   packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
 // Listings columns are saved per person; order tables per department.
@@ -3971,7 +3971,7 @@ function openProductForm(id, preset = {}) {
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
+const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, compare: p => Number(p.compareAt) || 0, cost: p => Number(p.cost) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products, lb = S.lbrand || "", lc = S.lcat || "";
@@ -4005,7 +4005,9 @@ function viewListings() {
         cat: () => `<td class="nowrap">${(() => { const c = p.category || "unisex", opts = [...WEB_CATS, ...(WEB_CATS.some(x => x[0] === c) ? [] : [[c, c]])]; return can ? `<select class="lcell" data-lset="category" data-id="${p.id}" aria-label="Collection">${opts.map(([k, l]) => `<option value="${esc(k)}" ${c === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : esc((opts.find(x => x[0] === c) || [c, c])[1]); })()}</td>`,
         kind: () => `<td class="nowrap">${can ? `<select class="status ${p.kind === "preorder" ? "st-blue" : "st-grey"}" data-lset="kind" data-id="${p.id}" aria-label="On hand or pre-order"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select>` : p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>`,
         eta: () => `<td>${p.kind === "preorder" ? (can ? `<select class="status st-blue" data-lset="eta" data-id="${p.id}" aria-label="ETA">${etaOpts(p)}</select>` : esc(p.eta || "–")) : `<span style="color:var(--muted)">–</span>`}</td>`,
-        price: () => `<td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="price" data-id="${p.id}" value="${p.price ?? ""}" aria-label="Price" style="width:80px;text-align:right">` : peso(p.price)}${p.compareAt > p.price ? `<div><s class="num" style="font-size:11px;color:var(--muted)">${peso(p.compareAt)}</s></div>` : ""}</td>`,
+        price: () => `<td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="price" data-id="${p.id}" value="${p.price ?? ""}" aria-label="SRP" style="width:80px;text-align:right">` : peso(p.price)}</td>`,
+        compare: () => `<td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="compareAt" data-id="${p.id}" value="${p.compareAt ?? ""}" placeholder="–" aria-label="Compare-at price" style="width:80px;text-align:right">` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
+        cost: () => `<td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="cost" data-id="${p.id}" value="${p.cost ?? ""}" placeholder="–" aria-label="Cost" style="width:80px;text-align:right">` : p.cost ? peso(p.cost) : "–"}</td>`,
         stock: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>${reservedOf(p) ? `<div style="font-size:11px;color:var(--muted)">+${reservedOf(p)} reserved</div>` : ""}`}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
         web: () => `<td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : `<span style="color:var(--muted);font-size:12px">On site</span>`}</td>`
@@ -6026,11 +6028,12 @@ document.addEventListener("change", guard(async ev => {
     const pr = S.products.find(x => x.id === t.dataset.id); if (!pr) return; const f = t.dataset.lset;
     let v = t.value.trim();
     if (f === "price" || f === "stock") { if (v === "" || isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return; } v = f === "stock" ? Math.round(Number(v)) : Number(v); }
-    if (String(pr[f] ?? "") === String(v)) return;
-    await patch("products", pr.id, { [f]: v, webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" });
-    const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "price", stock: "stock", category: "collection" }[f] || f;
-    const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" ? peso(v) : f === "category" ? (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : (v === "" ? "none" : v);
-    toast(`${pr.name}: ${lab} → ${shown} · marked To sync`); if (!S.db) render(); return;
+    if (f === "compareAt" || f === "cost") { if (v !== "" && isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return; } v = v === "" ? null : Number(v); }
+    if (String(pr[f] ?? "") === String(v ?? "")) return;
+    await patch("products", pr.id, { [f]: v, ...(f === "cost" ? {} : { webSync: "pending" }), editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" });
+    const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", category: "collection" }[f] || f;
+    const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" || f === "compareAt" || f === "cost" ? (v == null ? "none" : peso(v)) : f === "category" ? (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : (v === "" ? "none" : v);
+    toast(`${pr.name}: ${lab} → ${shown}`); if (!S.db) render(); return;
   }
   if (t.id === "sp-ful") { S.sp.ful = t.value; render(); return; }
   if (t.id === "sp-pay") { S.sp.pay = t.value; render(); return; }
