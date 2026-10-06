@@ -630,6 +630,14 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 /* Orders dropdowns sized like Listings pills (not stretched by the longest option). */
 .otable select.status { width: auto; max-width: 124px; text-overflow: ellipsis; }
 .otable:not(.ltable) td { vertical-align: middle; }
+/* Orders table follows the Listings pattern: lines between columns, centered titles and values. */
+.ordtable th, .ordtable td { padding-left: 12px; padding-right: 12px; }
+.ordtable th + th, .ordtable td + td { border-left: 1px solid var(--line); }
+.ordtable th.cb + th, .ordtable td.cb + td { border-left: 0; }
+.ordtable th:not(.cb), .ordtable td:not(.cb) { text-align: center; }
+.ordtable td .tags { justify-content: center; }
+.ordtable .hist-btn { align-items: center; text-align: center; margin: 0 auto; }
+.ordtable .note-t { text-align: center; }
 .osearch { display: flex; align-items: center; gap: 8px; flex: 1 1 280px; min-width: 220px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 0 10px; }
 .osearch:focus-within { border-color: var(--fg); }
 .osearch.big { flex: 1 1 100%; min-height: 48px; border: 2px solid var(--brand); border-radius: 12px; padding: 0 14px; box-shadow: 0 2px 10px rgba(74, 37, 69, .12); }
@@ -3109,7 +3117,7 @@ function notesPop(btn) {
 function ordersTable(rows, table, st, attr, selAllId) {
   const cols = visCols(table), selectable = canPay() || canShip();
   const allSel = rows.length && rows.every(o => S.sel.has(o.id));
-  return `<div class="table-wrap"><table class="otable" data-own="1">
+  return `<div class="table-wrap"><table class="otable ordtable" data-own="1">
     <thead><tr>${selectable ? `<th class="cb"><input type="checkbox" id="${selAllId}" aria-label="Select all" ${allSel ? "checked" : ""}></th>` : ""}${cols.map(k => ORDER_COLS[k].nosort ? `<th>${ORDER_COLS[k].label}</th>` : sortTh(k, ORDER_COLS[k].label, ORDER_COLS[k].cls || "", st, attr)).join("")}</tr></thead>
     <tbody>${rows.map(o => { const v = isVoid(o) && o.payment === "voided"; const done = !v && (isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)));
       return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>` : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
