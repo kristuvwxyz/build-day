@@ -6312,10 +6312,10 @@ function dig(obj, key, depth = 0) {
   for (const v of Object.values(obj)) { const r = dig(v, key, depth + 1); if (r !== undefined) return r; }
   return undefined;
 }
-async function shopCall(query, variables, first) {
+async function shopCall(query, variables, first, mcp) {
   const input = { query, variables, first: first || 50 };
   if (variables.after) input.after = variables.after;
-  const p = shopPayload(await S.mcp.callTool(SHOP_SERVER, SHOP_TOOL, input, { cache: false }));
+  const p = shopPayload(await (mcp || S.mcp).callTool(SHOP_SERVER, SHOP_TOOL, input, { cache: false }));
   const errs = dig(p, "errors");
   if (Array.isArray(errs) && errs.length && !dig(p, "orders") && !dig(p, "nodes")) throw { code: "tool_error", message: errs.map(e => e.message || e).join("; ") };
   return p;
@@ -6498,8 +6498,49 @@ async function reconcileStages() {
   const upd = o => { const st = tagStage(o.tags), u = { tags: stripStage(o.tags) }; if (!o.archived && st && OPEN_FUL.has(o.fulfillment)) u.fulfillment = st; if (o.archived && st && o.archivedPrev && OPEN_FUL.has(o.archivedPrev.fulfillment)) u.archivedPrev = { ...o.archivedPrev, fulfillment: st }; return u; };
   for (let i = 0; i < fix.length; i += 8) await Promise.all(fix.slice(i, i + 8).map(o => patch("orders", o.id, upd(o)).catch(() => {})));
 }
+/* One-time Shopify history check (the plan is cancelled, Oct 2026): when an owner or admin opens the app,
+   every Shopify order that isn't in Orders yet is brought in once. Existing orders and stock are never changed.
+   The result is kept in config/shopBackfill. */
+const SHOP_HIST_IDS_Q = `query RSHistIds($after: String) { orders(first: 250, after: $after, sortKey: CREATED_AT) { pageInfo { hasNextPage endCursor } nodes { id name } } }`;
+const SHOP_HIST_FILL_Q = `query RSHistFill($ids: [ID!]!) { nodes(ids: $ids) { ... on Order { ${SHOP_FIELDS} } } }`;
+async function shopHistoryBackfill(c) {
+  if (!S.db || S.readOnly || S.viewAs || !canAll()) return;
+  const cfg = S.db.doc("config/shopBackfill");
+  let st = {}; try { const s = await cfg.get(); st = s.exists ? s.data() : {}; } catch (e) { return; }
+  if (st.doneAt || (st.startedAt && Date.now() - st.startedAt < 20 * 60000)) return;
+  const mcp = c?.use ? await c.use("mcp").catch(() => null) : null; if (!mcp) return;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const t0 = Date.now();
+  while (!S.loaded.orders || !S.loaded.products) { if (Date.now() - t0 > 60000) return; await wait(500); }
+  try { await cfg.set({ ...st, startedAt: Date.now(), by: actor() }); } catch (e) { return; }
+  const call = async (q, v, first) => { for (let i = 0; ; i++) { try { return await shopCall(q, v, first, mcp); } catch (e) { if (i >= 4) throw e; await wait(2000 * 2 ** i); } } };
+  const stay = (msg, ms) => { toast(msg); clearTimeout(toastT); toastT = setTimeout(() => $("#toast").hidden = true, ms); };
+  try {
+    const all = []; let after = null;
+    do {
+      const conn = dig(await call(SHOP_HIST_IDS_Q, after ? { after } : {}, 250), "orders"); if (!conn) throw new Error("Shopify sent back an unexpected answer.");
+      all.push(...(conn.nodes || []));
+      after = conn.pageInfo && conn.pageInfo.hasNextPage ? conn.pageInfo.endCursor : null;
+    } while (after);
+    const docId = n => orderDocId({ num: String(n.name || "").replace(/^#/, "") });
+    const missing = all.filter(n => !findOrder(docId(n)));
+    let added = 0;
+    for (let i = 0; i < missing.length; i += 20) {
+      const nodes = (dig(await call(SHOP_HIST_FILL_Q, { ids: missing.slice(i, i + 20).map(n => n.id) }, 20), "nodes") || []).filter(n => n && n.id);
+      const rows = nodes.map(shopToOrder).filter(o => o.num && !findOrder(orderDocId(o))).map(o => ({ path: "orders/" + orderDocId(o), data: { ...o, source: "shopify-history", log: [{ at: Date.now(), by: "Shopify", msg: "brought in from Shopify order history" }] } }));
+      if (typeof S.db._bulkSet === "function") await S.db._bulkSet(rows); else for (const r of rows) await save("orders", r.path.slice(7), r.data);
+      added += rows.length;
+      stay(`Bringing in past Shopify orders: ${Math.min(i + 20, missing.length).toLocaleString("en-PH")} of ${missing.length.toLocaleString("en-PH")}. Keep this page open.`, 60000);
+    }
+    await cfg.set({ doneAt: Date.now(), by: actor(), shopifyTotal: all.length, alreadyIn: all.length - missing.length, added, missing: missing.slice(0, 3000).map(n => n.name) });
+    stay(`Shopify check done: ${all.length.toLocaleString("en-PH")} Shopify orders. ${added ? `${added.toLocaleString("en-PH")} were missing and are now in Orders.` : "All of them were already in Orders."}`, 20000);
+  } catch (e) {
+    try { await cfg.set({ ...st, startedAt: 0, lastError: String((e && e.message) || e).slice(0, 300), lastErrorAt: Date.now() }); } catch (e2) {}
+  }
+}
 async function startShopSync(c) {
   reconcileStages();
+  shopHistoryBackfill(c);
   if (!SHOPIFY_ON) return;
   S.mcp = c?.use ? await c.use("mcp").catch(() => null) : null;
   if (!S.mcp) { paintShop(); return; }
