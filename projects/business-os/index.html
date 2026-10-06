@@ -4017,11 +4017,18 @@ async function markSynced() {
   closeSheet(); toast(`${pend.length} change${pend.length === 1 ? "" : "s"} marked as on the website.`);
 }
 
-/* ---------- photo gallery (product photos from Shopify, saved for reuse) ---------- */
+/* ---------- photo gallery (every listing's photos, plus Shopify photos when loaded) ---------- */
 const GAL_BASE = "https://cdn.shopify.com/s/files/1/0574/1772/8133/files/";
-const galUrl = u => /^https?:/.test(u) ? u : GAL_BASE + u;
+const galUrl = u => /^(https?|data):/.test(u) ? u : GAL_BASE + u;
 const galThumb = u => { const x = galUrl(u); return /cdn\.shopify\.com/.test(x) ? x + (x.includes("?") ? "&" : "?") + "width=360" : x; };
-const galItems = () => S.gallery.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))).flatMap(d => d.items || []);
+const galKey = p => p.webId || "rs-" + p.id;
+const galProduct = h => S.products.find(p => galKey(p) === h);
+const galListingImgs = p => [...new Set([p.photo, ...(p.imgs || [])].filter(Boolean))];
+const galItems = () => {
+  const shop = S.gallery.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))).flatMap(d => d.items || []), seen = new Set(shop.map(x => x.h));
+  const mine = S.products.filter(p => !seen.has(galKey(p))).map(p => ({ t: [p.brand, p.name, p.size].filter(Boolean).join(" "), h: galKey(p), st: p.status || "active", imgs: galListingImgs(p) })).filter(x => x.imgs.length).sort((a, b) => a.t.localeCompare(b.t));
+  return [...mine, ...shop];
+};
 const SHOP_GAL_Q = `query RSGallery($first: Int!, $after: String) { products(first: $first, after: $after, sortKey: TITLE) { pageInfo { hasNextPage endCursor } nodes { handle title status media(first: 12) { nodes { ... on MediaImage { image { url } } } } } } }`;
 let galBusy = false;
 async function loadGallery() {
@@ -4046,35 +4053,35 @@ async function loadGallery() {
 function paintGalState() { const el = $("#gal-state"); if (el) el.textContent = S.galState || ""; }
 function viewGallery() {
   const q = (S.galq || "").trim().toLowerCase(), all = galItems(), f = S.galf || "all";
-  const listed = new Set(S.products.map(p => p.webId).filter(Boolean));
+  const listed = new Set(S.products.map(galKey));
   const rows = all.filter(x => (!q || (x.t + " " + x.h).toLowerCase().includes(q)) && (f === "all" || (f === "active" ? x.st === "active" : f === "listed" ? listed.has(x.h) : true)));
   const pg = Math.max(0, Math.min(S.galpage || 0, Math.ceil(rows.length / 60) - 1)); S.galpage = pg;
   const page = rows.slice(pg * 60, pg * 60 + 60);
   const at = Math.max(0, ...S.gallery.map(d => d.at || 0));
-  if (!all.length) return `<div class="panel"><div class="empty" style="padding:22px">${S.galState ? `<span id="gal-state">${esc(S.galState)}</span>` : `No photos saved yet. ${S.mcp && !S.readOnly ? `Click <b>Load photos from Shopify</b> to bring in every product photo, so the team can reuse them anytime.` : "Ask the owner to load them from Shopify in claude.ai."}`}</div></div>`;
-  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span>${all.reduce((a, x) => a + x.imgs.length, 0)} photos from ${all.length} Shopify products${at ? ` · saved ${esc(relTime(at))}` : ""}. Click a product to copy a photo link, open it full size to save it, or use it on a listing. <span id="gal-state">${esc(S.galState || "")}</span></span></div>
+  if (!all.length) return `<div class="panel"><div class="empty" style="padding:22px">${S.galState ? `<span id="gal-state">${esc(S.galState)}</span>` : `No photos yet. Photos added to Listings show up here automatically.`}</div></div>`;
+  return `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span>${all.reduce((a, x) => a + x.imgs.length, 0)} photos from ${all.length} products${at ? ` · Shopify photos saved ${esc(relTime(at))}` : ""}. Click a product to copy a photo link, open it full size to save it, or use it on a listing. <span id="gal-state">${esc(S.galState || "")}</span></span></div>
     <div class="toolbar"><div class="osearch">${svg("search")}<input id="galq" type="search" placeholder="Search product or brand" value="${esc(S.galq || "")}" aria-label="Search photos" autocomplete="off"></div>
-      <div class="seg" role="group" aria-label="Show">${[["all", "All"], ["active", "Active in Shopify"], ["listed", "In Listings"]].map(([k, l]) => `<button type="button" data-galf="${k}" aria-pressed="${f === k}">${l}</button>`).join("")}</div></div>
+      <div class="seg" role="group" aria-label="Show">${[["all", "All"], ["active", "Active"], ["listed", "In Listings"]].map(([k, l]) => `<button type="button" data-galf="${k}" aria-pressed="${f === k}">${l}</button>`).join("")}</div></div>
     <div class="gal-grid">${page.map(x => `<button type="button" class="gal-card" data-gal="${esc(x.h)}"><span class="gal-img"><img src="${esc(galThumb(x.imgs[0]))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg')">${BOTTLE}</span><span class="gal-t">${esc(x.t)}</span><small>${x.imgs.length} photo${x.imgs.length === 1 ? "" : "s"}${x.st && x.st !== "active" ? " · " + esc(x.st) : ""}</small></button>`).join("") || `<div class="empty">No products match.</div>`}</div>
     ${rows.length > 60 ? `<div class="pager"><button class="btn sm" type="button" data-galpage="-1" ${pg ? "" : "disabled"}>‹</button><span>${pg * 60 + 1}–${Math.min(rows.length, pg * 60 + 60)} of ${rows.length}</span><button class="btn sm" type="button" data-galpage="1" ${pg * 60 + 60 < rows.length ? "" : "disabled"}>›</button></div>` : ""}`;
 }
 function openGalleryItem(h) {
   const x = galItems().find(i => i.h === h); if (!x) return;
-  const p = S.products.find(pp => pp.webId === h);
+  const p = galProduct(h);
   openSheet(`<h3>${esc(x.t)}</h3>
-    <div style="font-size:13px;color:var(--muted)">${x.imgs.length} photo${x.imgs.length === 1 ? "" : "s"} · Shopify handle <code>${esc(x.h)}</code>${p ? ` · listing: ${esc(p.brand || "")} ${esc(p.name)}` : ""}</div>
+    <div style="font-size:13px;color:var(--muted)">${x.imgs.length} photo${x.imgs.length === 1 ? "" : "s"}${p ? ` · listing: ${esc(p.brand || "")} ${esc(p.name)}` : ` · Shopify handle <code>${esc(x.h)}</code>`}</div>
     <div class="gal-list">${x.imgs.map((u, k) => `<div class="gal-row"><span class="gal-img sm"><img src="${esc(galThumb(u))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg')">${BOTTLE}</span>
-      <div style="min-width:0;flex:1"><div class="gal-u" id="gal-u-${k}">${esc(galUrl(u))}</div>
+      <div style="min-width:0;flex:1"><div class="gal-u" id="gal-u-${k}">${u.startsWith("data:") ? "Uploaded photo (no web link)" : esc(galUrl(u))}</div>
       <div class="btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" type="button" data-act="gal-copy" data-k="${k}">Copy link</button><a class="btn sm" href="${esc(galUrl(u))}" target="_blank" rel="noopener">Open full size</a>${p && !S.readOnly ? `<button class="btn sm" type="button" data-act="gal-use" data-h="${esc(h)}" data-k="${k}">${p.photo === galUrl(u) ? "✓ Listing photo" : "Use as listing photo"}</button>` : ""}</div></div></div>`).join("")}</div>
     <div style="font-size:12px;color:var(--muted)">Previews may not show inside claude.ai, which blocks photos from other sites. "Open full size" always works: press and hold (phone) or right-click (computer) to save the photo.</div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null);
 }
 async function galCopy(k) { const t = ($("#gal-u-" + k) || {}).textContent || ""; try { await navigator.clipboard.writeText(t); toast("Photo link copied."); } catch (e) { toast("Press and hold the link to copy it."); } }
 async function galUse(h, k) {
-  const x = galItems().find(i => i.h === h), p = S.products.find(pp => pp.webId === h); if (!x || !p) return;
+  const x = galItems().find(i => i.h === h), p = galProduct(h); if (!x || !p) return;
   const url = galUrl(x.imgs[k]);
   await patch("products", p.id, { photo: url, imgs: [url, ...(p.imgs || []).filter(u => u !== url)], webSync: "pending", editedAt: Date.now(), editedBy: actor() });
-  toast("Listing photo updated · marked To sync"); openGalleryItem(h);
+  toast("Listing photo updated"); openGalleryItem(h);
 }
 
 /* ---------- barcode scanning ---------- */
