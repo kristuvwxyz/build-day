@@ -53,7 +53,9 @@ export default async function handler(req, res) {
     if (STATUSES.has(body.status)) call.status = body.status;
     if (typeof body.tracking === "string") call.tracking = body.tracking.trim().slice(0, 80);
     if (body.cancel === "Approved" || body.cancel === "Declined") call.cancel = body.cancel;
-    if (!("paid" in call) && !("status" in call) && !("tracking" in call) && !("cancel" in call)) return res.status(400).json({ ok: false, error: "Nothing to change." });
+    // BDO Checkout link pasted by staff (empty clears it). The website backend checks it again.
+    if (typeof body.bdoLink === "string") { const l = body.bdoLink.trim(); if (l && !/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\/\S*$/i.test(l)) return res.status(400).json({ ok: false, error: "That doesn’t look like a BDO Checkout link." }); call.bdoLink = l.slice(0, 1000); }
+    if (!("paid" in call) && !("status" in call) && !("tracking" in call) && !("cancel" in call) && !("bdoLink" in call)) return res.status(400).json({ ok: false, error: "Nothing to change." });
   } else if (body.action === "pushProducts") {
     // The full product catalog from RS OS Listings (same list the old WebCake code had). The website replaces its list.
     if (!Array.isArray(body.products) || body.products.length > 3000) return res.status(400).json({ ok: false, error: "Send the product list." });

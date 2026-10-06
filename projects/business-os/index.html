@@ -272,6 +272,10 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .nav button .cx-n { margin-left: auto; }
 .cx-seg { margin: 0 0 12px; } .cx-seg button[aria-pressed="false"] .cx-n { animation: cxpulse 1.6s ease-in-out infinite; }
 @keyframes cxpulse { 50% { opacity: .55; } } @media (prefers-reduced-motion: reduce) { .cx-seg .cx-n { animation: none; } }
+.bdo-box { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; border-left: 4px solid var(--gold); }
+.bdo-h { display: flex; align-items: center; gap: 8px; } .bdo-f { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.bdo-f > div { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 8px; align-items: center; } .bdo-f span { color: var(--muted); } .bdo-f b { font-weight: 600; overflow-wrap: anywhere; }
+.bdo-act, .bdo-paste { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .bdo-paste input { flex: 1; min-width: 180px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 10px; }
 .cx-list { display: flex; flex-direction: column; gap: 10px; }
 .cx-card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; } .cx-card.pend { border-left: 4px solid var(--bad); }
 .cx-top, .cx-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .cx-when { color: var(--muted); font-size: 13px; }
@@ -871,6 +875,7 @@ const COURIER_LABEL = { "J&T": "J&T", SDD: "SDD / Pickup" };
 const clsKey = st => String(st.cls || "").split(" ")[0] || "grey";
 const ORDER_VIEWS = [
   { id: "all", name: "All" },
+  { id: "bdo", name: "BDO — link needed" },
   { id: "unfulfilled", name: "To ship" },
   { id: "unpaid", name: "Unpaid" },
   { id: "on_hold", name: "On hold" },
@@ -2605,23 +2610,44 @@ function openWebOrder(ref) {
   const o = S.web.orders.find(x => x.ref === ref); if (!o) return;
   const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
   openSheet(`<h2 style="margin:0">#${esc(String(o.ref || "").replace(/^#/, ""))} ${webBadge(o)}</h2>
-    <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date))} · ${esc(o.payment || "")}${o.payRef ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
+    <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date))} · ${esc(o.payment || "")}${o.payRef && !/bdo\.com\.ph/i.test(o.payRef) ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
     <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
       <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
     </div>
-    <div class="table-wrap"><table class="otable"><tbody>${(o.items || []).map(i => `<tr><td>${esc(i.title || "")}${i.variant ? `<br><small style="color:var(--muted)">${esc(i.variant)}</small>` : ""}</td><td class="r num">${Number(i.qty) || 1} × ${peso(i.price)}</td></tr>`).join("")}
+    <div class="table-wrap" style="flex-shrink:0"><table class="otable"><tbody>${(o.items || []).map(i => `<tr><td>${esc(i.title || "")}${i.variant ? `<br><small style="color:var(--muted)">${esc(i.variant)}</small>` : ""}</td><td class="r num">${Number(i.qty) || 1} × ${peso(i.price)}</td></tr>`).join("")}
       ${Number(o.shipping) ? `<tr><td>Shipping</td><td class="r num">${peso(o.shipping)}</td></tr>` : ""}
       ${Number(o.voucherOff) ? `<tr><td>Voucher ${esc(o.voucher || "")}</td><td class="r num">−${peso(o.voucherOff)}</td></tr>` : ""}
       ${Number(o.pointsUsed) ? `<tr><td>Royal Points used</td><td class="r num">${esc(String(o.pointsUsed))}</td></tr>` : ""}
       <tr><td><b>Total</b></td><td class="r num"><b>${peso(o.total)}</b></td></tr>
       ${Number(o.due) && Number(o.due) !== Number(o.total) ? `<tr><td>Due now</td><td class="r num">${peso(o.due)}</td></tr>` : ""}</tbody></table></div>
     ${o.note ? `<div class="notice" style="white-space:pre-wrap">${esc(o.note)}</div>` : ""}
+    ${bdoBox(o)}
     <p style="margin:0;font-size:12.5px;color:var(--muted)">Before shipping, check the amount paid matches <b>${peso(Number(o.due) || o.total)}</b>.</p>
     ${canPay() ? `<div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ${o.paid ? "" : "primary"}" type="button" data-act="web-paid" data-ref="${esc(o.ref)}" data-paid="${o.paid ? "0" : "1"}">${o.paid ? "Mark unpaid" : "Mark paid"}</button></div>` : ""}
     ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${FULFILLMENTS.map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
       <div class="field"><label for="web-track">Tracking number</label><input id="web-track" value="${esc(o.tracking || "")}" autocomplete="off" placeholder="e.g. JT0012345678"></div>
       <div style="display:flex;gap:8px"><button class="btn primary" type="button" data-act="web-save" data-ref="${esc(o.ref)}">Save status</button><button class="btn ghost" type="button" data-act="close">Close</button></div>` : `<button class="btn ghost" type="button" data-act="close">Close</button>`}
     <div class="sheet-err" id="sheet-err" hidden></div>`);
+}
+// BDO Checkout has no API: staff make the link or email bill on BDO's site, then paste the link here (website backend v18 saves it as Pay Ref).
+const isBdo = o => !!o && /bdo/i.test(o.payment || "");
+const bdoNeeds = o => isBdo(o) && !o.paid && !o.payRef && !/cancel/i.test(o.status || "");
+function bdoFields(o) {
+  const due = Number(o.due) || Number(o.total) || 0, num = String(o.ref || "").replace(/^#/, "");
+  const items = (o.items || []).map(i => (Number(i.qty) > 1 ? i.qty + "× " : "") + (i.title || "")).join(", ");
+  let desc = `Regal Spritz PH · Order #${num}${items ? " · " + items : ""}`; if (desc.length > 120) desc = desc.slice(0, 117) + "…";
+  return [["Customer Name", o.name || ""], ["Mobile", o.mobile || ""], ["Email", o.email || ""], ["Amount", due.toFixed(2)], ["Description", desc], ["Link Expiry", "1 day"]];
+}
+function bdoBox(o) {
+  if (!isBdo(o) || o.paid || !canPay()) return "";
+  const f = bdoFields(o), saved = /bdo\.com\.ph/i.test(o.payRef || "") ? o.payRef : "";
+  return `<div class="panel bdo-box"><div class="bdo-h"><b>BDO payment link</b>${saved ? `<span class="badge green">Link sent ✓</span>` : `<span class="badge amber">Link needed</span>`}</div>
+    <div class="bdo-f">${f.map(([k, v], i) => `<div><span>${k}</span><b>${esc(v || "–")}</b>${v && k !== "Link Expiry" ? `<button type="button" class="btn ghost sm" data-copy="${esc(v)}" aria-label="Copy ${k}">Copy</button>` : ""}</div>`).join("")}</div>
+    <div class="bdo-act"><button type="button" class="btn sm" data-copy="${esc(f.map(([k, v]) => k + ": " + v).join("\n"))}">Copy all</button>
+      <a class="btn sm primary" href="https://checkout.bdo.com.ph/AutoMailPaymentDetails.asp" target="_blank" rel="noopener">Open BDO Checkout (email bill)</a>
+      <a class="btn sm" href="https://checkout.bdo.com.ph/MailPaymentDetails.asp" target="_blank" rel="noopener">Create a payment link</a></div>
+    <div class="bdo-paste"><input id="bdo-link" type="url" placeholder="Paste the BDO link here (https://…bdo.com.ph/…)" value="${esc(saved)}" autocomplete="off"><button type="button" class="btn sm primary" data-act="bdo-save" data-ref="${esc(o.ref)}">Save</button>${saved ? `<button type="button" class="btn sm ghost" data-act="bdo-clear" data-ref="${esc(o.ref)}">Clear</button>` : ""}</div>
+    ${saved ? `<div style="font-size:12.5px;color:var(--muted);word-break:break-all">Customer sees a <b>Pay with BDO</b> button in My Account: <a href="${esc(saved)}" target="_blank" rel="noopener">${esc(saved)}</a></div>` : `<div style="font-size:12.5px;color:var(--muted)">Amount is the Due Today amount (pre-orders may be a down payment). After the customer pays, check BDO's report, then click Mark paid.</div>`}</div>`;
 }
 async function webUpdate(ref, patch, btn) {
   if (!S.site) return;
@@ -3016,6 +3042,7 @@ function filteredOrders() {
     if (S.of.sup && S.of.sup !== "all" && !(o.tags || []).some(t => t.toUpperCase() === S.of.sup)) return false;
     if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
     if (S.of.month && dstr(o.createdAt || 0).slice(0, 7) !== S.of.month) return false;
+    if (vw === "bdo" && !(o.web && bdoNeeds(S.web.orders.find(x => x.ref === o.ref)))) return false;
     if (vw === "unfulfilled" && (o.fulfillment !== "unfulfilled" || isVoid(o))) return false;
     if (vw === "unpaid" && !(o.payment === "pending" || o.payment === "partial")) return false;
     if (vw === "on_hold" && o.fulfillment !== "on_hold") return false;
@@ -3124,7 +3151,7 @@ function orderCell(k, o, table) {
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
     case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
-    case "source": return `<td class="nowrap">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>${o.cancel && o.cancel.status === "Pending" ? ` <span class="badge red">Cancel request</span>` : ""}` : `<span class="chip">${esc(orderSource(o))}</span>`}${disputeChip(o)}${exChip(o)}</td>`;
+    case "source": return `<td class="nowrap">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>${o.cancel && o.cancel.status === "Pending" ? ` <span class="badge red">Cancel request</span>` : ""}${bdoNeeds(S.web.orders.find(x => x.ref === o.ref)) ? ` <span class="badge amber" title="Make a BDO Checkout link for this order">BDO link needed</span>` : ""}` : `<span class="chip">${esc(orderSource(o))}</span>`}${disputeChip(o)}${exChip(o)}</td>`;
     case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
     case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
     case "customer": return `<td class="strike cust-td">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
@@ -3228,7 +3255,9 @@ function viewOrders() {
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
   const cxTabs = S.site ? `<div class="seg cx-seg" role="group" aria-label="Orders or cancellation requests"><button type="button" data-cx="0" aria-pressed="${!S.cx.show}">Orders</button><button type="button" data-cx="1" aria-pressed="${S.cx.show}">Cancellation requests${cxBadge()}</button></div>` : "";
   if (S.cx.show && S.site) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
-  return `${webErrNotice()}${cxTabs}
+  const nBdo = S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0;
+  const bdoNote = nBdo && S.of.view !== "bdo" ? `<div class="notice" style="background:var(--warn-bg);color:var(--warn, #8a5a00)"><span><strong>${nBdo} BDO order${nBdo > 1 ? "s need" : " needs"} a payment link.</strong> Make the link in BDO Checkout and paste it in the order.</span><button class="btn sm" type="button" data-bdoview="1">Show ${nBdo > 1 ? "them" : "it"}</button></div>` : "";
+  return `${webErrNotice()}${cxTabs}${bdoNote}
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${ctxDept() === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
@@ -6006,6 +6035,8 @@ document.addEventListener("click", guard(async ev => {
   const go = ev.target.closest("[data-goorders]");
   if (go) { S.oSrc = "all"; return goOrders(go.dataset.goorders); }
   const gw = ev.target.closest("[data-goweb]"); if (gw) { S.of.q = ""; return goOrders(gw.dataset.goweb === "unpaid" ? "unpaid" : "unfulfilled"); }
+  const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
+  const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
   const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "1"; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
   const cxf = ev.target.closest("[data-cxf]"); if (cxf) { S.cx.f = cxf.dataset.cxf; render(); return; }
   const cxd = ev.target.closest("[data-cxdec]"); if (cxd) { const ref = cxd.dataset.ref, d = cxd.dataset.cxdec;
@@ -6237,6 +6268,8 @@ document.addEventListener("click", guard(async ev => {
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
+    case "bdo-save": { const v = ($("#bdo-link").value || "").trim(); if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\//i.test(v)) return sheetError("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph)."); return webUpdate(b.dataset.ref, { bdoLink: v }, b); }
+    case "bdo-clear": return webUpdate(b.dataset.ref, { bdoLink: "" }, b);
     case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
       await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
     case "refresh": saveNav(); try { sessionStorage.setItem("rs-refresh-y", String(Math.round(window.scrollY))); } catch (e) {} b.classList.add("spin"); location.reload(); return;
