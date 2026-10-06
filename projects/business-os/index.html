@@ -530,7 +530,7 @@ body.has-pomo #view { padding-bottom: 64px; }
 
 .av { position: relative; width: var(--sz); height: var(--sz); flex: none; display: inline-grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--avc) 18%, var(--surface)); color: var(--avc); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--avc) 45%, transparent); font-weight: 700; font-size: calc(var(--sz) * .36); }
 .av > img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.av .bottle { position: absolute; right: calc(var(--sz) * -.12); bottom: calc(var(--sz) * -.08); width: max(16px, calc(var(--sz) * .42)); height: max(20px, calc(var(--sz) * .52)); padding: 2px 3px; border: 0; border-radius: 6px; background: var(--surface); box-shadow: 0 0 0 1.5px var(--line); color: var(--fg); display: grid; place-items: center; cursor: pointer; }
+.av .bottle { position: absolute; right: calc(var(--sz) * -.1); bottom: calc(var(--sz) * -.06); width: max(18px, calc(var(--sz) * .44)); height: max(18px, calc(var(--sz) * .44)); padding: 2px; border: 0; border-radius: 50%; overflow: hidden; background: var(--surface); box-shadow: 0 0 0 1.5px var(--line); color: var(--fg); display: grid; place-items: center; cursor: pointer; }
 .av .bottle svg { width: 100%; height: 100%; }
 .av .bottle.empty { opacity: .5; }
 .av .bottle:hover { box-shadow: 0 0 0 1.5px var(--gold); opacity: 1; }
@@ -546,7 +546,17 @@ body.has-pomo #view { padding-bottom: 64px; }
 .otable tr.grp td { background: var(--surface-2); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: default; }
 code.pw { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 2px 6px; border-radius: 5px; }
 html, body { overflow-x: clip; }
-.av .bottle img { width: 100%; height: 100%; object-fit: contain; border-radius: 3px; }
+.av .bottle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.av .bottle svg { padding: 12%; }
+.org-scent img { border-radius: 50%; object-fit: cover !important; width: 16px !important; height: 16px !important; }
+.crop-wrap { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; }
+.crop-box { background: var(--bg); color: var(--fg); border-radius: 16px; padding: 18px; width: min(340px, 100%); display: grid; gap: 14px; }
+.crop-box h3 { margin: 0; }
+.crop-stage { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 12px; background: #111; touch-action: none; cursor: grab; }
+.crop-stage img { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; pointer-events: none; max-width: none; }
+.crop-stage::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgba(0,0,0,.55); outline: 2px solid #fff; outline-offset: -2px; pointer-events: none; }
+.crop-box input[type=range] { width: 100%; }
+.crop-box .actions { display: flex; gap: 8px; justify-content: flex-end; }
 .scent-prev { width: 56px; height: 68px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 6px; color: var(--fg); }
 .scent-prev img, .scent-prev svg { width: 100%; height: 100%; object-fit: contain; }
 .s-money { --c: var(--gold); --cb: color-mix(in srgb, var(--gold) 16%, var(--surface)); }
@@ -2039,6 +2049,34 @@ function resizeImage(file, max = 256, square = true) {
     img.src = url;
   });
 }
+// Lets the person drag and zoom a photo inside a circle before saving it. Resolves to a square JPEG data URL, or null if cancelled.
+function cropPhoto(file, out = 256) {
+  return new Promise((ok, bad) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error("That file isn't a picture we can read.")); };
+    img.onload = () => {
+      const w = document.createElement("div"); w.className = "crop-wrap";
+      w.innerHTML = `<div class="crop-box" role="dialog" aria-label="Crop photo"><h3>Adjust your photo</h3><div class="crop-stage"></div><label style="display:grid;gap:4px;font-size:13px;color:var(--muted)">Zoom<input type="range" min="1" max="4" step="0.01" value="1"></label><p style="margin:0;font-size:12.5px;color:var(--muted)">Drag the photo to move it inside the circle.</p><div class="actions"><button class="btn" type="button" data-c="0">Cancel</button><button class="btn primary" type="button" data-c="1">Use photo</button></div></div>`;
+      document.body.appendChild(w);
+      const st = w.querySelector(".crop-stage"), zr = w.querySelector("input"); st.appendChild(img);
+      const W = st.clientWidth, base = W / Math.min(img.width, img.height);
+      let z = 1, x = (W - img.width * base) / 2, y = (W - img.height * base) / 2;
+      const fit = () => { const k = base * z; x = Math.min(0, Math.max(W - img.width * k, x)); y = Math.min(0, Math.max(W - img.height * k, y)); img.style.transform = `translate(${x}px,${y}px) scale(${k})`; };
+      fit();
+      zr.oninput = () => { const k0 = base * z, cx = (W / 2 - x) / k0, cy = (W / 2 - y) / k0; z = Number(zr.value); const k = base * z; x = W / 2 - cx * k; y = W / 2 - cy * k; fit(); };
+      let drag = null;
+      st.onpointerdown = e => { drag = { px: e.clientX, py: e.clientY, x, y }; st.setPointerCapture(e.pointerId); };
+      st.onpointermove = e => { if (!drag) return; x = drag.x + e.clientX - drag.px; y = drag.y + e.clientY - drag.py; fit(); };
+      st.onpointerup = st.onpointercancel = () => { drag = null; };
+      st.onwheel = e => { e.preventDefault(); zr.value = Math.min(4, Math.max(1, z - e.deltaY / 400)); zr.oninput(); };
+      w.onclick = e => { const b = e.target.closest("[data-c]"); if (!b && e.target !== w) return;
+        let r = null;
+        if (b && b.dataset.c === "1") { const k = base * z, c = document.createElement("canvas"); c.width = c.height = out; const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, out, out); g.drawImage(img, -x / k, -y / k, W / k, W / k, 0, 0, out, out); r = c.toDataURL("image/jpeg", 0.85); }
+        w.remove(); URL.revokeObjectURL(url); ok(r); };
+    };
+    img.src = url;
+  });
+}
 function perfumeCatalog() {
   const set = new Map();
   const add = n => { n = String(n || "").replace(/\s+/g, " ").trim(); if (n.length > 2 && !set.has(n.toLowerCase())) set.set(n.toLowerCase(), n); };
@@ -2097,7 +2135,7 @@ async function setScentDraft(file) {
 }
 async function myPhoto(file) {
   const mid = myMemberId(); if (!mid) return;
-  const photo = await resizeImage(file, 256, true);
+  const photo = await cropPhoto(file); if (!photo) return;
   const data = { ...clean(extraOf(mid)), memberId: mid, photo, updatedAt: Date.now() };
   if (S.db) await wdb().doc("scents/" + mid).set(data); else { S.scents = S.scents.filter(s => s.id !== mid).concat({ id: mid, ...data }); render(); }
   toast("Photo updated.");
@@ -6399,8 +6437,8 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "li-file" && t.files[0]) return readListingFile(t.files[0]);
   if (t.id === "lq") return;
   if (t.id === "sc-file" && t.files[0]) return setScentDraft(t.files[0]);
-  if (t.id === "my-photo" && t.files[0]) return myPhoto(t.files[0]);
-  if (t.id === "m-photo-file" && t.files[0]) { try { const d = await resizeImage(t.files[0], 256, true); $("#m-photo").value = d; $("#m-photo-prev").innerHTML = `<img src="${d}" alt="">`; } catch (e) { sheetError(e.message); } return; }
+  if (t.id === "my-photo" && t.files[0]) { const f = t.files[0]; t.value = ""; return myPhoto(f); }
+  if (t.id === "m-photo-file" && t.files[0]) { try { const d = await cropPhoto(t.files[0]); t.value = ""; if (!d) return; $("#m-photo").value = d; $("#m-photo-prev").innerHTML = `<img src="${d}" alt="">`; } catch (e) { sheetError(e.message); } return; }
   if (t.id === "bir-month") { S.birMonth = t.value; render(); return; }
   if (t.id === "pr-person") { S.prPerson = t.value; render(); return; }
   if (t.id === "imp-open") { S.impOpenOnly = t.checked; if (lastImportFile) return readImportFile(lastImportFile); return; }
