@@ -3617,8 +3617,9 @@ function jntMatch(A, sh) {
 const jntPhone = p => { const d = String(p || "").replace(/\D/g, ""); if (d.startsWith("63") && d.length === 12) return "+" + d; if (d.startsWith("09") && d.length === 11) return "+63" + d.slice(1); if (d.startsWith("9") && d.length === 10) return "+63" + d; return p ? String(p) : ""; };
 const JNT_HEAD = ["Receiver(*)", "Receiver Telephone (*)", "Receiver Address (*)", "Receiver Province (*)", "Receiver City (*)", "Receiver Region (*)", "Express Type (*)", "Parcel Name (*)", "Weight (kg)  (*)", "Total parcels(*)", "Parcel Value (Insurance Fee) (*)", "COD (PHP) (*)", "Remarks"];
 function jntOrders() {
-  const sel = S.orders.filter(o => S.sel.has(o.id));
-  return sel.length ? sel : filteredOrders().filter(o => courierOf(o) === "J&T" && o.fulfillment === "unfulfilled");
+  // Only the ticked orders (website ones too) when anything is ticked; otherwise every J&T order to ship in this view.
+  if (S.sel.size) return allOrderRows().filter(o => S.sel.has(o.id));
+  return filteredOrders().filter(o => courierOf(o) === "J&T" && o.fulfillment === "unfulfilled");
 }
 async function openJntFile() {
   const os = jntOrders();
@@ -3697,8 +3698,7 @@ function shipOf(o) {
   return { name: o.customer || "", phone: o.phone || "", address1: parts.join(", "), address2, city, province, zip, country };
 }
 function jntRows() {
-  const sel = S.orders.filter(o => S.sel.has(o.id));
-  const list = sel.length ? sel : packList().filter(o => courierOf(o) === "J&T");
+  const list = S.sel.size ? allOrderRows().filter(o => S.sel.has(o.id)) : packList().filter(o => courierOf(o) === "J&T");
   return [["Order No.", "Receiver Name", "Receiver Phone", "Province", "City/Municipality", "Barangay", "Street Address", "Zip Code", "Item Name", "Quantity", "Weight (kg)", "COD Amount", "Declared Value", "Remarks"],
     ...list.map(o => { const sh = shipOf(o); return [onum(o), sh.name || o.customer, (sh.phone || o.phone || "").replace(/^\+63/, "0"), sh.province, sh.city, sh.address2, sh.address1, sh.zip, (o.items || []).map(i => `${i.qty}x ${i.name}`).join("; ").slice(0, 120), itemCount(o), "", o.payment === "paid" ? 0 : o.payment === "pending" ? total(o) : "", total(o), o.note || ""]; })];
 }
