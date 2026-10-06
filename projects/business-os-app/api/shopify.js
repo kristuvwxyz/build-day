@@ -2,7 +2,7 @@
 // Secrets stay here on the server (Vercel environment variables), never in the browser.
 const API_VERSION = "2025-07";
 // Only the requests the app actually makes are allowed through.
-const ALLOWED = new Set(["RSOpenOrders", "RSOrderStatus", "RSByName", "RSFO", "RSShip", "RSRelease", "RSRev"]);
+const ALLOWED = new Set(["RSOpenOrders", "RSOrderStatus", "RSByName", "RSFO", "RSShip", "RSRelease", "RSRev", "RSHistIds", "RSHistFill"]);
 let cached = { token: "", exp: 0 };
 
 async function shopToken(shop) {

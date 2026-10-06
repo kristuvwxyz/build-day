@@ -1,0 +1,96 @@
+<!--
+  Apple Pay and Google Pay logos on regalspritz.com (K, 2026-10-06), in the same badge style as the logos already there:
+  1. the logo row under "Maya Checkout" on the checkout, right after QR Ph
+  2. the "We accept" row in the footer, right after the Maya / QR Ph logos
+  Logos only: nothing to click, the payment choice and the order work exactly as before.
+  Maya's own payment page shows the Apple Pay / Google Pay buttons (they come with card acceptance on the Maya account).
+-->
+<style>
+  .rs-wl{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+  .rs-wl svg{display:block;width:auto}
+  .rs-wl-own{padding:4px 8px;border:1px solid #e3ddd0;border-radius:4px;background:#fff;margin:0 0 6px 6px;vertical-align:middle}
+</style>
+<script>
+(function () {
+  var APPLE = '<svg viewBox="0 0 52 22" role="img" aria-label="Apple Pay">' +
+    '<g transform="translate(1 1.5) scale(.0375)"><path fill="#000" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></g>' +
+    '<text x="18" y="17" fill="#000" font-family="-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif" font-size="16" font-weight="600">Pay</text></svg>';
+  var GOOGLE = '<svg viewBox="0 0 54 22" role="img" aria-label="Google Pay">' +
+    '<g transform="translate(1 2)"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></g>' +
+    '<text x="22" y="17" fill="#5f6368" font-family="Roboto,Arial,sans-serif" font-size="16" font-weight="500">Pay</text></svg>';
+  var NAMES = /^(visa|mastercard|jcb|amex|american express|diners club|maya|gcash|shopeepay|grabpay|wechat pay|alipay|qr ?ph|bdo)$/i;
+
+  function vis(el) { var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
+  // A payment logo inside `scope`: an image/svg, or a short badge whose text is a payment brand.
+  function isLogo(el) {
+    if (el.closest('.rs-wl') || el.tagName.toLowerCase() !== 'svg' && el.closest('svg') || !vis(el)) return false;
+    var t = el.tagName.toLowerCase();
+    if (t === 'img' || t === 'svg') { var h = el.getBoundingClientRect().height; return h >= 8 && h <= 60; }
+    return !el.children.length && NAMES.test(String(el.textContent).trim());
+  }
+  function logos(scope) { return [].filter.call(scope.querySelectorAll('img,svg,span,div,i,b,a,li,p'), isLogo); }
+  // Climb from a logo to its badge: the child of the row that holds the other badges too.
+  function badgeOf(logo, scope) {
+    var b = logo;
+    while (b.parentElement && b.parentElement !== scope) {
+      var kids = [].filter.call(b.parentElement.children, function (k) { return isLogo(k) || logos(k).length; });
+      if (kids.length >= 3) break;
+      b = b.parentElement;
+    }
+    return b;
+  }
+  // Put Apple Pay + Google Pay badges after the last badge in `scope`, copying that badge's look.
+  function addTo(scope, key) {
+    if (!scope || scope.querySelector('.rs-wl')) return;
+    var ls = logos(scope);
+    if (!ls.length) return;
+    var last = badgeOf(ls[ls.length - 1], scope), row = last.parentElement;
+    if (!row) return;
+    var g = ls[ls.length - 1].tagName.toLowerCase() === 'img' || ls[ls.length - 1].tagName.toLowerCase() === 'svg' ? ls[ls.length - 1] : null;
+    var h = Math.round((g ? g.getBoundingClientRect().height : last.getBoundingClientRect().height * 0.55) || 16);
+    h = Math.max(14, Math.min(h, 26));
+    var bh = Math.round(last.getBoundingClientRect().height);
+    [APPLE, GOOGLE].forEach(function (svg, i) {
+      var b = document.createElement(last === g ? 'span' : last.tagName);
+      if (last !== g) { b.className = last.className; b.style.cssText = last.style.cssText; }
+      else b.classList.add('rs-wl-own');
+      b.classList.add('rs-wl');
+      if (bh && last !== g) b.style.height = bh + 'px';
+      b.style.backgroundImage = 'none'; b.style.width = 'auto';
+      b.setAttribute('data-rs-wl', key);
+      b.innerHTML = svg;
+      b.firstChild.style.height = h + 'px';
+      row.insertBefore(b, i ? row.querySelector('[data-rs-wl="' + key + '"]').nextSibling : last.nextSibling);
+    });
+  }
+  // The checkout's "Maya Checkout" option (the box holding its logo row).
+  function mayaBox() {
+    var all = document.body.querySelectorAll('label,li,div,section');
+    for (var j = all.length - 1; j >= 0; j--) {
+      var el = all[j], t = el.textContent || '';
+      if (/maya\s*checkout/i.test(t) && !/bdo\s*checkout/i.test(t) && logos(el).length >= 3) return el;
+    }
+    return null;
+  }
+  // The footer's "We accept" logo row.
+  function acceptBox() {
+    var hs = document.body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,div,span');
+    for (var i = 0; i < hs.length; i++) {
+      var h = hs[i];
+      if (h.children.length || !/^\s*we\s+accept\s*$/i.test(h.textContent)) continue;
+      for (var p = h; p && p !== document.body; p = p.parentElement) {
+        var n = p.nextElementSibling;
+        if (n && logos(n).length >= 3) return n;
+        if (p.parentElement && logos(p.parentElement).length >= 3) return p.parentElement;
+      }
+    }
+    return null;
+  }
+  function run() { addTo(mayaBox(), 'maya'); addTo(acceptBox(), 'accept'); }
+  // The checkout is drawn after the page loads, so keep watching for it.
+  var t;
+  new MutationObserver(function () { clearTimeout(t); t = setTimeout(run, 200); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
+})();
+</script>

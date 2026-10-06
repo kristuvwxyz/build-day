@@ -134,7 +134,7 @@
       const c = cols.get(parentOf(p)); if (c && c.loaded) c.subs.forEach(f => { try { f(snapC(parentOf(p))); } catch (e) { console.error(e); } });
       const d = docs.get(p); if (d) d.subs.forEach(f => { try { f(snapD(p)); } catch (e) { console.error(e); } });
     };
-    const put = (p, data) => { const c = colOf(parentOf(p)); if (data === undefined) c.rows.delete(leafOf(p)); else c.rows.set(leafOf(p), data); };
+    const put = (p, data) => { const c = colOf(parentOf(p)); c.ver = (c.ver || 0) + 1; if (data === undefined) c.rows.delete(leafOf(p)); else c.rows.set(leafOf(p), data); };
     async function loadCol(c) {
       const x = colOf(c); if (x.loading) return x.loading;
       x.loading = (async () => {
@@ -189,6 +189,21 @@
         new Set(rows.map(r => parentOf(r.path))).forEach(c => { const x = cols.get(c); if (x && x.loaded) x.subs.forEach(f => f(snapC(c))); });
       },
       _cached: c => cols.get(c),
+      // re-read every loaded collection and watched doc from the server (catches anything the live channel missed)
+      async _refresh() {
+        await Promise.all([...cols].filter(([, x]) => x.loaded && !x.refreshing).map(async ([c, x]) => {
+          x.refreshing = true; const ver = x.ver || 0, fresh = new Map();
+          try {
+            for (let from = 0; ; from += 1000) {
+              const { data, error } = await sb.from("docs").select("id,data").eq("col", c).order("id").range(from, from + 999);
+              if (error) return; data.forEach(r => fresh.set(r.id, r.data)); if (data.length < 1000) break;
+            }
+            if ((x.ver || 0) !== ver || JSON.stringify([...fresh]) === JSON.stringify([...x.rows])) return; // a local write landed meanwhile, or nothing changed
+            x.rows = fresh; x.subs.forEach(f => { try { f(snapC(c)); } catch (e) { console.error(e); } });
+            docs.forEach((d, p) => { if (parentOf(p) === c) d.subs.forEach(f => { try { f(snapD(p)); } catch (e) { console.error(e); } }); });
+          } finally { x.refreshing = false; }
+        }));
+      },
     };
   }
 
@@ -220,7 +235,9 @@
         if (!r.ok && !j.error) j.error = "Website request failed (" + r.status + ")";
         return j;
       };
-      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }), pushProducts: products => call({ action: "pushProducts", products }) };
+      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }), pushProducts: products => call({ action: "pushProducts", products }),
+        // Notes and accords from a Fragrantica page (our /api/fragrantica server route).
+        fragrantica: async url => { const { data: { session } } = await sb.auth.getSession(); const r = await fetch("/api/fragrantica", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (session && session.access_token) }, body: JSON.stringify({ url }) }); const j = await r.json().catch(() => ({})); if (!r.ok && !j.error) j.error = "Fragrantica request failed (" + r.status + ")"; return j; } };
     },
     async mcp() {
       const { sb } = await ready;
