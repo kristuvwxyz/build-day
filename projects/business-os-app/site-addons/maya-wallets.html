@@ -1,0 +1,78 @@
+<!--
+  Regal Spritz PH: show Apple Pay and Google Pay under "Maya Checkout" on the regalspritz.com checkout (2026-10-06).
+  Paste into WebCake: Settings (gear, top left) > HTML/JavaScript > the "Before </body>" box, then Publish.
+
+  Nothing else changes: the order is still saved as "Maya Checkout" and the buyer goes to Maya's payment page,
+  where Maya itself shows the Apple Pay and Google Pay buttons (they come with card acceptance on the Maya account).
+  Picking Apple Pay or Google Pay here just selects Maya Checkout and tells the buyer which button to tap on Maya.
+-->
+<style>
+  .rs-wallets{margin:6px 0 10px 28px;font-size:13px;line-height:1.4;color:#555}
+  .rs-wallets-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .rs-wallet{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1.5px solid #ccc;border-radius:8px;
+    background:#fff;color:#111;font:600 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;cursor:pointer}
+  .rs-wallet svg{height:16px;width:auto;display:block}
+  .rs-wallet.on{border-color:#111;box-shadow:0 0 0 1px #111}
+  .rs-wallet-tip{margin-top:6px;font-size:12px;color:#777}
+</style>
+<script>
+(function () {
+  var LABEL = /maya\s*checkout/i;
+  var APPLE = '<svg viewBox="0 0 384 512" aria-hidden="true"><path fill="#000" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>';
+  var GOOGLE = '<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>';
+
+  // The "Maya Checkout" choice: a radio whose value or label says Maya Checkout, else the smallest element with that text.
+  function findMaya() {
+    var radios = document.querySelectorAll('input[type=radio]');
+    for (var i = 0; i < radios.length; i++) {
+      var r = radios[i], lab = r.closest('label') || (r.id && document.querySelector('label[for="' + r.id + '"]'));
+      if (LABEL.test(r.value) || (lab && LABEL.test(lab.textContent))) return { input: r, box: lab || r.parentElement };
+    }
+    var all = document.body.querySelectorAll('label,button,div,li,span,p');
+    for (var j = 0; j < all.length; j++) {
+      var el = all[j];
+      if (el.closest('.rs-wallets') || !LABEL.test(el.textContent) || el.textContent.length > 60) continue;
+      var kid = [].some.call(el.children, function (c) { return LABEL.test(c.textContent); });
+      if (!kid) return { input: null, box: el.closest('label,button,li') || el };
+    }
+    return null;
+  }
+
+  function pickMaya(m) {
+    if (m.input) { if (!m.input.checked) m.input.click(); }
+    else if (m.box) m.box.click();
+  }
+
+  function add() {
+    var m = findMaya();
+    if (!m || !m.box || !m.box.parentNode) return;
+    var next = m.box.nextElementSibling;
+    if (next && next.classList.contains('rs-wallets')) return;   // already added
+    var w = document.createElement('div');
+    w.className = 'rs-wallets';
+    w.innerHTML = 'Also with:' +
+      '<div class="rs-wallets-row">' +
+      '<button type="button" class="rs-wallet" data-w="Apple Pay">' + APPLE + 'Apple Pay</button>' +
+      '<button type="button" class="rs-wallet" data-w="Google Pay">' + GOOGLE + 'Google Pay</button>' +
+      '</div><div class="rs-wallet-tip" hidden></div>';
+    w.addEventListener('click', function (e) {
+      var b = e.target.closest('.rs-wallet');
+      if (!b) return;
+      e.preventDefault();
+      [].forEach.call(w.querySelectorAll('.rs-wallet'), function (x) { x.classList.toggle('on', x === b); });
+      var tip = w.querySelector('.rs-wallet-tip');
+      tip.textContent = 'You’ll pay on Maya’s secure page. Tap the ' + b.getAttribute('data-w') + ' button there.' +
+        (b.getAttribute('data-w') === 'Apple Pay' ? ' (iPhone, iPad or Mac with Safari)' : '');
+      tip.hidden = false;
+      pickMaya(findMaya() || m);
+    });
+    m.box.parentNode.insertBefore(w, m.box.nextSibling);
+  }
+
+  // The checkout is drawn after the page loads, so keep watching for it.
+  var t;
+  new MutationObserver(function () { clearTimeout(t); t = setTimeout(add, 150); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState !== 'loading') add(); else document.addEventListener('DOMContentLoaded', add);
+})();
+</script>

@@ -25,3 +25,22 @@ const head = `<!doctype html>
 writeFileSync(new URL("index.html", OUT), head + app + "\n</body>\n</html>\n");
 for (const f of ["website-reviews.json", "jnt-address.json"]) copyFileSync(new URL(f, SRC), new URL(f, OUT));
 console.log("Built public/index.html from business-os/index.html");
+
+// Website add-ons for regalspritz.com: every site-addons/*.html (style + script) bundled into public/site-addons.js.
+// WebCake loads that one file, so website fixes ship by pushing to main.
+import { readdirSync } from "fs";
+const ADD = new URL("./site-addons/", import.meta.url);
+const parts = readdirSync(ADD).filter(f => f.endsWith(".html")).sort().map(f => {
+  const h = readFileSync(new URL(f, ADD), "utf8");
+  const css = [...h.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join("\n");
+  const js = [...h.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join("\n");
+  return `/* ${f} */\n` + (css.trim() ? `addCss(${JSON.stringify(css)});\n` : "") + (js.trim() ? `try {\n${js}\n} catch (e) { console.error("site add-on ${f}", e); }\n` : "");
+});
+writeFileSync(new URL("site-addons.js", OUT), `/* Regal Spritz website add-ons, built from projects/business-os-app/site-addons. Don't edit here. */
+(function () {
+  if (window.__rsSiteAddons) return; window.__rsSiteAddons = true;
+  function addCss(t) { var s = document.createElement("style"); s.textContent = t; (document.head || document.documentElement).appendChild(s); }
+${parts.join("\n")}
+})();
+`);
+console.log("Built public/site-addons.js from " + parts.length + " add-ons");
