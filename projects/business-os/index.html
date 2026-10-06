@@ -221,6 +221,8 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
 .item-row select, .item-row input { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px; width: 100%; min-width: 0; }
 .total-line { display: flex; justify-content: space-between; font-weight: 700; padding-top: 8px; border-top: 1px solid var(--line); }
 .sheet-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: auto; padding-top: 8px; }
+/* Save / Cancel sit at the top of every sheet, right under the title, and stay visible while scrolling. */
+.sheet > .foot-top { order: 0; position: sticky; top: calc(-22px - env(safe-area-inset-top, 0px)); z-index: 5; margin: -8px -22px 0; padding: 10px 22px; background: var(--surface); border-bottom: 1px solid var(--line); justify-content: flex-end; flex-wrap: wrap; }
 .confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--bad); font-weight: 600; }
 
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; z-index: 30; }
@@ -3909,10 +3911,22 @@ function openSheet(html, onSubmit) {
   else if (!S.sheetNoPush && S.sheetCur) S.sheetStack.push(S.sheetCur);
   S.sheetNoPush = false; S.sheetCur = next;
   if (S.sheetStack.length) html = `<button class="btn ghost sm sheet-back" type="button" data-act="sheet-back">← Back</button>` + html;
-  $("#sheet").innerHTML = html; $("#sheet").scrollTop = 0;
+  const sh = $("#sheet"); sh.innerHTML = html; sh.scrollTop = 0;
+  footToTop(sh);
   sheetSubmit = onSubmit;
   $("#scrim").hidden = false;
-  const f = $("#sheet").querySelector("input:not([type=file]), select, textarea"); if (f) f.focus();
+  // Phones: don't jump into the first box (it opens the keyboard and zooms the page).
+  if (!matchMedia("(pointer: coarse)").matches) { const f = sh.querySelector("input:not([type=file]), select, textarea"); if (f) f.focus(); }
+}
+// Moves a sheet's button row (Save / Cancel / Close) up under its title.
+function footToTop(sh) {
+  const kids = [...sh.children];
+  const foot = kids.find(el => el.classList.contains("sheet-foot")) || (() => { const l = kids[kids.length - 1]; return l && l.classList.contains("actions") && l.querySelector("button") ? l : null; })();
+  if (!foot) return;
+  const head = kids.find(el => /^H[1-4]$/.test(el.tagName));
+  foot.classList.add("foot-top");
+  if (head) head.after(foot); else sh.prepend(foot);
+  const err = sh.querySelector(":scope > #sheet-err"); if (err) foot.after(err);
 }
 function closeSheet() {
   const sh0 = $("#sheet"); if (sh0) sh0.classList.remove("wide"); $("#scrim").hidden = true; $("#sheet").innerHTML = ""; sheetSubmit = null; S.sheetStack = []; S.sheetCur = null; render(); }
