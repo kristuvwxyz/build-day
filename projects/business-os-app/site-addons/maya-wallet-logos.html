@@ -1,0 +1,59 @@
+<!--
+  Regal Spritz PH: Apple Pay and Google Pay logos next to "Maya Checkout" on the regalspritz.com checkout (2026-10-06).
+  Logos only: nothing to click, the payment choice and the order work exactly as before.
+  (Maya's own payment page shows the Apple Pay / Google Pay buttons; this just tells buyers they can use them.)
+-->
+<style>
+  .rs-wallet-logos{display:inline-flex;align-items:center;gap:6px;margin-left:8px;vertical-align:middle}
+  .rs-wallet-logos svg{height:var(--rs-logo-h,20px);width:auto;display:block}
+</style>
+<script>
+(function () {
+  var LABEL = /maya\s*checkout/i;
+  // Apple Pay mark: black rounded box, white Apple logo + "Pay".
+  var APPLE = '<svg viewBox="0 0 66 28" role="img" aria-label="Apple Pay"><rect width="66" height="28" rx="5" fill="#000"/>' +
+    '<g transform="translate(9 5.5) scale(.0335)"><path fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></g>' +
+    '<text x="25" y="19.5" fill="#fff" font-family="-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif" font-size="14" font-weight="500">Pay</text></svg>';
+  // Google Pay mark: white box with grey border, the four-colour G + "Pay".
+  var GOOGLE = '<svg viewBox="0 0 66 28" role="img" aria-label="Google Pay"><rect x=".5" y=".5" width="65" height="27" rx="5" fill="#fff" stroke="#3c4043" stroke-opacity=".35"/>' +
+    '<g transform="translate(9 6.5) scale(.833)"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></g>' +
+    '<text x="27" y="19.5" fill="#3c4043" font-family="Roboto,Arial,sans-serif" font-size="14" font-weight="500">Pay</text></svg>';
+
+  // The "Maya Checkout" option: a radio whose value or label says Maya Checkout, else the smallest element with that text.
+  function findMaya() {
+    var radios = document.querySelectorAll('input[type=radio]');
+    for (var i = 0; i < radios.length; i++) {
+      var r = radios[i], lab = r.closest('label') || (r.id && document.querySelector('label[for="' + r.id + '"]'));
+      if (LABEL.test(r.value) || (lab && LABEL.test(lab.textContent))) return lab || r.parentElement;
+    }
+    var all = document.body.querySelectorAll('label,button,div,li,span,p');
+    for (var j = 0; j < all.length; j++) {
+      var el = all[j];
+      if (!LABEL.test(el.textContent) || el.textContent.length > 80) continue;
+      if (![].some.call(el.children, function (c) { return LABEL.test(c.textContent); })) return el.closest('label,button,li') || el;
+    }
+    return null;
+  }
+
+  function add() {
+    var box = findMaya();
+    if (!box || box.querySelector('.rs-wallet-logos')) return;
+    var w = document.createElement('span');
+    w.className = 'rs-wallet-logos';
+    // Match the height of any logos already on that option (e.g. the Maya / card logos).
+    var other = box.querySelector('img,svg');
+    var h = other && other.getBoundingClientRect().height;
+    if (h >= 12 && h <= 40) w.style.setProperty('--rs-logo-h', Math.round(h) + 'px');
+    w.innerHTML = APPLE + GOOGLE;
+    // Put them right after the existing logos if there are any, else at the end of the option.
+    var last = box.querySelectorAll('img,svg'); last = last.length ? last[last.length - 1] : null;
+    if (last && last.parentNode) last.parentNode.insertBefore(w, last.nextSibling); else box.appendChild(w);
+  }
+
+  // The checkout is drawn after the page loads, so keep watching for it.
+  var t;
+  new MutationObserver(function () { clearTimeout(t); t = setTimeout(add, 150); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState !== 'loading') add(); else document.addEventListener('DOMContentLoaded', add);
+})();
+</script>

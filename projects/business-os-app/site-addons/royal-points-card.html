@@ -1,0 +1,99 @@
+<!--
+  Regal Spritz PH: tidy the Royal Points card on the regalspritz.com account page (2026-10-06).
+  Paste into WebCake: Settings (gear, top left) > HTML/JavaScript > the "Before </body>" box, under anything already there, then Publish.
+
+  What it does:
+  - Splits the one long stats line ("53 more to start using them · 1 pending · 147 expire Dec 31, 2027")
+    into short lines, one per stat, and keeps the date on one line.
+  - Tightens the line spacing.
+  - Lines "HOW IT WORKS" up with the text column (under "ROYAL POINTS"), not under the crown.
+  Nothing about points changes; it only re-lays out the text the page already shows.
+-->
+<style>
+  .rs-pts-hide{display:none!important}
+  .rs-pts-lines{margin:6px 0 0;padding:0;list-style:none;line-height:1.35}
+  .rs-pts-lines li{margin:0 0 3px;padding:0}
+  .rs-pts-lines li:last-child{margin-bottom:0}
+  .rs-pts-lines .rs-pts-sub{opacity:.75}
+  .rs-pts-nowrap{white-space:nowrap}
+</style>
+<script>
+(function () {
+  var TITLE = /^\s*royal\s+points\s*$/i, HOW = /^\s*how\s+it\s+works\s*$/i, SEP = /\s+[·•]\s+/;
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function txt(el) { return (el.textContent || '').replace(/\s+/g, ' ').trim(); }
+
+  // The smallest element whose own text matches (not a wrapper around it).
+  function findLeaf(root, test) {
+    var all = root.querySelectorAll('*'), best = null;
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.closest('.rs-pts-lines') || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+      if (test(txt(el))) best = el;   // later matches are deeper in the tree
+    }
+    return best;
+  }
+
+  // Reword each stat a little and keep dates on one line.
+  function line(part) {
+    var p = part.trim(), m;
+    if ((m = p.match(/^(\d[\d,]*) more to start using them$/i)))
+      return esc(m[1]) + ' more points to start redeeming';
+    if ((m = p.match(/^(\d[\d,]*) pending$/i)))
+      return esc(m[1]) + (m[1] === '1' ? ' point' : ' points') + ' pending <span class="rs-pts-sub">(from orders not yet paid)</span>';
+    if ((m = p.match(/^(\d[\d,]*) expires? (?:on )?(.+)$/i)))
+      return esc(m[1]) + (m[1] === '1' ? ' expires' : ' expire') + ' on <span class="rs-pts-nowrap">' + esc(m[2]) + '</span>';
+    return esc(p).replace(/([A-Z][a-z]{2,8} \d{1,2}, \d{4})/g, '<span class="rs-pts-nowrap">$1</span>');
+  }
+
+  function fix() {
+    var title = findLeaf(document.body, function (t) { return TITLE.test(t); });
+    if (!title) return;
+    // The card: the nearest wrapper of the title that also holds "How it works".
+    var card = title.parentElement;
+    while (card && card !== document.body && !/how it works/i.test(txt(card))) card = card.parentElement;
+    if (!card || card === document.body) return;
+
+    // 1) Stats line -> one short line per stat.
+    var stats = card.querySelector('.rs-pts-src') ||
+      findLeaf(card, function (t) { return SEP.test(t) && /pending|expire|start using|more/i.test(t) && t.length < 200; });
+    if (stats) {
+      var src = txt(stats), list = stats.nextElementSibling;
+      if (!list || !list.classList.contains('rs-pts-lines')) {
+        list = document.createElement('ul');
+        list.className = 'rs-pts-lines';
+        stats.parentNode.insertBefore(list, stats.nextSibling);
+      }
+      if (list.getAttribute('data-src') !== src) {   // rebuild only when the page changed the numbers
+        list.setAttribute('data-src', src);
+        list.innerHTML = src.split(SEP).filter(Boolean).map(function (s) { return '<li>' + line(s) + '</li>'; }).join('');
+        var cs = getComputedStyle(stats);
+        list.style.color = cs.color; list.style.font = cs.font; list.style.lineHeight = '1.35';
+        list.style.letterSpacing = cs.letterSpacing; list.style.textAlign = cs.textAlign;
+      }
+      stats.classList.add('rs-pts-src', 'rs-pts-hide');
+    }
+
+    // 2) "How it works" lined up with the text column.
+    var how = findLeaf(card, function (t) { return HOW.test(t); });
+    if (how) {
+      how.style.marginLeft = '';
+      var shift = Math.round(title.getBoundingClientRect().left - how.getBoundingClientRect().left);
+      // Only when the text sits to the right of the link (desktop, crown on the left); on phones it already lines up.
+      if (shift > 2 && shift < card.getBoundingClientRect().width / 2) {
+        if (getComputedStyle(how).display === 'inline') how.style.display = 'inline-block';
+        how.style.marginLeft = shift + 'px';
+      }
+    }
+  }
+
+  // The account page is drawn after the page loads (and redrawn when points update), so keep watching.
+  var t, busy = false;
+  function run() { if (busy) return; busy = true; try { fix(); } catch (e) {} setTimeout(function () { busy = false; }, 0); }
+  new MutationObserver(function () { clearTimeout(t); t = setTimeout(run, 150); })
+    .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(run, 150); });
+  if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
+})();
+</script>

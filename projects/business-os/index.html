@@ -85,8 +85,10 @@ select.lcell { width: auto; max-width: 118px; padding-right: 2px; }
 .pbox:focus-within { border-color: var(--gold); }
 .ltable th, .ltable td { padding-left: 12px; padding-right: 12px; }
 .ltable th + th, .ltable td + td { border-left: 1px solid var(--line); }
-.ltable th:first-child + th, .ltable td:first-child + td { border-left: 0; }
-.ltable th:nth-child(n+3), .ltable td:nth-child(n+3) { text-align: center; }
+.ltable th:nth-child(-n+3), .ltable td:nth-child(-n+3) { border-left: 0; }
+.ltable th:nth-child(n+4), .ltable td:nth-child(n+4) { text-align: center; }
+.ltable .cb { width: 34px; padding-right: 0; }
+.bulk input.lb-num { width: 96px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; background: var(--bg); }
 .ltable input.lcell { text-align: center; } .ltable .pbox input.lcell { text-align: right; }
 @keyframes markTap { 0% { transform: scale(1); } 35% { transform: scale(.94); letter-spacing: .02em; } 100% { transform: scale(1); } }
 @keyframes homeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -185,6 +187,8 @@ h2 { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: u
 
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .toolbar input, .toolbar select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+/* Filter dropdowns: one chevron style, sized to the chosen option (fitSelects) so the arrow sits right after the text. */
+.toolbar select { -webkit-appearance: none; appearance: none; padding-right: 30px; max-width: 100%; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23857a83' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 11px 8px; }
 .toolbar input { flex: 1 1 200px; }
 
 .table-wrap, .strip, .tabs, .team-strip, .supbar { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
@@ -1053,6 +1057,50 @@ function committedOf(p) {
 
 /* Applies a payment/fulfillment/tag/note change and keeps stock + timestamps right. */
 async function updateOrder(o, ch) {
+  const r = await updateOrderCore(o, ch);
+  if (ch && "assignee" in ch && !ownerBusy) await setCustomerOwner(o, ch.assignee || "");
+  return r;
+}
+
+/* ---------- 1 customer = 1 sales staff ----------
+   Assigning an order makes that staff the customer's owner (matched by phone, then email, then name).
+   Every open and future order from the customer, website or Shopify or RS OS, follows. Shared in webmeta/_owners. */
+let ownerBusy = false, ownerT = 0;
+function custKeysOf(o) {
+  const k = [], ph = String(o.phone || (o.ship && o.ship.phone) || o.mobile || "").replace(/\D/g, "").slice(-10), e = String(o.email || "").trim().toLowerCase(), n = normName(o.customer || o.name);
+  if (ph.length === 10) k.push("p" + ph); if (e.includes("@")) k.push("e" + e); if (n.length >= 4) k.push("n" + n);
+  return k;
+}
+const ownerMap = () => (S.webmeta.find(d => d.id === "_owners") || {}).map || {};
+function ownerOf(o) { const m = ownerMap(); for (const k of custKeysOf(o)) if (m[k] !== undefined) return m[k]; return ""; }
+const sameCustomer = (a, b) => { const ka = custKeysOf(a); return custKeysOf(b).some(k => ka.includes(k)); };
+const openOrder = o => !isVoid(o) && OPEN_FUL.has(o.fulfillment);
+async function setCustomerOwner(o, mid) {
+  const keys = custKeysOf(o); if (!keys.length || S.readOnly || !S.db) return;
+  const map = { ...ownerMap() }; for (const k of keys) map[k] = mid;
+  await save("webmeta", "_owners", { map, at: Date.now() });
+  const others = allOrderRows().filter(x => x.id !== o.id && openOrder(x) && (x.assignee || "") !== mid && sameCustomer(o, x));
+  if (!others.length) return;
+  ownerBusy = true;
+  try { for (const x of others) await updateOrderCore(x, { assignee: mid }); } finally { ownerBusy = false; }
+  toast(`${o.customer || "Customer"} → ${mid ? memberName(mid) : "Unassigned"}: ${others.length} more open order${others.length === 1 ? "" : "s"} moved too. New orders follow.`);
+}
+// Fills in the owner on unassigned open RS OS orders (website orders read it live). First run learns owners from orders already assigned.
+function scheduleOwnerSync() { clearTimeout(ownerT); ownerT = setTimeout(ownerSync, 3000); }
+async function ownerSync() {
+  if (ownerBusy || S.readOnly || !S.db || !canAll() || !S.loaded.orders || !S.loaded.webmeta || (S.site && !S.web.loaded)) return;
+  if (!S.webmeta.some(d => d.id === "_owners")) {
+    const map = {};
+    for (const o of allOrderRows().filter(x => x.assignee).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))) for (const k of custKeysOf(o)) map[k] = o.assignee;
+    await save("webmeta", "_owners", { map, at: Date.now() }).catch(() => {}); return;
+  }
+  const todo = S.orders.filter(o => !o.assignee && openOrder(o) && ownerOf(o));
+  if (!todo.length) return;
+  ownerBusy = true;
+  try { for (const o of todo) await updateOrderCore(o, { assignee: ownerOf(o), _by: "Auto · customer's sales staff" }); } finally { ownerBusy = false; }
+}
+
+async function updateOrderCore(o, ch) {
   if (o.web) return webOrderUpdate(o, ch);
   ch = { ...ch };
   const upd = { ...ch }, now = Date.now();
@@ -1082,7 +1130,7 @@ async function updateOrder(o, ch) {
   return stockDelta;
 }
 
-function writeErr(e) {
+function writeErr(e) { try { console.warn("writeErr", e && (e.stack || e.message || e)); } catch (x) {}
   if (e && e.code === "viewas") { toast("Preview only: you're viewing as a team member, so nothing was saved."); return; }
   if (e && e.code === "invalid_argument") { S.readOnly = true; toast("You have view-only access. Ask the owner for Contributor access to make changes."); render(); }
   else if (e && e.code === "quota_exceeded") toast("Storage is full. Delete old records to add new ones.");
@@ -1741,7 +1789,7 @@ function periodSeg() {
 const SCROLLERS = "#view .table-wrap, #view .strip, #view .tabs, #view .team-strip, #view .supbar, #view .seg";
 function render() {
   const keep = [...document.querySelectorAll(SCROLLERS)].map(e => e.scrollLeft), y = window.scrollY, key = S.view + "|" + S.dept + "|" + S.tab;
-  renderInner(); enhanceTables(); enhanceSearch(); try { tickWorkClock(); } catch (e) {}
+  renderInner(); enhanceTables(); enhanceSearch(); fitSelects(); try { tickWorkClock(); } catch (e) {}
   if (key === S._rkey) { document.querySelectorAll(SCROLLERS).forEach((e, i) => { if (keep[i]) e.scrollLeft = keep[i]; }); if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); }
   S._rkey = key;
 }
@@ -1753,7 +1801,16 @@ function bgRender() {
   if (bgT) return;
   bgT = setTimeout(() => { bgT = 0; if (!$("#scrim").hidden) { renderNav(); return; } if (pickerOpen()) { S.renderPending = true; return; } render(); }, 120);
 }
-document.addEventListener("change", () => { S.lastAct = Date.now(); }, true);
+document.addEventListener("change", e => { S.lastAct = Date.now(); if (e.target.matches && e.target.matches(".toolbar select")) fitSelects(); }, true);
+let fitCtx = null;
+function fitSelects() {
+  fitCtx = fitCtx || document.createElement("canvas").getContext("2d");
+  document.querySelectorAll(".toolbar select").forEach(sel => {
+    const o = sel.options[sel.selectedIndex]; if (!o) return;
+    const cs = getComputedStyle(sel); fitCtx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    sel.style.width = Math.ceil(fitCtx.measureText(o.text).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + "px";
+  });
+}
 document.addEventListener("focusout", e => { const t = e.target; if (t.classList && t.classList.contains("money") && t.value.trim()) { const n = Number(t.value.replace(/,/g, "")); if (!isNaN(n)) t.value = moneyFmt(n); } });
 document.addEventListener("focusout", e => { if (S.renderPending && e.target.tagName === "SELECT") setTimeout(() => { if (!S.renderPending || pickerOpen()) return; S.renderPending = false; if ($("#scrim").hidden) render(); }, 0); });
 function enhanceSearch() {
@@ -2319,14 +2376,26 @@ async function webLoad(quiet) {
     S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
-  webStockSync();
+  webStockSync(); scheduleOwnerSync(); webStatusSync();
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
   const last = S.webmeta.find(d => d.id === "_push");
-  if (S.loaded.products && S.loaded.webmeta && S.products.length && !autoPushT && !webPushBusy && Date.now() - webPushFailAt > 30 * 60e3 && (!last || Date.now() - (last.at || 0) > 6 * 3600e3)) scheduleWebPush(true);
+  if (S.loaded.products && S.loaded.webmeta && S.products.length && !autoPushT && !webPushBusy && Date.now() - webPushFailAt > 30 * 60e3 && (!last || !last.photos || Date.now() - (last.at || 0) > 6 * 3600e3)) scheduleWebPush(true);
 }
 
 // Website orders that fail to load must be visible, or the list silently shows only RS OS orders.
+// Keeps the customer's status on the website matching RS OS Fulfillment status (also fixes orders saved before the mapping).
+let webStatusBusy = false;
+async function webStatusSync() {
+  if (!S.site || webStatusBusy || S.readOnly || !canFul() || !S.web.loaded || !S.loaded.webmeta) return;
+  const todo = webAsOrders().filter(r => { const src = S.web.orders.find(x => x.ref === r.ref), want = WEB_STATUS_OF[r.fulfillment];
+    const m = S.webmeta.find(d => d.id === webMetaId(r.ref));
+    return src && want && m && m.fulfillment && want !== src.status && !/^(shipped|delivered|cancelled)$/i.test(src.status || "") && !/cancel/i.test(src.status || ""); }).slice(0, 10);
+  if (!todo.length) return;
+  webStatusBusy = true;
+  try { for (const r of todo) { const x = await S.site.update(r.ref, { status: WEB_STATUS_OF[r.fulfillment] }).catch(() => null); const i = S.web.orders.findIndex(o => o.ref === r.ref); if (x && x.ok && x.order && i >= 0) { S.web.orders[i] = x.order; S.web.dirty = true; } } }
+  finally { webStatusBusy = false; bgRender(); }
+}
 function webErrNotice() {
   if (!S.site || !S.web.err || S.web.loading) return "";
   return `<div class="notice" style="background:var(--bad-bg, #fde8e8);color:var(--bad)"><span><strong>Website orders didn't load:</strong> ${esc(S.web.err)}${S.web.loaded ? " Showing the last list." : ""}</span><button class="btn sm" type="button" data-act="web-retry">Try again</button></div>`;
@@ -2338,7 +2407,7 @@ function webRows() {
     && (!q || squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(q)));
 }
 // Website orders shown as rows in the one Orders list. Built in memory from the live list, never saved.
-const WEB_FUL = { placed: "to_confirm", confirmed: "unfulfilled", packed: "on_hold", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
+const WEB_FUL = { placed: "to_confirm", confirmed: "unfulfilled", packed: "unfulfilled", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
 let webRowsMemo = { at: null, n: -1, rows: [] };
 function webAsOrders() {
   if (!S.site || !S.web.loaded) return [];
@@ -2355,7 +2424,7 @@ function webAsOrders() {
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
       items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0 })),
       adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
-      payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || "",
+      payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
       tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
   });
@@ -2363,7 +2432,9 @@ function webAsOrders() {
 }
 // Edits on a website order: payment, status and tracking go to the website; assignee, courier, tags,
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
-const WEB_STATUS_OF = { to_confirm: "Placed", unfulfilled: "Confirmed", on_hold: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
+// RS OS Fulfillment status is the one the team edits; the customer's profile on regalspritz.com shows this status for it.
+const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
+  sorted: "Packed", unfulfilled: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
   const site = {}, keep = {}, msgs = [];
@@ -2373,7 +2444,7 @@ async function webOrderUpdate(o, ch) {
   }
   if ("fulfillment" in ch && ch.fulfillment !== o.fulfillment) {
     keep.fulfillment = ch.fulfillment; msgs.push("Fulfillment Status → " + ful(ch.fulfillment).name);
-    const st = WEB_STATUS_OF[ch.fulfillment] || (STAGE_IDS.has(ch.fulfillment) ? "Confirmed" : ""); if (st && st !== src.status) site.status = st;
+    const st = WEB_STATUS_OF[ch.fulfillment] || ""; if (st && st !== src.status) site.status = st;
   }
   if ("tracking" in ch && String(ch.tracking || "") !== String(src.tracking || "")) { site.tracking = String(ch.tracking || ""); msgs.push("tracking → " + (ch.tracking || "none")); }
   for (const k of ["assignee", "courier", "note"]) if (k in ch && ch[k] !== o[k]) { keep[k] = ch[k]; msgs.push(k === "assignee" ? "assigned to " + (memberName(ch[k]) || "nobody") : k + " updated"); }
@@ -2492,7 +2563,7 @@ function openWebOrder(ref) {
     ${o.note ? `<div class="notice" style="white-space:pre-wrap">${esc(o.note)}</div>` : ""}
     <p style="margin:0;font-size:12.5px;color:var(--muted)">Before shipping, check the amount paid matches <b>${peso(Number(o.due) || o.total)}</b>.</p>
     ${canPay() ? `<div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ${o.paid ? "" : "primary"}" type="button" data-act="web-paid" data-ref="${esc(o.ref)}" data-paid="${o.paid ? "0" : "1"}">${o.paid ? "Mark unpaid" : "Mark paid"}</button></div>` : ""}
-    ${canFul() ? `<div class="field"><label for="web-status">Status</label><select id="web-status">${[...new Set([...WEB_STATUSES, o.status || "Placed"])].map(x => `<option ${x === (o.status || "Placed") ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+    ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${FULFILLMENTS.map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
       <div class="field"><label for="web-track">Tracking number</label><input id="web-track" value="${esc(o.tracking || "")}" autocomplete="off" placeholder="e.g. JT0012345678"></div>
       <div style="display:flex;gap:8px"><button class="btn primary" type="button" data-act="web-save" data-ref="${esc(o.ref)}">Save status</button><button class="btn ghost" type="button" data-act="close">Close</button></div>` : `<button class="btn ghost" type="button" data-act="close">Close</button>`}
     <div class="sheet-err" id="sheet-err" hidden></div>`);
@@ -4017,6 +4088,8 @@ function viewListings() {
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
   const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
   const page = rows.slice(S.lpage * PAGE, S.lpage * PAGE + PAGE);
+  S.lrowIds = rows.map(p => p.id);
+  S.lsel = S.lsel || new Set(); for (const id of [...S.lsel]) if (!all.some(p => p.id === id)) S.lsel.delete(id);
   const can = !S.readOnly, cols = visCols("listings").filter(k => !(k === "eta" && f === "onhand"));
   const th = (k, l, c) => sortTh(k, l, c || "", ls, "lsort");
   const etaOpts = p => { const opts2 = [...new Set([...MONTHS, p.eta].filter(Boolean))]; return `<option value="">–</option>${opts2.map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}`; };
@@ -4027,9 +4100,19 @@ function viewListings() {
       <select id="l-cat" aria-label="Filter by collection"><option value="">All collections</option>${WEB_CATS.map(([k, l]) => `<option value="${k}" ${k === lc ? "selected" : ""}>${l}</option>`).join("")}</select>
       ${f !== "all" || q || lb || lc ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
       <button class="btn" type="button" data-act="columns" data-table="listings">⚙︎ Columns</button></div>
+    ${can && S.lsel.size ? (() => { const o = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`; return `<div class="bulk"><strong>${S.lsel.size} selected</strong>
+      <select data-lbulk="ptype" aria-label="Set type"><option value="">Set type…</option>${LIST_TYPES.map(t => o(t, t)).join("")}</select>
+      <select data-lbulk="category" aria-label="Set collection"><option value="">Set collection…</option>${WEB_CATS.map(([k, l]) => o(k, l)).join("")}</select>
+      <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}</select>
+      <select data-lbulk="eta" aria-label="Set ETA"><option value="">Set ETA (pre-orders)…</option>${MONTHS.map(m => o(m, m)).join("")}</select>
+      <select data-lbulk="status" aria-label="Set status"><option value="">Set status…</option>${Object.entries(LIST_STATUS).map(([k, st]) => o(k, k === "hidden" ? "Inactive" : st.name)).join("")}</select>
+      <input class="lb-num" id="lb-price" type="number" min="0" placeholder="SRP" aria-label="New SRP"><input class="lb-num" id="lb-compare" type="number" min="0" placeholder="Compare" aria-label="New compare-at price"><input class="lb-num" id="lb-cost" type="number" min="0" placeholder="Cost" aria-label="New cost">
+      <button class="btn sm" type="button" data-act="lb-prices">Apply prices</button>
+      <span id="lb-del-slot"><button class="btn sm danger" type="button" data-act="lb-ask-del">Delete…</button></span>
+      <button class="btn ghost sm" type="button" data-act="lb-clear">Clear selection</button></div>`; })() : ""}
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
-    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
-    <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}">
+    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th class="cb">${can ? `<input type="checkbox" id="l-selall" aria-label="Select all ${rows.length} listings in this view" ${rows.length && rows.every(p => S.lsel.has(p.id)) ? "checked" : ""}>` : ""}</th><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
+    <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}" class="${S.lsel.has(p.id) ? "sel" : ""}"><td class="cb">${can ? `<input type="checkbox" data-lsel="${p.id}" aria-label="Select ${esc(p.name)}" ${S.lsel.has(p.id) ? "checked" : ""}>` : ""}</td>
       <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
       <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>
       ${cols.map(k => ({
@@ -4048,6 +4131,23 @@ function viewListings() {
       })[k]()).join("")}</tr>`; }).join("")}</tbody></table>
     ${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No listings match." : "No listings yet. Click “Add listing”."}</div>`}</div>
     <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${rows.length ? `${S.lpage * PAGE + 1}–${Math.min(rows.length, S.lpage * PAGE + PAGE)} of ${rows.length}` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
+}
+
+// Bulk edit on Listings: same fields as the table, each listing logs the change and goes to the website as usual.
+async function listingsBulk(upd, label) {
+  const ids = [...(S.lsel || [])], by = (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "";
+  let n = 0;
+  for (const id of ids) {
+    const pr = S.products.find(x => x.id === id); if (!pr) continue;
+    const u = { ...upd }; if ("eta" in u && pr.kind !== "preorder" && u.kind !== "preorder") delete u.eta;
+    for (const k of Object.keys(u)) if (String(pr[k] ?? "") === String(u[k] ?? "")) delete u[k];
+    if (!Object.keys(u).length) continue;
+    const webSide = Object.keys(u).some(k => k !== "cost");
+    await patch("products", id, { ...u, ...(webSide ? { webSync: "pending" } : {}), editedAt: Date.now(), editedBy: by, log: logAdd(pr, ["bulk edit: " + label], by) });
+    n++;
+  }
+  toast(n ? `${label} · ${n} listing${n === 1 ? "" : "s"} updated.` : "Nothing to change.");
+  render();
 }
 
 let pendingListings = null;
@@ -4117,10 +4217,15 @@ async function pushListings(btn, auto) {
   const list = webProducts(), pend = S.products.filter(p => p.webSync === "pending");
   webPushBusy = true; if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
   try {
+    // Photos of listings not on the site (sold out, inactive) ride along on the first item, so past orders
+    // in a customer's account can still show their picture. [brand, name, size, photo], all lowercase letters/digits.
+    const nk = x => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, ""), live = new Set(list.map(x => nk(x.brand) + "|" + nk(x.name) + "|" + nk(x.size)));
+    const extra = S.products.map(p => [nk(p.brand), nk(p.name), nk(p.size), (p.imgs && p.imgs[0]) || (p.photo && !p.photo.startsWith("data:") ? p.photo : "")]).filter(x => x[3] && x[1] && !live.has(x.slice(0, 3).join("|")));
+    if (list.length) list[0] = { ...list[0], _photos: extra };
     const r = await S.site.pushProducts(list);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
     for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
-    if (S.db) await save("webmeta", "_push", { at: Date.now(), count: list.length }).catch(() => {});
+    if (S.db) await save("webmeta", "_push", { at: Date.now(), count: list.length, photos: 1 }).catch(() => {});
     webPushErr = ""; webPushFailAt = 0;
     if (!auto) toast(`Website updated: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
   } catch (e) { const m = (e && e.message) || "couldn't send."; if (!auto || m !== webPushErr) toast("Website: " + m); if (auto) { webPushErr = m; webPushFailAt = Date.now(); } }
@@ -6007,10 +6112,17 @@ document.addEventListener("click", guard(async ev => {
     case "gal-use": await galUse(b.dataset.h, Number(b.dataset.k)); return;
     case "shop-find-open": await openShopFound(b.dataset.num); return;
     case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
+    case "lb-clear": S.lsel.clear(); render(); return;
+    case "lb-prices": { const upd = {}, labs = []; for (const [id, k, l] of [["lb-price", "price", "SRP"], ["lb-compare", "compareAt", "compare at"], ["lb-cost", "cost", "cost"]]) { const v = val(id); if (v === "") continue; if (isNaN(Number(v))) { toast("Enter a number."); return; } upd[k] = Number(v); labs.push(l + " → " + peso(Number(v))); }
+      if (!labs.length) { toast("Type a price first."); return; } await listingsBulk(upd, labs.join(", ")); return; }
+    case "lb-ask-del": $("#lb-del-slot").innerHTML = `<span class="confirm">Delete ${S.lsel.size} listing${S.lsel.size === 1 ? "" : "s"}? This can't be undone. <button class="btn sm danger" type="button" data-act="lb-del">Yes, delete</button><button class="btn sm ghost" type="button" data-act="lb-clear-del">Cancel</button></span>`; return;
+    case "lb-clear-del": render(); return;
+    case "lb-del": { const ids = [...S.lsel]; for (const id of ids) await remove("products", id); S.lsel.clear(); toast(`Deleted ${ids.length} listing${ids.length === 1 ? "" : "s"}.`); render(); return; }
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
-    case "web-save": return webUpdate(b.dataset.ref, { status: val("web-status"), tracking: val("web-track") }, b);
+    case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
+      await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
     case "refresh": saveNav(); try { sessionStorage.setItem("rs-refresh-y", String(Math.round(window.scrollY))); } catch (e) {} b.classList.add("spin"); location.reload(); return;
     case "log-out": S.unlocked.clear(); saveUnlocked(); S.loggedOut = true; try { localStorage.removeItem("rs-nav"); } catch (e) {} S.view = "home"; render(); toast("Logged out."); return;
     case "log-in": S.loggedOut = false; render(); return;
@@ -6050,6 +6162,11 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset && t.dataset.spitem != null) { const a = S.spAgg && S.spAgg.get(t.dataset.spitem); if (a) a.ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if ((t.id === "sp-bulk-ful" || t.id === "sp-bulk-pay") && t.value) return bulkAction((t.id === "sp-bulk-pay" ? "pay:" : "ful:") + t.value);
   if (t.id === "inv-sup") { S.invF.sup = t.value; render(); return; }
+  if (t.id === "l-selall") { const ids = S.lrowIds || []; ids.forEach(id => t.checked ? S.lsel.add(id) : S.lsel.delete(id)); render(); return; }
+  if (t.dataset.lsel) { t.checked ? S.lsel.add(t.dataset.lsel) : S.lsel.delete(t.dataset.lsel); render(); return; }
+  if (t.dataset.lbulk) { const f = t.dataset.lbulk, v = t.value; if (!v) return;
+    const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "status" ? "status → " + (v === "hidden" ? "Inactive" : (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
+    await listingsBulk({ [f]: v }, lab); return; }
   if (t.id === "l-brand" || t.id === "l-cat") { S[t.id === "l-brand" ? "lbrand" : "lcat"] = t.value; S.lpage = 0; render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
@@ -6434,7 +6551,7 @@ render();
         if (col === "orders") { S.orders = docs.filter(r => !r.archived).map(norm); S.archived = docs.filter(r => r.archived); }
         else S[col] = docs;
         S.loaded[col] = true;
-        if (col === "orders" || col === "webmeta") S.web.dirty = true;
+        if (col === "orders" || col === "webmeta") { S.web.dirty = true; scheduleOwnerSync(); }
         bgRender();
       }, () => { S.loaded[col] = true; $("#sync").textContent = "Connection lost · reload the page"; render(); });
     }
