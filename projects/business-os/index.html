@@ -1094,7 +1094,7 @@ async function ownerSync() {
     for (const o of allOrderRows().filter(x => x.assignee).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))) for (const k of custKeysOf(o)) map[k] = o.assignee;
     await save("webmeta", "_owners", { map, at: Date.now() }).catch(() => {}); return;
   }
-  const todo = S.orders.filter(o => !o.assignee && openOrder(o) && ownerOf(o));
+  const todo = S.orders.filter(o => !o.assignee && openOrder(o) && ownerOf(o) && !String(o.source || "").startsWith("shopify-backfill"));
   if (!todo.length) return;
   ownerBusy = true;
   try { for (const o of todo) await updateOrderCore(o, { assignee: ownerOf(o), _by: "Auto · customer's sales staff" }); } finally { ownerBusy = false; }
@@ -6527,7 +6527,7 @@ async function shopHistoryBackfill(c) {
     let added = 0;
     for (let i = 0; i < missing.length; i += 20) {
       const nodes = (dig(await call(SHOP_HIST_FILL_Q, { ids: missing.slice(i, i + 20).map(n => n.id) }, 20), "nodes") || []).filter(n => n && n.id);
-      const rows = nodes.map(shopToOrder).filter(o => o.num && !findOrder(orderDocId(o))).map(o => ({ path: "orders/" + orderDocId(o), data: { ...o, source: "shopify-history", log: [{ at: Date.now(), by: "Shopify", msg: "brought in from Shopify order history" }] } }));
+      const rows = nodes.map(shopToOrder).filter(o => o.num && !findOrder(orderDocId(o))).map(o => ({ path: "orders/" + orderDocId(o), data: { ...o, source: "shopify-backfill-2026-10-06", log: [{ at: Date.now(), by: "Shopify", msg: "brought in from Shopify order history" }] } }));
       if (typeof S.db._bulkSet === "function") await S.db._bulkSet(rows); else for (const r of rows) await save("orders", r.path.slice(7), r.data);
       added += rows.length;
       stay(`Bringing in past Shopify orders: ${Math.min(i + 20, missing.length).toLocaleString("en-PH")} of ${missing.length.toLocaleString("en-PH")}. Keep this page open.`, 60000);
