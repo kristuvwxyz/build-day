@@ -4161,6 +4161,11 @@ async function pushListings(btn, auto) {
   const list = webProducts(), pend = S.products.filter(p => p.webSync === "pending");
   webPushBusy = true; if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
   try {
+    // Photos of listings not on the site (sold out, inactive) ride along on the first item, so past orders
+    // in a customer's account can still show their picture. [brand, name, size, photo], all lowercase letters/digits.
+    const nk = x => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, ""), live = new Set(list.map(x => nk(x.brand) + "|" + nk(x.name) + "|" + nk(x.size)));
+    const extra = S.products.map(p => [nk(p.brand), nk(p.name), nk(p.size), (p.imgs && p.imgs[0]) || (p.photo && !p.photo.startsWith("data:") ? p.photo : "")]).filter(x => x[3] && x[1] && !live.has(x.slice(0, 3).join("|")));
+    if (list.length) list[0] = { ...list[0], _photos: extra };
     const r = await S.site.pushProducts(list);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
     for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
