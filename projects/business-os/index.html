@@ -943,9 +943,9 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "archived", "reviews", "logins", "homecontent", "dtasks"], blurb: "Directory, logins, Home page" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "reviews", "logins", "homecontent", "dtasks"], blurb: "Directory, logins, Home page" },
   { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
-  { id: "SALES", name: "Sales", tabs: ["suppliers", "archived", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
+  { id: "SALES", name: "Sales", tabs: ["suppliers", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "customers", "dtasks"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
@@ -3340,8 +3340,10 @@ function viewOrders() {
       <input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
-  const cxTabs = S.site ? `<div class="seg cx-seg" role="group" aria-label="Orders or cancellation requests"><button type="button" data-cx="0" aria-pressed="${!S.cx.show}">Orders</button><button type="button" data-cx="1" aria-pressed="${S.cx.show}">Cancellation requests${cxBadge()}</button></div>` : "";
-  if (S.cx.show && S.site) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
+  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT;
+  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or archived"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Archived <span style="color:var(--muted)">${S.archived.length}</span></button>` : ""}</div>` : "";
+  if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
+  if (arOn) return `${cxTabs}${viewArchived()}`;
   const nBdo = S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0;
   const bdoNote = nBdo && S.of.view !== "bdo" ? `<div class="notice" style="background:var(--warn-bg);color:var(--warn, #8a5a00)"><span><strong>${nBdo} BDO order${nBdo > 1 ? "s need" : " needs"} a payment link.</strong> Make the link in BDO Checkout and paste it in the order.</span><button class="btn sm" type="button" data-bdoview="1">Show ${nBdo > 1 ? "them" : "it"}</button></div>` : "";
   return `${webErrNotice()}${cxTabs}${bdoNote}
@@ -3472,13 +3474,13 @@ function viewArchived() {
   return `<div class="toolbar"><input id="aq" type="search" placeholder="Search archived orders" value="${esc(S.aq || "")}" aria-label="Search archived orders"></div>
   ${bulk}
   <div class="table-wrap"><table>
-    <thead><tr>${ca ? `<th style="width:34px"><input type="checkbox" data-aselall="1" aria-label="Select all" ${allOn ? "checked" : ""}></th>` : ""}<th>Order</th><th>Customer</th><th>Items</th><th class="r">Total</th><th>Archived</th><th>Why</th><th>By</th><th></th></tr></thead>
-    <tbody>${rows.map(o => `<tr data-row="${o.id}">${ca ? `<td><input type="checkbox" data-asel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.asel.has(o.id) ? "checked" : ""}></td>` : ""}<td class="nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}</td><td>${custLink(o)}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
+    <thead><tr>${ca ? `<th style="width:34px"><input type="checkbox" data-aselall="1" aria-label="Select all" ${allOn ? "checked" : ""}></th>` : ""}<th>Order</th><th>Customer</th><th>Items</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Archived</th><th>Why</th><th>By</th><th></th></tr></thead>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}">${ca ? `<td><input type="checkbox" data-asel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.asel.has(o.id) ? "checked" : ""}></td>` : ""}<td class="nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}</td><td>${custLink(o)}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td>${badge(pay("voided"))}</td><td>${badge(ful("cancelled"))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
       <td class="nowrap">${ca ? `<button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button> <button class="btn ghost sm" type="button" data-act="ask-del-forever" data-id="${o.id}">Delete forever</button>` : ""}</td></tr>`).join("")}</tbody>
-  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No archived orders. “Delete” on an order moves it here; you can unarchive it any time.</div>`}</div>`;
+  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No archived orders. “Archive” on an order moves it here as Cancelled · Voided; you can unarchive it any time.</div>`}</div>`;
 }
 async function archiveOrder(o, reason, extra = {}) {
-  const upd = { archived: true, archivedAt: Date.now(), archivedBy: actor(), archivedReason: reason || "", archivedPrev: { payment: o.payment, fulfillment: o.fulfillment }, payment: "", fulfillment: "", log: logAdd(o, [reason ? `archived the order (${reason})` : "archived the order"]), ...extra };
+  const upd = { archived: true, archivedAt: Date.now(), archivedBy: actor(), archivedReason: reason || "", archivedPrev: { payment: o.payment, fulfillment: o.fulfillment }, payment: "voided", fulfillment: "cancelled", log: logAdd(o, [(reason ? `archived the order (${reason})` : "archived the order") + " · Fulfillment → Cancelled · Payment → Voided"]), ...extra };
   await patch("orders", o.id, upd);
   if (!S.db) { S.orders = S.orders.filter(x => x.id !== o.id); S.archived.push(Object.assign(o, upd)); }
   S.sel.delete(o.id);
@@ -3856,7 +3858,8 @@ function viewCustomers() {
 function openCustomer(key) {
   const c = customerList().find(x => custKey(x) === key); if (!c) return;
   S.sheetReopen = () => openCustomer(key);
-  const orders = c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(Boolean).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const cn = String(c.name || "").trim().toLowerCase(), ce = String(c.email || "").trim().toLowerCase();
+  const orders = [...c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(Boolean), ...S.archived.filter(o => (ce && String(o.email || "").toLowerCase() === ce) || (cn && String(o.customer || "").trim().toLowerCase() === cn))].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const ro = S.readOnly || !c.docId;
   openSheet(`
     <h3>${esc(c.name)}</h3>
@@ -3872,7 +3875,7 @@ function openCustomer(key) {
       <div class="field"><label for="c-tags">Tags (comma separated)</label><input id="c-tags" value="${esc((c.tags || []).join(", "))}" autocomplete="off"></div>
       <div class="field"><label for="c-note">Note</label><textarea id="c-note" rows="2">${esc(c.note || "")}</textarea></div>`}
     <h2>Orders in this app</h2>
-    ${orders.length ? `<div class="list">${orders.slice(0, 20).map(o => `<div class="li" data-open="${o.id}" style="cursor:pointer"><div class="main"><div class="t">#${esc(o.num)}</div><div class="s">${esc(plat(o.platform))} · ${relTime(o.createdAt)}</div></div><div style="display:flex;gap:6px;align-items:center"><span class="num">${peso2(total(o))}</span>${badge(pay(o.payment))}</div></div>`).join("")}</div>` : `<div class="empty">No orders in the app yet${c.base && c.base.orders ? `. Shopify shows ${c.base.orders} order${c.base.orders === 1 ? "" : "s"}; import your orders export to see them here.` : "."}</div>`}
+    ${orders.length ? `<div class="list">${orders.slice(0, 20).map(o => `<div class="li" data-open="${o.id}" style="cursor:pointer"><div class="main"><div class="t">#${esc(o.num)}</div><div class="s">${esc(plat(o.platform))} · ${relTime(o.createdAt)}</div></div><div style="display:flex;gap:6px;align-items:center"><span class="num">${peso2(total(o))}</span>${o.archived ? `<span class="badge red">CANCELLED</span>` : badge(pay(o.payment))}</div></div>`).join("")}</div>` : `<div class="empty">No orders in the app yet${c.base && c.base.orders ? `. Shopify shows ${c.base.orders} order${c.base.orders === 1 ? "" : "s"}; import your orders export to see them here.` : "."}</div>`}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${ro ? "Close" : "Cancel"}</button>${ro ? "" : `<button class="btn primary" type="submit">Save changes</button>`}</div>`,
   ro ? null : async () => {
     await patch("customers", c.docId, { tags: parseTags(val("c-tags")), note: val("c-note") });
@@ -6139,7 +6142,7 @@ document.addEventListener("click", guard(async ev => {
   const gw = ev.target.closest("[data-goweb]"); if (gw) { S.of.q = ""; return goOrders(gw.dataset.goweb === "unpaid" ? "unpaid" : "unfulfilled"); }
   const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
   const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
-  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "1"; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
+  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
   const cxf = ev.target.closest("[data-cxf]"); if (cxf) { S.cx.f = cxf.dataset.cxf; render(); return; }
   const cxd = ev.target.closest("[data-cxdec]"); if (cxd) { const ref = cxd.dataset.ref, d = cxd.dataset.cxdec;
     if (d === "Approved" && !confirm(`Cancel order #${String(ref).replace(/^#/, "")}? The customer will see it as Cancelled.`)) return;
