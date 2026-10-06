@@ -301,27 +301,31 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .car-dots button { width: 8px; height: 8px; border-radius: 4px; border: 0; padding: 0; background: color-mix(in srgb, var(--brand-ink) 40%, transparent); transition: width .2s; }
 .car-dots button[aria-current="true"] { width: 22px; background: var(--gold); }
 
-/* home hero */
-.hero { position: relative; border-radius: 16px; background: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--hero-gold) 30%, transparent), transparent 55%), linear-gradient(135deg, #3A1C36 0%, var(--hero-bg) 55%, var(--hero-bg2) 100%); color: var(--hero-ink); --gold: var(--hero-gold); padding: clamp(28px, 5vw, 52px) clamp(22px, 5vw, 56px); display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
-.hero::after { content: ""; position: absolute; inset: 10px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 10px; pointer-events: none; }
-.hero-top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
-.hero-greet { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 4vw, 40px); line-height: 1.1; margin: 0; color: inherit; text-transform: none; letter-spacing: 0; text-wrap: balance; }
-.hero-rule { width: 48px; height: 1px; background: var(--gold); border: 0; margin: 4px 0; }
-.hero-q { margin: 0; max-width: 60ch; }
-.hero-q blockquote { margin: 0; font-family: var(--font-display); font-style: italic; font-size: clamp(16px, 2vw, 20px); line-height: 1.45; opacity: .95; text-wrap: pretty; }
-@media (min-width: 900px) {
-  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); grid-template-areas: "top top" "greet quote"; column-gap: 40px; row-gap: 6px; padding: 20px 30px 22px; align-items: center; }
-  .hero-top { grid-area: top; font-size: 10.5px; }
-  .hero-greet { grid-area: greet; font-size: clamp(24px, 2.2vw, 30px); }
-  .hero-rule { display: none; }
-  .hero-q { grid-area: quote; border-left: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); padding-left: 24px; }
-  .hero-q blockquote { font-size: 15px; line-height: 1.4; }
-  .hero-q figcaption { margin-top: 4px; font-size: 10px; }
-  .today > * { padding: 12px 16px; }
-  .today b { font-size: 22px; }
-  .today span { font-size: 10.5px; }
-}
-.hero-q figcaption { margin-top: 8px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .75; }
+/* home header: one compact strip (greeting + date on the left, the day's quote on the right) */
+.hero { border-radius: 14px; background: linear-gradient(120deg, #3A1C36 0%, var(--hero-bg) 60%, var(--hero-bg2) 100%); color: var(--hero-ink); --gold: var(--hero-gold); padding: 12px 20px; display: flex; align-items: center; gap: 8px 24px; flex-wrap: wrap; }
+.hero-l { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; min-width: 0; }
+.hero-greet { font-family: var(--font-display); font-weight: 400; font-size: 22px; line-height: 1.15; margin: 0; color: inherit; text-transform: none; letter-spacing: 0; }
+.hero-date { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); font-weight: 700; white-space: nowrap; }
+.hero-q { margin: 0 0 0 auto; min-width: 0; flex: 1 1 260px; display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; font-size: 13px; }
+.hero-q blockquote { margin: 0; font-family: var(--font-display); font-style: italic; opacity: .92; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-q figcaption { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; white-space: nowrap; }
+@media (max-width: 720px) { .hero-q { margin: 0; justify-content: flex-start; } .hero-q blockquote { white-space: normal; } }
+/* home stat tiles: one row of small cards that wraps on narrow screens */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.kpis > * { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); text-align: left; color: inherit; font: inherit; min-width: 0; }
+.kpis button:hover { background: var(--surface-2); }
+.kpis b { font-family: var(--font-display); font-weight: 400; font-size: 24px; line-height: 1; }
+.kpis span { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.kpis .hot b { color: var(--bad); }
+.kpis .att { grid-column: span 2; }
+.kpis .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+@media (max-width: 480px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* home body: my tasks beside a side column (Employee of the Month, goals) */
+.home-grid { display: grid; gap: 14px; align-items: start; }
+@media (min-width: 1000px) { .home-grid.has-side { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); } }
+.home-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.goals-card h2 { margin: 0; }
+.goals-card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
 .tpill.u-overdue { background: var(--bad-bg); --c: var(--bad); font-weight: 700; box-shadow: inset 0 0 0 1px var(--bad); }
 .tpill.u-today { background: var(--orange-bg); --c: var(--orange); font-weight: 700; }
 .tpill.u-soon { background: var(--amber-bg); --c: var(--amber); }
@@ -365,17 +369,7 @@ button.org-node { cursor: pointer; } button.org-node:hover { border-color: var(-
 .org-node > span { display: grid; min-width: 0; }
 .org-node b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .org-node small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.today { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.today > * { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; border: 0; border-left: 1px solid var(--line); background: none; text-align: left; color: inherit; font: inherit; min-width: 0; }
-.today > *:first-child { border-left: 0; }
-.today button:hover { background: var(--surface-2); }
-.today b { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1; }
-.today span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
-.today .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
 .wseg button { white-space: nowrap; }
-.today.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.today.two > *:nth-child(2) { border-top: 0; border-left: 1px solid var(--line); }
-@media (max-width: 720px) { .today { grid-template-columns: repeat(2, minmax(0, 1fr)); } .today > *:nth-child(3) { border-left: 0; } .today > *:nth-child(n+3) { border-top: 1px solid var(--line); } }
 .quiet h2 { font-size: 11px; letter-spacing: .16em; }
 .goals-line { font-size: 13px; color: var(--muted); text-align: center; padding: 4px 8px; }
 .goals-line b { color: var(--gold); letter-spacing: .14em; text-transform: uppercase; font-size: 11px; margin-right: 6px; }
@@ -2216,28 +2210,30 @@ function viewHome() {
   const st = mid && member(mid) ? attStatus(mToday(), mid) : "";
   const r = mid ? attRec(mToday(), mid) : null;
   const goals = (h.goals || "").split("\n").map(x => x.trim()).filter(Boolean);
+  const overdue = mine.filter(t => t.due && t.due < today()).length;
+  const web = S.site && S.web.loaded && canOrders();
+  const side = (isCEO() ? eomHomeCard() : "") + (goals.length ? `<section class="panel quiet goals-card"><h2>Our goals</h2><ul>${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ul></section>` : "");
   return `${birthdayBanner()}
   <section class="hero" aria-label="Welcome">
-    <div class="hero-top"><span>${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span><span>Regal Spritz PH</span></div>
-    <h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}</h2>
-    <hr class="hero-rule">
-    <figure class="hero-q"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure>
+    <div class="hero-l"><h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}</h2><span class="hero-date">${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span></div>
+    <figure class="hero-q" title="${esc(q)}${who ? " — " + esc(who) : ""}"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure>
   </section>
-  <section class="today" aria-label="Today">
-    <button type="button" data-nav="tasks"><b class="num">${mine.length}</b><span>My open tasks</span></button>
+  <section class="kpis" aria-label="Today">
+    <button type="button" data-nav="tasks"${overdue ? ' class="hot"' : ""}><b class="num">${mine.length}</b><span>My open tasks${overdue ? ` · ${overdue} late` : ""}</span></button>
     <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
     ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="tasks"><b class="num">${visTasks().filter(t => t.status === "in_progress").length}</b><span>In progress</span></button>`}
-    <div>${st ? `<b style="font-size:20px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
-      : `<b style="font-size:20px">–</b><span>Attendance</span><span style="font-size:12px">Not linked</span>`}</div>
+    ${web ? (() => { const wu = S.web.orders.filter(o => !o.paid && !/cancel/i.test(o.status || "")).length, ws = S.web.orders.filter(o => o.paid && !webDone(o)).length; return `<button type="button" data-goweb="unpaid"><b class="num">${wu}</b><span>Unpaid website</span></button><button type="button" data-goweb="toship"><b class="num">${ws}</b><span>Website to ship</span></button>`; })() : ""}
+    <div class="att">${st ? `<b style="font-size:18px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
+      : `<b style="font-size:18px">–</b><span>Attendance · not linked</span>`}</div>
   </section>
-  ${S.site && S.web.loaded && canOrders() ? (() => { const wu = S.web.orders.filter(o => !o.paid && !/cancel/i.test(o.status || "")).length, ws = S.web.orders.filter(o => o.paid && !webDone(o)).length; return `<section class="today two" aria-label="Website orders"><button type="button" data-goweb="unpaid"><b class="num">${wu}</b><span>Unpaid website orders</span></button><button type="button" data-goweb="toship"><b class="num">${ws}</b><span>Website orders to ship</span></button></section>`; })() : ""}
   ${duesAlert()}
-  ${isCEO() ? eomHomeCard() : ""}
+  <div class="home-grid${side ? " has-side" : ""}">
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
-    ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 5).map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">You're all caught up.</div>`)
+    ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>${mine.length > 6 ? `<button type="button" class="linkish" data-nav="tasks" style="font-size:12.5px">+${mine.length - 6} more in Tasks</button>` : ""}` : `<div class="empty">You're all caught up.</div>`)
       : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your tasks here.</div>`}
   </section>
-  ${goals.length ? `<div class="goals-line"><b>Our goals</b>${goals.map(esc).join(" · ")}</div>` : ""}
+  ${side ? `<div class="home-side">${side}</div>` : ""}
+  </div>
   ${orgChart(false)}`;
 }
 // Organization chart: the CEO on top, then one column per department, most senior first.
@@ -2495,7 +2491,7 @@ function viewHomeContent() {
   return `<form class="panel" id="home-form">
     <div class="field"><label for="h-quotes">Your own quotes (optional, one per line, like: Scent is memory — Regal Spritz PH)</label><textarea id="h-quotes" rows="5">${esc(h.quotes || "")}</textarea>
       <div style="font-size:12px;color:var(--muted)">Home shows one perfume quote a day. Yours are mixed in with ${QUOTES.length} classic quotes from Chanel, Dior, Guerlain and others.</div></div>
-    <div class="field"><label for="h-goals">RS Goals (one per line, shown quietly at the bottom of Home)</label><textarea id="h-goals" rows="4">${esc(h.goals || "")}</textarea></div>
+    <div class="field"><label for="h-goals">RS Goals (one per line, shown beside My tasks on Home)</label><textarea id="h-goals" rows="4">${esc(h.goals || "")}</textarea></div>
     <div><button class="btn primary" type="submit">Save Home page</button></div>
   </form>`;
 }
