@@ -408,6 +408,9 @@ button.org-node { cursor: pointer; } button.org-node:hover { border-color: var(-
 .org-node > span { display: grid; min-width: 0; }
 .org-node b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .org-node small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.org-node small.org-scent { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: var(--fg); }
+.org-scent img, .org-scent svg { width: 14px; height: 18px; object-fit: contain; flex: none; }
+.org-scent em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wseg button { white-space: nowrap; }
 .quiet h2 { font-size: 11px; letter-spacing: .16em; }
 .goals-line { font-size: 13px; color: var(--muted); text-align: center; padding: 4px 8px; }
@@ -2372,7 +2375,7 @@ function orgChart(full) {
   const team = teamByRank(); if (!team.length) return full ? `<div class="empty">Add team members in Directory to build the chart.</div>` : "";
   const own = ownerMember();
   const top = team.filter(m => m.department === "CEO" || (own && m.id === own.id));
-  const node = (m, lead) => `<${full && S.canEdit ? `button type="button" data-act="edit-member" data-id="${m.id}"` : "div"} class="org-node${lead ? " lead" : ""}">${avatar(m, lead ? 40 : 30, false)}<span><b>${esc(m.nickname || m.name)}</b><small>${esc(m.role || (dept(m.department) || {}).name || "")}</small>${full && m.nickname && m.nickname !== m.name ? `<small class="org-full">${esc(m.name)}</small>` : ""}</span></${full && S.canEdit ? "button" : "div"}>`;
+  const node = (m, lead) => `<${full && S.canEdit ? `button type="button" data-act="edit-member" data-id="${m.id}"` : "div"} class="org-node${lead ? " lead" : ""}">${avatar(m, lead ? 40 : 30, false)}<span><b>${esc(m.nickname || m.name)}</b><small>${esc(m.role || (dept(m.department) || {}).name || "")}</small>${(() => { const sc = scentOf(m.id), si = scentImgOf(m.id); return sc ? `<small class="org-scent" title="Signature scent: ${esc(sc)}">${si ? `<img src="${esc(si)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : BOTTLE}<em>${esc(sc)}</em></small>` : ""; })()}${full && m.nickname && m.nickname !== m.name ? `<small class="org-full">${esc(m.name)}</small>` : ""}</span></${full && S.canEdit ? "button" : "div"}>`;
   const cols = DEPTS.filter(d => d.id !== "CEO").map(d => {
     const ms = team.filter(m => m.department === d.id && !top.includes(m)); if (!ms.length) return "";
     const head = roleRank(ms[0].role) <= 2 ? ms[0] : null;
