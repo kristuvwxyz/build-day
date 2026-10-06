@@ -3631,7 +3631,7 @@ async function openJntFile() {
   if (!os.length) { toast("No J&T orders to book. Select orders, or filter to To ship."); return; }
   let A; try { A = await jntAddr(); } catch (e) { toast(e.message); return; }
   let d = {}; try { d = JSON.parse(localStorage.getItem("rs-jnt") || "{}"); } catch (e) {}
-  S.jnt = { express: d.express || "EZ", parcel: d.parcel || "PERFUME", weight: d.weight || "0.5", rows: os.map(o => { const sh = shipOf(o), m = jntMatch(A, sh); return { id: o.id, num: onum(o), name: sh.name || o.customer || "", phone: jntPhone(sh.phone || o.phone), addr: [sh.address1, sh.address2].filter(Boolean).join(", "), ...m, weight: "", parcels: 1, value: Math.round(total(o)), cod: o.payment === "paid" ? 0 : o.payment === "pending" ? Math.round(total(o)) : "", remarks: onum(o) }; }) };
+  S.jnt = { express: d.express || "EZ", parcel: "COSMETICS", weight: d.weight || "0.5", rows: os.map(o => { const sh = shipOf(o), m = jntMatch(A, sh); return { id: o.id, num: onum(o), name: sh.name || o.customer || "", phone: jntPhone(sh.phone || o.phone), addr: [sh.address1, sh.address2].filter(Boolean).join(", "), ...m, weight: "", parcels: 1, value: 500, cod: o.payment === "paid" ? 0 : o.payment === "pending" ? Math.round(total(o)) : "", remarks: onum(o) }; }) };
   renderJnt();
 }
 function jntRowHTML(r, i) {
@@ -3705,7 +3705,7 @@ function shipOf(o) {
 function jntRows() {
   const list = S.sel.size ? allOrderRows().filter(o => S.sel.has(o.id)) : packList().filter(o => courierOf(o) === "J&T");
   return [["Order No.", "Receiver Name", "Receiver Phone", "Province", "City/Municipality", "Barangay", "Street Address", "Zip Code", "Item Name", "Quantity", "Weight (kg)", "COD Amount", "Declared Value", "Remarks"],
-    ...list.map(o => { const sh = shipOf(o); return [onum(o), sh.name || o.customer, (sh.phone || o.phone || "").replace(/^\+63/, "0"), sh.province, sh.city, sh.address2, sh.address1, sh.zip, (o.items || []).map(i => `${i.qty}x ${i.name}`).join("; ").slice(0, 120), itemCount(o), "", o.payment === "paid" ? 0 : o.payment === "pending" ? total(o) : "", total(o), o.note || ""]; })];
+    ...list.map(o => { const sh = shipOf(o); return [onum(o), sh.name || o.customer, (sh.phone || o.phone || "").replace(/^\+63/, "0"), sh.province, sh.city, sh.address2, sh.address1, sh.zip, "COSMETICS", itemCount(o), "", o.payment === "paid" ? 0 : o.payment === "pending" ? total(o) : "", 500, o.note || ""]; })];
 }
 async function jntExport() {
   const rows = jntRows(); if (rows.length < 2) { toast("No J&T orders to export here. Select orders or switch the filter."); return; }
