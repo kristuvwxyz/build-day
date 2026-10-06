@@ -3928,7 +3928,7 @@ function openProductForm(id, preset = {}) {
     <div class="row">
       <div class="field"><label for="p-sku">SKU</label><input id="p-sku" value="${esc(p.sku || "")}"></div>
       <div class="field"><label for="p-barcode">Barcode</label><div style="display:flex;gap:6px"><input id="p-barcode" value="${esc(p.barcode || "")}" style="flex:1;min-width:0"><label class="btn sm" for="p-bc-cam" title="Scan with camera" style="cursor:pointer">📷</label><input id="p-bc-cam" type="file" accept="image/*" capture="environment" hidden></div></div>
-      <div class="field"><label for="p-cat">Category</label><select id="p-cat"><option value="">–</option>${[...WEB_CATS, ...(p.category && !WEB_CATS.some(c => c[0] === p.category) ? [[p.category, p.category]] : [])].map(([k, l]) => `<option value="${esc(k)}" ${p.category === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+      <div class="field"><label for="p-cat">Collection</label><select id="p-cat"><option value="">–</option>${[...WEB_CATS, ...(p.category && !WEB_CATS.some(c => c[0] === p.category) ? [[p.category, p.category]] : [])].map(([k, l]) => `<option value="${esc(k)}" ${p.category === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
     </div>
     <div class="row">
       <div class="field"><label for="p-kind">Availability</label><select id="p-kind"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand (ships in 24h)</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select></div>
@@ -3961,7 +3961,7 @@ function openProductForm(id, preset = {}) {
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
+const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter || "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products;
@@ -3980,12 +3980,13 @@ function viewListings() {
     <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"], ["pending", "To sync"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
       ${f !== "all" || q ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}</div>
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
-    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${th("size", "Size")}${th("type", "Type")}${th("kind", "On hand / Pre-order")}${th("eta", "ETA")}${th("price", "Price", "r")}${th("stock", "Stock", "r")}${th("status", "Status")}${th("web", "Website")}</tr></thead>
+    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${th("size", "Size")}${th("type", "Type")}${th("cat", "Collection")}${th("kind", "On hand / Pre-order")}${th("eta", "ETA")}${th("price", "Price", "r")}${th("stock", "Stock", "r")}${th("status", "Status")}${th("web", "Website")}</tr></thead>
     <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}">
       <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
       <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>
       <td class="nowrap">${can ? `<input class="lcell" data-lset="size" data-id="${p.id}" list="l-size-list" value="${esc(p.size || "")}" aria-label="Size" style="width:78px">` : esc(p.size || "")}</td>
       <td class="nowrap">${can ? `<select class="lcell" data-lset="ptype" data-id="${p.id}" aria-label="Type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : esc(p.ptype || "")}</td>
+      <td class="nowrap">${(() => { const c = p.category || "unisex", opts = [...WEB_CATS, ...(WEB_CATS.some(x => x[0] === c) ? [] : [[c, c]])]; return can ? `<select class="lcell" data-lset="category" data-id="${p.id}" aria-label="Collection">${opts.map(([k, l]) => `<option value="${esc(k)}" ${c === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : esc((opts.find(x => x[0] === c) || [c, c])[1]); })()}</td>
       <td class="nowrap">${can ? `<select class="status ${p.kind === "preorder" ? "st-blue" : "st-grey"}" data-lset="kind" data-id="${p.id}" aria-label="On hand or pre-order"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select>` : p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>
       <td>${p.kind === "preorder" ? (can ? `<select class="status st-blue" data-lset="eta" data-id="${p.id}" aria-label="ETA">${etaOpts(p)}</select>` : esc(p.eta || "–")) : `<span style="color:var(--muted)">–</span>`}</td>
       <td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="price" data-id="${p.id}" value="${p.price ?? ""}" aria-label="Price" style="width:80px;text-align:right">` : peso(p.price)}${p.compareAt > p.price ? `<div><s class="num" style="font-size:11px;color:var(--muted)">${peso(p.compareAt)}</s></div>` : ""}</td>
@@ -6002,8 +6003,8 @@ document.addEventListener("change", guard(async ev => {
     if (f === "price" || f === "stock") { if (v === "" || isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return; } v = f === "stock" ? Math.round(Number(v)) : Number(v); }
     if (String(pr[f] ?? "") === String(v)) return;
     await patch("products", pr.id, { [f]: v, webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" });
-    const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "price", stock: "stock" }[f] || f;
-    const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" ? peso(v) : (v === "" ? "none" : v);
+    const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "price", stock: "stock", category: "collection" }[f] || f;
+    const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" ? peso(v) : f === "category" ? (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : (v === "" ? "none" : v);
     toast(`${pr.name}: ${lab} → ${shown} · marked To sync`); if (!S.db) render(); return;
   }
   if (t.id === "sp-ful") { S.sp.ful = t.value; render(); return; }
