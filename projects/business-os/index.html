@@ -1053,6 +1053,50 @@ function committedOf(p) {
 
 /* Applies a payment/fulfillment/tag/note change and keeps stock + timestamps right. */
 async function updateOrder(o, ch) {
+  const r = await updateOrderCore(o, ch);
+  if (ch && "assignee" in ch && !ownerBusy) await setCustomerOwner(o, ch.assignee || "");
+  return r;
+}
+
+/* ---------- 1 customer = 1 sales staff ----------
+   Assigning an order makes that staff the customer's owner (matched by phone, then email, then name).
+   Every open and future order from the customer, website or Shopify or RS OS, follows. Shared in webmeta/_owners. */
+let ownerBusy = false, ownerT = 0;
+function custKeysOf(o) {
+  const k = [], ph = String(o.phone || (o.ship && o.ship.phone) || o.mobile || "").replace(/\D/g, "").slice(-10), e = String(o.email || "").trim().toLowerCase(), n = normName(o.customer || o.name);
+  if (ph.length === 10) k.push("p" + ph); if (e.includes("@")) k.push("e" + e); if (n.length >= 4) k.push("n" + n);
+  return k;
+}
+const ownerMap = () => (S.webmeta.find(d => d.id === "_owners") || {}).map || {};
+function ownerOf(o) { const m = ownerMap(); for (const k of custKeysOf(o)) if (m[k] !== undefined) return m[k]; return ""; }
+const sameCustomer = (a, b) => { const ka = custKeysOf(a); return custKeysOf(b).some(k => ka.includes(k)); };
+const openOrder = o => !isVoid(o) && OPEN_FUL.has(o.fulfillment);
+async function setCustomerOwner(o, mid) {
+  const keys = custKeysOf(o); if (!keys.length || S.readOnly || !S.db) return;
+  const map = { ...ownerMap() }; for (const k of keys) map[k] = mid;
+  await save("webmeta", "_owners", { map, at: Date.now() });
+  const others = allOrderRows().filter(x => x.id !== o.id && openOrder(x) && (x.assignee || "") !== mid && sameCustomer(o, x));
+  if (!others.length) return;
+  ownerBusy = true;
+  try { for (const x of others) await updateOrderCore(x, { assignee: mid }); } finally { ownerBusy = false; }
+  toast(`${o.customer || "Customer"} → ${mid ? memberName(mid) : "Unassigned"}: ${others.length} more open order${others.length === 1 ? "" : "s"} moved too. New orders follow.`);
+}
+// Fills in the owner on unassigned open RS OS orders (website orders read it live). First run learns owners from orders already assigned.
+function scheduleOwnerSync() { clearTimeout(ownerT); ownerT = setTimeout(ownerSync, 3000); }
+async function ownerSync() {
+  if (ownerBusy || S.readOnly || !S.db || !canAll() || !S.loaded.orders || !S.loaded.webmeta || (S.site && !S.web.loaded)) return;
+  if (!S.webmeta.some(d => d.id === "_owners")) {
+    const map = {};
+    for (const o of allOrderRows().filter(x => x.assignee).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))) for (const k of custKeysOf(o)) map[k] = o.assignee;
+    await save("webmeta", "_owners", { map, at: Date.now() }).catch(() => {}); return;
+  }
+  const todo = S.orders.filter(o => !o.assignee && openOrder(o) && ownerOf(o));
+  if (!todo.length) return;
+  ownerBusy = true;
+  try { for (const o of todo) await updateOrderCore(o, { assignee: ownerOf(o), _by: "Auto · customer's sales staff" }); } finally { ownerBusy = false; }
+}
+
+async function updateOrderCore(o, ch) {
   if (o.web) return webOrderUpdate(o, ch);
   ch = { ...ch };
   const upd = { ...ch }, now = Date.now();
@@ -2319,7 +2363,7 @@ async function webLoad(quiet) {
     S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
-  webStockSync();
+  webStockSync(); scheduleOwnerSync();
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
   const last = S.webmeta.find(d => d.id === "_push");
@@ -2355,7 +2399,7 @@ function webAsOrders() {
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
       items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0 })),
       adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
-      payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || "",
+      payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
       tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
   });
@@ -6434,7 +6478,7 @@ render();
         if (col === "orders") { S.orders = docs.filter(r => !r.archived).map(norm); S.archived = docs.filter(r => r.archived); }
         else S[col] = docs;
         S.loaded[col] = true;
-        if (col === "orders" || col === "webmeta") S.web.dirty = true;
+        if (col === "orders" || col === "webmeta") { S.web.dirty = true; scheduleOwnerSync(); }
         bgRender();
       }, () => { S.loaded[col] = true; $("#sync").textContent = "Connection lost · reload the page"; render(); });
     }
