@@ -1205,6 +1205,7 @@ async function updateOrderCore(o, ch) {
   const by = upd._by; delete upd._by;
   if (msgs.length) upd.log = logAdd(o, msgs, by);
   await patch("orders", o.id, upd);
+  if (!o.web && "fulfillment" in upd) scheduleStatusSync();
   if (stockDelta) { if (o.stockTaken) await applyStockMap(o.stockTaken, stockDelta); else for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, stockDelta * (Number(i.qty) || 0)); }
   return stockDelta;
 }
@@ -2497,7 +2498,7 @@ async function webLoad(quiet) {
     S.web.orders = r.orders || []; S.web.cancelRequests = Number(r.cancelRequests) || (r.orders || []).filter(o => o.cancel && o.cancel.status === "Pending").length; S.web.at = r.at || new Date().toISOString(); S.web.ms = Date.now() - S.web.t0; S.web.backendMs = Number(r.backendMs) || 0; S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
-  webStockSync(); scheduleOwnerSync(); webStatusSync(); if (!S.web.err) legacyCancelSync();
+  webStockSync(); scheduleOwnerSync(); webStatusSync(); scheduleStatusSync(3000);
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
   const last = S.webmeta.find(d => d.id === "_push");
@@ -3489,28 +3490,35 @@ async function archiveOrder(o, reason, extra = {}) {
   await patch("orders", o.id, upd);
   if (!S.db) { S.orders = S.orders.filter(x => x.id !== o.id); S.archived.push(Object.assign(o, upd)); }
   S.sel.delete(o.id);
-  if (!o.web) legacyWebStatus(o, "Cancelled");
+  if (!o.web) scheduleStatusSync();
 }
-// Old-shop / RS OS orders also show in the customer's account on regalspritz.com. Archiving one marks it Cancelled there too.
+// RS OS and old-shop orders also show in the customer's account on regalspritz.com. Their status there follows RS OS:
+// archived → Cancelled, otherwise the website status for the Fulfillment status. Changes go out in one opsStatuses batch,
+// and webmeta/_wstat remembers what the website already has (order number → status only, no customer details).
 const legacyRef = o => { const n = String(o.num || "").replace(/^#/, "").trim(); return /^RS\d+$/i.test(n) ? n.toUpperCase() : ""; };
-// Never touch a number that is also a live order (a website order, or an open RS OS / Shopify order with the same RS number).
-const legacyClash = (o, ref) => (S.web.orders || []).some(w => String(w.ref || "").replace(/^#/, "").toUpperCase() === ref)
-  || S.orders.some(x => x.id !== o.id && legacyRef(x) === ref);
-async function legacyWebStatus(o, status) {
-  const ref = legacyRef(o); if (!S.site || !ref || S.readOnly || !S.web.loaded || legacyClash(o, ref)) return false;
+let statusSyncT = 0, statusSyncBusy = false;
+function scheduleStatusSync(ms = 5000) { clearTimeout(statusSyncT); statusSyncT = setTimeout(statusSync, ms); }
+async function statusSync() {
+  if (statusSyncBusy || !S.site || !S.site.statuses || S.readOnly || !canAll() || !S.loaded.orders || !S.loaded.webmeta || !S.web.loaded || S.web.err) return;
+  statusSyncBusy = true;
   try {
-    const r = await S.site.update(ref, { status });
-    await patch("orders", o.id, r && r.ok ? { webStatusSent: status, webStatusAt: Date.now(), webStatusErr: "" } : { webStatusErr: String((r && r.error) || "no answer").slice(0, 120), webStatusAt: Date.now() });
-    return !!(r && r.ok);
-  } catch (e) { return false; }
-}
-// Once per session: archived orders the website still shows as open get marked Cancelled (each tried once a day at most).
-let legacySyncDone = false;
-async function legacyCancelSync() {
-  if (legacySyncDone || !S.site || S.readOnly || !canAll() || !S.loaded.orders) return; legacySyncDone = true;
-  const todo = S.archived.filter(o => !o.web && legacyRef(o) && o.webStatusSent !== "Cancelled" && Date.now() - (o.webStatusAt || 0) > 864e5).slice(0, 40);
-  let ok = 0; for (const o of todo) if (await legacyWebStatus(o, "Cancelled")) ok++;
-  if (ok) toast(`${ok} archived order${ok === 1 ? "" : "s"} now show as Cancelled on the website.`);
+    const live = new Set((S.web.orders || []).map(w => String(w.ref || "").replace(/^#/, "").toUpperCase()));
+    const want = {};
+    // Archived first, so an open order with the same number wins.
+    for (const o of [...S.archived, ...S.orders]) { if (o.web) continue; const ref = legacyRef(o); if (!ref || live.has(ref)) continue;
+      const st = o.archived ? "Cancelled" : WEB_STATUS_OF[o.fulfillment]; if (st) want[ref] = st; }
+    const meta = S.webmeta.find(d => d.id === "_wstat") || {}, had = meta.map || {};
+    const todo = Object.entries(want).filter(([ref, st]) => had[ref] !== st).map(([ref, status]) => ({ ref, status }));
+    if (!todo.length) return;
+    const map = { ...had };
+    for (let i = 0; i < todo.length; i += 2000) {
+      const part = todo.slice(i, i + 2000), r = await S.site.statuses(part);
+      if (!r || !r.ok) { console.warn("Website status sync:", r && r.error); break; }
+      for (const x of part) map[x.ref] = x.status;
+      await save("webmeta", "_wstat", { map, at: Date.now(), by: actor() });
+    }
+  } catch (e) { console.warn("Website status sync failed", e); }
+  finally { statusSyncBusy = false; }
 }
 async function restoreOrder(o) {
   const pv = o.archivedPrev || {};
@@ -3518,6 +3526,7 @@ async function restoreOrder(o) {
   const upd = { archived: false, archivedAt: 0, archivedReason: "", mergedInto: "", payment, fulfillment, log: logAdd(o, [`unarchived the order (back to ${pay(payment).name} · ${ful(fulfillment).name})`]) };
   if (S.db) await wdb().collection("orders").doc(o.id).update(upd);
   else { S.archived = S.archived.filter(x => x.id !== o.id); S.orders.push(Object.assign(o, upd)); render(); }
+  scheduleStatusSync();
 }
 function openMergePick(id) {
   const o = findOrder(id); if (!o) return;

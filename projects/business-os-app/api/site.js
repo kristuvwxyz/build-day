@@ -61,6 +61,12 @@ export default async function handler(req, res) {
     if (!Array.isArray(body.products) || body.products.length > 3000) return res.status(400).json({ ok: false, error: "Send the product list." });
     const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
     call = { action: "opsSetProducts", key: KEY, products: body.products, by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
+  } else if (body.action === "statuses") {
+    // Many order statuses at once (RS OS / old-shop orders shown in customers' accounts). Website backend v22+ (opsStatuses).
+    if (!Array.isArray(body.orders) || !body.orders.length || body.orders.length > 5000) return res.status(400).json({ ok: false, error: "Send 1 to 5000 orders." });
+    const orders = body.orders.map(o => ({ ref: String((o && o.ref) || "").trim().replace(/^#/, ""), status: o && o.status })).filter(o => /^[A-Za-z0-9_-]{1,40}$/.test(o.ref) && STATUSES.has(o.status));
+    if (!orders.length) return res.status(400).json({ ok: false, error: "Nothing to change." });
+    call = { action: "opsStatuses", key: KEY, orders };
   } else return res.status(400).json({ ok: false, error: "That request isn't allowed." });
 
   // 3. Ask the website backend (Apps Script answers with a redirect, which fetch follows).
