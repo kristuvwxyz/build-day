@@ -3834,6 +3834,36 @@ const LIST_TYPES = ["Sealed", "Tester", "Partial", "Unsealed, New", "Boxed, New"
 const WEB_CATS = [["her", "For her"], ["him", "For him"], ["unisex", "Unisex"], ["arabian", "Arabian"], ["beauty", "Beauty"]];
 const SITE = "https://www.regalspritz.com/";
 const LIST_STATUS = { active: { name: "Active", cls: "good" }, draft: { name: "Draft", cls: "" }, hidden: { name: "Inactive", cls: "warn" } };
+/* ---------- Fragrantica: fill a listing's notes and main accords from its Fragrantica page ----------
+   The RS App reads the page on the server (/api/fragrantica). If Fragrantica blocks it (or outside the RS App), the user pastes the page text. */
+const fragCap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+function fragFromText(txt) {
+  const lines = String(txt).split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const stop = l => l.length > 40 || /notes$|^(main accords|perfume pyramid)$|vote|rating|longevity|sillage|gender|price value|when to wear|reviews?|smells like|fragrantica|perfumer|^\d/i.test(l);
+  const after = (re, max) => { const i = lines.findIndex(l => re.test(l)); if (i < 0) return []; const out = []; for (const l of lines.slice(i + 1)) { if (stop(l) || out.length >= max) break; out.push(...l.split(",").map(x => x.trim()).filter(Boolean)); } return [...new Set(out)]; };
+  return { accords: after(/^main accords$/i, 15).map(fragCap), notes: { top: after(/^top notes$/i, 25), heart: after(/^(middle|heart) notes$/i, 25), base: after(/^base notes$/i, 25) } };
+}
+function fragFill(r, fromPaste) {
+  const n = r.notes || {}, msg = $("#p-frag-msg"), got = (r.accords || []).length + ["top", "heart", "base"].reduce((a, k) => a + (n[k] || []).length, 0);
+  if (!got) { if (msg) { msg.hidden = false; msg.textContent = fromPaste ? "No notes found in what you pasted. Copy the whole Fragrantica page (Ctrl+A, then Ctrl+C) and paste again." : "No notes found on that page."; } return false; }
+  for (const [k, f] of [["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]]) if ((n[k] || []).length) $("#" + f).value = n[k].join(", ");
+  if ((r.accords || []).length) $("#p-acc").value = r.accords.join(", ");
+  if (msg) { msg.hidden = false; msg.textContent = `Filled ${(r.accords || []).length} accords and ${got - (r.accords || []).length} notes. Check them, then Save listing.`; }
+  const pb = $("#p-frag-paste"); if (pb && fromPaste) pb.hidden = true;
+  return true;
+}
+async function fragGet(btn) {
+  const url = val("p-frag"), msg = $("#p-frag-msg"), pb = $("#p-frag-paste");
+  if (!/^https?:\/\/([a-z0-9-]+\.)*fragrantica\.[a-z.]+\//i.test(url)) { msg.hidden = false; msg.textContent = "Paste a fragrantica.com perfume link first."; return; }
+  const paste = why => { msg.hidden = false; msg.textContent = why; pb.hidden = false; $("#p-frag-text").value = ""; $("#p-frag-text").focus(); };
+  if (!S.site || !S.site.fragrantica) return paste("Paste the page below to fill the notes.");
+  btn.disabled = true; btn.textContent = "Getting…";
+  try {
+    const r = await S.site.fragrantica(url);
+    if (r && r.ok) fragFill(r); else paste((r && r.error) || "Fragrantica didn't answer.");
+  } catch (e) { paste("Fragrantica didn't answer."); }
+  finally { btn.disabled = false; btn.textContent = "Get notes"; }
+}
 function openProductForm(id, preset = {}) {
   const p = id ? S.products.find(x => x.id === id) : { status: "active", reorder: 1, stock: 0, ...preset };
   openSheet(`
@@ -3870,11 +3900,15 @@ function openProductForm(id, preset = {}) {
     </div>
     <fieldset class="field" style="border:0;padding:0;margin:0"><legend style="font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px">Badges</legend>
       <div style="display:flex;flex-wrap:wrap;gap:6px 16px">${BADGES.map((b, k) => `<label style="display:flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer"><input type="checkbox" class="p-badge" id="p-badge-${k}" value="${esc(b)}" ${badgesOf(p).includes(b) ? "checked" : ""}> ${esc(b)}</label>`).join("")}</div></fieldset>
+    <div class="field"><label for="p-frag">Fragrantica link <span style="font-weight:400">(fills the notes and accords)</span></label><div style="display:flex;gap:6px"><input id="p-frag" type="url" value="${esc(p.fragrantica || "")}" placeholder="https://www.fragrantica.com/perfume/…" style="flex:1;min-width:0" autocomplete="off"><button class="btn sm" type="button" data-act="p-frag-get">Get notes</button></div>
+      <div id="p-frag-msg" style="font-size:12.5px;color:var(--muted)" hidden></div>
+      <div id="p-frag-paste" hidden><div style="font-size:12.5px;margin:6px 0 4px">Fragrantica blocked the automatic read, so paste the page instead: open the link, press <b>Ctrl+A</b> (Mac: <b>⌘A</b>), then <b>Ctrl+C</b> (<b>⌘C</b>), and paste here.</div><textarea id="p-frag-text" rows="3" placeholder="Paste the Fragrantica page here" autocomplete="off" spellcheck="false"></textarea></div></div>
     <div class="row">
       <div class="field"><label for="p-ntop">Top notes</label><input id="p-ntop" value="${esc(((p.notes || {}).top || []).join(", "))}" placeholder="Lime, Cardamom"></div>
       <div class="field"><label for="p-nheart">Heart notes</label><input id="p-nheart" value="${esc(((p.notes || {}).heart || []).join(", "))}"></div>
       <div class="field"><label for="p-nbase">Base notes</label><input id="p-nbase" value="${esc(((p.notes || {}).base || []).join(", "))}"></div>
     </div>
+    <div class="field"><label for="p-acc">Main accords</label><input id="p-acc" value="${esc((p.accords || []).join(", "))}" placeholder="Fresh spicy, Citrus, Woody"></div>
     <div class="field"><label for="p-desc">Description</label><textarea id="p-desc" rows="3">${esc(p.description || "")}</textarea></div>
     <div class="row">
       <div class="field"><label for="p-url">Website link</label><input id="p-url" value="${esc(p.url || "")}" placeholder="https://regal.famcoventures.com/#/…"></div>
@@ -3887,7 +3921,7 @@ function openProductForm(id, preset = {}) {
     if (!val("p-name")) return sheetError("Give the product a name.");
     const bc = val("p-barcode");
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
-    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: val("p-type"), sku: val("p-sku"), barcode: bc, category: val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: val("p-status"), kind: val("p-kind"), eta: val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), description: val("p-desc"), url: val("p-url"), batch: val("p-batch"), photo: document.getElementById("p-photo").value, imgs: (() => { const ph = document.getElementById("p-photo").value, rest = (p.imgs || []).filter(u => u !== p.photo); return ph && !ph.startsWith("data:") ? [ph, ...rest] : (p.imgs || []); })(), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    const data = { ...(id ? clean(p) : {}), name: val("p-name"), brand: val("p-brand"), size: val("p-size"), ptype: val("p-type"), sku: val("p-sku"), barcode: bc, category: val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: val("p-status"), kind: val("p-kind"), eta: val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: val("p-url"), batch: val("p-batch"), photo: document.getElementById("p-photo").value, imgs: (() => { const ph = document.getElementById("p-photo").value, rest = (p.imgs || []).filter(u => u !== p.photo); return ph && !ph.startsWith("data:") ? [ph, ...rest] : (p.imgs || []); })(), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     if (!id) data.createdAt = Date.now();
     await save("products", id || uid("p"), data);
     closeSheet(); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
@@ -3976,7 +4010,7 @@ function webProducts() {
   const live = S.products.filter(p => (p.status || "active") === "active" && p.name && (p.kind === "preorder" || (Number(p.stock) || 0) > 0 || p.webId));
   return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
     .filter(p => p.kind === "preorder" || (Number(p.stock) || 0) > 0)
-    .map(p => ({ id: p.webId || slug([p.kind === "preorder" ? "preorder" : "", p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" ")), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", vac: !!p.vac, created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
+    .map(p => ({ id: p.webId || slug([p.kind === "preorder" ? "preorder" : "", p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" ")), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [], isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", vac: !!p.vac, created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
 }
 const webCodeText = () => "<script>\nwindow.PRODUCTS=" + JSON.stringify(webProducts()).replace(/<\//g, "<\\/") + ";\n</" + "script>";
 function openWebCode() {
@@ -5776,6 +5810,7 @@ document.addEventListener("click", guard(async ev => {
     case "web-dl": return downloadWebCode();
     case "web-synced": return markSynced();
     case "scan-undo": return scanUndo();
+    case "p-frag-get": return fragGet(b);
     case "p-photo-clear": $("#p-photo").value = ""; $("#p-photo-prev").innerHTML = ""; b.remove(); return;
     case "m-photo-clear": $("#m-photo").value = ""; $("#m-photo-prev").innerHTML = "<span>?</span>"; b.remove(); return;
     case "scent-web": { const q = val("sc-name"); window.open("https://www.google.com/search?tbm=isch&q=" + encodeURIComponent((q || "perfume") + " perfume bottle"), "_blank", "noopener"); return; }
@@ -5972,6 +6007,7 @@ document.addEventListener("input", ev => {
   const t = ev.target;
   if (t.matches(".it-q, .it-price")) return updateOrderTotal();
   if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-disc")) return eiTotal();
+  if (t.id === "p-frag-text") { if (t.value.trim()) fragFill(fragFromText(t.value), true); return; }
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
   if (t.classList.contains("gs-in")) return globalSearch(t);
   if (t.classList.contains("jnt-f") && t.tagName === "INPUT") { jntField(t, true); return; }

@@ -220,7 +220,9 @@
         if (!r.ok && !j.error) j.error = "Website request failed (" + r.status + ")";
         return j;
       };
-      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }), pushProducts: products => call({ action: "pushProducts", products }) };
+      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }), pushProducts: products => call({ action: "pushProducts", products }),
+        // Notes and accords from a Fragrantica page (our /api/fragrantica server route).
+        fragrantica: async url => { const { data: { session } } = await sb.auth.getSession(); const r = await fetch("/api/fragrantica", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (session && session.access_token) }, body: JSON.stringify({ url }) }); const j = await r.json().catch(() => ({})); if (!r.ok && !j.error) j.error = "Fragrantica request failed (" + r.status + ")"; return j; } };
     },
     async mcp() {
       const { sb } = await ready;
