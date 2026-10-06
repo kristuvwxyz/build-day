@@ -2374,7 +2374,7 @@ async function webLoad(quiet) {
     S.web.orders = r.orders || []; S.web.at = r.at || new Date().toISOString(); S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
-  webStockSync(); scheduleOwnerSync();
+  webStockSync(); scheduleOwnerSync(); webStatusSync();
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
   const last = S.webmeta.find(d => d.id === "_push");
@@ -2382,6 +2382,18 @@ async function webLoad(quiet) {
 }
 
 // Website orders that fail to load must be visible, or the list silently shows only RS OS orders.
+// Keeps the customer's status on the website matching RS OS Fulfillment status (also fixes orders saved before the mapping).
+let webStatusBusy = false;
+async function webStatusSync() {
+  if (!S.site || webStatusBusy || S.readOnly || !canFul() || !S.web.loaded || !S.loaded.webmeta) return;
+  const todo = webAsOrders().filter(r => { const src = S.web.orders.find(x => x.ref === r.ref), want = WEB_STATUS_OF[r.fulfillment];
+    const m = S.webmeta.find(d => d.id === webMetaId(r.ref));
+    return src && want && m && m.fulfillment && want !== src.status && !/^(shipped|delivered|cancelled)$/i.test(src.status || "") && !/cancel/i.test(src.status || ""); }).slice(0, 10);
+  if (!todo.length) return;
+  webStatusBusy = true;
+  try { for (const r of todo) { const x = await S.site.update(r.ref, { status: WEB_STATUS_OF[r.fulfillment] }).catch(() => null); const i = S.web.orders.findIndex(o => o.ref === r.ref); if (x && x.ok && x.order && i >= 0) { S.web.orders[i] = x.order; S.web.dirty = true; } } }
+  finally { webStatusBusy = false; bgRender(); }
+}
 function webErrNotice() {
   if (!S.site || !S.web.err || S.web.loading) return "";
   return `<div class="notice" style="background:var(--bad-bg, #fde8e8);color:var(--bad)"><span><strong>Website orders didn't load:</strong> ${esc(S.web.err)}${S.web.loaded ? " Showing the last list." : ""}</span><button class="btn sm" type="button" data-act="web-retry">Try again</button></div>`;
@@ -2393,7 +2405,7 @@ function webRows() {
     && (!q || squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(q)));
 }
 // Website orders shown as rows in the one Orders list. Built in memory from the live list, never saved.
-const WEB_FUL = { placed: "to_confirm", confirmed: "unfulfilled", packed: "on_hold", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
+const WEB_FUL = { placed: "to_confirm", confirmed: "unfulfilled", packed: "unfulfilled", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
 let webRowsMemo = { at: null, n: -1, rows: [] };
 function webAsOrders() {
   if (!S.site || !S.web.loaded) return [];
@@ -2418,7 +2430,9 @@ function webAsOrders() {
 }
 // Edits on a website order: payment, status and tracking go to the website; assignee, courier, tags,
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
-const WEB_STATUS_OF = { to_confirm: "Placed", unfulfilled: "Confirmed", on_hold: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
+// RS OS Fulfillment status is the one the team edits; the customer's profile on regalspritz.com shows this status for it.
+const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
+  sorted: "Packed", unfulfilled: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
   const site = {}, keep = {}, msgs = [];
@@ -2428,7 +2442,7 @@ async function webOrderUpdate(o, ch) {
   }
   if ("fulfillment" in ch && ch.fulfillment !== o.fulfillment) {
     keep.fulfillment = ch.fulfillment; msgs.push("Fulfillment Status → " + ful(ch.fulfillment).name);
-    const st = WEB_STATUS_OF[ch.fulfillment] || (STAGE_IDS.has(ch.fulfillment) ? "Confirmed" : ""); if (st && st !== src.status) site.status = st;
+    const st = WEB_STATUS_OF[ch.fulfillment] || ""; if (st && st !== src.status) site.status = st;
   }
   if ("tracking" in ch && String(ch.tracking || "") !== String(src.tracking || "")) { site.tracking = String(ch.tracking || ""); msgs.push("tracking → " + (ch.tracking || "none")); }
   for (const k of ["assignee", "courier", "note"]) if (k in ch && ch[k] !== o[k]) { keep[k] = ch[k]; msgs.push(k === "assignee" ? "assigned to " + (memberName(ch[k]) || "nobody") : k + " updated"); }
@@ -2547,7 +2561,7 @@ function openWebOrder(ref) {
     ${o.note ? `<div class="notice" style="white-space:pre-wrap">${esc(o.note)}</div>` : ""}
     <p style="margin:0;font-size:12.5px;color:var(--muted)">Before shipping, check the amount paid matches <b>${peso(Number(o.due) || o.total)}</b>.</p>
     ${canPay() ? `<div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ${o.paid ? "" : "primary"}" type="button" data-act="web-paid" data-ref="${esc(o.ref)}" data-paid="${o.paid ? "0" : "1"}">${o.paid ? "Mark unpaid" : "Mark paid"}</button></div>` : ""}
-    ${canFul() ? `<div class="field"><label for="web-status">Status</label><select id="web-status">${[...new Set([...WEB_STATUSES, o.status || "Placed"])].map(x => `<option ${x === (o.status || "Placed") ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+    ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${FULFILLMENTS.map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
       <div class="field"><label for="web-track">Tracking number</label><input id="web-track" value="${esc(o.tracking || "")}" autocomplete="off" placeholder="e.g. JT0012345678"></div>
       <div style="display:flex;gap:8px"><button class="btn primary" type="button" data-act="web-save" data-ref="${esc(o.ref)}">Save status</button><button class="btn ghost" type="button" data-act="close">Close</button></div>` : `<button class="btn ghost" type="button" data-act="close">Close</button>`}
     <div class="sheet-err" id="sheet-err" hidden></div>`);
@@ -6070,7 +6084,8 @@ document.addEventListener("click", guard(async ev => {
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
-    case "web-save": return webUpdate(b.dataset.ref, { status: val("web-status"), tracking: val("web-track") }, b);
+    case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
+      await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
     case "refresh": saveNav(); try { sessionStorage.setItem("rs-refresh-y", String(Math.round(window.scrollY))); } catch (e) {} b.classList.add("spin"); location.reload(); return;
     case "log-out": S.unlocked.clear(); saveUnlocked(); S.loggedOut = true; try { localStorage.removeItem("rs-nav"); } catch (e) {} S.view = "home"; render(); toast("Logged out."); return;
     case "log-in": S.loggedOut = false; render(); return;
