@@ -1481,7 +1481,7 @@ const workedMs = r => r && r.in ? Math.max(0, (r.out || Date.now()) - r.in - bre
 function timeNavItem() {
   if (!myMemberId()) return "";
   const r = myAtt(), on = r && r.in && !r.out, brk = on && onBreak(r);
-  const label = !r || !r.in ? "Time in" : r.out ? "Done today" : brk ? "On break" : "Time out";
+  const label = !r || !r.in || canResume(mToday(), myMemberId(), r) ? "Time in" : r.out ? "Done today" : brk ? "On break" : "Time out";
   return `<button type="button" class="tclock${on ? (brk ? " brk" : " on") : ""}" data-act="tclock">${svg("clock")}<span>${label}</span><span class="wt" data-wtime>${r && r.in ? hms(workedMs(r)) : ""}</span></button>`;
 }
 function tickWorkClock() {
@@ -1494,10 +1494,10 @@ setInterval(tickWorkClock, 1000);
 async function tclock() {
   const mid = myMemberId(); if (!mid) return toast("Your account isn't linked to the team directory yet.");
   const r = myAtt();
-  if (!r || !r.in) { await clock(mid, "in"); if (!S.db) render(); return; }
+  if (!r || !r.in || canResume(mToday(), mid, r)) { await clock(mid, "in"); if (!S.db) render(); return; }
   const brk = onBreak(r), done = !!r.out;
   openSheet(`<h3>${done ? "You've timed out" : brk ? "On break" : "You're timed in"}</h3>
-    <div style="display:flex;flex-direction:column;gap:4px"><span class="tc-big" id="tc-live">${hms(workedMs(r))}</span><span class="acct-note">worked today · in at ${mTime(r.in)}${r.out ? " · out at " + mTime(r.out) : ""}${breakMs(r) ? ` · breaks ${fmtMin(breakMs(r))}` : ""}</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px"><span class="tc-big" id="tc-live">${hms(workedMs(r))}</span><span class="acct-note">worked today · in at ${mTime(r.in)}${r.out ? " · out at " + mTime(r.out) : ""}${ownBreakMs(r) ? ` · breaks ${fmtMin(ownBreakMs(r))}` : ""}</span></div>
     ${done ? `<div class="acct-note">See you tomorrow. Ask Admin if this needs a correction.</div>` : ""}
     <div class="sheet-foot">${done ? `<button class="btn primary" type="button" data-act="close">Close</button>` : `<button class="btn" type="button" data-act="close">Close</button><button class="btn" type="button" data-act="tc" data-dir="${brk ? "bend" : "bstart"}">${brk ? "End break" : "Start break"}</button><button class="btn primary" type="button" data-act="tc" data-dir="out">Time out</button>`}</div>`, null);
 }
@@ -2635,6 +2635,8 @@ async function openMemberForm(id) {
     <div class="row">
       <div class="field"><label for="m-status">Status</label><select id="m-status"><option value="active" ${m.status !== "inactive" ? "selected" : ""}>Active</option><option value="inactive" ${m.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
     </div>
+    <div class="field"><label>Work schedule</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">${SCHED_DAYS.map((d, i) => `<div class="field"><label for="m-sch-${i}" style="font-weight:400">${d}</label><input id="m-sch-${i}" value="${esc((schedOf(m) || {})[i] || "")}" placeholder="${schedOf(m) ? "Day off" : "Shared shift"}"></div>`).join("")}</div>
+      <div style="font-size:12px;color:var(--muted)">24-hour times. Split shift: <code>08:00-12:00, 17:00-21:00</code>. Leave a day blank for a day off. Leave all blank to use the shared shift in Attendance settings.</div></div>
     <div style="font-size:12px;color:var(--muted)">Inactive members drop off attendance and can't be assigned new tasks, but their history stays.</div>
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-member" data-id="${id}">Remove from directory</button></div>` : ""}
@@ -2643,6 +2645,9 @@ async function openMemberForm(id) {
     if (!val("m-name")) return sheetError("Enter the full name.");
     const data = { ...(id ? clean(m) : {}), idNumber: val("m-idn"), nickname: val("m-nick"), name: val("m-name"), phone: val("m-phone"), email: val("m-email").toLowerCase(), address: val("m-addr"), department: val("m-dept"), role: val("m-role"), started: val("m-start"), birthday: val("m-bday"), photo: document.getElementById("m-photo").value, status: val("m-status") };
     delete data.contact;
+    data.sched = Object.fromEntries(SCHED_DAYS.map((_, i) => [i, val("m-sch-" + i)]).filter(x => x[1]));
+    const badDay = SCHED_DAYS.find((_, i) => data.sched[i] && !parseBlocks(data.sched[i]).length);
+    if (badDay) return sheetError(`Check the ${badDay} schedule. Use times like 08:00-17:00 or 08:00-12:00, 17:00-21:00.`);
     data.emergency = { name: val("m-ec-name"), relation: val("m-ec-rel"), phone: val("m-ec-phone") };
     if (S.vaultKey && $("#m-g-tin")) { const g = Object.fromEntries(GOV_IDS.map(([k]) => [k, val("m-g-" + k)]).filter(x => x[1])); data.govIds = Object.keys(g).length ? await vEnc(S.vaultKey, JSON.stringify(g)) : null; }
     await save("team", id || uid("m"), data);
@@ -4464,11 +4469,32 @@ const fmtMin = ms => { const m = Math.round(ms / 6e4); return m <= 0 ? "–" : m
 const attId = (date, mid) => date + "_" + mid;
 const attRec = (date, mid) => S.attendance.find(a => a.id === attId(date, mid));
 const isWorkday = d => attCfg().workdays.includes(new Date(d + "T12:00:00+08:00").getDay());
+/* Per-person schedule: member.sched = { 0..6 (0 = Sunday): "08:00-12:00, 17:00-21:00" }. A day left blank is that person's day off.
+   No schedule = the shared shift in Attendance settings. Split days get a second Time in after the first Time out. */
+const SPLIT = "08:00-12:00, 17:00-21:00", FULL = "08:00-17:00";
+const SCHED_DEFAULT = { // Sales schedules from K (2026-10-06), used until a schedule is saved on the person
+  bai: { 1: SPLIT, 3: SPLIT, 5: SPLIT, 2: FULL, 4: FULL, 6: FULL },
+  eve: { 1: FULL, 3: FULL, 5: FULL, 2: SPLIT, 4: SPLIT, 6: SPLIT },
+};
+const SCHED_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const schedOf = m => !m ? null : m.sched && Object.keys(m.sched).length ? m.sched : SCHED_DEFAULT[String(m.nickname || m.name || "").trim().split(/\s+/)[0].toLowerCase()] || null;
+const parseBlocks = s => String(s || "").split(/[,;&]/).map(x => x.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?$/)).filter(Boolean).map(x => [Number(x[1]) * 60 + Number(x[2] || 0), Number(x[3]) * 60 + Number(x[4] || 0)]).filter(([a, z]) => z > a);
+function shiftBlocks(date, mid) {
+  const s = schedOf(member(mid));
+  if (!s) { const c = attCfg(); return isWorkday(date) ? [[toMin(c.start), toMin(c.end)]] : []; }
+  return parseBlocks(s[new Date(date + "T12:00:00+08:00").getDay()]);
+}
+const fmtHM = n => { const h = Math.floor(n / 60), mm = n % 60; return (h % 12 || 12) + (mm ? ":" + String(mm).padStart(2, "0") : "") + (h === 12 && !mm ? "nn" : h < 12 ? "am" : "pm"); };
+const shiftLabel = (date, mid) => { const b = shiftBlocks(date, mid); return b.length ? b.map(([a, z]) => fmtHM(a) + "–" + fmtHM(z)).join(" & ") : "day off"; };
+const shiftStart = (date, mid) => { const b = shiftBlocks(date, mid); return b.length ? b[0][0] : toMin(attCfg().start); };
+// The time between split shifts is saved as a "gap" break: it isn't paid, and it doesn't use up the break allowance.
+const ownBreakMs = r => breakMs(r && r.breaks ? { ...r, breaks: r.breaks.filter(b => !b.gap) } : r);
+const canResume = (date, mid, r) => !!(r && r.in && r.out) && date === mToday() && (r.breaks || []).filter(b => b.gap).length < shiftBlocks(date, mid).length - 1;
 function attStatus(date, mid) {
   const r = attRec(date, mid);
   if (r && r.status && r.status !== "present") return r.status;
-  if (r && r.in) return mMinutes(r.in) > toMin(attCfg().start) + (Number(attCfg().grace) || 0) ? "late" : "present";
-  if (!isWorkday(date)) return "off";
+  if (r && r.in) return mMinutes(r.in) > shiftStart(date, mid) + (Number(attCfg().grace) || 0) ? "late" : "present";
+  if (!shiftBlocks(date, mid).length) return "off";
   if (date < mToday()) return "absent";
   return "notin";
 }
@@ -4479,6 +4505,10 @@ async function clock(mid, dir) {
   const date = mToday(), id = attId(date, mid), r = attRec(date, mid), now = Date.now();
   const by = (member(myMemberId()) || {}).name || (S.me && S.me.name) || "";
   if (dir === "in") {
+    if (canResume(date, mid, r)) {
+      await patch("attendance", id, { breaks: [...(r.breaks || []), { s: r.out, e: now, gap: true }], out: 0, updatedAt: now });
+      toast(`${memberName(mid)} timed in again at ${mTime(now)} for the next shift.`); return;
+    }
     if (r && r.in) { toast(`${memberName(mid)} already timed in at ${mTime(r.in)}.`); return; }
     await save("attendance", id, { ...(r ? clean(r) : {}), date, memberId: mid, in: now, out: 0, status: "present", recordedByName: by, updatedAt: now });
     toast(`${memberName(mid)} timed in at ${mTime(now)}.`);
@@ -4491,14 +4521,14 @@ async function clock(mid, dir) {
     if (!onBreak(r)) return;
     const b = r.breaks.map(x => ({ ...x })); b[b.length - 1].e = now;
     await patch("attendance", id, { breaks: b, updatedAt: now });
-    const used = breakMs({ ...r, breaks: b });
+    const used = ownBreakMs({ ...r, breaks: b });
     toast(`Welcome back! Break today: ${fmtMin(used)}${used > attCfg().breakMin * 6e4 ? ` (over by ${fmtMin(used - attCfg().breakMin * 6e4)})` : ""}.`);
   } else {
     if (!r || !r.in) { toast("Time in first."); return; }
     const upd = { out: now, updatedAt: now };
     if (onBreak(r)) { const b = r.breaks.map(x => ({ ...x })); b[b.length - 1].e = now; upd.breaks = b; }
     await patch("attendance", id, upd);
-    toast(`${memberName(mid)} timed out at ${mTime(now)} · ${fmtHours(hoursOf({ ...r, ...upd }))} worked.`);
+    toast(`${memberName(mid)} timed out at ${mTime(now)} · ${fmtHours(hoursOf({ ...r, ...upd }))} worked${canResume(date, mid, { ...r, ...upd }) ? ". Time in again for the next shift." : "."}`);
   }
 }
 function clockButtons(mid, date) {
@@ -4508,14 +4538,15 @@ function clockButtons(mid, date) {
   if (!r || !r.in) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in</button>`;
   if (!r.out) return onBreak(r) ? `<button class="btn sm primary" type="button" data-clock="bend" data-mid="${mid}">End break</button>`
     : `<button class="btn sm" type="button" data-clock="bstart" data-mid="${mid}">☕ Break</button><button class="btn sm" type="button" data-clock="out" data-mid="${mid}">Time out</button>`;
+  if (canResume(date, mid, r)) return `<button class="btn sm primary" type="button" data-clock="in" data-mid="${mid}">Time in (next shift)</button>`;
   return "";
 }
 function myClockCard() {
   const mid = myMemberId(); if (!mid || !member(mid)) return "";
   const r = attRec(mToday(), mid), st = attStatus(mToday(), mid);
   return `<section class="panel clock-card"><div class="head"><h2>My attendance today</h2><span class="chip ${onBreak(r) ? "warn" : astat(st).cls}">${onBreak(r) ? "On break" : astat(st).name}</span></div>
-    <div class="clock-row"><div><div class="clock-big num" data-live-clock>${mTime(Date.now())}</div><div style="font-size:12px;color:var(--muted)">Manila time · shift ${esc(attCfg().start)}–${esc(attCfg().end)}</div></div>
-    <div style="font-size:13px">${r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))} worked${breakMs(r) ? ` · break ${fmtMin(breakMs(r))} of ${attCfg().breakMin}m` : ""}` : "Not timed in yet"}</div>
+    <div class="clock-row"><div><div class="clock-big num" data-live-clock>${mTime(Date.now())}</div><div style="font-size:12px;color:var(--muted)">Manila time · shift ${esc(shiftLabel(mToday(), mid))}</div></div>
+    <div style="font-size:13px">${r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))} worked${ownBreakMs(r) ? ` · break ${fmtMin(ownBreakMs(r))} of ${attCfg().breakMin}m` : ""}` : "Not timed in yet"}</div>
     <div class="actions">${clockButtons(mid, mToday())}</div></div></section>`;
 }
 setInterval(() => document.querySelectorAll("[data-live-clock]").forEach(e => e.textContent = mTime(Date.now())), 20000);
@@ -4544,11 +4575,11 @@ function viewAttendance() {
       <thead><tr><th>Team member</th><th>Department</th><th>Status</th><th>Time in</th><th>Time out</th><th class="r">Break</th><th class="r">Hours</th><th>Note</th><th></th></tr></thead>
       <tbody>${team.map(m => { const r = attRec(A.date, m.id), st = astat(attStatus(A.date, m.id)); return `<tr data-att="${m.id}">
         <td style="font-weight:600">${esc(m.name)}${m.id === myMemberId() ? ' <span class="chip">You</span>' : ""}</td>
-        <td>${esc((dept(m.department) || { name: "–" }).name)}</td>
+        <td>${esc((dept(m.department) || { name: "–" }).name)}${schedOf(m) ? `<div style="font-size:11px;color:var(--muted)">${esc(shiftLabel(A.date, m.id))}</div>` : ""}</td>
         <td><span class="chip ${st.cls}">${st.name}</span>${onBreak(r) ? ' <span class="chip warn">On break</span>' : ""}</td>
         <td class="num nowrap">${r && r.in ? mTime(r.in) : "–"}</td>
         <td class="num nowrap">${r && r.out ? mTime(r.out) : r && r.in ? '<span style="color:var(--muted)">still in</span>' : "–"}</td>
-        <td class="r num nowrap" data-sort="${Math.round(breakMs(r) / 6e4)}" style="color:${breakMs(r) > attCfg().breakMin * 6e4 ? "var(--warn)" : "inherit"}">${fmtMin(breakMs(r))}${r && r.breaks && r.breaks.length > 1 ? ` <small style="color:var(--muted)">×${r.breaks.length}</small>` : ""}</td>
+        <td class="r num nowrap" data-sort="${Math.round(ownBreakMs(r) / 6e4)}" style="color:${ownBreakMs(r) > attCfg().breakMin * 6e4 ? "var(--warn)" : "inherit"}">${fmtMin(ownBreakMs(r))}${r && r.breaks && r.breaks.filter(b => !b.gap).length > 1 ? ` <small style="color:var(--muted)">×${r.breaks.filter(b => !b.gap).length}</small>` : ""}</td>
         <td class="r num">${fmtHours(hoursOf(r))}</td>
         <td style="max-width:200px;color:var(--muted)">${esc(r && r.note || "")}</td>
         <td class="r nowrap">${clockButtons(m.id, A.date)} ${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-att" data-mid="${m.id}">Edit</button>`}</td></tr>`; }).join("")}</tbody>
@@ -5368,7 +5399,7 @@ function payCalc(m, per) {
   for (let t = new Date(per.start + "T12:00:00+08:00").getTime(); dstr(t) <= per.end; t += 864e5) {
     const d = mDate(t); if (d > mToday()) break;
     const st = attStatus(d, m.id), r = attRec(d, m.id);
-    if (st === "present" || st === "late") { worked++; hours += hoursOf(r); if (st === "late") { late++; lateMin += Math.max(0, mMinutes(r.in) - toMin(attCfg().start)); } }
+    if (st === "present" || st === "late") { worked++; hours += hoursOf(r); if (st === "late") { late++; lateMin += Math.max(0, mMinutes(r.in) - shiftStart(d, m.id)); } }
     if (st === "leave" || st === "sick") leave++;
     if (st === "absent") absent++;
     if (st === "holiday") hol++;
