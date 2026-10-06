@@ -2497,7 +2497,7 @@ async function webLoad(quiet) {
     S.web.orders = r.orders || []; S.web.cancelRequests = Number(r.cancelRequests) || (r.orders || []).filter(o => o.cancel && o.cancel.status === "Pending").length; S.web.at = r.at || new Date().toISOString(); S.web.ms = Date.now() - S.web.t0; S.web.backendMs = Number(r.backendMs) || 0; S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); }
-  webStockSync(); scheduleOwnerSync(); webStatusSync();
+  webStockSync(); scheduleOwnerSync(); webStatusSync(); if (!S.web.err) legacyCancelSync();
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
   const last = S.webmeta.find(d => d.id === "_push");
@@ -3489,6 +3489,25 @@ async function archiveOrder(o, reason, extra = {}) {
   await patch("orders", o.id, upd);
   if (!S.db) { S.orders = S.orders.filter(x => x.id !== o.id); S.archived.push(Object.assign(o, upd)); }
   S.sel.delete(o.id);
+  if (!o.web) legacyWebStatus(o, "Cancelled");
+}
+// Old-shop / RS OS orders also show in the customer's account on regalspritz.com. Archiving one marks it Cancelled there too.
+const legacyRef = o => { const n = String(o.num || "").replace(/^#/, "").trim(); return /^RS\d+$/i.test(n) ? n.toUpperCase() : ""; };
+async function legacyWebStatus(o, status) {
+  const ref = legacyRef(o); if (!S.site || !ref || S.readOnly) return false;
+  try {
+    const r = await S.site.update(ref, { status });
+    await patch("orders", o.id, r && r.ok ? { webStatusSent: status, webStatusAt: Date.now(), webStatusErr: "" } : { webStatusErr: String((r && r.error) || "no answer").slice(0, 120), webStatusAt: Date.now() });
+    return !!(r && r.ok);
+  } catch (e) { return false; }
+}
+// Once per session: archived orders the website still shows as open get marked Cancelled (each tried once a day at most).
+let legacySyncDone = false;
+async function legacyCancelSync() {
+  if (legacySyncDone || !S.site || S.readOnly || !canAll() || !S.loaded.orders) return; legacySyncDone = true;
+  const todo = S.archived.filter(o => !o.web && legacyRef(o) && o.webStatusSent !== "Cancelled" && Date.now() - (o.webStatusAt || 0) > 864e5).slice(0, 40);
+  let ok = 0; for (const o of todo) if (await legacyWebStatus(o, "Cancelled")) ok++;
+  if (ok) toast(`${ok} archived order${ok === 1 ? "" : "s"} now show as Cancelled on the website.`);
 }
 async function restoreOrder(o) {
   const pv = o.archivedPrev || {};
