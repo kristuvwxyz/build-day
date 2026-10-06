@@ -3335,14 +3335,15 @@ function viewOrders() {
   if (S.page >= pages) S.page = pages - 1;
   const rows = all.slice(S.page * PAGE, S.page * PAGE + PAGE);
   for (const id of [...S.sel]) if (!allOrderRows().some(o => o.id === id)) S.sel.delete(id);
+  // In the order the team works: payment → tag → merge → fulfillment → archive / clear. J&T booking sits at the far right.
   const bulk = S.sel.size && (canPay() || canShip()) ? `<div class="bulk"><strong>${S.sel.size} selected</strong>
       ${canPay() ? `<select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
+      ${canAll() ? `<input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
+      <button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>` : ""}
       ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
-      ${canShip() ? `<button class="btn sm" type="button" data-act="jnt-file">J&T booking file</button>` : ""}
-      ${canAll() ? `<button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>
-      <input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
-      <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
-      <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
+      ${canAll() ? `<button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
+      <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
+      ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
   const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT;
   const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or archived"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Archived <span style="color:var(--muted)">${S.archived.length}</span></button>` : ""}</div>` : "";
   if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
