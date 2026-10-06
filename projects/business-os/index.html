@@ -2310,7 +2310,8 @@ async function webLoad(quiet) {
   if (!S.site || webBusy || !canOrders()) return;
   webBusy = true; S.web.loading = true; if (!quiet) paintWebState();
   try {
-    const r = await S.site.list({ limit: 300 });
+    let r = await S.site.list({ limit: 300 });
+    if (!r || !r.ok) { await new Promise(res => setTimeout(res, 2000)); r = await S.site.list({ limit: 300 }); }
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't answer.");
     const seen = S.web.loaded ? new Set(S.web.orders.map(o => o.ref)) : null, fresh = seen ? (r.orders || []).filter(o => !seen.has(o.ref)) : [];
     if (fresh.length) toast(fresh.length === 1 ? `New website order ${fresh[0].ref}${fresh[0].name ? " from " + fresh[0].name : ""}` : `${fresh.length} new website orders`);
@@ -2324,6 +2325,11 @@ async function webLoad(quiet) {
   if (S.loaded.products && S.loaded.webmeta && S.products.length && !autoPushT && !webPushBusy && Date.now() - webPushFailAt > 30 * 60e3 && (!last || Date.now() - (last.at || 0) > 6 * 3600e3)) scheduleWebPush(true);
 }
 
+// Website orders that fail to load must be visible, or the list silently shows only RS OS orders.
+function webErrNotice() {
+  if (!S.site || !S.web.err || S.web.loading) return "";
+  return `<div class="notice" style="background:var(--bad-bg, #fde8e8);color:var(--bad)"><span><strong>Website orders didn't load:</strong> ${esc(S.web.err)}${S.web.loaded ? " Showing the last list." : ""}</span><button class="btn sm" type="button" data-act="web-retry">Try again</button></div>`;
+}
 function paintWebState() { const el = $("#web-state"); if (el) el.textContent = S.web.loading ? "Updating…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) : ""; }
 function webRows() {
   const q = squash(S.wf.q || "").replace(/^rs/, ""), f = S.wf.f;
@@ -3090,7 +3096,7 @@ function viewOrders() {
       <input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
-  return `
+  return `${webErrNotice()}
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${ctxDept() === "CEO" ? statsStrip() : ""}
   ${ctxDept() === "PACKING" ? packTools() : ""}
@@ -5931,6 +5937,7 @@ document.addEventListener("click", guard(async ev => {
     case "import": return openImport();
     case "edit-items": return openItemsEdit(id);
     case "columns": return openColumns(b.dataset.table);
+    case "web-retry": S.web.err = ""; render(); await webLoad(true); return;
     case "col-up": case "col-down": { const r = b.closest(".colrow"); if (b.dataset.act === "col-up" && r.previousElementSibling) r.parentNode.insertBefore(r, r.previousElementSibling); if (b.dataset.act === "col-down" && r.nextElementSibling) r.parentNode.insertBefore(r.nextElementSibling, r); return; }
     case "col-reset": { const pr = colPref(b.dataset.table); if (pr) await remove("colprefs", pr.id); closeSheet(); toast("Columns reset to default."); return; }
     case "merge": return openMerge();
