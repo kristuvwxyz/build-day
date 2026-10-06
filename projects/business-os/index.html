@@ -216,6 +216,7 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
 .it-list { position: absolute; z-index: 30; left: 0; width: max(100%, 420px); max-width: calc(100vw - 32px); top: calc(100% + 4px); max-height: 280px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 4px; }
 .it-list button { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 10px; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 7px; font: inherit; color: inherit; cursor: pointer; }
 .it-list button:hover, .it-list button.on { background: var(--surface-2); } .it-list small { color: var(--muted); white-space: nowrap; flex: none; } .it-list .out small { color: var(--bad); }
+.it-list button small small, .it-list span small { margin-left: 6px; }
 .it-list .none { padding: 8px 10px; color: var(--muted); font-size: 13px; }
 .item-row select, .item-row input { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px; width: 100%; min-width: 0; }
 .total-line { display: flex; justify-content: space-between; font-weight: 700; padding-top: 8px; border-top: 1px solid var(--line); }
@@ -763,6 +764,9 @@ main > .gs.mobile-only { margin-bottom: 12px; }
   .cal-h { padding: 4px; font-size: 10px; text-align: center; }
 }
 @media (prefers-reduced-motion: no-preference) { .nav button, .btn { transition: background .15s, color .15s, border-color .15s; } }
+/* One dropdown arrow app-wide (filters, forms, strips, table pills). */
+select:not([multiple]) { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23857a83' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: right 11px center !important; background-size: 11px 8px !important; padding-right: 30px !important; }
+select.status:not([multiple]), select.lcell:not([multiple]) { background-position: right 7px center !important; background-size: 9px 6px !important; padding-right: 22px !important; }
 </style>
 
 <div class="app">
@@ -1048,7 +1052,8 @@ async function adjustStock(productId, delta) {
   if (!p) return;
   const next = (Number(p.stock) || 0) + delta;
   p.stock = next;
-  await patch("products", productId, { stock: next });
+  // Stock changes from orders (sold, cancelled, restocked) go to regalspritz.com too, so sold-out items come off the site.
+  await patch("products", productId, { stock: next, webSync: "pending" });
 }
 
 /* Reserved stock: units in checked-out orders that haven't shipped yet.
@@ -1685,7 +1690,7 @@ function viewEom() {
       <ul style="margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px">${cfg.rewards.split("\n").filter(Boolean).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
       ${ceo && S.canEdit ? `<form id="eom-cfg" style="display:flex;flex-direction:column;gap:10px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
         <div class="row">${EOM_CRIT.map(c => `<div class="field"><label for="ew-${c.k}">${c.name.split(" (")[0]} (points)</label><input id="ew-${c.k}" type="number" min="0" max="100" value="${cfg.weights[c.k]}"></div>`).join("")}</div>
-        <div class="row"><div class="field"><label for="ew-bonus">Winner cash bonus (₱)</label><input id="ew-bonus" type="number" min="0" step="100" value="${cfg.bonus}"></div><div class="field"><label for="ew-pbonus">Perfect attendance draw (₱)</label><input id="ew-pbonus" type="number" min="0" step="50" value="${cfg.perfectBonus}"></div></div>
+        <div class="row"><div class="field"><label for="ew-bonus">Winner cash bonus (₱)</label><input inputmode="decimal" class="money" id="ew-bonus" value="${moneyFmt(cfg.bonus)}"></div><div class="field"><label for="ew-pbonus">Perfect attendance draw (₱)</label><input inputmode="decimal" class="money" id="ew-pbonus" value="${moneyFmt(cfg.perfectBonus)}"></div></div>
         <div style="font-size:12px;color:var(--muted)">Monthly budget: ${peso(EOM_BUDGET)}. The two cash prizes together can't go over it.</div>
         <div class="field"><label for="ew-rewards">Rewards (one per line)</label><textarea id="ew-rewards" rows="5">${esc(cfg.rewards)}</textarea></div>
         <div><button class="btn primary sm" type="submit">Save criteria and rewards</button></div></form>` : ""}
@@ -3792,7 +3797,8 @@ function openSheet(html, onSubmit) {
 }
 function closeSheet() {
   const sh0 = $("#sheet"); if (sh0) sh0.classList.remove("wide"); $("#scrim").hidden = true; $("#sheet").innerHTML = ""; sheetSubmit = null; S.sheetStack = []; S.sheetCur = null; render(); }
-const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+const val = id => { const el = document.getElementById(id); return el ? (el.classList.contains("money") ? el.value.replace(/,/g, "") : el.value).trim() : ""; };
+const mnum = el => Number(String((el && el.value) || "").replace(/,/g, "")) || 0;
 const numv = id => Number(val(id).replace(/,/g, "")) || 0;
 // Peso amounts in inputs show thousands commas (10,500). numv and the Listings table strip them when saving.
 const moneyFmt = v => v === "" || v == null || isNaN(Number(v)) ? "" : Number(v).toLocaleString("en-PH", { maximumFractionDigits: 2 });
@@ -3814,7 +3820,7 @@ function productOptions(sel) {
 const prodLabel = p => [p.brand, p.name, p.size].filter(Boolean).join(" ");
 function itemRow(i = {}) {
   const p0 = i.productId && S.products.find(x => x.id === i.productId);
-  return `<div class="item-row"><div class="it-pick"><input type="hidden" class="it-p" value="${p0 ? p0.id : ""}"><input class="it-s" type="search" placeholder="Type product name…" autocomplete="off" aria-label="Product" value="${p0 ? esc(prodLabel(p0)) : ""}"><div class="it-list" hidden></div></div><input class="it-q num" type="number" min="1" step="1" value="${i.qty || 1}" aria-label="Quantity"><input class="it-price num" type="number" min="0" step="0.01" value="${i.price ?? ""}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="rm-item" aria-label="Remove item">×</button></div>`;
+  return `<div class="item-row"><div class="it-pick"><input type="hidden" class="it-p" value="${p0 ? p0.id : ""}"><input class="it-s" type="search" placeholder="Type product name…" autocomplete="off" aria-label="Product" value="${p0 ? esc(prodLabel(p0)) : ""}"><div class="it-list" hidden></div></div><input class="it-q num" type="number" min="1" step="1" value="${i.qty || 1}" aria-label="Quantity"><input inputmode="decimal" class="money it-price num" value="${moneyFmt(i.price ?? "")}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="rm-item" aria-label="Remove item">×</button></div>`;
 }
 function itemSearch(inp) {
   const box = inp.parentElement, list = box.querySelector(".it-list"), q = squash(inp.value || "");
@@ -3827,27 +3833,43 @@ function itemSearch(inp) {
     return `<button type="button" data-pick="${p.id}" class="${k ? "" : "on"}${!pre && n <= 0 ? " out" : ""}"><span>${esc(prodLabel(p))}</span><small>${pre ? "Pre-order" : n + " left"} · ${peso(p.price)}</small></button>`; }).join("") : `<div class="none">No product matches “${esc(inp.value)}”.</div>`;
   list.hidden = false;
 }
+// Customer name: matching past customers (name, phone, email) appear as you type; picking one fills name and phone.
+function custSearch(inp) {
+  const list = inp.parentElement.querySelector(".it-list"), words = (inp.value || "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) { list.hidden = true; return; }
+  const hits = customerList().filter(c => c.name).map(c => [c, [c.name, c.phone, c.email].join(" ").toLowerCase()]).filter(([, t]) => words.every(w => t.includes(w)))
+    .sort((a, b) => (b[0].last || 0) - (a[0].last || 0)).slice(0, 12);
+  if (!hits.length) { list.hidden = true; return; }
+  list.innerHTML = hits.map(([c], k) => { const n = (c.orderIds || []).length + ((c.base && c.base.orders) || 0);
+    return `<button type="button" data-cpick="${esc(c.name)}" data-cphone="${esc(c.phone || "")}" class="${k ? "" : "on"}"><span>${esc(c.name)}${c.phone ? ` <small>${esc(c.phone)}</small>` : ""}</span><small>${n ? n.toLocaleString("en-PH") + (n > 1 ? " orders" : " order") : ""}${c.last ? " · last " + esc(fmtDate(dstr(c.last))) : ""}</small></button>`; }).join("");
+  list.hidden = false;
+}
+function custPick(btn) {
+  const box = btn.closest(".it-pick"); box.querySelector(".cu-s").value = btn.dataset.cpick; box.querySelector(".it-list").hidden = true;
+  const ph = document.getElementById("o-phone"); if (ph && !ph.value && btn.dataset.cphone) ph.value = btn.dataset.cphone;
+}
 function itemPick(btn) {
   const box = btn.closest(".it-pick"), p = S.products.find(x => x.id === btn.dataset.pick); if (!p) return;
   const hid = box.querySelector(".it-p"); hid.value = p.id; box.querySelector(".it-s").value = prodLabel(p); box.querySelector(".it-list").hidden = true;
   hid.dispatchEvent(new Event("change", { bubbles: true }));
 }
-document.addEventListener("input", e => { if (e.target.matches && e.target.matches(".it-s")) itemSearch(e.target); });
+document.addEventListener("input", e => { if (!e.target.matches) return; if (e.target.matches(".it-s")) itemSearch(e.target); else if (e.target.matches(".cu-s")) custSearch(e.target); });
 document.addEventListener("keydown", e => {
-  if (!e.target.matches || !e.target.matches(".it-s")) return;
+  if (!e.target.matches || !e.target.matches(".it-s, .cu-s")) return;
   const list = e.target.parentElement.querySelector(".it-list"), bs = [...list.querySelectorAll("button")], cur = bs.findIndex(b => b.classList.contains("on"));
   if (e.key === "Escape") { list.hidden = true; return; }
   if (list.hidden || !bs.length) return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const n = Math.max(0, Math.min(bs.length - 1, cur + (e.key === "ArrowDown" ? 1 : -1))); bs.forEach(b => b.classList.remove("on")); bs[n].classList.add("on"); bs[n].scrollIntoView({ block: "nearest" }); }
-  if (e.key === "Enter") { e.preventDefault(); itemPick(bs[Math.max(0, cur)]); }
+  if (e.key === "Enter") { e.preventDefault(); const b = bs[Math.max(0, cur)]; b.dataset.cpick !== undefined ? custPick(b) : itemPick(b); }
 });
 document.addEventListener("click", e => {
   const b = e.target.closest && e.target.closest(".it-list [data-pick]"); if (b) { itemPick(b); return; }
+  const cb = e.target.closest && e.target.closest(".it-list [data-cpick]"); if (cb) { custPick(cb); return; }
   document.querySelectorAll(".it-list:not([hidden])").forEach(l => { if (!l.parentElement.contains(e.target)) l.hidden = true; });
 }, true);
 function updateOrderTotal() {
   let t = 0;
-  document.querySelectorAll("#sheet .item-row").forEach(r => { t += (Number(r.querySelector(".it-q").value) || 0) * (Number(r.querySelector(".it-price").value) || 0); });
+  document.querySelectorAll("#sheet .item-row").forEach(r => { t += (Number(r.querySelector(".it-q").value) || 0) * mnum(r.querySelector(".it-price")); });
   const el = $("#order-total"); if (el) el.textContent = peso2(t);
 }
 
@@ -3855,20 +3877,19 @@ function openOrderForm() {
   if (!S.products.length) { toast("Add your products first in Packing → Inventory, then create orders."); S.view = "dept"; S.dept = "PACKING"; S.tab = "inventory"; render(); return; }
   const num = nextNum();
   openSheet(`
-    <h3>Create order #${num}</h3>
+    <h3>${S.db && !S.loaded.orders ? `Create order <small style="font-size:13px;color:var(--muted);font-weight:500">· the order # is given when you save</small>` : `Create order #${num}`}</h3>
     <div class="row">
       <div class="field"><label for="o-date">Date</label><input id="o-date" type="date" value="${today()}"></div>
       <div class="field"><label for="o-platform">Channel</label><select id="o-platform">${opts(PLATFORMS)}</select></div>
     </div>
     <div class="row">
-      <div class="field"><label for="o-customer">Customer name</label><input id="o-customer" autocomplete="off" list="cust-list"><datalist id="cust-list">${customerList().map(c => `<option value="${esc(c.name)}"></option>`).join("")}</datalist></div>
-      <div class="field"><label for="o-ref">Platform order # (optional)</label><input id="o-ref" autocomplete="off" placeholder="Shopee / TikTok ref"></div>
+      <div class="field"><label for="o-customer">Customer name</label><div class="it-pick cu-pick"><input id="o-customer" class="cu-s" type="search" autocomplete="off" placeholder="Type a name — past customers show up"><div class="it-list" hidden></div></div></div>
+      <div class="field"><label for="o-phone">Phone or handle (optional)</label><input id="o-phone" autocomplete="off"></div>
     </div>
-    <div class="field"><label for="o-phone">Phone or handle (optional)</label><input id="o-phone" autocomplete="off"></div>
     <div class="field"><label>Items</label><div id="items" style="display:flex;flex-direction:column;gap:6px">${itemRow()}</div><button class="btn sm" type="button" data-act="add-item" style="align-self:flex-start;margin-top:4px">+ Add item</button></div>
     <div class="row">
-      <div class="field"><label for="o-fees">Platform fees (₱)</label><input id="o-fees" type="number" min="0" step="0.01" placeholder="0"></div>
-      <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input id="o-ship" type="number" min="0" step="0.01" placeholder="0"></div>
+      <div class="field"><label for="o-fees">Platform fees (₱)</label><input inputmode="decimal" class="money" id="o-fees" placeholder="0"></div>
+      <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input inputmode="decimal" class="money" id="o-ship" placeholder="0"></div>
     </div>
     <div class="row">
       <div class="field"><label for="o-pay">Payment status</label><select id="o-pay">${opts(PAYMENTS.filter(p => !VOIDPAY.has(p.id)), "pending")}</select></div>
@@ -3876,6 +3897,7 @@ function openOrderForm() {
     </div>
     ${tagField([])}
     <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2"></textarea></div>
+    <div class="field"><label for="o-ref">Platform order # (optional)</label><input id="o-ref" autocomplete="off" placeholder="Shopee / TikTok ref"></div>
     <div class="total-line"><span>Order total</span><span id="order-total" class="num">₱0.00</span></div>
     <div style="font-size:12px;color:var(--muted)">Saving deducts these quantities from inventory.</div>
     <div id="sheet-err" class="confirm" hidden></div>
@@ -3886,7 +3908,7 @@ function openOrderForm() {
       const pid = r.querySelector(".it-p").value, qty = Number(r.querySelector(".it-q").value) || 0;
       if (!pid || qty <= 0) return;
       const p = S.products.find(x => x.id === pid);
-      const price = r.querySelector(".it-price").value === "" ? Number(p.price) || 0 : Number(r.querySelector(".it-price").value) || 0;
+      const price = r.querySelector(".it-price").value === "" ? Number(p.price) || 0 : mnum(r.querySelector(".it-price"));
       items.push({ productId: pid, name: p.name, sku: p.sku || "", qty, price, cost: Number(p.cost) || 0 });
     });
     if (!items.length) return sheetError("Add at least one product with a quantity.");
@@ -3897,9 +3919,10 @@ function openOrderForm() {
     if (S.site && S.site.nextNumber && !(rsv && rsv.ok && /^RS\d+$/.test(rsv.ref || ""))) return sheetError((rsv && rsv.error) || "Couldn't get the next RS number. Try again.");
     const fnum = (rsv && rsv.ref) || num;
     const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: val("o-customer"), ref: val("o-ref"), phone: val("o-phone"), items, fees: numv("o-fees"), shipping: numv("o-ship"), adjust: 0, payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
+    const take = isCancelled(order.payment, fulfillment) ? {} : stockTake(items);
+    order.stockTaken = take;
     await save("orders", uid("o"), order);
-    const qtyBy = {}; items.forEach(i => qtyBy[i.productId] = (qtyBy[i.productId] || 0) + i.qty);
-    for (const [pid, q] of Object.entries(qtyBy)) await adjustStock(pid, -q);
+    await applyStockMap(take, -1);
     closeSheet(); toast(`Order #${fnum} saved. Inventory updated.`);
   });
 }
@@ -3954,14 +3977,14 @@ function openOrderDetails(id) {
 }
 
 /* ---------- internal order edit: items, prices, discount ---------- */
-const editItemRow = (i = {}) => `<div class="ei-row" ${i.from ? `data-from="${esc(i.from)}"` : ""}><input class="ei-name" list="ei-products" value="${esc(i.name || "")}" placeholder="Item name" aria-label="Item"><input class="ei-q num" type="number" min="0" step="1" value="${i.qty ?? 1}" aria-label="Qty"><input class="ei-p num" type="number" min="0" step="0.01" value="${i.price ?? ""}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="ei-rm" aria-label="Remove item">×</button></div>`;
+const editItemRow = (i = {}) => `<div class="ei-row" ${i.from ? `data-from="${esc(i.from)}"` : ""}><input class="ei-name" list="ei-products" value="${esc(i.name || "")}" placeholder="Item name" aria-label="Item"><input class="ei-q num" type="number" min="0" step="1" value="${i.qty ?? 1}" aria-label="Qty"><input inputmode="decimal" class="money ei-p num" value="${moneyFmt(i.price ?? "")}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="ei-rm" aria-label="Remove item">×</button></div>`;
 function eiRead() {
   const items = [];
   document.querySelectorAll("#sheet .ei-row").forEach(r => {
     const name = r.querySelector(".ei-name").value.trim(), qty = Number(r.querySelector(".ei-q").value) || 0;
     if (!name || qty <= 0) return;
     const p = S.products.find(x => (x.name || "").toLowerCase() === name.toLowerCase());
-    const pv = r.querySelector(".ei-p").value;
+    const pv = r.querySelector(".ei-p").value.replace(/,/g, "");
     items.push({ ...(r.dataset.from ? { from: r.dataset.from } : {}), productId: p ? p.id : "", name, sku: p ? p.sku || "" : "", qty, price: pv === "" ? (p ? Number(p.price) || 0 : 0) : Number(pv) || 0, cost: p ? Number(p.cost) || 0 : 0 });
   });
   return items;
@@ -3982,8 +4005,8 @@ function openItemsEdit(id) {
     <div class="field"><label>Items <span style="font-weight:400;color:var(--muted)">(name · qty · unit price)</span></label><div id="ei-items" style="display:flex;flex-direction:column;gap:6px">${(o.items || []).map(editItemRow).join("") || editItemRow()}</div>
       <button class="btn sm" type="button" data-act="ei-add" style="align-self:flex-start;margin-top:4px">+ Add item</button></div>
     <div class="row">
-      <div class="field"><label for="ei-adj">Shipping fee & other charges (₱)</label><input id="ei-adj" type="number" step="0.01" value="${Number(o.adjust) || ""}" placeholder="0"></div>
-      <div class="field"><label for="ei-disc">Discount</label><div style="display:flex;gap:6px"><input id="ei-disc" type="number" min="0" step="0.01" value="${Number(o.discount) || ""}" placeholder="0" style="flex:1;min-width:0"><select id="ei-dtype" aria-label="Discount type" style="width:auto"><option value="amt">₱</option><option value="pct">%</option></select></div><span id="ei-dshow" style="font-size:12px;color:var(--muted)"></span></div>
+      <div class="field"><label for="ei-adj">Shipping fee & other charges (₱)</label><input inputmode="decimal" class="money" id="ei-adj" value="${moneyFmt(Number(o.adjust) || "")}" placeholder="0"></div>
+      <div class="field"><label for="ei-disc">Discount</label><div style="display:flex;gap:6px"><input inputmode="decimal" class="money" id="ei-disc" value="${moneyFmt(Number(o.discount) || "")}" placeholder="0" style="flex:1;min-width:0"><select id="ei-dtype" aria-label="Discount type" style="width:auto"><option value="amt">₱</option><option value="pct">%</option></select></div><span id="ei-dshow" style="font-size:12px;color:var(--muted)"></span></div>
     </div>
     <div class="field"><label for="ei-dnote">Discount reason (optional)</label><input id="ei-dnote" value="${esc(o.discountNote || "")}" placeholder="e.g. loyal buyer, promo code"></div>
     <div class="total-line"><span>New order total</span><span id="ei-total" class="num">${peso2(total(o))}</span></div>
@@ -4100,9 +4123,9 @@ function openProductForm(id, preset = {}) {
       <div style="display:flex;flex-direction:column;gap:6px"><label class="btn sm" for="p-photo-file" style="cursor:pointer">Upload photo</label><input id="p-photo-file" type="file" accept="image/*" hidden>
         ${p.photo ? `<button class="btn sm ghost" type="button" data-act="p-photo-clear">Remove photo</button>` : ""}<input type="hidden" id="p-photo" value="${esc(p.photo || "")}"></div>
     </div>
+    <div class="field"><label for="p-brand">Brand</label><input id="p-brand" list="p-brand-list" value="${esc(p.brand || "")}" placeholder="Pick or type a brand" autocomplete="off"><datalist id="p-brand-list">${listOptions("brand").sort((a, b) => a.localeCompare(b)).map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
     <div class="field"><label for="p-name">Product name</label><input id="p-name" value="${esc(p.name || "")}" placeholder="e.g. Carolina Herrera Good Girl EDP 80ml"></div>
     <div class="row">
-      <div class="field"><label for="p-brand">Brand</label><input id="p-brand" list="p-brand-list" value="${esc(p.brand || "")}" placeholder="Pick or type a brand" autocomplete="off"><datalist id="p-brand-list">${listOptions("brand").sort((a, b) => a.localeCompare(b)).map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
       ${id ? "" : `<div class="field"><label for="p-size">Size</label><input id="p-size" list="p-size-list" value="${esc(p.size || "")}" placeholder="Pick or type, e.g. 100ml" autocomplete="off"><datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist></div>`}
       ${id ? "" : `<div class="field"><label for="p-type">Type</label><select id="p-type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>`}
     </div>
@@ -4193,7 +4216,7 @@ function viewListings() {
       <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}</select>
       <select data-lbulk="eta" aria-label="Set ETA"><option value="">Set ETA (pre-orders)…</option>${MONTHS.map(m => o(m, m)).join("")}</select>
       <select data-lbulk="status" aria-label="Set status"><option value="">Set status…</option>${Object.entries(LIST_STATUS).map(([k, st]) => o(k, k === "hidden" ? "Inactive" : st.name)).join("")}</select>
-      <input class="lb-num" id="lb-price" type="number" min="0" placeholder="SRP" aria-label="New SRP"><input class="lb-num" id="lb-compare" type="number" min="0" placeholder="Compare" aria-label="New compare-at price"><input class="lb-num" id="lb-cost" type="number" min="0" placeholder="Cost" aria-label="New cost">
+      <input inputmode="decimal" class="money lb-num" id="lb-price" placeholder="SRP" aria-label="New SRP"><input inputmode="decimal" class="money lb-num" id="lb-compare" placeholder="Compare" aria-label="New compare-at price"><input inputmode="decimal" class="money lb-num" id="lb-cost" placeholder="Cost" aria-label="New cost">
       <button class="btn sm" type="button" data-act="lb-prices">Apply prices</button>
       <span id="lb-del-slot"><button class="btn sm danger" type="button" data-act="lb-ask-del">Delete…</button></span>
       <button class="btn ghost sm" type="button" data-act="lb-clear">Clear selection</button></div>`; })() : ""}
@@ -4503,7 +4526,7 @@ function openExpenseForm(id) {
     <h3>${id ? "Edit expense" : "Add expense"}</h3>
     <div class="row">
       <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" value="${esc(e.date || today())}"></div>
-      <div class="field"><label for="e-amt">Amount (₱)</label><input id="e-amt" type="number" min="0" step="0.01" value="${e.amount ?? ""}"></div>
+      <div class="field"><label for="e-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="e-amt" value="${moneyFmt(e.amount ?? "")}"></div>
     </div>
     <div class="field"><label for="e-cat">Category</label><select id="e-cat">${EXP_CATS.map(c => `<option ${e.category === c ? "selected" : ""}>${c}</option>`).join("")}</select></div>
     <div class="field"><label for="e-note">Note</label><input id="e-note" value="${esc(e.note || "")}" placeholder="e.g. 500 amber bottles"></div>
@@ -5031,11 +5054,11 @@ function openInvForm(id, kind) {
     ${loan ? "" : `<div class="row"><div class="field"><label for="v-code">INV code</label><input id="v-code" value="${esc(v.code ?? (id ? "" : nextCode()))}"></div><div class="field"><label for="v-fb">FB account</label><input id="v-fb" value="${esc(v.fb || "")}"></div></div>`}
     <div class="field"><label for="v-name">${loan ? "Loan name" : "Investor's name"}</label><input id="v-name" value="${esc(v.name || "")}"></div>
     <div class="row">
-      <div class="field"><label for="v-amt">Amount (₱)</label><input id="v-amt" type="number" min="0" step="0.01" value="${v.amount ?? ""}"></div>
-      <div class="field"><label for="v-rate">% interest / month</label><input id="v-rate" type="number" min="0" step="0.01" value="${v.rate ?? ""}"></div>
+      <div class="field"><label for="v-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="v-amt" value="${moneyFmt(v.amount ?? "")}"></div>
+      <div class="field"><label for="v-rate">% interest / month</label><input inputmode="decimal" class="money" id="v-rate" value="${moneyFmt(v.rate ?? "")}"></div>
     </div>
     <div class="row">
-      <div class="field"><label for="v-mo">${loan ? "Monthly payment" : "Interest / month"} (leave blank to calculate)</label><input id="v-mo" type="number" min="0" step="0.01" value="${v.monthlyOverride ?? ""}" placeholder="Auto"></div>
+      <div class="field"><label for="v-mo">${loan ? "Monthly payment" : "Interest / month"} (leave blank to calculate)</label><input inputmode="decimal" class="money" id="v-mo" value="${moneyFmt(v.monthlyOverride ?? "")}" placeholder="Auto"></div>
       <div class="field"><label for="v-months">Duration (months)</label><input id="v-months" type="number" min="0" step="1" value="${v.months ?? ""}"></div>
     </div>
     <div class="row">
@@ -5226,7 +5249,7 @@ function openInvoiceForm(id, kind) {
     : `<div class="row"><div class="field"><label for="iv-sup">Supplier</label><input id="iv-sup" list="iv-sups" value="${esc(x.supplier || "")}" placeholder="e.g. S-JEFF" autocomplete="off"><datalist id="iv-sups">${supplierNames().map(n => `<option value="${esc(n)}">`).join("")}</datalist></div>
       <div class="field"><label for="iv-no">Invoice #</label><input id="iv-no" value="${esc(x.invNo || "")}"></div></div>
       <div class="field"><label for="iv-orders">Orders covered <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input id="iv-orders" value="${esc(x.orders || "")}" placeholder="#RS9991, #RS9990"></div>`}
-    <div class="row"><div class="field"><label for="iv-amt">Amount (₱)</label><input id="iv-amt" type="number" step="0.01" min="0" value="${esc(x.amount ?? "")}"></div>
+    <div class="row"><div class="field"><label for="iv-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="iv-amt" value="${moneyFmt(x.amount ?? "")}"></div>
       <div class="field"><label for="iv-due">${req ? "Needed by" : "Due date"}</label><input id="iv-due" type="date" value="${esc(x.dueDate || "")}"></div></div>
     ${req ? "" : `<div class="field"><label for="iv-date">Invoice date</label><input id="iv-date" type="date" value="${esc(x.invDate || "")}"></div>`}
     <div class="field"><label>Status</label><div class="seg" role="group">${Object.entries(INV_STATUS).map(([k, v]) => `<button type="button" data-ivst="${k}" aria-pressed="${(x.status || "topay") === k}">${v.name}</button>`).join("")}</div><input type="hidden" id="iv-st" value="${esc(x.status || "topay")}"></div>
@@ -5308,7 +5331,7 @@ function openFixedForm(id) {
   const x = id ? S.fixedexp.find(r => r.id === id) : {};
   openSheet(`<h3>${id ? "Edit expense line" : "Add expense line"}</h3>
     <div class="field"><label for="fx-desc">Description</label><input id="fx-desc" value="${esc(x.desc || "")}" placeholder="e.g. Bill - Water"></div>
-    <div class="row"><div class="field"><label for="fx-amt">Amount per month (₱)</label><input id="fx-amt" type="number" step="0.01" min="0" value="${esc(x.amount ?? "")}"></div>
+    <div class="row"><div class="field"><label for="fx-amt">Amount per month (₱)</label><input inputmode="decimal" class="money" id="fx-amt" value="${moneyFmt(x.amount ?? "")}"></div>
       <div class="field"><label for="fx-notes">Notes</label><input id="fx-notes" value="${esc(x.notes || "")}" placeholder="monthly, yearly / 12 mos."></div></div>
     <div class="field"><label for="fx-bd">Breakdown (optional, one per line)</label><textarea id="fx-bd" rows="3">${esc(x.breakdown || "")}</textarea></div>
     <div id="sheet-err" class="confirm" hidden></div>
@@ -5347,7 +5370,7 @@ function openDueForm(id) {
     <div class="row"><div class="field"><label for="du-name">Name</label><input id="du-name" value="${esc(d.name || "")}" placeholder="e.g. Lorelie Tacio, BPI credit card"></div>
       <div class="field"><label for="du-kind">Type</label><select id="du-kind">${DUE_KINDS.map(([k, l]) => `<option value="${k}" ${d.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>
     <div class="row"><div class="field"><label for="du-day">Day of the month</label><input id="du-day" type="number" min="1" max="31" value="${esc(d.day ?? 15)}"></div>
-      <div class="field"><label for="du-amt">Amount (₱)</label><input id="du-amt" type="number" step="0.01" min="0" value="${esc(d.amount ?? "")}"></div></div>
+      <div class="field"><label for="du-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="du-amt" value="${moneyFmt(d.amount ?? "")}"></div></div>
     <div class="row"><div class="field"><label for="du-method">Paid via / bank</label><input id="du-method" value="${esc(d.method || "")}" placeholder="Maribank, BPI QR code"></div>
       <div class="field"><label for="du-acct">Account (last 4 digits)</label><input id="du-acct" inputmode="numeric" maxlength="4" value="${esc(d.account || "")}"></div></div>
     <div class="row"><div class="field"><label for="du-holder">Holder</label><input id="du-holder" value="${esc(d.holder || "")}"></div>
@@ -5395,7 +5418,7 @@ function openCheckForm(id, date) {
     <div class="row"><div class="field"><label for="ck-no">Check no.</label><input id="ck-no" value="${esc(c.checkNo || "")}"></div>
       <div class="field"><label for="ck-date">Check date</label><input id="ck-date" type="date" value="${esc(c.checkDate || "")}"></div></div>
     <div class="row"><div class="field"><label for="ck-payee">Payee</label><input id="ck-payee" value="${esc(c.payee || "")}"></div>
-      <div class="field"><label for="ck-amt">Amount (₱)</label><input id="ck-amt" type="number" step="0.01" min="0" value="${esc(c.amount ?? "")}"></div></div>
+      <div class="field"><label for="ck-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="ck-amt" value="${moneyFmt(c.amount ?? "")}"></div></div>
     <div class="row"><div class="field"><label for="ck-bank">Bank / account</label><input id="ck-bank" value="${esc(c.bank || "")}"></div>
       <div class="field"><label for="ck-issued">Date issued</label><input id="ck-issued" type="date" value="${esc(c.issued || "")}"></div></div>
     <div class="row"><div class="field"><label for="ck-purpose">Purpose</label><input id="ck-purpose" value="${esc(c.purpose || "")}" placeholder="e.g. Rent, supplier, investor"></div>
@@ -5452,8 +5475,8 @@ function openPayRecForm(docId, i) {
       <div class="field"><label for="pr-name">Name</label><input id="pr-name" list="pr-names" value="${esc(r.name || "")}"><datalist id="pr-names">${S.team.map(m => `<option value="${esc(m.name)}">`).join("")}</datalist></div></div>
     <div class="row"><div class="field"><label for="pr-pos">Position</label><input id="pr-pos" value="${esc(r.position || "")}"></div>
       <div class="field"><label for="pr-id">ID</label><input id="pr-id" value="${esc(r.idNumber || "")}"></div></div>
-    <div class="row"><div class="field"><label for="pr-rate">Daily rate (₱)</label><input id="pr-rate" type="number" value="${esc(r.rate ?? "")}"></div>
-      <div class="field"><label for="pr-net">Net pay (₱)</label><input id="pr-net" type="number" step="0.01" value="${esc(r.net ?? "")}"></div></div>
+    <div class="row"><div class="field"><label for="pr-rate">Daily rate (₱)</label><input inputmode="decimal" class="money" id="pr-rate" value="${moneyFmt(r.rate ?? "")}"></div>
+      <div class="field"><label for="pr-net">Net pay (₱)</label><input inputmode="decimal" class="money" id="pr-net" value="${moneyFmt(r.net ?? "")}"></div></div>
     <div class="field"><label for="pr-note">Note</label><input id="pr-note" value="${esc(r.note || "")}" placeholder="e.g. Leave"></div>
     <div id="sheet-err" class="confirm" hidden></div>
     ${docId ? `<div><button class="btn danger sm" type="button" data-act="del-pr" data-id="${docId}" data-i="${i}">Delete record</button></div>` : ""}
@@ -5512,7 +5535,7 @@ function openBirForm(docId, i) {
     <div class="field"><label for="bi-item">Description</label><input id="bi-item" value="${esc(r.item || "")}"></div>
     <div class="row"><div class="field"><label for="bi-qty">Qty</label><input id="bi-qty" value="${esc(r.qty || "")}"></div>
       <div class="field"><label for="bi-mop">MOP</label><input id="bi-mop" list="bi-mops" value="${esc(r.mop || "")}"><datalist id="bi-mops"><option value="BPI"><option value="BDO"><option value="Gcash"><option value="Maya"><option value="Cash"></datalist></div>
-      <div class="field"><label for="bi-amt">Amount (₱)</label><input id="bi-amt" type="number" step="0.01" value="${esc(r.amount ?? "")}"></div></div>
+      <div class="field"><label for="bi-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="bi-amt" value="${moneyFmt(r.amount ?? "")}"></div></div>
     <div id="sheet-err" class="confirm" hidden></div>
     ${editing ? `<div><button class="btn danger sm" type="button" data-act="del-bir" data-id="${docId}" data-i="${i}">Delete line</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -5540,7 +5563,7 @@ function openBirTaxForm(id) {
   const t = id ? S.birtax.find(x => x.id === id) : { quarter: QUARTER(mToday().slice(0, 7)) };
   openSheet(`<h3>${id ? "Edit BIR tax payment" : "Add BIR tax payment"}</h3>
     <div class="row"><div class="field"><label for="bt-q">Quarter</label><input id="bt-q" value="${esc(t.quarter || "")}" placeholder="2026 Q2"></div>
-      <div class="field"><label for="bt-amt">Amount paid (₱)</label><input id="bt-amt" type="number" step="0.01" value="${esc(t.amount ?? "")}"></div></div>
+      <div class="field"><label for="bt-amt">Amount paid (₱)</label><input inputmode="decimal" class="money" id="bt-amt" value="${moneyFmt(t.amount ?? "")}"></div></div>
     <div class="row"><div class="field"><label for="bt-date">Paid on</label><input id="bt-date" type="date" value="${esc(t.paidOn || "")}"></div>
       <div class="field"><label for="bt-form">Form / reference</label><input id="bt-form" value="${esc(t.ref || "")}" placeholder="e.g. 2551Q"></div></div>
     <div class="field"><label for="bt-notes">Notes</label><input id="bt-notes" value="${esc(t.notes || "")}"></div>
@@ -5786,7 +5809,7 @@ function payslipHTML(c, per) {
 function openPayslip(mid) {
   const m = member(mid); if (!m) return;
   const per = payPeriod(), c = payCalc(m, per), ro = S.readOnly;
-  const num = (k, n) => `<div class="field"><label for="ps-${k}">${n}</label><input id="ps-${k}" type="number" min="0" step="0.01" value="${c.rec[k] || ""}" placeholder="0" ${ro ? "disabled" : ""}></div>`;
+  const num = (k, n) => `<div class="field"><label for="ps-${k}">${n}</label><input inputmode="decimal" class="money" id="ps-${k}" value="${moneyFmt(c.rec[k] || "")}" placeholder="0" ${ro ? "disabled" : ""}></div>`;
   openSheet(`
     <h3>Payslip · ${esc(m.nickname || m.name)}</h3>
     <div style="color:var(--muted);font-size:13px">${esc(m.name)}${m.idNumber ? " · ID " + esc(m.idNumber) : ""} · ${esc(positionOf(m) || "No position")} · ${esc(per.label)}</div>
@@ -6319,7 +6342,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "pack-filter") { S.packF = t.value; render(); return; }
   if (t.id === "of-view") { S.of.view = t.value; S.page = 0; render(); }
   if (t.id === "of-range") { S.of.range = t.value; render(); }
-  if (t.matches(".it-p")) { const p = S.products.find(x => x.id === t.value); const pr = t.closest(".item-row").querySelector(".it-price"); if (p) pr.value = p.price ?? ""; updateOrderTotal(); }
+  if (t.matches(".it-p")) { const p = S.products.find(x => x.id === t.value); const pr = t.closest(".item-row").querySelector(".it-price"); if (p) pr.value = moneyFmt(p.price ?? ""); updateOrderTotal(); }
 }));
 
 document.addEventListener("input", ev => {
