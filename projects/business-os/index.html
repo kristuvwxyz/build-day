@@ -6690,7 +6690,9 @@ async function photoCopyRun() {
   if (photoCopyBusy || !S.photos || !S.db || S.readOnly || S.viewAs || !canAll() || !S.loaded.products) return;
   const todo = S.products.filter(p => galListingImgs(p).some(u => !OWN_PHOTO.test(u) && !(p.photoGone || []).includes(u)));
   if (!todo.length) return;
-  photoCopyBusy = true; let done = 0, n = 0;
+  photoCopyBusy = true; let done = 0, n = 0, failed = 0, lastError = "";
+  const report = extra => wdb().collection("config").doc("photoCopy").set({ at: Date.now(), by: actor(), listingsLeft: todo.length - done, copied: n, failed, lastError, ...(extra || {}) }).catch(() => {});
+  await report({ startedAt: Date.now() });
   try {
     for (const p0 of todo) {
       const p = S.products.find(x => x.id === p0.id); if (!p) continue;
@@ -6698,13 +6700,17 @@ async function photoCopyRun() {
       for (const u of list) {
         if (OWN_PHOTO.test(u) || gone.includes(u)) { out.push(u); continue; }
         const r = await S.photos.save(String(u).startsWith("data:") ? { data: u } : { url: u }).catch(() => null);
-        if (r && r.ok && r.url) { out.push(r.url); changed = true; n++; } else { out.push(u); if (r && r.gone) { gone.push(u); changed = true; } }
+        if (r && r.ok && r.url) { out.push(r.url); changed = true; n++; }
+        else { out.push(u); failed++; lastError = String((r && r.error) || "no answer from /api/photo").slice(0, 200); if (r && r.gone) { gone.push(u); changed = true; }
+          if (failed === 1 && !n) toast("Photo copy problem: " + lastError); }
       }
       if (changed) { const cur = S.products.find(x => x.id === p.id); if (!cur) continue;
         await patch("products", p.id, { photo: out[0] || "", imgs: out.filter(u => !String(u).startsWith("data:")), photoGone: gone, photoSrc: (cur.photoSrc && cur.photoSrc.length ? cur.photoSrc : list.filter(u => !String(u).startsWith("data:"))), webSync: "pending" }); }
       done++;
-      if (done % 10 === 0) toast(`Saving our own copy of listing photos: ${done} of ${todo.length} listings…`);
+      if (done % 10 === 0) { toast(`Saving our own copy of listing photos: ${done} of ${todo.length} listings…`); report(); }
+      if (failed >= 20 && !n) { report({ stoppedAt: Date.now() }); return; } // nothing works yet: stop and keep the error for us to see
     }
+    await report({ doneAt: Date.now() });
     if (n) toast(`${n.toLocaleString("en-PH")} listing photos now saved in RS OS. The website gets the new links automatically.`);
   } finally { photoCopyBusy = false; }
 }
