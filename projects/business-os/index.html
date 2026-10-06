@@ -3898,10 +3898,12 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
-  const all = S.products;
+  const all = S.products, lb = S.lbrand || "", lc = S.lcat || "";
+  const brands = [...new Set(all.map(p => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(p => p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
   const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
   const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? p.kind !== "preorder" && (Number(p.stock) || 0) <= 0 : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
+    && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc)
     && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta].join(" ").toLowerCase().includes(q)))
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
   const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
@@ -3912,7 +3914,9 @@ function viewListings() {
   return `${webPushErr && counts.pending ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending} change${counts.pending === 1 ? "" : "s"} couldn’t reach <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet (${esc(webPushErr)}). RS OS keeps trying on its own.</span></div>` : ""}
     <div class="bigsearch">${svg("search")}<input id="liq" type="search" placeholder="Search name, brand, SKU, barcode or ETA" value="${esc(S.liq || "")}" aria-label="Search listings" autocomplete="off"></div>
     <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
-      ${f !== "all" || q ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}</div>
+      <select id="l-brand" aria-label="Filter by brand"><option value="">All brands</option>${brands.map(b => `<option ${b === lb ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
+      <select id="l-cat" aria-label="Filter by collection"><option value="">All collections</option>${WEB_CATS.map(([k, l]) => `<option value="${k}" ${k === lc ? "selected" : ""}>${l}</option>`).join("")}</select>
+      ${f !== "all" || q || lb || lc ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}</div>
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
     <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th></th>${th("name", "Product")}${th("size", "Size")}${th("type", "Type")}${th("cat", "Collection")}${th("kind", "On hand / Pre-order")}${th("eta", "ETA")}${th("price", "Price", "r")}${th("stock", "Stock", "r")}${th("status", "Status")}${th("web", "Website")}</tr></thead>
     <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}">
@@ -5853,7 +5857,7 @@ document.addEventListener("click", guard(async ev => {
     case "gal-use": await galUse(b.dataset.h, Number(b.dataset.k)); return;
     case "shop-find-open": await openShopFound(b.dataset.num); return;
     case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
-    case "l-clear": S.lfilter = "all"; S.liq = ""; S.lpage = 0; render(); return;
+    case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
     case "web-save": return webUpdate(b.dataset.ref, { status: val("web-status"), tracking: val("web-track") }, b);
@@ -5896,6 +5900,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset && t.dataset.spitem != null) { const a = S.spAgg && S.spAgg.get(t.dataset.spitem); if (a) a.ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if ((t.id === "sp-bulk-ful" || t.id === "sp-bulk-pay") && t.value) return bulkAction((t.id === "sp-bulk-pay" ? "pay:" : "ful:") + t.value);
   if (t.id === "inv-sup") { S.invF.sup = t.value; render(); return; }
+  if (t.id === "l-brand" || t.id === "l-cat") { S[t.id === "l-brand" ? "lbrand" : "lcat"] = t.value; S.lpage = 0; render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
   if (t.id === "p-photo-file" && t.files[0]) { try { const d = await resizeImage(t.files[0], 600, false); $("#p-photo").value = d; $("#p-photo-prev").innerHTML = `<img src="${d}" alt="">`; } catch (e) { sheetError(e.message); } return; }
