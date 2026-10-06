@@ -1034,6 +1034,13 @@ function reservedMap() {
   resvCache = { ref: S.orders, n, map: m }; return m;
 }
 const reservedOf = p => p && p.kind !== "preorder" ? (reservedMap()[p.id] || 0) : 0;
+// Committed = units held by open, unshipped orders: RS OS orders + website orders whose stock was taken off.
+function committedOf(p) {
+  if (!p || p.kind === "preorder") return 0;
+  let n = reservedOf(p);
+  for (const o of (S.web && S.web.orders) || []) { if (webDone(o)) continue; const m = S.webmeta.find(d => d.id === webMetaId(o.ref)); if (m && m.stock === "taken" && m.stockMap) n += Number(m.stockMap[p.id]) || 0; }
+  return n;
+}
 
 /* Applies a payment/fulfillment/tag/note change and keeps stock + timestamps right. */
 async function updateOrder(o, ch) {
@@ -2933,8 +2940,8 @@ const ORDER_COLS = {
 const TABLE_COLS = {
   orders: { all: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
-  listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r" }, compare: { label: "Compare at", cls: "r" }, cost: { label: "Cost", cls: "r" }, stock: { label: "Stock", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
-    all: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "status", "web"], show: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "status", "web"] },
+  listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r" }, compare: { label: "Compare at", cls: "r" }, cost: { label: "Cost", cls: "r" }, stock: { label: "In stock", cls: "r" }, committed: { label: "Committed", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
+    all: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"], show: ["size", "type", "cat", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"] },
   packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
 // Listings columns are saved per person; order tables per department.
@@ -3971,7 +3978,7 @@ function openProductForm(id, preset = {}) {
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, compare: p => Number(p.compareAt) || 0, cost: p => Number(p.cost) || 0, stock: p => Number(p.stock) || 0, status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
+const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, compare: p => Number(p.compareAt) || 0, cost: p => Number(p.cost) || 0, stock: p => Number(p.stock) || 0, committed: p => committedOf(p), status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products, lb = S.lbrand || "", lc = S.lcat || "";
@@ -4008,7 +4015,8 @@ function viewListings() {
         price: () => `<td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="price" data-id="${p.id}" value="${p.price ?? ""}" aria-label="SRP" style="width:80px;text-align:right">` : peso(p.price)}</td>`,
         compare: () => `<td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="compareAt" data-id="${p.id}" value="${p.compareAt ?? ""}" placeholder="–" aria-label="Compare-at price" style="width:80px;text-align:right">` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
         cost: () => `<td class="r num nowrap">${can ? `<span style="color:var(--muted)">₱</span><input class="lcell num" type="number" min="0" step="1" data-lset="cost" data-id="${p.id}" value="${p.cost ?? ""}" placeholder="–" aria-label="Cost" style="width:80px;text-align:right">` : p.cost ? peso(p.cost) : "–"}</td>`,
-        stock: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>${reservedOf(p) ? `<div style="font-size:11px;color:var(--muted)">+${reservedOf(p)} reserved</div>` : ""}`}</td>`,
+        stock: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>`,
+        committed: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : (() => { const c = committedOf(p); return c ? `<b>${c}</b>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
         web: () => `<td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : `<span style="color:var(--muted);font-size:12px">On site</span>`}</td>`
       })[k]()).join("")}</tr>`; }).join("")}</tbody></table>
