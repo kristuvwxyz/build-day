@@ -239,6 +239,13 @@
         // Notes and accords from a Fragrantica page (our /api/fragrantica server route).
         fragrantica: async url => { const { data: { session } } = await sb.auth.getSession(); const r = await fetch("/api/fragrantica", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (session && session.access_token) }, body: JSON.stringify({ url }) }); const j = await r.json().catch(() => ({})); if (!r.ok && !j.error) j.error = "Fragrantica request failed (" + r.status + ")"; return j; } };
     },
+    // Listing photos saved in our own storage (our /api/photo server route): save({ url }) copies one from the web, save({ data }) stores an upload.
+    async photos() {
+      const { sb } = await ready;
+      return { save: async src => { const { data: { session } } = await sb.auth.getSession();
+        const r = await fetch("/api/photo", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (session && session.access_token) }, body: JSON.stringify(src || {}) });
+        const j = await r.json().catch(() => ({})); if (!r.ok && !j.error) j.error = "Photo request failed (" + r.status + ")"; return j; } };
+    },
     async mcp() {
       const { sb } = await ready;
       const callTool = async (server, tool, input) => {
