@@ -3729,11 +3729,12 @@ async function jntDownload() {
   const bad = J.rows.filter(r => !(r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== ""));
   if (bad.length) return sheetError(`${bad.length} order${bad.length === 1 ? "" : "s"} still need${bad.length === 1 ? "s" : ""} details: ${bad.slice(0, 6).map(r => r.num).join(", ")}${bad.length > 6 ? "…" : ""}`);
   let X; try { X = await loadXLSX(); } catch (e) { return sheetError(e.message); }
-  const blank = () => Array(13).fill("");
-  const aoa = [blank(), blank(), ["", "", "PH GLOBAL JET EXPRESS INC.", ...Array(10).fill("")], blank(), blank(), ["V20200721", "", "", "", "ORDER LIST", ...Array(8).fill("")], ["(*) Information that must be filled out", ...Array(12).fill("")], JNT_HEAD,
-    ...J.rows.map(r => [r.name, r.phone, r.addr, r.prov, r.city, r.brgy, J.express, J.parcel, Number(r.weight || J.weight) || 0.5, Number(r.parcels) || 1, Number(r.value) || 0, Number(r.cod) || 0, r.remarks])];
+  // Empty cells stay truly empty (null), and text goes in Excel's shared-string table (bookSST) like J&T's own template: J&T's upload reads only that, so plain text cells came through blank.
+  const blank = () => Array(13).fill(null);
+  const aoa = [blank(), blank(), [null, null, "PH GLOBAL JET EXPRESS INC.", ...Array(10).fill(null)], blank(), blank(), ["V20200721", null, null, null, "ORDER LIST", ...Array(8).fill(null)], ["(*) Information that must be filled out", ...Array(12).fill(null)], JNT_HEAD,
+    ...J.rows.map(r => [r.name, r.phone, r.addr, r.prov, r.city, r.brgy, J.express, J.parcel, Number(r.weight || J.weight) || 0.5, Number(r.parcels) || 1, Number(r.value) || 0, Number(r.cod) || 0, r.remarks || null])];
   const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), "List");
-  const data = X.write(wb, { bookType: "biff8", type: "array" });
+  const data = X.write(wb, { bookType: "biff8", type: "array", bookSST: true });
   const filename = `JNT_BOOKING_${mToday()}.xls`;
   if (!S.dl) return sheetError("Downloads aren't available in this view. Open the app in claude.ai.");
   try { await S.dl.save({ filename, data: new Uint8Array(data) }); closeSheet(); toast(`${filename} ready · ${J.rows.length} parcel${J.rows.length === 1 ? "" : "s"}. Upload it in J&T VIP → Batch order.`); }
@@ -6556,7 +6557,7 @@ document.addEventListener("change", guard(async ev => {
   }
   if (t.id === "sp-ful") { S.sp.ful = t.value; render(); return; }
   if (t.id === "sp-pay") { S.sp.pay = t.value; render(); return; }
-  if (t.classList.contains("jnt-f")) { jntField(t); return; }
+  if (t.classList.contains("jnt-f")) { jntField(t, t.tagName === "INPUT"); return; } // text boxes update in place: redrawing here would swap out the box being clicked into next
   if (t.id === "of-ful") { S.of.ful = t.value; S.page = 0; render(); return; }
   if (t.id === "bk-file" && t.files[0]) { const f = t.files[0]; t.value = ""; return importBackup(f); }
   if (t.id === "dev-viewas" || t.id === "viewas-pick") { try { t.value ? sessionStorage.setItem("rs-viewas", t.value) : sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return; }
