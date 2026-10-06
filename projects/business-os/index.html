@@ -189,6 +189,7 @@ h2 { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: u
 .toolbar input, .toolbar select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
 /* Filter dropdowns: one chevron style, sized to the chosen option (fitSelects) so the arrow sits right after the text. */
 .toolbar select { -webkit-appearance: none; appearance: none; padding-right: 30px; max-width: 100%; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23857a83' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 11px 8px; }
+body .field select, body .item-row select { -webkit-appearance: none; appearance: none; padding-right: 30px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23857a83' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 11px 8px; }
 .toolbar input { flex: 1 1 200px; }
 
 .table-wrap, .strip, .tabs, .team-strip, .supbar { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
@@ -211,6 +212,11 @@ select.status { border: 1px solid var(--line); background: var(--surface); borde
 .field input, .field select, .field textarea { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px 10px; width: 100%; }
 .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .item-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 92px 32px; gap: 6px; align-items: end; }
+.it-pick { position: relative; min-width: 0; }
+.it-list { position: absolute; z-index: 30; left: 0; width: max(100%, 420px); max-width: calc(100vw - 32px); top: calc(100% + 4px); max-height: 280px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 4px; }
+.it-list button { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 10px; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 7px; font: inherit; color: inherit; cursor: pointer; }
+.it-list button:hover, .it-list button.on { background: var(--surface-2); } .it-list small { color: var(--muted); white-space: nowrap; flex: none; } .it-list .out small { color: var(--bad); }
+.it-list .none { padding: 8px 10px; color: var(--muted); font-size: 13px; }
 .item-row select, .item-row input { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px; width: 100%; min-width: 0; }
 .total-line { display: flex; justify-content: space-between; font-weight: 700; padding-top: 8px; border-top: 1px solid var(--line); }
 .sheet-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: auto; padding-top: 8px; }
@@ -3804,9 +3810,41 @@ function tagField(tags) {
 function productOptions(sel) {
   return `<option value="">Choose product…</option>` + [...S.products].sort((a, b) => (a.name || "").localeCompare(b.name || "")).map(p => `<option value="${p.id}" ${sel === p.id ? "selected" : ""}>${esc(p.name)} (${Number(p.stock) || 0} left)</option>`).join("");
 }
+// Product picker: type a few letters, matching products appear (not one long dropdown).
+const prodLabel = p => [p.brand, p.name, p.size].filter(Boolean).join(" ");
 function itemRow(i = {}) {
-  return `<div class="item-row"><select class="it-p" aria-label="Product">${productOptions(i.productId)}</select><input class="it-q num" type="number" min="1" step="1" value="${i.qty || 1}" aria-label="Quantity"><input class="it-price num" type="number" min="0" step="0.01" value="${i.price ?? ""}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="rm-item" aria-label="Remove item">×</button></div>`;
+  const p0 = i.productId && S.products.find(x => x.id === i.productId);
+  return `<div class="item-row"><div class="it-pick"><input type="hidden" class="it-p" value="${p0 ? p0.id : ""}"><input class="it-s" type="search" placeholder="Type product name…" autocomplete="off" aria-label="Product" value="${p0 ? esc(prodLabel(p0)) : ""}"><div class="it-list" hidden></div></div><input class="it-q num" type="number" min="1" step="1" value="${i.qty || 1}" aria-label="Quantity"><input class="it-price num" type="number" min="0" step="0.01" value="${i.price ?? ""}" placeholder="Price" aria-label="Unit price"><button class="btn ghost sm" type="button" data-act="rm-item" aria-label="Remove item">×</button></div>`;
 }
+function itemSearch(inp) {
+  const box = inp.parentElement, list = box.querySelector(".it-list"), q = squash(inp.value || "");
+  box.querySelector(".it-p").value = "";
+  if (!q) { list.hidden = true; return; }
+  const words = (inp.value || "").toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = S.products.filter(p => p.status !== "draft").map(p => [p, (prodLabel(p) + " " + (p.sku || "")).toLowerCase()]).filter(([, t]) => words.every(w => t.includes(w)))
+    .sort((a, b) => ((Number(b[0].stock) || 0) > 0) - ((Number(a[0].stock) || 0) > 0) || prodLabel(a[0]).localeCompare(prodLabel(b[0]))).slice(0, 40);
+  list.innerHTML = hits.length ? hits.map(([p], k) => { const n = Number(p.stock) || 0, pre = p.kind === "preorder";
+    return `<button type="button" data-pick="${p.id}" class="${k ? "" : "on"}${!pre && n <= 0 ? " out" : ""}"><span>${esc(prodLabel(p))}</span><small>${pre ? "Pre-order" : n + " left"} · ${peso(p.price)}</small></button>`; }).join("") : `<div class="none">No product matches “${esc(inp.value)}”.</div>`;
+  list.hidden = false;
+}
+function itemPick(btn) {
+  const box = btn.closest(".it-pick"), p = S.products.find(x => x.id === btn.dataset.pick); if (!p) return;
+  const hid = box.querySelector(".it-p"); hid.value = p.id; box.querySelector(".it-s").value = prodLabel(p); box.querySelector(".it-list").hidden = true;
+  hid.dispatchEvent(new Event("change", { bubbles: true }));
+}
+document.addEventListener("input", e => { if (e.target.matches && e.target.matches(".it-s")) itemSearch(e.target); });
+document.addEventListener("keydown", e => {
+  if (!e.target.matches || !e.target.matches(".it-s")) return;
+  const list = e.target.parentElement.querySelector(".it-list"), bs = [...list.querySelectorAll("button")], cur = bs.findIndex(b => b.classList.contains("on"));
+  if (e.key === "Escape") { list.hidden = true; return; }
+  if (list.hidden || !bs.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const n = Math.max(0, Math.min(bs.length - 1, cur + (e.key === "ArrowDown" ? 1 : -1))); bs.forEach(b => b.classList.remove("on")); bs[n].classList.add("on"); bs[n].scrollIntoView({ block: "nearest" }); }
+  if (e.key === "Enter") { e.preventDefault(); itemPick(bs[Math.max(0, cur)]); }
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest(".it-list [data-pick]"); if (b) { itemPick(b); return; }
+  document.querySelectorAll(".it-list:not([hidden])").forEach(l => { if (!l.parentElement.contains(e.target)) l.hidden = true; });
+}, true);
 function updateOrderTotal() {
   let t = 0;
   document.querySelectorAll("#sheet .item-row").forEach(r => { t += (Number(r.querySelector(".it-q").value) || 0) * (Number(r.querySelector(".it-price").value) || 0); });
