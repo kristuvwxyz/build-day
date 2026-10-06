@@ -456,6 +456,12 @@ body.has-pomo #view { padding-bottom: 64px; }
 .tpill.s-cancelled .tt { text-decoration: line-through; color: var(--muted); }
 .tpill.overdue { box-shadow: inset 0 0 0 1px var(--bad); }
 .tpill .ini { flex: none; font-size: 9.5px; font-weight: 800; background: var(--surface); border-radius: 999px; padding: 0 4px; color: var(--muted); }
+.tboard { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.tcol { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.tcol-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 700; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.tcol-h span { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.tcol .tpill { font-size: 12.5px; padding: 4px 6px; }
+.tgrp td { background: var(--surface-2); font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .03em; }
 .cal-more { font-size: 11px; color: var(--muted); padding-left: 4px; }
 .cal-dots { display: none; gap: 3px; }
 .cal-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
@@ -904,7 +910,7 @@ const S = {
   of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
   page: 0, sel: new Set(),
   pq: "", cq: "", cpage: 0,
-  t: { scope: "team", person: "", dept: "", mode: "calendar", month: today().slice(0, 7), day: today() },
+  t: { scope: "team", person: "", dept: "", mode: "calendar", range: "month", month: today().slice(0, 7), day: today() },
   slide: 0, slidePaused: false,
   unlocked: new Set(),
   accessreq: [], db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
@@ -2049,10 +2055,38 @@ function viewTasks(forceDept) {
     <span style="flex:1"></span>
     <div class="seg" role="group" aria-label="Layout">${[["calendar", "Calendar"], ["list", "List"]].map(([k, l]) => `<button type="button" data-tmode="${k}" aria-pressed="${S.t.mode === k}">${l}</button>`).join("")}</div>
   </div>`;
-  const monthNav = `<div class="head"><div class="pager"><button class="btn sm" type="button" data-tmonth="-1" aria-label="Previous month">‹</button><strong style="min-width:150px;text-align:center">${monthLabel(ym)}</strong><button class="btn sm" type="button" data-tmonth="1" aria-label="Next month">›</button><button class="btn ghost sm" type="button" data-tmonth="0">Today</button></div></div>`;
+  const isToday = S.t.range === "today";
+  const rangeSeg = `<div class="seg" role="group" aria-label="Range">${[["month", "Month"], ["today", "Today"]].map(([k, l]) => `<button type="button" data-trange="${k}" aria-pressed="${(S.t.range || "month") === k}">${l}</button>`).join("")}</div>`;
+  const monthNav = `<div class="head">${isToday ? `<strong>${longDate(today())}</strong>` : `<div class="pager"><button class="btn sm" type="button" data-tmonth="-1" aria-label="Previous month">‹</button><strong style="min-width:150px;text-align:center">${monthLabel(ym)}</strong><button class="btn sm" type="button" data-tmonth="1" aria-label="Next month">›</button><button class="btn ghost sm" type="button" data-tmonth="0">This month</button></div>`}${rangeSeg}</div>`;
+  // Today view: tasks due today (or spanning today) plus overdue ones not yet done, grouped by person or department.
+  const todayTasks = isToday ? scoped.filter(t => (onDay(t, today()) || isOverdue(t)) && t.status !== "cancelled") : [];
+  const groupBy = forceDept ? "person" : S.t.scope === "person" && S.t.person ? "" : S.t.scope === "dept" && !S.t.dept ? "dept" : "person";
+  const todayGroups = () => {
+    const g = new Map();
+    if (groupBy === "person") for (const m of (forceDept ? activeTeam().filter(m => m.department === forceDept) : S.t.scope === "dept" && S.t.dept ? activeTeam().filter(m => m.department === S.t.dept) : taskTeam())) g.set(m.id, []);
+    if (groupBy === "dept") for (const d of DEPTS.filter(d => taskDepts().includes(d.id))) g.set(d.id, []);
+    const ord = t => [t.status === "done" ? 2 : isOverdue(t) ? 0 : 1, t.due || ""];
+    for (const t of todayTasks) { const k = groupBy === "dept" ? t.department || "" : groupBy === "person" ? t.assigneeId || "" : "all"; if (!g.has(k)) g.set(k, []); g.get(k).push(t); }
+    return [...g.entries()].map(([k, ts]) => ({ k, ts: ts.sort((a, b) => { const x = ord(a), y = ord(b); return x[0] - y[0] || x[1].localeCompare(y[1]); }), name: groupBy === "dept" ? (dept(k) || { name: "No department" }).name : groupBy === "person" ? memberName(k) : "" }))
+      .filter(r => r.ts.length || groupBy === "person").sort((a, b) => (b.ts.filter(t => t.status !== "done").length - a.ts.filter(t => t.status !== "done").length) || a.name.localeCompare(b.name));
+  };
+  const openCount = ts => ts.filter(t => t.status !== "done").length;
 
   let main;
-  if (S.t.mode === "calendar") {
+  if (isToday) {
+    const groups = todayGroups(), nOver = todayTasks.filter(isOverdue).length;
+    const note = `<div style="font-size:12px;color:var(--muted)">Due today plus ${nOver ? `<b style="color:var(--bad)">${nOver} overdue</b>` : "overdue"} tasks that aren't done yet.</div>`;
+    if (S.t.mode === "calendar") {
+      main = groupBy ? `<div class="tboard">${groups.map(r => `<div class="tcol"><div class="tcol-h">${esc(r.name)}<span>${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? ` · ${r.ts.length - openCount(r.ts)} done` : ""}</span></div>${r.ts.length ? r.ts.map(taskPill).join("") : `<div style="font-size:12px;color:var(--muted)">Nothing today</div>`}</div>`).join("")}</div>`
+        : `<div class="tboard"><div class="tcol">${todayTasks.length ? groups[0].ts.map(taskPill).join("") : `<div style="font-size:12px;color:var(--muted)">Nothing today</div>`}</div></div>`;
+    } else {
+      const rows = groupBy ? groups.filter(r => r.ts.length).map(r => `<tr class="tgrp"><td colspan="6">${esc(r.name)} · ${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? `, ${r.ts.length - openCount(r.ts)} done` : ""}</td></tr>${r.ts.map(taskRow).join("")}`).join("") : (groups[0] ? groups[0].ts.map(taskRow).join("") : "");
+      main = `<div class="table-wrap"><table>
+      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody></table>${todayTasks.length ? "" : `<div class="empty" style="padding:16px">No tasks for today.</div>`}</div>`;
+    }
+    main = note + main;
+  } else if (S.t.mode === "calendar") {
     const [y, m] = ym.split("-").map(Number);
     const first = new Date(y, m - 1, 1), dim = new Date(y, m, 0).getDate();
     const weeks = Math.ceil((first.getDay() + dim) / 7);
@@ -2084,13 +2118,13 @@ function viewTasks(forceDept) {
       <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
       <tbody>${sorted.map(taskRow).join("")}</tbody></table>${sorted.length ? "" : `<div class="empty" style="padding:16px">No tasks due in ${monthLabel(ym)}.</div>`}</div>`;
   }
-  const extra = forceDept ? workload(monthTasks, "person")
+  const extra = isToday ? "" : forceDept ? workload(monthTasks, "person")
     : S.t.scope === "team" ? workload(monthTasks, "person")
     : S.t.scope === "dept" && !S.t.dept ? workload(monthTasks, "dept")
     : S.t.scope === "dept" ? workload(monthTasks, "person") : "";
   const noTeam = !S.team.length ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span>Add your team in <strong>Admin → Team</strong> so you can assign tasks to people.</span></div>` : "";
-  return `${noTeam}${forceDept && forceDept !== "FINANCE" ? "" : duesAlert()}${taskSummary(monthTasks, `${monthLabel(ym)} · ${esc(scopeName)}`)}${controls}${monthNav}${main}
-    ${undated.length ? `<section class="panel"><h2>No due date</h2><div class="table-wrap" style="border:0"><table><tbody>${undated.map(taskRow).join("")}</tbody></table></div></section>` : ""}
+  return `${noTeam}${forceDept && forceDept !== "FINANCE" ? "" : duesAlert()}${isToday ? taskSummary(todayTasks, `Today · ${esc(scopeName)}`) : taskSummary(monthTasks, `${monthLabel(ym)} · ${esc(scopeName)}`)}${controls}${monthNav}${main}
+    ${undated.length && !isToday ? `<section class="panel"><h2>No due date</h2><div class="table-wrap" style="border:0"><table><tbody>${undated.map(taskRow).join("")}</tbody></table></div></section>` : ""}
     ${extra}`;
 }
 
@@ -5631,6 +5665,8 @@ document.addEventListener("click", guard(async ev => {
   if (tsc) { S.t.scope = tsc.dataset.tscope; render(); return; }
   const tmo = ev.target.closest("[data-tmode]");
   if (tmo) { S.t.mode = tmo.dataset.tmode; render(); return; }
+  const trg = ev.target.closest("[data-trange]");
+  if (trg) { S.t.range = trg.dataset.trange; if (S.t.range === "today") { S.t.month = today().slice(0, 7); S.t.day = today(); } render(); return; }
   const tmn = ev.target.closest("[data-tmonth]");
   if (tmn) { const k = Number(tmn.dataset.tmonth); if (!k) { S.t.month = today().slice(0, 7); S.t.day = today(); } else { const [y, m] = S.t.month.split("-").map(Number); const d = new Date(y, m - 1 + k, 1); S.t.month = dstr(d.getTime()).slice(0, 7); S.t.day = S.t.month === today().slice(0, 7) ? today() : S.t.month + "-01"; } render(); return; }
   const wp = ev.target.closest("[data-wperson]");
