@@ -2253,6 +2253,13 @@ const webBadge = o => o.paid ? `<span class="badge green">Paid${o.mayaPaid ? " v
 const webTime = d => { const t = d ? new Date(d) : null; return t && !isNaN(t) ? t.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; };
 const webItems = o => (o.items || []).map(i => `${i.qty > 1 ? i.qty + "× " : ""}${i.title || ""}${i.variant ? " (" + i.variant + ")" : ""}`).join(", ");
 let webBusy = false;
+// Moving between pages quietly re-reads the latest data (team data + website orders), at most every 15s.
+let navRefreshAt = 0;
+function navRefresh() {
+  if (Date.now() - navRefreshAt < 15000) return; navRefreshAt = Date.now();
+  if (S.baseDb && S.baseDb._refresh) S.baseDb._refresh().catch(() => {});
+  if (S.site) webLoad(true);
+}
 async function webLoad(quiet) {
   if (!S.site || webBusy || !canOrders()) return;
   webBusy = true; S.web.loading = true; if (!quiet) paintWebState();
@@ -5606,12 +5613,12 @@ document.addEventListener("click", guard(async ev => {
   if (tpo) return openOrderDetails(tpo.dataset.open);
   const nav = ev.target.closest("[data-nav]");
   if (nav) {
-    if ($("#scrim").hidden === false) closeSheet(); S.view = nav.dataset.nav; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0);
+    if ($("#scrim").hidden === false) closeSheet(); S.view = nav.dataset.nav; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); navRefresh();
     if (nav.classList.contains("mark")) for (const [el, c] of [[nav, "tap"], [$("#view"), "home-in"]]) { el.classList.remove(c); void el.offsetWidth; el.classList.add(c); el.addEventListener("animationend", () => el.classList.remove(c), { once: true }); }
     return;
   }
   const dp = ev.target.closest("[data-dept]");
-  if (dp) { S.view = "dept"; if (S.dept !== dp.dataset.dept) { S.dept = dp.dataset.dept; S.tab = dept(S.dept).tabs[0]; } S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); return; }
+  if (dp) { S.view = "dept"; if (S.dept !== dp.dataset.dept) { S.dept = dp.dataset.dept; S.tab = dept(S.dept).tabs[0]; } S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); navRefresh(); return; }
   const tb = ev.target.closest("[data-tab]");
   if (tb) { S.tab = tb.dataset.tab; S.sel.clear(); saveNav(); render(); return; }
   const sl = ev.target.closest("[data-slide]");
@@ -6298,7 +6305,7 @@ render();
     c?.use ? c.use("user").catch(() => null) : null,
     c?.use ? c.use("downloads").catch(() => null) : null,
   ]);
-  S.db = db; S.dl = dl; S.user = user; S.dbChecked = true;
+  S.db = db; S.baseDb = db; S.dl = dl; S.user = user; S.dbChecked = true;
   if (c?.use) c.use("assets").then(a => { S.assets = a; }).catch(() => {});
   if (c?.use) Promise.resolve().then(() => c.use("site")).then(si => { if (!si || !si.list) return; S.site = si; setTimeout(() => webLoad(true), 1500); let webTick = 0; setInterval(() => { webTick++; if (document.visibilityState === "visible" && (S.view === "orders" || S.view === "home" || webTick % 3 === 0)) webLoad(true); }, 60000); }).catch(() => {});
   if (user) {
