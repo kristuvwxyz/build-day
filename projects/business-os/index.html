@@ -2367,7 +2367,7 @@ async function webLoad(quiet) {
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
   const last = S.webmeta.find(d => d.id === "_push");
-  if (S.loaded.products && S.loaded.webmeta && S.products.length && !autoPushT && !webPushBusy && Date.now() - webPushFailAt > 30 * 60e3 && (!last || Date.now() - (last.at || 0) > 6 * 3600e3)) scheduleWebPush(true);
+  if (S.loaded.products && S.loaded.webmeta && S.products.length && !autoPushT && !webPushBusy && Date.now() - webPushFailAt > 30 * 60e3 && (!last || !last.photos || Date.now() - (last.at || 0) > 6 * 3600e3)) scheduleWebPush(true);
 }
 
 // Website orders that fail to load must be visible, or the list silently shows only RS OS orders.
@@ -4169,7 +4169,7 @@ async function pushListings(btn, auto) {
     const r = await S.site.pushProducts(list);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
     for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
-    if (S.db) await save("webmeta", "_push", { at: Date.now(), count: list.length }).catch(() => {});
+    if (S.db) await save("webmeta", "_push", { at: Date.now(), count: list.length, photos: 1 }).catch(() => {});
     webPushErr = ""; webPushFailAt = 0;
     if (!auto) toast(`Website updated: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
   } catch (e) { const m = (e && e.message) || "couldn't send."; if (!auto || m !== webPushErr) toast("Website: " + m); if (auto) { webPushErr = m; webPushFailAt = Date.now(); } }
