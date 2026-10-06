@@ -83,8 +83,11 @@ select.lcell { width: auto; max-width: 118px; padding-right: 2px; }
 .pbox > span { color: var(--muted); font-size: 12px; }
 .pbox .lcell { border: 0; background: transparent; width: 84px; text-align: right; padding: 4px 2px; }
 .pbox:focus-within { border-color: var(--gold); }
-.ltable td.pcell, .ltable th.pcell { padding-left: 14px; padding-right: 14px; }
-.ltable td.pcell + td.pcell { border-left: 1px solid var(--line); }
+.ltable th, .ltable td { padding-left: 12px; padding-right: 12px; }
+.ltable th + th, .ltable td + td { border-left: 1px solid var(--line); }
+.ltable th:first-child + th, .ltable td:first-child + td { border-left: 0; }
+.ltable th:nth-child(n+3), .ltable td:nth-child(n+3) { text-align: center; }
+.ltable input.lcell { text-align: center; } .ltable .pbox input.lcell { text-align: right; }
 @keyframes markTap { 0% { transform: scale(1); } 35% { transform: scale(.94); letter-spacing: .02em; } 100% { transform: scale(1); } }
 @keyframes homeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .mark.tap { animation: markTap .45s cubic-bezier(.3, .7, .4, 1); }
