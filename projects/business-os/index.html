@@ -1102,6 +1102,26 @@ function committedOf(p) {
   return n;
 }
 
+// The open orders holding a listing's committed units (RS OS orders + website orders whose stock was taken off).
+function committedOrders(p) {
+  const out = [];
+  if (!p || p.kind === "preorder") return out;
+  for (const o of S.orders) { if (o.archived || !OPEN_FUL.has(o.fulfillment) || isVoid(o)) continue; const q = (o.items || []).filter(i => i.productId === p.id).reduce((a, i) => a + (Number(i.qty) || 0), 0); if (q) out.push({ o, q }); }
+  for (const w of (S.web && S.web.orders) || []) { if (webDone(w)) continue; const m = S.webmeta.find(d => d.id === webMetaId(w.ref)); const q = m && m.stock === "taken" && m.stockMap ? Number(m.stockMap[p.id]) || 0 : 0; if (q) out.push({ w, q }); }
+  return out.sort((a, b) => ((b.o && b.o.createdAt) || Date.parse((b.w && b.w.date) || "") || 0) - ((a.o && a.o.createdAt) || Date.parse((a.w && a.w.date) || "") || 0));
+}
+function openCommitted(pid) {
+  const p = S.products.find(x => x.id === pid); if (!p) return;
+  const rows = committedOrders(p), n = rows.reduce((a, r) => a + r.q, 0);
+  openSheet(`<h3>${n} committed · ${esc([p.brand, p.name, p.size].filter(Boolean).join(" "))}</h3>
+    <p style="margin:0;color:var(--muted);font-size:13px">Open orders not shipped yet that are holding this item. Tap an order to open it.</p>
+    ${rows.length ? `<div class="olist">${rows.map(r => r.o
+      ? `<button type="button" class="orow" data-open="${r.o.id}"><span class="onum">#${esc(r.o.num)}</span><span class="ocust">${esc(r.o.customer || "No customer")}<small>${relTime(r.o.createdAt)} · ${esc(orderSource(r.o))} · ${r.q} unit${r.q === 1 ? "" : "s"}</small></span>${badge(ful(r.o.fulfillment))}</button>`
+      : `<button type="button" class="orow" data-webopen="${esc(r.w.ref)}"><span class="onum">#${esc(String(r.w.ref || "").replace(/^#/, ""))}</span><span class="ocust">${esc(r.w.name || "")}<small>${esc(webTime(r.w.date))} · Website · ${r.q} unit${r.q === 1 ? "" : "s"}</small></span>${webBadge(r.w)}</button>`).join("")}</div>`
+      : `<div class="empty">No open orders found for this item.</div>`}
+    <div class="actions"><button class="btn" type="button" data-act="close">Close</button></div>`);
+}
+
 /* Applies a payment/fulfillment/tag/note change and keeps stock + timestamps right. */
 async function updateOrder(o, ch) {
   const r = await updateOrderCore(o, ch);
@@ -4307,7 +4327,7 @@ function viewListings() {
         compare: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="compareAt" data-id="${p.id}" value="${Number(p.compareAt) ? moneyFmt(p.compareAt) : ""}" placeholder="Compare" aria-label="Compare-at price"></span>` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
         cost: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="cost" data-id="${p.id}" value="${Number(p.cost) ? moneyFmt(p.cost) : ""}" placeholder="Cost" aria-label="Cost"></span>` : p.cost ? peso(p.cost) : "–"}</td>`,
         stock: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>`,
-        committed: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : (() => { const c = committedOf(p); return c ? `<b>${c}</b>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
+        committed: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : (() => { const c = committedOf(p); return c ? `<button type="button" class="linkish num" data-commit="${p.id}" title="See the orders holding these" style="font-weight:700">${c}</button>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
         web: () => `<td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : onSite(p) ? `<a class="site-link" href="${esc(webUrl(p))}" target="_blank" rel="noopener" title="Open this product on regalspritz.com">View on site ↗</a>` : `<span style="color:var(--muted);font-size:12px">Not on site</span>`}</td>`
       })[k]()).join("")}</tr>`; }).join("")}</tbody></table>
@@ -6045,6 +6065,7 @@ document.addEventListener("click", guard(async ev => {
   if (lsrt) { const k = lsrt.dataset.lsort, c = S.ls; S.ls = c.sort === k ? { sort: k, dir: c.dir === "asc" ? "desc" : "asc" } : { sort: k, dir: ["edited", "price", "stock"].includes(k) ? "desc" : "asc" }; S.lpage = 0; render(); return; }
   const lpg = ev.target.closest("[data-lpage]");
   if (lpg) { S.lpage = Math.max(0, (S.lpage || 0) + Number(lpg.dataset.lpage)); render(); window.scrollTo(0, 0); return; }
+  const cmt = ev.target.closest("[data-commit]"); if (cmt) return openCommitted(cmt.dataset.commit);
   const lrow = ev.target.closest("tr[data-lrow]");
   if (lrow && !S.readOnly && !ev.target.closest("input, select, button, a, label")) return openProductForm(lrow.dataset.lrow);
   const sps = ev.target.closest("[data-spsup]");
