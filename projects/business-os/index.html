@@ -932,6 +932,8 @@ const today = () => dstr(Date.now());
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const plat = id => (PLATFORMS.find(p => p.id === id) || PLATFORMS[4]).name;
 const pay = id => PAYMENTS.find(s => s.id === id) || PAYMENTS[0];
+// Delivered is no longer offered (K, 2026-10-08); old Delivered orders still show it.
+const FUL_PICK = FULFILLMENTS.filter(f => f.id !== "delivered");
 const ful = id => FULFILLMENTS.find(s => s.id === id) || FULFILLMENTS[0];
 const badge = s => `<span class="badge ${s.cls}">${esc(s.name)}</span>`;
 const fmtDate = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "";
@@ -2499,8 +2501,9 @@ function goOrders(view) {
 
 /* ---------- website orders (regalspritz.com), read live from the website's backend ----------
    Only in the RS App (it has the /api/site server route). Customer details are never saved here: fetched live each time. */
-const WEB_STATUSES = ["Placed", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"];
-const webDone = o => /^(shipped|delivered|cancelled)$/i.test(o.status || "");
+// Customers see Completed once an order ships (K, 2026-10-08): no separate Shipped / Delivered on the website.
+const WEB_STATUSES = ["Placed", "Confirmed", "Packed", "Completed", "Cancelled"];
+const webDone = o => /^(completed|shipped|delivered|cancelled)$/i.test(o.status || "");
 const webPayKind = o => /maya/i.test(o.payment || "") ? "maya" : /bdo/i.test(o.payment || "") ? "bdo" : "";
 const webBadge = o => o.paid ? `<span class="badge green">Paid${o.mayaPaid ? " via Maya" : ""}</span>` : `<span class="badge amber">Unpaid</span>`;
 const webTime = d => { const t = d ? new Date(d) : null; return t && !isNaN(t) ? t.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; };
@@ -2539,7 +2542,7 @@ async function webStatusSync() {
   if (!S.site || webStatusBusy || S.readOnly || !canFul() || !S.web.loaded || !S.loaded.webmeta) return;
   const todo = webAsOrders().filter(r => { const src = S.web.orders.find(x => x.ref === r.ref), want = WEB_STATUS_OF[r.fulfillment];
     const m = S.webmeta.find(d => d.id === webMetaId(r.ref));
-    return src && want && m && m.fulfillment && want !== src.status && !/^(shipped|delivered|cancelled)$/i.test(src.status || "") && !/cancel/i.test(src.status || ""); }).slice(0, 10);
+    return src && want && m && m.fulfillment && want !== src.status && !/^(completed|shipped|delivered|cancelled)$/i.test(src.status || "") && !/cancel/i.test(src.status || ""); }).slice(0, 10);
   if (!todo.length) return;
   webStatusBusy = true;
   try { for (const r of todo) { const x = await S.site.update(r.ref, { status: WEB_STATUS_OF[r.fulfillment] }).catch(() => null); const i = S.web.orders.findIndex(o => o.ref === r.ref); if (x && x.ok && x.order && i >= 0) { S.web.orders[i] = x.order; S.web.dirty = true; } } }
@@ -2556,7 +2559,7 @@ function webRows() {
     && (!q || squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(q)));
 }
 // Website orders shown as rows in the one Orders list. Built in memory from the live list, never saved.
-const WEB_FUL = { placed: "to_confirm", confirmed: "unfulfilled", packed: "unfulfilled", shipped: "fulfilled", delivered: "delivered", cancelled: "cancelled" };
+const WEB_FUL = { placed: "to_confirm", confirmed: "unfulfilled", packed: "unfulfilled", completed: "fulfilled", shipped: "fulfilled", delivered: "fulfilled", cancelled: "cancelled" };
 let webRowsMemo = { at: null, n: -1, rows: [] };
 function webAsOrders() {
   if (!S.site || !S.web.loaded) return [];
@@ -2583,7 +2586,7 @@ function webAsOrders() {
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
 // RS OS Fulfillment status is the one the team edits; the customer's profile on regalspritz.com shows this status for it.
 const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
-  sorted: "Packed", unfulfilled: "Packed", fulfilled: "Shipped", delivered: "Delivered", cancelled: "Cancelled" };
+  sorted: "Packed", unfulfilled: "Packed", fulfilled: "Completed", delivered: "Completed", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
   const site = {}, keep = {}, msgs = [];
@@ -2736,7 +2739,7 @@ function openWebOrder(ref) {
     ${bdoBox(o)}
     <p style="margin:0;font-size:12.5px;color:var(--muted)">Before shipping, check the amount paid matches <b>${peso(Number(o.due) || o.total)}</b>.</p>
     ${canPay() ? `<div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ${o.paid ? "" : "primary"}" type="button" data-act="web-paid" data-ref="${esc(o.ref)}" data-paid="${o.paid ? "0" : "1"}">${o.paid ? "Mark unpaid" : "Mark paid"}</button></div>` : ""}
-    ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${FULFILLMENTS.map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
+    ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${FUL_PICK.map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
       <div class="field"><label for="web-track">Tracking number</label><input id="web-track" value="${esc(o.tracking || "")}" autocomplete="off" placeholder="e.g. JT0012345678"></div>
       <div style="display:flex;gap:8px"><button class="btn primary" type="button" data-act="web-save" data-ref="${esc(o.ref)}">Save status</button><button class="btn ghost" type="button" data-act="close">Close</button></div>` : `<button class="btn ghost" type="button" data-act="close">Close</button>`}
     <div class="sheet-err" id="sheet-err" hidden></div>`);
@@ -3277,7 +3280,7 @@ function orderCell(k, o, table) {
       return canAll() ? `<td><select class="status st-grey" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "total": return `<td class="r num strike nowrap">${peso2(total(o))}</td>`;
     case "payment": return `<td>${canPay() ? st(pay(o.payment), "payment", opts(PAYMENTS, o.payment)) : badge(pay(o.payment))}</td>`;
-    case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(FULFILLMENTS, o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
+    case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(o.fulfillment === "delivered" ? FULFILLMENTS : FUL_PICK, o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
     case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
@@ -3368,7 +3371,7 @@ function viewOrders() {
       ${canPay() ? `<select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
       ${canAll() ? `<input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>` : ""}
-      ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
+      ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FUL_PICK)}</select>` : ""}
       ${canAll() ? `<button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
@@ -3387,7 +3390,7 @@ function viewOrders() {
     <div class="osearch big">${svg("search")}<input id="of-q" type="search" placeholder="Order # (e.g. 9978), name, phone, tag or tracking #" value="${esc(S.of.q)}" aria-label="Search orders" autocomplete="off"></div>
     ${monthSelect()}
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
-    <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FULFILLMENTS.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
+    <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FUL_PICK.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
     <select id="of-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${S.of.pay === f.id ? "selected" : ""}>${f.name} (${S.orders.filter(o => o.payment === f.id).length})</option>`).join("")}</select>
     ${ofActive() ? `<button class="btn ghost" type="button" data-act="of-clear">✕ Clear filters</button>` : ""}
     <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
@@ -3428,7 +3431,7 @@ function viewSuppliers() {
   const isSel = r => [...r.ids].every(id => S.sel.has(id));
   const allSel = os.length > 0 && os.every(o => S.sel.has(o.id));
   const bulk = S.sel.size ? `<div class="bulk"><strong>${S.sel.size} order${S.sel.size === 1 ? "" : "s"} selected</strong>
-      ${canFul() ? `<select id="sp-bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FULFILLMENTS)}</select>` : ""}
+      ${canFul() ? `<select id="sp-bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FUL_PICK)}</select>` : ""}
       ${canPay() ? `<select id="sp-bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button></div>` : "";
   return `${modeBar}<div class="bigsearch">${svg("search")}<input id="spq" type="search" placeholder="Search item, order # or customer" value="${esc(sp.q)}" aria-label="Search supplier orders" autocomplete="off"></div>
@@ -4101,7 +4104,7 @@ function openOrderForm() {
     <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input inputmode="decimal" class="money" id="o-ship" placeholder="0"></div>
     <div class="row">
       <div class="field"><label for="o-pay">Payment status</label><select id="o-pay">${opts(PAYMENTS.filter(p => !VOIDPAY.has(p.id)), "pending")}</select></div>
-      <div class="field"><label for="o-ful">Fulfillment status</label><select id="o-ful">${opts(FULFILLMENTS.filter(f => f.id !== "delivered"), "to_confirm")}</select></div>
+      <div class="field"><label for="o-ful">Fulfillment status</label><select id="o-ful">${opts(FUL_PICK, "to_confirm")}</select></div>
     </div>
     ${tagField([])}
     <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2"></textarea></div>

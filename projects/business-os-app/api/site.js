@@ -3,7 +3,8 @@
 // The website backend key (RS_BACKEND_KEY) stays here on the server, never in the browser.
 // Customer details pass straight through: nothing is saved or logged here.
 const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbz7R17lKloaq_VaFMK-nDge-9AUXNFmNgaH7WZr2gWJjxRLMn1hEa6HubmeaDbaPzdU4g/exec";
-const STATUSES = new Set(["Placed", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"]);
+// Shipped orders show as Completed to customers; Shipped / Delivered are no longer sent.
+const STATUSES = new Set(["Placed", "Confirmed", "Packed", "Completed", "Cancelled"]);
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
