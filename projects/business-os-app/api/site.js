@@ -67,6 +67,14 @@ export default async function handler(req, res) {
     const orders = body.orders.map(o => ({ ref: String((o && o.ref) || "").trim().replace(/^#/, ""), status: o && o.status })).filter(o => /^[A-Za-z0-9_-]{1,40}$/.test(o.ref) && STATUSES.has(o.status));
     if (!orders.length) return res.status(400).json({ ok: false, error: "Nothing to change." });
     call = { action: "opsStatuses", key: KEY, orders };
+  } else if (body.action === "email") {
+    // Royal Receipt to one buyer, sent from the store Gmail by the website backend (opsEmail). Team members only (checked above).
+    const to = String(body.to || "").trim().toLowerCase();
+    if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[a-z]{2,}$/i.test(to) || to.length > 120) return res.status(400).json({ ok: false, error: "That email address doesn't look right." });
+    const subject = String(body.subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 200), html = String(body.html || ""), text = String(body.text || "").slice(0, 20000);
+    if (!subject || !html || html.length > 150000) return res.status(400).json({ ok: false, error: "The receipt is empty or too big." });
+    const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
+    call = { action: "opsEmail", key: KEY, to, subject, html, text, by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
   } else return res.status(400).json({ ok: false, error: "That request isn't allowed." });
 
   // 3. Ask the website backend (Apps Script answers with a redirect, which fetch follows).
@@ -78,6 +86,7 @@ export default async function handler(req, res) {
     if (j && call.action === "opsOrders") j.backendMs = Date.now() - t0;
     if (!j) return res.status(502).json({ ok: false, error: "The website backend didn't answer (" + r.status + ")." });
     if (!j.ok && call.action === "opsSetProducts" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website can't receive listings yet. Update the website backend to v15 (see the setup guide)." });
+    if (!j.ok && call.action === "opsEmail" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "the website backend can't send emails yet (needs the opsEmail update)" });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });
     // Keep the shared counter above every website order number seen (covers numbers the website made on its own).
     if (call.action === "opsOrders" && j.ok && Array.isArray(j.orders)) {

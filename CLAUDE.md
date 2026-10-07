@@ -31,6 +31,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Access: Admin sees every department except CEO, Finance and Marketing.
 - Forms and pop-up sheets: Save / Cancel buttons go at the top, under the title. On phones, don't auto-focus a box or zoom the page.
 - J&T bookings: Parcel name is always COSMETICS and declared Value is always ₱500.
+- Royal Receipt: every RS OS order with an email gets the Royal Receipt emailed automatically (store Gmail via the website backend `opsEmail`), and again when a pay link is added. The only payment button is the order's own pay link (Maya/BDO). Staff can copy it as text for chat when there's no email.
 - Don't add buttons or screens for one-off cleanups (like re-sorting categories or fixing photos). Just do the fix when I ask.
 - Website orders (regalspritz.com) are read live from the website's Apps Script backend through the RS App's `/api/site` route (key `RS_BACKEND_KEY` in Vercel only). Don't copy customer details into the dashboard database; only team fields (assignee, courier, tags, team note) are saved per order number in `webmeta`. RS OS is the single RS number counter (`/api/site` nextOrderNumber).
 - Shopify is one-way: new orders and Shopify-side changes (status, tags, notes) come into the dashboard. Never send dashboard edits back to Shopify. (On hold: the Shopify plan is cancelled.)

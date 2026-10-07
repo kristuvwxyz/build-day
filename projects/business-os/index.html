@@ -200,6 +200,11 @@ td { padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: midd
 tr:first-child td { border-top: 0; }
 td.r, th.r { text-align: right; }
 td .s { font-size: 12px; color: var(--muted); }
+.cfs { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cfs legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
+.rr-bar, .rr-act { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.rr-frame { width: 100%; height: 640px; border: 1px solid var(--line); border-radius: 12px; background: #faf7fb; }
+.rr-text { white-space: pre-wrap; font-size: 12.5px; background: var(--surface-2); padding: 10px 12px; border-radius: 8px; margin: 6px 0 0; user-select: all; }
 select.tq-st.info { color: var(--info); } select.tq-st.good { color: var(--good); } select.tq-st.bad { color: var(--bad); }
 input.tq-date { width: auto; padding: 3px 6px; font-size: 12.5px; border: 1px solid transparent; background: transparent; }
 input.tq-date:hover, input.tq-date:focus { border-color: var(--line); background: var(--surface); }
@@ -4030,6 +4035,7 @@ function custSearch(inp) {
 function custPick(btn) {
   const box = btn.closest(".it-pick"); box.querySelector(".cu-s").value = btn.dataset.cpick; box.querySelector(".it-list").hidden = true;
   const ph = document.getElementById("o-phone"); if (ph && !ph.value && btn.dataset.cphone) ph.value = btn.dataset.cphone;
+  if (document.getElementById("o-email")) custFill(btn.dataset.cpick);
 }
 function itemPick(btn) {
   const box = btn.closest(".it-pick"), p = S.products.find(x => x.id === btn.dataset.pick); if (!p) return;
@@ -4067,8 +4073,8 @@ function openOrderForm() {
     </div>
     <div class="row">
       <div class="field"><label for="o-customer">Customer name</label><div class="it-pick cu-pick"><input id="o-customer" class="cu-s" type="search" autocomplete="off" placeholder="Type a name — past customers show up"><div class="it-list" hidden></div></div></div>
-      <div class="field"><label for="o-phone">Phone or handle (optional)</label><input id="o-phone" autocomplete="off"></div>
     </div>
+    ${contactFields({})}
     <div class="field"><label>Items</label><div id="items" style="display:flex;flex-direction:column;gap:6px">${itemRow()}</div><button class="btn sm" type="button" data-act="add-item" style="align-self:flex-start;margin-top:4px">+ Add item</button></div>
     <div class="row">
       <div class="field"><label for="o-fees">Platform fees (₱)</label><input inputmode="decimal" class="money" id="o-fees" placeholder="0"></div>
@@ -4095,19 +4101,174 @@ function openOrderForm() {
       items.push({ productId: pid, name: p.name, sku: p.sku || "", qty, price, cost: Number(p.cost) || 0 });
     });
     if (!items.length) return sheetError("Add at least one product with a quantity.");
+    const cErr = contactCheck(contactRead()); if (cErr) return sheetError(cErr);
     const date = val("o-date") || today();
     const createdAt = date === today() ? Date.now() : new Date(date + "T12:00:00").getTime();
     const fulfillment = val("o-ful");
     const rsv = S.site && S.site.nextNumber ? await S.site.nextNumber().catch(() => null) : null;
     if (S.site && S.site.nextNumber && !(rsv && rsv.ok && /^RS\d+$/.test(rsv.ref || ""))) return sheetError((rsv && rsv.error) || "Couldn't get the next RS number. Try again.");
     const fnum = (rsv && rsv.ref) || num;
-    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: val("o-customer"), ref: val("o-ref"), phone: val("o-phone"), items, fees: numv("o-fees"), shipping: numv("o-ship"), adjust: 0, payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
+    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: val("o-customer"), ref: val("o-ref"), ...contactRead(), items, fees: numv("o-fees"), shipping: numv("o-ship"), adjust: 0, payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
     const take = isCancelled(order.payment, fulfillment) ? {} : stockTake(items);
     order.stockTaken = take;
     await save("orders", uid("o"), order);
     await applyStockMap(take, -1);
     closeSheet(); toast(`Order #${fnum} saved. Inventory updated.`);
+    if (order.email && !isCancelled(order.payment, fulfillment)) { const nw = S.orders.find(x => x.num === fnum); if (nw) receiptSend(nw, true); }
   });
+}
+
+/* ---------- contact & shipping (Create order + Edit contact) ---------- */
+const PAYLINK_RE = /^https:\/\/[^\s"'<>]+$/i;
+function contactFields(o) {
+  const sh = o.ship || (o.address ? shipOf(o) : {});
+  const f = (id, label, v, extra = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${esc(v || "")}" autocomplete="off" ${extra}></div>`;
+  return `<fieldset class="cfs"><legend>Contact & shipping</legend>
+    <div class="row">${f("o-email", "Email address", o.email, 'type="email" inputmode="email" placeholder="for the Royal Receipt"')}${f("o-phone", "Phone number", o.phone, 'type="tel" inputmode="tel" placeholder="09XX XXX XXXX"')}</div>
+    <div class="row">${f("o-shname", "Ship to (name)", sh.name && sh.name !== o.customer ? sh.name : "", 'placeholder="Same as customer"')}${f("o-shphone", "Receiver phone", sh.phone && sh.phone !== o.phone ? sh.phone : "", 'type="tel" inputmode="tel" placeholder="Same as above"')}</div>
+    ${f("o-a1", "House no., building, street", sh.address1)}
+    <div class="row">${f("o-a2", "Barangay", sh.address2)}${f("o-city", "City / municipality", sh.city)}</div>
+    <div class="row">${f("o-prov", "Province", sh.province, 'placeholder="e.g. Metro Manila"')}${f("o-zip", "ZIP code", sh.zip, 'inputmode="numeric" maxlength="4"')}</div>
+  </fieldset>`;
+}
+function contactRead() {
+  const v = id => ($("#" + id) ? $("#" + id).value.trim() : "");
+  const ship = { name: v("o-shname"), phone: v("o-shphone"), address1: v("o-a1"), address2: v("o-a2"), city: v("o-city"), province: v("o-prov"), zip: v("o-zip") };
+  const address = [ship.address1, ship.address2, ship.city, ship.province, ship.zip].filter(Boolean).join(", ");
+  return { email: v("o-email").toLowerCase(), phone: v("o-phone"), ship: address ? ship : null, address };
+}
+function contactCheck(c) {
+  if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) return "That email address doesn't look right.";
+  if (c.ship && c.ship.zip && !/^\d{4}$/.test(c.ship.zip)) return "ZIP code is 4 digits.";
+  return "";
+}
+// Past customer picked in Create order: fill their last email, phone and address (only empty boxes).
+function custFill(name) {
+  const last = [...S.orders].filter(o => (o.customer || "").trim().toLowerCase() === name.trim().toLowerCase()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const pick = k => (last.find(o => o[k]) || {})[k] || "";
+  const sh = (last.find(o => o.ship && (o.ship.address1 || o.ship.city)) || last.find(o => o.address) || null);
+  const put = (id, v) => { const el = $("#" + id); if (el && !el.value && v) el.value = v; };
+  put("o-email", pick("email")); put("o-phone", pick("phone"));
+  if (sh) { const x = shipOf(sh); put("o-a1", x.address1); put("o-a2", x.address2); put("o-city", x.city); put("o-prov", x.province); put("o-zip", x.zip); }
+}
+function openContactEdit(id) {
+  const o = S.orders.find(x => x.id === id); if (!o) return;
+  openSheet(`<h3>Edit contact & shipping · ${esc(onum(o))}</h3>
+    ${contactFields(o)}
+    <div class="field"><label for="o-paylink">Payment link <span style="font-weight:400;color:var(--muted)">(Maya or BDO link, shows as the Pay now button on the Royal Receipt)</span></label><input id="o-paylink" type="url" value="${esc(o.payLink || "")}" placeholder="https://…" autocomplete="off"></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    const c = contactRead(), err = contactCheck(c); if (err) return sheetError(err);
+    const payLink = val("o-paylink").trim(); if (payLink && !PAYLINK_RE.test(payLink)) return sheetError("The payment link must start with https://");
+    const changed = ["email", "phone", "address"].filter(k => (o[k] || "") !== (c[k] || "")).concat(payLink !== (o.payLink || "") ? ["payment link"] : []);
+    if (!changed.length) { closeSheet(); return; }
+    const newLink = payLink && payLink !== (o.payLink || "");
+    await patch("orders", o.id, { ...c, payLink, log: logAdd(o, ["updated " + changed.join(", ")]) });
+    closeSheet(); toast("Contact & shipping saved.");
+    const nw = S.orders.find(x => x.id === o.id);
+    if (newLink && nw && nw.email && !["paid", "refunded", "voided", "to_refund"].includes(nw.payment)) receiptSend(nw, true);
+  });
+}
+
+/* ---------- Royal Receipt: emailed invoice with a Pay now button, plus a copy-ready text version ---------- */
+const RR = { brand: "#3d1a6e", gold: "#b8913a", ink: "#2a2230", muted: "#7a6f80", line: "#e8e1ec", bg: "#faf7fb" };
+const rrDue = o => o.payment === "paid" || VOIDPAY.has(o.payment) ? 0 : total(o);
+const rrState = o => o.payment === "paid" ? "PAID" : o.payment === "partial" ? "PARTIALLY PAID" : VOIDPAY.has(o.payment) ? pay(o.payment).name.toUpperCase() : "UNPAID";
+const rrPayable = o => !["paid", "refunded", "voided", "to_refund"].includes(o.payment) && !o.archived;
+const rrDate = o => new Date(o.createdAt || Date.now()).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" });
+function receiptHTML(o) {
+  const e = esc, sh = shipOf(o), c = RR, link = rrPayable(o) && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
+  const addr = [sh.address1, sh.address2, sh.city, sh.province, sh.zip].filter(Boolean).join(", ");
+  const row = (l, v, b) => `<tr><td style="padding:4px 0;color:${b ? c.ink : c.muted};font-size:14px;${b ? "font-weight:700" : ""}">${l}</td><td align="right" style="padding:4px 0;color:${c.ink};font-size:14px;${b ? "font-weight:700" : ""}">${v}</td></tr>`;
+  const st = rrState(o), stCol = st === "PAID" ? "#2e7d4f" : st === "UNPAID" ? "#b4541a" : c.brand;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Royal Receipt ${e(onum(o))}</title></head>
+<body style="margin:0;padding:0;background:${c.bg};font-family:Helvetica,Arial,sans-serif;color:${c.ink}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg}"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:14px;overflow:hidden">
+<tr><td style="background:${c.brand};padding:26px 28px;text-align:center">
+  <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#ffffff;letter-spacing:.5px">Regal Spritz PH</div>
+  <div style="font-size:11px;letter-spacing:4px;color:${c.gold};margin-top:6px;font-weight:700">&#9819; ROYAL RECEIPT &#9819;</div>
+</td></tr>
+<tr><td style="padding:24px 28px 8px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td style="font-size:13px;color:${c.muted}">Order<br><b style="font-size:18px;color:${c.ink}">${e(onum(o))}</b><br>${e(rrDate(o))}</td>
+    <td align="right" valign="top"><span style="display:inline-block;padding:5px 12px;border-radius:999px;border:1.5px solid ${stCol};color:${stCol};font-size:12px;font-weight:700;letter-spacing:1px">${e(st)}</span></td>
+  </tr></table>
+  <p style="font-size:15px;line-height:1.5;margin:18px 0 4px">Hi ${e((o.customer || "").split(" ")[0] || "there")}, thank you for your order! Here is your receipt.</p>
+</td></tr>
+<tr><td style="padding:8px 28px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${c.line}">
+    <tr><td style="padding:10px 0 6px;font-size:11px;letter-spacing:1.5px;color:${c.muted};font-weight:700">ITEM</td><td align="center" style="padding:10px 0 6px;font-size:11px;letter-spacing:1.5px;color:${c.muted};font-weight:700">QTY</td><td align="right" style="padding:10px 0 6px;font-size:11px;letter-spacing:1.5px;color:${c.muted};font-weight:700">AMOUNT</td></tr>
+    ${(o.items || []).map(i => `<tr><td style="padding:8px 8px 8px 0;font-size:14px;border-top:1px solid ${c.line}">${e(i.name)}<div style="font-size:12px;color:${c.muted}">${e(peso2(i.price))} each</div></td><td align="center" style="padding:8px 0;font-size:14px;border-top:1px solid ${c.line}">${e(i.qty)}</td><td align="right" style="padding:8px 0;font-size:14px;border-top:1px solid ${c.line};white-space:nowrap">${e(peso2((Number(i.qty) || 0) * (Number(i.price) || 0)))}</td></tr>`).join("")}
+  </table>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid ${c.ink};margin-top:4px;padding-top:6px">
+    ${row("Subtotal", e(peso2(itemsTotal(o))))}
+    ${Number(o.adjust) ? row("Shipping fee & other charges", e(peso2(o.adjust))) : ""}
+    ${Number(o.discount) ? row("Discount" + (o.discountNote ? " · " + e(o.discountNote) : ""), "−" + e(peso2(o.discount))) : ""}
+    ${row("Total", e(peso2(total(o))), true)}
+    ${o.payment === "paid" ? row("Amount due", e(peso2(0)), true) : o.payment === "partial" ? "" : rrPayable(o) ? row("Amount due", e(peso2(rrDue(o))), true) : ""}
+  </table>
+</td></tr>
+${link ? `<tr><td align="center" style="padding:18px 28px 6px">
+  <a href="${e(link)}" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 34px;border-radius:10px;border-bottom:3px solid ${c.gold}">Pay now${o.payment === "partial" ? "" : " · " + e(peso2(rrDue(o)))}</a>
+  <div style="font-size:12px;color:${c.muted};margin-top:8px">Secure payment link. If the button doesn't work, open: <a href="${e(link)}" style="color:${c.brand};word-break:break-all">${e(link)}</a></div>
+</td></tr>` : rrPayable(o) ? `<tr><td style="padding:14px 28px 0;font-size:13px;color:${c.muted}">Our team will send your payment link shortly.</td></tr>` : ""}
+<tr><td style="padding:18px 28px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg};border-radius:10px"><tr>
+    <td valign="top" style="padding:14px 16px;font-size:13px;line-height:1.5;width:50%"><div style="font-size:11px;letter-spacing:1.5px;color:${c.muted};font-weight:700">BILLED TO</div>${e(o.customer || "")}${o.email ? "<br>" + e(o.email) : ""}${o.phone ? "<br>" + e(o.phone) : ""}</td>
+    <td valign="top" style="padding:14px 16px;font-size:13px;line-height:1.5"><div style="font-size:11px;letter-spacing:1.5px;color:${c.muted};font-weight:700">SHIP TO</div>${addr ? `${e(sh.name || o.customer || "")}${sh.phone && sh.phone !== o.phone ? "<br>" + e(sh.phone) : ""}<br>${e(addr)}` : "To follow"}</td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:6px 28px 26px;text-align:center;font-size:12px;color:${c.muted};line-height:1.6">Questions? Just reply to this email.<br><a href="https://regalspritz.com" style="color:${c.brand};text-decoration:none;font-weight:700">regalspritz.com</a> · Fragrance, fit for royalty.</td></tr>
+</table></td></tr></table></body></html>`;
+}
+function receiptText(o) {
+  const sh = shipOf(o), link = rrPayable(o) && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
+  const addr = [sh.address1, sh.address2, sh.city, sh.province, sh.zip].filter(Boolean).join(", ");
+  return [`👑 REGAL SPRITZ PH · ROYAL RECEIPT`, `Order ${onum(o)} · ${rrDate(o)} · ${rrState(o)}`, "",
+    `Hi ${(o.customer || "").split(" ")[0] || "there"}, thank you for your order!`, "",
+    ...(o.items || []).map(i => `• ${i.qty}× ${i.name} · ${peso2((Number(i.qty) || 0) * (Number(i.price) || 0))}`), "",
+    `Subtotal: ${peso2(itemsTotal(o))}`,
+    ...(Number(o.adjust) ? [`Shipping & other charges: ${peso2(o.adjust)}`] : []),
+    ...(Number(o.discount) ? [`Discount: −${peso2(o.discount)}`] : []),
+    `TOTAL: ${peso2(total(o))}`,
+    ...(rrPayable(o) && o.payment !== "partial" ? [`Amount due: ${peso2(rrDue(o))}`] : []),
+    ...(link ? ["", `💳 Pay here: ${link}`] : rrPayable(o) ? ["", "We'll send your payment link shortly."] : []),
+    "", `Ship to: ${addr ? `${sh.name || o.customer || ""}, ${addr}` : "to follow"}`,
+    "", "Thank you! · regalspritz.com"].join("\n");
+}
+const receiptSubject = o => `Your Royal Receipt · Regal Spritz PH order ${onum(o)}`;
+// Sends through the website's Apps Script backend (store Gmail). quiet = automatic send after save.
+async function receiptSend(o, quiet) {
+  if (!o.email) { if (!quiet) toast("Add the customer's email first (Edit contact & shipping)."); return false; }
+  if (!S.site || !S.site.email) { if (!quiet) toast("Emailing works in the RS App. Copy the receipt here instead."); return false; }
+  const r = await S.site.email({ to: o.email, subject: receiptSubject(o), html: receiptHTML(o), text: receiptText(o) }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok) { toast(`Royal Receipt not sent: ${(r && r.error) || "the website didn't answer"}. Copy it from the order instead.`); return false; }
+  const cur = S.orders.find(x => x.id === o.id) || o;
+  await patch("orders", o.id, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
+  toast(`Royal Receipt emailed to ${o.email}.`); return true;
+}
+async function copyRich(html, text) {
+  try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]); return true; }
+  catch (e) { try { await navigator.clipboard.writeText(text); return true; } catch (e2) { return false; } }
+}
+function openReceipt(id) {
+  const o = S.orders.find(x => x.id === id) || S.archived.find(x => x.id === id); if (!o) return;
+  S.sheetReopen = () => openReceipt(id);
+  const sent = o.receipt && o.receipt.at ? `Emailed to ${esc(o.receipt.to)} · ${relTime(o.receipt.at)}` : "Not emailed yet";
+  openSheet(`<h3>Royal Receipt · ${esc(onum(o))}</h3>
+    <div class="rr-bar"><span class="badge ${o.receipt && o.receipt.at ? "green" : "grey"}">${sent}</span>${o.email ? "" : `<span style="font-size:12.5px;color:var(--muted)">No email on this order. Copy and paste it in chat instead.</span>`}</div>
+    <div class="rr-act">
+      ${o.email ? `<button class="btn primary sm" type="button" data-act="rr-send" data-id="${o.id}">${o.receipt && o.receipt.at ? "Send again" : "Email to " + esc(o.email)}</button>` : ""}
+      <button class="btn sm" type="button" data-act="rr-copy" data-id="${o.id}">Copy text (for chat)</button>
+      <button class="btn sm" type="button" data-act="rr-copyhtml" data-id="${o.id}">Copy formatted (for email)</button>
+      ${S.canEdit || canAll() ? `<button class="btn ghost sm" type="button" data-act="edit-contact" data-id="${o.id}">Edit contact & pay link</button>` : ""}
+    </div>
+    ${rrPayable(o) && !o.payLink ? `<div class="notice" style="font-size:13px">No payment link yet, so the receipt says "we'll send your payment link". Add the Maya or BDO link in <b>Edit contact & pay link</b> and the updated receipt is emailed automatically.</div>` : ""}
+    <iframe class="rr-frame" title="Royal Receipt preview" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="${esc(receiptHTML(o))}"></iframe>
+    <details><summary style="cursor:pointer;font-weight:600;font-size:13px">Text version</summary><pre class="rr-text">${esc(receiptText(o))}</pre></details>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null);
 }
 
 function openOrderDetails(id) {
@@ -4120,8 +4281,8 @@ function openOrderDetails(id) {
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
     <div class="sheet-title"><h3>${esc(onum(o))}</h3></div>
-    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
-    ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button></div>` : ""}
+    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button><button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
+    ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${arch ? "" : `<button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>`}${cp ? `<button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button>` : ""}</div>` : ""}
     ${(() => { const ts = S.tasks.filter(t => t.orderId === o.id).sort((a, b) => (a.due || "").localeCompare(b.due || "")); return ts.length ? `<div class="oactions" style="font-size:13px">📅 On the calendar: ${ts.map(t => `<button type="button" class="chip" data-task="${t.id}">${t.due ? fmtDate(t.due) : "No date"} · ${esc(t.title.slice(0, 40))} · ${esc(tstat(t.status).name)}</button>`).join("")}</div>` : ""; })()}
     ${isDispute(o) ? `<div class="notice" style="border-color:var(--bad);color:var(--bad)">⚠️ <b>Dispute.</b> Check that this is resolved before dispatch. Remove the DISPUTE tag once it is.</div>` : ""}
     <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
@@ -6320,6 +6481,10 @@ document.addEventListener("click", guard(async ev => {
   const id = b.dataset.id;
   switch (b.dataset.act) {
     case "new-order": return openOrderForm();
+    case "edit-contact": return openContactEdit(b.dataset.id);
+    case "receipt": return openReceipt(b.dataset.id);
+    case "rr-send": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Sending…"; await receiptSend(o); if ($("#sheet") && S.sheetReopen) openReceipt(o.id); return; }
+    case "rr-copy": case "rr-copyhtml": { const o = S.orders.find(x => x.id === b.dataset.id) || S.archived.find(x => x.id === b.dataset.id); if (!o) return; const ok = b.dataset.act === "rr-copy" ? await navigator.clipboard.writeText(receiptText(o)).then(() => true, () => false) : await copyRich(receiptHTML(o), receiptText(o)); const was = b.textContent; b.textContent = ok ? "Copied ✓" : "Couldn't copy"; setTimeout(() => { b.textContent = was; }, 1400); return; }
     case "lock-dept": S.unlocked.delete(S.dept); saveUnlocked(); render(); toast(`${dept(S.dept).name} locked.`); return;
     case "new-review": return openReviewForm();
     case "edit-review": return openReviewForm(id);
