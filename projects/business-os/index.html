@@ -200,6 +200,12 @@ td { padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: midd
 tr:first-child td { border-top: 0; }
 td.r, th.r { text-align: right; }
 td .s { font-size: 12px; color: var(--muted); }
+.ot-note { font-size: 13px; padding: 9px 14px; border-radius: 10px; background: var(--surface-2); color: var(--muted); border-left: 3px solid var(--gold); } .ot-note b { color: var(--ink, inherit); }
+.fill-host { position: relative; }
+.fillh { position: absolute; right: 2px; bottom: 2px; width: 9px; height: 9px; background: var(--brand); border: 2px solid var(--surface); border-radius: 2px; cursor: crosshair; z-index: 3; touch-action: none; }
+.fill-sel { background: color-mix(in srgb, var(--brand) 16%, transparent) !important; box-shadow: inset 0 0 0 1px var(--brand); }
+body.filling, body.filling * { cursor: crosshair !important; user-select: none !important; }
+input.it-price.disc { color: var(--good); font-weight: 700; }
 .cfs { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .cfs legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
 .rr-bar, .rr-act { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -2442,6 +2448,7 @@ function viewHome() {
     <div class="att">${st ? `<b style="font-size:18px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
       : `<b style="font-size:18px">–</b><span>Attendance · not linked</span>`}</div>
   </section>
+  <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>
   ${duesAlert()}
   <div class="home-grid${side ? " has-side" : ""}">
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
@@ -4057,12 +4064,23 @@ document.addEventListener("click", e => {
   document.querySelectorAll(".it-list:not([hidden])").forEach(l => { if (!l.parentElement.contains(e.target)) l.hidden = true; });
 }, true);
 function updateOrderTotal() {
-  let t = 0;
-  document.querySelectorAll("#sheet .item-row").forEach(r => { t += (Number(r.querySelector(".it-q").value) || 0) * mnum(r.querySelector(".it-price")); });
-  const el = $("#order-total"); if (el) el.textContent = peso2(t);
+  let t = 0, srp = 0;
+  document.querySelectorAll("#sheet .item-row").forEach(r => { const q = Number(r.querySelector(".it-q").value) || 0, p = S.products.find(x => x.id === r.querySelector(".it-p").value), pr = r.querySelector(".it-price"), v = pr.value === "" && p ? Number(p.price) || 0 : mnum(pr);
+    t += q * v; srp += q * (p ? Number(p.price) || 0 : v);
+    pr.classList.toggle("disc", !!p && pr.value !== "" && v < (Number(p.price) || 0)); pr.title = p && v < (Number(p.price) || 0) ? `SRP ${peso2(p.price)} · ${peso2((Number(p.price) || 0) - v)} off` : ""; });
+  const d = orderDisc(null, t), el = $("#order-total");
+  if (el) el.innerHTML = (srp > t - d + 0.004 && srp ? `<s style="color:var(--muted);font-weight:400;font-size:13px">${peso2(srp)}</s> ` : "") + peso2(t - d);
+}
+// Order-level discount from Create order (₱ or % of the items).
+function orderDisc(items, sub) {
+  if (!$("#o-disc")) return 0;
+  const s0 = sub != null ? sub : (items || []).reduce((a, i) => a + i.qty * i.price, 0), dv = numv("o-disc");
+  const d = $("#o-dtype") && $("#o-dtype").value === "pct" ? Math.round(s0 * Math.min(100, dv)) / 100 : dv;
+  return Math.max(0, Math.min(s0, d || 0));
 }
 
 function openOrderForm() {
+  S.mergeAns = null;
   if (!S.products.length) { toast("Add your products first in Packing → Inventory, then create orders."); S.view = "dept"; S.dept = "PACKING"; S.tab = "inventory"; render(); return; }
   const num = nextNum();
   openSheet(`
@@ -4075,11 +4093,12 @@ function openOrderForm() {
       <div class="field"><label for="o-customer">Customer name</label><div class="it-pick cu-pick"><input id="o-customer" class="cu-s" type="search" autocomplete="off" placeholder="Type a name — past customers show up"><div class="it-list" hidden></div></div></div>
     </div>
     ${contactFields({})}
-    <div class="field"><label>Items</label><div id="items" style="display:flex;flex-direction:column;gap:6px">${itemRow()}</div><button class="btn sm" type="button" data-act="add-item" style="align-self:flex-start;margin-top:4px">+ Add item</button></div>
+    <div class="field"><label>Items <span style="font-weight:400;color:var(--muted)">(product · qty · unit price: change the price to give a discount)</span></label><div id="items" style="display:flex;flex-direction:column;gap:6px">${itemRow()}</div><button class="btn sm" type="button" data-act="add-item" style="align-self:flex-start;margin-top:4px">+ Add item</button></div>
     <div class="row">
-      <div class="field"><label for="o-fees">Platform fees (₱)</label><input inputmode="decimal" class="money" id="o-fees" placeholder="0"></div>
-      <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input inputmode="decimal" class="money" id="o-ship" placeholder="0"></div>
+      <div class="field"><label for="o-disc">Discount</label><div style="display:flex;gap:6px"><input inputmode="decimal" class="money" id="o-disc" placeholder="0" style="flex:1;min-width:0"><select id="o-dtype" aria-label="Discount type" style="width:auto"><option value="amt">₱</option><option value="pct">%</option></select></div></div>
+      <div class="field"><label for="o-dnote">Discount reason (optional)</label><input id="o-dnote" placeholder="e.g. loyal buyer, promo code" autocomplete="off"></div>
     </div>
+    <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input inputmode="decimal" class="money" id="o-ship" placeholder="0"></div>
     <div class="row">
       <div class="field"><label for="o-pay">Payment status</label><select id="o-pay">${opts(PAYMENTS.filter(p => !VOIDPAY.has(p.id)), "pending")}</select></div>
       <div class="field"><label for="o-ful">Fulfillment status</label><select id="o-ful">${opts(FULFILLMENTS.filter(f => f.id !== "delivered"), "to_confirm")}</select></div>
@@ -4101,40 +4120,105 @@ function openOrderForm() {
       items.push({ productId: pid, name: p.name, sku: p.sku || "", qty, price, cost: Number(p.cost) || 0 });
     });
     if (!items.length) return sheetError("Add at least one product with a quantity.");
-    const cErr = contactCheck(contactRead()); if (cErr) return sheetError(cErr);
+    const cc = contactRead(), cErr = contactCheck(cc); if (cErr) return sheetError(cErr);
+    const custIn = val("o-customer").trim(), hit = buyerMatch(cc);
+    if (hit && custIn && hit.name.trim().toLowerCase() !== custIn.toLowerCase() && !S.mergeAns) return askMerge(hit);
+    const custName = hit && (S.mergeAns === "merge" || !custIn) ? hit.name : custIn;
     const date = val("o-date") || today();
     const createdAt = date === today() ? Date.now() : new Date(date + "T12:00:00").getTime();
     const fulfillment = val("o-ful");
     const rsv = S.site && S.site.nextNumber ? await S.site.nextNumber().catch(() => null) : null;
     if (S.site && S.site.nextNumber && !(rsv && rsv.ok && /^RS\d+$/.test(rsv.ref || ""))) return sheetError((rsv && rsv.error) || "Couldn't get the next RS number. Try again.");
     const fnum = (rsv && rsv.ref) || num;
-    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: val("o-customer"), ref: val("o-ref"), ...contactRead(), items, fees: numv("o-fees"), shipping: numv("o-ship"), adjust: 0, payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
+    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: custName, ref: val("o-ref"), ...cc, items, fees: 0, shipping: numv("o-ship"), adjust: 0, discount: orderDisc(items), discountNote: orderDisc(items) ? val("o-dnote") : "", payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
     const take = isCancelled(order.payment, fulfillment) ? {} : stockTake(items);
     order.stockTaken = take;
     await save("orders", uid("o"), order);
     await applyStockMap(take, -1);
-    closeSheet(); toast(`Order #${fnum} saved. Inventory updated.`);
+    const fresh = await buyerRecord(order, hit, S.mergeAns).catch(() => false); S.mergeAns = null;
+    closeSheet(); toast(`Order #${fnum} saved. Inventory updated.${fresh ? " New buyer added to Customers." : ""}`);
     if (order.email && !isCancelled(order.payment, fulfillment)) { const nw = S.orders.find(x => x.num === fnum); if (nw) receiptSend(nw, true); }
   });
+  addrInit();
+}
+
+/* ---------- buyer records: first order makes a Customers record; same email or phone asks to merge ---------- */
+const phoneKey = p => String(p || "").replace(/\D/g, "").slice(-10);
+function buyerMatch(c) {
+  const em = (c.email || "").toLowerCase(), ph = phoneKey(c.phone);
+  if (!em && ph.length < 10) return null;
+  for (const x of customerList()) {
+    const via = em && (x.email || "").toLowerCase() === em ? "email" : ph.length === 10 && phoneKey(x.phone) === ph ? "phone number" : "";
+    if (via && x.name) return { name: x.name, email: x.email || "", phone: x.phone || "", address: x.address || "", docId: x.docId || "", orders: x.orders || 0, via };
+  }
+  return null;
+}
+function askMerge(hit) {
+  const el = $("#sheet-err"); if (!el) return;
+  el.hidden = false;
+  el.innerHTML = `<div>This ${esc(hit.via)} already belongs to <b>${esc(hit.name)}</b>${hit.orders ? ` (${hit.orders} order${hit.orders === 1 ? "" : "s"})` : ""}. Is this the same buyer?</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn primary sm" type="button" data-act="cm-merge">Yes, merge into ${esc(hit.name)}</button><button class="btn sm" type="button" data-act="cm-sep">No, save as a new buyer</button></div>`;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+// Returns true when a new buyer record was made.
+async function buyerRecord(o, hit, ans) {
+  const base = { email: o.email || "", phone: o.phone || "", address: o.address || "" };
+  if (hit && ans !== "separate") {
+    const id = hit.docId || custDocId({ email: hit.email || o.email, name: hit.name });
+    const ex = S.customers.find(c => c.id === id);
+    const fill = Object.fromEntries(Object.entries(base).filter(([k, v]) => v && !(ex ? ex[k] : hit[k])));
+    if (ex) { if (Object.keys(fill).length) await patch("customers", id, fill); return false; }
+    await save("customers", id, { name: hit.name, email: hit.email || base.email, phone: hit.phone || base.phone, address: hit.address || base.address, tags: [], note: "", source: "RS OS", firstOrder: o.num, createdAt: Date.now() });
+    return false;
+  }
+  if (!o.customer && !base.email && !base.phone) return false;
+  const id = ans === "separate" ? "c-" + safeId((o.customer || "") + "-" + (phoneKey(o.phone) || o.num)) : custDocId({ email: base.email, name: o.customer || base.phone });
+  if (S.customers.some(c => c.id === id)) return false;
+  await save("customers", id, { name: o.customer || "", ...base, tags: [], note: "", source: "RS OS", firstOrder: o.num, createdAt: Date.now() });
+  return true;
 }
 
 /* ---------- contact & shipping (Create order + Edit contact) ---------- */
+// J&T writes places in capitals with dashes (METRO-MANILA); people read "Metro Manila".
+const placeName = v => String(v || "").replace(/-/g, " ").toLowerCase().replace(/(^|[\s(])([a-zñ])/g, (m, a, b) => a + b.toUpperCase());
+const addrLine = sh => [sh.address1, ...[sh.address2, sh.city, sh.province].map(placeName), sh.zip].filter(Boolean).join(", ");
+// Fills Province → City → Barangay from J&T's list. Old free-text values are matched to J&T's names when possible.
+async function addrInit() {
+  const P = $("#o-prov"), C = $("#o-city"), B = $("#o-a2"); if (!P) return;
+  let A; try { A = await jntAddr(); } catch (e) { P.innerHTML = `<option value="">Couldn't load J&T's list</option>`; return; }
+  if (!$("#o-prov")) return;
+  const m = (P.dataset.was || C.dataset.was) ? jntMatch(A, { province: P.dataset.was, city: C.dataset.was, address1: $("#o-a1") ? $("#o-a1").value : "", address2: B.dataset.was }) : { prov: "", city: "", brgy: "" };
+  const fill = (el, list, v, ph) => { const keep = v && !list.includes(v) ? el.dataset.was : ""; el.innerHTML = `<option value="">${ph}</option>${keep ? `<option value="${esc(keep)}" selected>${esc(keep)} (not in J&T list)</option>` : ""}${list.map(x => `<option value="${esc(x)}" ${x === v ? "selected" : ""}>${esc(placeName(x))}</option>`).join("")}`; el.disabled = !list.length && !keep; };
+  fill(P, Object.keys(A).sort(), m.prov || P.dataset.was, "Choose province…");
+  const cities = P.value && A[P.value] ? Object.keys(A[P.value]).sort() : [];
+  fill(C, cities, m.city || (P.value === m.prov ? "" : C.dataset.was), cities.length ? "Choose city…" : "Choose a province first");
+  const bs = P.value && C.value && A[P.value] && A[P.value][C.value] ? A[P.value][C.value].slice().sort() : [];
+  fill(B, bs, m.brgy || (C.value === m.city ? "" : B.dataset.was), bs.length ? "Choose barangay…" : "Choose a city first");
+}
+function addrCascade(t) {
+  const A = JNT_ADDR; if (!A) return;
+  const P = $("#o-prov"), C = $("#o-city"), B = $("#o-a2");
+  if (t.id === "o-prov") { const cs = A[P.value] ? Object.keys(A[P.value]).sort() : []; C.innerHTML = `<option value="">${cs.length ? "Choose city…" : "Choose a province first"}</option>${cs.map(x => `<option value="${esc(x)}">${esc(placeName(x))}</option>`).join("")}`; C.disabled = !cs.length; }
+  if (t.id === "o-prov" || t.id === "o-city") { const bs = A[P.value] && A[P.value][C.value] ? A[P.value][C.value].slice().sort() : []; B.innerHTML = `<option value="">${bs.length ? "Choose barangay…" : "Choose a city first"}</option>${bs.map(x => `<option value="${esc(x)}">${esc(placeName(x))}</option>`).join("")}`; B.disabled = !bs.length; }
+}
 const PAYLINK_RE = /^https:\/\/[^\s"'<>]+$/i;
 function contactFields(o) {
   const sh = o.ship || (o.address ? shipOf(o) : {});
   const f = (id, label, v, extra = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${esc(v || "")}" autocomplete="off" ${extra}></div>`;
+  const asel = (id, label, v) => `<div class="field"><label for="${id}">${label}</label><select id="${id}" class="addr-sel" data-was="${esc(v || "")}">${v ? `<option selected>${esc(v)}</option>` : `<option value="">Loading…</option>`}</select></div>`;
   return `<fieldset class="cfs"><legend>Contact & shipping</legend>
     <div class="row">${f("o-email", "Email address", o.email, 'type="email" inputmode="email" placeholder="for the Royal Receipt"')}${f("o-phone", "Phone number", o.phone, 'type="tel" inputmode="tel" placeholder="09XX XXX XXXX"')}</div>
     <div class="row">${f("o-shname", "Ship to (name)", sh.name && sh.name !== o.customer ? sh.name : "", 'placeholder="Same as customer"')}${f("o-shphone", "Receiver phone", sh.phone && sh.phone !== o.phone ? sh.phone : "", 'type="tel" inputmode="tel" placeholder="Same as above"')}</div>
     ${f("o-a1", "House no., building, street", sh.address1)}
-    <div class="row">${f("o-a2", "Barangay", sh.address2)}${f("o-city", "City / municipality", sh.city)}</div>
-    <div class="row">${f("o-prov", "Province", sh.province, 'placeholder="e.g. Metro Manila"')}${f("o-zip", "ZIP code", sh.zip, 'inputmode="numeric" maxlength="4"')}</div>
+    <div class="row">${asel("o-prov", "Province", sh.province)}${asel("o-city", "City / municipality", sh.city)}</div>
+    <div class="row">${asel("o-a2", "Barangay", sh.address2)}${f("o-zip", "ZIP code", sh.zip, 'inputmode="numeric" maxlength="4"')}</div>
+    <div style="font-size:12px;color:var(--muted)">Province, city and barangay use J&T's address list, so the J&T booking file matches.</div>
   </fieldset>`;
 }
 function contactRead() {
   const v = id => ($("#" + id) ? $("#" + id).value.trim() : "");
   const ship = { name: v("o-shname"), phone: v("o-shphone"), address1: v("o-a1"), address2: v("o-a2"), city: v("o-city"), province: v("o-prov"), zip: v("o-zip") };
-  const address = [ship.address1, ship.address2, ship.city, ship.province, ship.zip].filter(Boolean).join(", ");
+  const address = addrLine(ship);
   return { email: v("o-email").toLowerCase(), phone: v("o-phone"), ship: address ? ship : null, address };
 }
 function contactCheck(c) {
@@ -4149,7 +4233,7 @@ function custFill(name) {
   const sh = (last.find(o => o.ship && (o.ship.address1 || o.ship.city)) || last.find(o => o.address) || null);
   const put = (id, v) => { const el = $("#" + id); if (el && !el.value && v) el.value = v; };
   put("o-email", pick("email")); put("o-phone", pick("phone"));
-  if (sh) { const x = shipOf(sh); put("o-a1", x.address1); put("o-a2", x.address2); put("o-city", x.city); put("o-prov", x.province); put("o-zip", x.zip); }
+  if (sh && !($("#o-prov") || {}).value) { const x = shipOf(sh); put("o-a1", x.address1); put("o-zip", x.zip); $("#o-prov").dataset.was = x.province || ""; $("#o-city").dataset.was = x.city || ""; $("#o-a2").dataset.was = x.address2 || ""; addrInit(); }
 }
 function openContactEdit(id) {
   const o = S.orders.find(x => x.id === id); if (!o) return;
@@ -4169,6 +4253,7 @@ function openContactEdit(id) {
     const nw = S.orders.find(x => x.id === o.id);
     if (newLink && nw && nw.email && !["paid", "refunded", "voided", "to_refund"].includes(nw.payment)) receiptSend(nw, true);
   });
+  addrInit();
 }
 
 /* ---------- Royal Receipt: emailed invoice with a Pay now button, plus a copy-ready text version ---------- */
@@ -4179,7 +4264,7 @@ const rrPayable = o => !["paid", "refunded", "voided", "to_refund"].includes(o.p
 const rrDate = o => new Date(o.createdAt || Date.now()).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" });
 function receiptHTML(o) {
   const e = esc, sh = shipOf(o), c = RR, link = rrPayable(o) && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
-  const addr = [sh.address1, sh.address2, sh.city, sh.province, sh.zip].filter(Boolean).join(", ");
+  const addr = addrLine(sh);
   const row = (l, v, b) => `<tr><td style="padding:4px 0;color:${b ? c.ink : c.muted};font-size:14px;${b ? "font-weight:700" : ""}">${l}</td><td align="right" style="padding:4px 0;color:${c.ink};font-size:14px;${b ? "font-weight:700" : ""}">${v}</td></tr>`;
   const st = rrState(o), stCol = st === "PAID" ? "#2e7d4f" : st === "UNPAID" ? "#b4541a" : c.brand;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Royal Receipt ${e(onum(o))}</title></head>
@@ -4225,7 +4310,7 @@ ${link ? `<tr><td align="center" style="padding:18px 28px 6px">
 }
 function receiptText(o) {
   const sh = shipOf(o), link = rrPayable(o) && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
-  const addr = [sh.address1, sh.address2, sh.city, sh.province, sh.zip].filter(Boolean).join(", ");
+  const addr = addrLine(sh);
   return [`👑 REGAL SPRITZ PH · ROYAL RECEIPT`, `Order ${onum(o)} · ${rrDate(o)} · ${rrState(o)}`, "",
     `Hi ${(o.customer || "").split(" ")[0] || "there"}, thank you for your order!`, "",
     ...(o.items || []).map(i => `• ${i.qty}× ${i.name} · ${peso2((Number(i.qty) || 0) * (Number(i.price) || 0))}`), "",
@@ -5118,8 +5203,12 @@ const ATT_STATUS = [
   { id: "holiday", name: "Holiday", cls: "", short: "H" },
   { id: "absent", name: "Absent", cls: "bad", short: "A" },
   { id: "notin", name: "Not in yet", cls: "", short: "" },
+  { id: "flex", name: "Flexible", cls: "", short: "F" },
 ];
 const astat = id => ATT_STATUS.find(s => s.id === id) || ATT_STATUS[7];
+// The owner (and anyone marked flexible) has no fixed hours: never late or absent.
+const isFlex = mid => { const m = member(mid), own = ownerMember(); return !!m && (m.flex === true || (!!own && own.id === mid)); };
+const OT_NOTE = "Overtime isn't paid. Be on time and make the most of your scheduled work hours.";
 const attCfg = () => ({ start: "09:00", end: "18:00", grace: 15, breakMin: 60, workdays: [1, 2, 3, 4, 5, 6], ...(S.attSettings || {}) });
 const onBreak = r => !!(r && r.in && !r.out && r.breaks && r.breaks.length && !r.breaks[r.breaks.length - 1].e);
 const breakMs = r => !r || !r.breaks ? 0 : r.breaks.reduce((a, b) => a + Math.max(0, (b.e || r.out || (mDate(b.s) === mToday() ? Date.now() : b.s)) - b.s), 0);
@@ -5138,12 +5227,13 @@ const SCHED_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const schedOf = m => !m ? null : m.sched && Object.keys(m.sched).length ? m.sched : SCHED_DEFAULT[String(m.nickname || m.name || "").trim().split(/\s+/)[0].toLowerCase()] || null;
 const parseBlocks = s => String(s || "").split(/[,;&]/).map(x => x.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?$/)).filter(Boolean).map(x => [Number(x[1]) * 60 + Number(x[2] || 0), Number(x[3]) * 60 + Number(x[4] || 0)]).filter(([a, z]) => z > a);
 function shiftBlocks(date, mid) {
+  if (isFlex(mid)) return [];
   const s = schedOf(member(mid));
   if (!s) { const c = attCfg(); return isWorkday(date) ? [[toMin(c.start), toMin(c.end)]] : []; }
   return parseBlocks(s[new Date(date + "T12:00:00+08:00").getDay()]);
 }
 const fmtHM = n => { const h = Math.floor(n / 60), mm = n % 60; return (h % 12 || 12) + (mm ? ":" + String(mm).padStart(2, "0") : "") + (h === 12 && !mm ? "nn" : h < 12 ? "am" : "pm"); };
-const shiftLabel = (date, mid) => { const b = shiftBlocks(date, mid); return b.length ? b.map(([a, z]) => fmtHM(a) + "–" + fmtHM(z)).join(" & ") : "day off"; };
+const shiftLabel = (date, mid) => { if (isFlex(mid)) return "flexible hours"; const b = shiftBlocks(date, mid); return b.length ? b.map(([a, z]) => fmtHM(a) + "–" + fmtHM(z)).join(" & ") : "day off"; };
 const shiftStart = (date, mid) => { const b = shiftBlocks(date, mid); return b.length ? b[0][0] : toMin(attCfg().start); };
 // The time between split shifts is saved as a "gap" break: it isn't paid, and it doesn't use up the break allowance.
 const ownBreakMs = r => breakMs(r && r.breaks ? { ...r, breaks: r.breaks.filter(b => !b.gap) } : r);
@@ -5151,6 +5241,7 @@ const canResume = (date, mid, r) => !!(r && r.in && r.out) && date === mToday() 
 function attStatus(date, mid) {
   const r = attRec(date, mid);
   if (r && r.status && r.status !== "present") return r.status;
+  if (isFlex(mid)) return r && r.in ? "present" : "flex";
   if (r && r.in) return mMinutes(r.in) > shiftStart(date, mid) + (Number(attCfg().grace) || 0) ? "late" : "present";
   if (!shiftBlocks(date, mid).length) return "off";
   if (date < mToday()) return "absent";
@@ -5220,12 +5311,12 @@ function myClockCard() {
   return `<section class="panel clock-card"><div class="head"><h2>My attendance today</h2><span class="chip ${onBreak(r) ? "warn" : astat(st).cls}">${onBreak(r) ? "On break" : astat(st).name}</span></div>
     <div class="clock-row"><div><div class="clock-big num" data-live-clock>${mTime(Date.now())}</div><div style="font-size:12px;color:var(--muted)">Manila time · shift ${esc(shiftLabel(mToday(), mid))}</div></div>
     <div style="font-size:13px">${r && r.in && shiftBlocks(mToday(), mid).length > 1 ? `<div style="display:flex;gap:14px"><div><small style="color:var(--muted)">In</small>${shiftCells(mToday(), mid, r, "in")}</div><div><small style="color:var(--muted)">Out</small>${shiftCells(mToday(), mid, r, "out")}</div></div>${fmtHours(hoursOf(r))} worked` : r && r.in ? `In <b>${mTime(r.in)}</b>${r.out ? ` · Out <b>${mTime(r.out)}</b>` : ""} · ${fmtHours(hoursOf(r))} worked${ownBreakMs(r) ? ` · break ${fmtMin(ownBreakMs(r))} of ${attCfg().breakMin}m` : ""}` : "Not timed in yet"}</div>
-    <div class="actions">${clockButtons(mid, mToday())}</div></div></section>`;
+    <div class="actions">${clockButtons(mid, mToday())}</div></div><div style="font-size:12px;color:var(--muted)">⏰ ${OT_NOTE}</div></section>`;
 }
 setInterval(() => document.querySelectorAll("[data-live-clock]").forEach(e => e.textContent = mTime(Date.now())), 20000);
 
 function attSummary(date) {
-  const ms = activeTeam(), n = ms.length, c = id => ms.filter(m => attStatus(date, m.id) === id).length;
+  const ms = activeTeam().filter(m => attStatus(date, m.id) !== "flex"), n = ms.length, c = id => ms.filter(m => attStatus(date, m.id) === id).length;
   const leave = c("leave") + c("sick");
   const parts = [["present", "Present", c("present")], ["late", "Late", c("late")], ["leave", "On leave", leave], ["absent", "Absent", c("absent")], ["notin", "Not in yet", c("notin")], ["off", "Day off / holiday", c("off") + c("holiday")]].filter(p => p[2] || ["present", "late", "absent"].includes(p[0]));
   return `<div class="tsum"><div class="tsum-line">${parts.map(([id, nm, v]) => `<span class="tsum-part a-${id}"><b class="num">${v}/${n}</b> ${nm}</span>`).join('<span class="tsum-sep">|</span>')}</div>
@@ -5248,7 +5339,7 @@ function viewAttendance() {
       <thead><tr><th>Team member</th><th>Department</th><th>Status</th><th>Time in</th><th>Time out</th><th class="r">Break</th><th class="r">Hours</th><th>Note</th><th></th></tr></thead>
       <tbody>${team.map(m => { const r = attRec(A.date, m.id), st = astat(attStatus(A.date, m.id)); return `<tr data-att="${m.id}">
         <td style="font-weight:600">${esc(m.name)}${m.id === myMemberId() ? ' <span class="chip">You</span>' : ""}</td>
-        <td>${esc((dept(m.department) || { name: "–" }).name)}${schedOf(m) ? `<div style="font-size:11px;color:var(--muted)">${esc(shiftLabel(A.date, m.id))}</div>` : ""}</td>
+        <td>${esc((dept(m.department) || { name: "–" }).name)}${schedOf(m) || isFlex(m.id) ? `<div style="font-size:11px;color:var(--muted)">${esc(isFlex(m.id) ? "Flexible hours" : shiftLabel(A.date, m.id))}</div>` : ""}</td>
         <td><span class="chip ${st.cls}">${st.name}</span>${onBreak(r) ? ' <span class="chip warn">On break</span>' : ""}</td>
         <td class="num nowrap">${shiftCells(A.date, m.id, r, "in")}</td>
         <td class="num nowrap">${shiftCells(A.date, m.id, r, "out")}</td>
@@ -6064,7 +6155,8 @@ function payPeriod(month = S.pay.month, half = S.pay.half) {
   const label = half === 0 ? monthLabel(month) : `${new Date(y, mo - 1, from).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}–${to}, ${y}`;
   return { start: d(from), end: d(to), key: `${month}-${half === 0 ? "M" : half === 1 ? "A" : "B"}`, label };
 }
-const ADD_FIELDS = [["overtime", "Overtime"], ["holidayPay", "Holiday pay"], ["allowance", "Allowance"], ["incentives", "Incentives / commission"], ["otherAdd", "Other additions"]];
+// No overtime pay (K, 2026-10-08), so there's no Overtime line on payslips.
+const ADD_FIELDS = [["holidayPay", "Holiday pay"], ["allowance", "Allowance"], ["incentives", "Incentives / commission"], ["otherAdd", "Other additions"]];
 const DED_FIELDS = [["cashAdvance", "Cash advance"], ["sss", "SSS"], ["philhealth", "PhilHealth"], ["pagibig", "Pag-IBIG"], ["otherDed", "Other deductions"]];
 function payCalc(m, per) {
   const cfg = payCfg(), rate = rateOf(m), rec = S.payroll.find(r => r.id === per.key + "_" + m.id) || {};
@@ -6133,7 +6225,7 @@ function payRatesPanel(staff) {
           <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="pc-late" ${cfg.deductLate ? "checked" : ""}> Deduct late minutes (daily rate ÷ 8 hours ÷ 60 per minute)</label>
           <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="pc-leave" ${cfg.paidLeave ? "checked" : ""}> Pay vacation / sick leave days</label>
           <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="pc-hol" ${cfg.paidHoliday ? "checked" : ""}> Pay holidays as a regular day</label>
-          <div style="font-size:12px;color:var(--muted)">Days worked come from Attendance (Present + Late). You can still adjust days and add overtime, allowances or deductions on each payslip.</div>
+          <div style="font-size:12px;color:var(--muted)">Days worked come from Attendance (Present + Late). You can still adjust days and add allowances or deductions on each payslip. Overtime isn't paid.</div>
         </div>
       </div>
       <div class="table-wrap" style="border:0"><table><thead><tr><th>Employee</th><th>Position</th><th>Custom rate / day (optional)</th></tr></thead><tbody>
@@ -6482,6 +6574,7 @@ document.addEventListener("click", guard(async ev => {
   switch (b.dataset.act) {
     case "new-order": return openOrderForm();
     case "edit-contact": return openContactEdit(b.dataset.id);
+    case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
     case "rr-send": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Sending…"; await receiptSend(o); if ($("#sheet") && S.sheetReopen) openReceipt(o.id); return; }
     case "rr-copy": case "rr-copyhtml": { const o = S.orders.find(x => x.id === b.dataset.id) || S.archived.find(x => x.id === b.dataset.id); if (!o) return; const ok = b.dataset.act === "rr-copy" ? await navigator.clipboard.writeText(receiptText(o)).then(() => true, () => false) : await copyRich(receiptHTML(o), receiptText(o)); const was = b.textContent; b.textContent = ok ? "Copied ✓" : "Couldn't copy"; setTimeout(() => { b.textContent = was; }, 1400); return; }
@@ -6663,6 +6756,65 @@ document.addEventListener("click", guard(async ev => {
   }
 }));
 
+async function listSet(t, quiet) {
+  const pr = S.products.find(x => x.id === t.dataset.id); if (!pr) return false; const f = t.dataset.lset;
+  let v = t.value.trim(); if (t.classList.contains("money")) v = v.replace(/,/g, "");
+  if (f === "price" || f === "stock") { if (v === "" || isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return false; } v = f === "stock" ? Math.round(Number(v)) : Number(v); }
+  if (f === "compareAt" || f === "cost") { if (v !== "" && isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return false; } v = v === "" ? null : Number(v); }
+  if (String(pr[f] ?? "") === String(v ?? "")) return false;
+  const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", category: "collection" }[f] || f;
+  const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" || f === "compareAt" || f === "cost" ? (v == null ? "none" : peso(v)) : f === "category" ? (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : (v === "" ? "none" : v);
+  await patch("products", pr.id, { [f]: v, ...(f === "cost" ? {} : { webSync: "pending" }), editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(pr, [`changed ${lab} to ${shown}`]) });
+  if (!quiet) toast(`${pr.name}: ${lab} → ${shown}`); if (!S.db && !quiet) render(); return true;
+}
+
+/* ---------- Listings: drag the corner of a cell (like Excel / Google Sheets) to copy its value down or up ---------- */
+let fillH = null, fillDrag = null, fillEndAt = 0;
+window.addEventListener("click", e => { if (Date.now() - fillEndAt < 400) { e.stopPropagation(); e.preventDefault(); } }, true);
+function fillShow(el) {
+  if (!el || !el.closest(".ltable") || S.readOnly) return;
+  if (!fillH) { fillH = document.createElement("span"); fillH.className = "fillh"; fillH.title = "Drag to copy this value to other rows"; fillH.addEventListener("pointerdown", fillStart); }
+  const td = el.closest("td"); if (!td) return; td.classList.add("fill-host"); td.appendChild(fillH); fillH.dataset.f = el.dataset.lset; fillH.dataset.id = el.dataset.id;
+}
+const fillRows = () => [...document.querySelectorAll(".ltable tbody tr")];
+function fillStart(ev) {
+  ev.preventDefault(); ev.stopPropagation();
+  const f = fillH.dataset.f, src = document.querySelector(`.ltable [data-lset="${f}"][data-id="${fillH.dataset.id}"]`); if (!src) return;
+  fillDrag = { f, src, from: src.closest("tr"), to: src.closest("tr") };
+  try { fillH.setPointerCapture(ev.pointerId); } catch (e) {}
+  fillH.addEventListener("pointermove", fillMove); fillH.addEventListener("pointerup", fillEnd, { once: true }); fillH.addEventListener("pointercancel", fillEnd, { once: true });
+  document.body.classList.add("filling");
+}
+function fillPaint(d = fillDrag) {
+  const rows = fillRows(), a = rows.indexOf(d.from), b = rows.indexOf(d.to), lo = Math.min(a, b), hi = Math.max(a, b);
+  document.querySelectorAll(".fill-sel").forEach(x => x.classList.remove("fill-sel"));
+  rows.slice(lo, hi + 1).forEach(r => { const el = r.querySelector(`[data-lset="${d.f}"]`); if (el) el.closest("td").classList.add("fill-sel"); });
+  return rows.slice(lo, hi + 1);
+}
+function fillMove(ev) {
+  if (!fillDrag) return;
+  const under = document.elementFromPoint(ev.clientX, ev.clientY), tr = under && under.closest(".ltable tbody tr");
+  if (tr && tr !== fillDrag.to) { fillDrag.to = tr; fillPaint(); }
+  if (ev.clientY > window.innerHeight - 40) window.scrollBy(0, 18); // keep scrolling near the edge else if (ev.clientY < 40) window.scrollBy(0, -18);
+}
+async function fillEnd() {
+  const d = fillDrag; fillDrag = null; document.body.classList.remove("filling");
+  if (fillH) fillH.removeEventListener("pointermove", fillMove);
+  if (!d) return;
+  // The drop would also count as a click on the row (which opens the listing): swallow that one click.
+  fillEndAt = Date.now();
+  const rows = fillPaint(d); document.querySelectorAll(".fill-sel").forEach(x => x.classList.remove("fill-sel"));
+  const ids = rows.map(r => (r.querySelector(`[data-lset="${d.f}"]`) || {}).dataset).filter(Boolean).map(x => x.id).filter(id => id !== d.src.dataset.id);
+  if (!ids.length) return;
+  const v = d.src.value; await listSet(d.src, true);
+  let n = 0;
+  for (const id of ids) { const el = document.querySelector(`.ltable [data-lset="${d.f}"][data-id="${id}"]`); if (!el) continue; el.value = v; if (await listSet(el, true)) n++; }
+  const lab = { eta: "ETA", status: "Status", size: "Size", ptype: "Type", kind: "On hand / Pre-order", price: "SRP", compareAt: "Compare at", cost: "Cost", stock: "In stock", category: "Collection" }[d.f] || d.f;
+  toast(n ? `${lab} copied to ${n} more listing${n === 1 ? "" : "s"}.` : "Those listings already had that value."); if (!S.db) render();
+}
+document.addEventListener("focusin", e => { if (e.target.dataset && e.target.dataset.lset) fillShow(e.target); });
+document.addEventListener("pointerover", e => { if (fillDrag || !e.target.closest) return; const el = e.target.closest("td") && e.target.closest("td").querySelector("[data-lset]"); if (el && e.pointerType === "mouse") fillShow(el); });
+
 document.addEventListener("change", guard(async ev => {
   const t = ev.target;
   if (t.dataset.tq) return taskQuick(t);
@@ -6709,17 +6861,9 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.oset) { const o = findOrder(t.dataset.id); if (!o) return; const f = t.dataset.oset; await updateOrder(o, { [f]: t.value }); const lab = { payment: pay(t.value).name, fulfillment: ful(t.value).name, courier: t.value, assignee: t.value ? memberName(t.value) : "Unassigned" }[f]; toast(f === "fulfillment" && isDispute(o) && ["unfulfilled", "fulfilled"].includes(t.value) ? `⚠️ ${onum(o)} has a DISPUTE tag. Double-check it's resolved before dispatch.` : `${onum(o)} → ${lab}`); if (!S.db) render(); return; }
   if (t.dataset.cassign !== undefined) { const c = customerList().find(x => custKey(x) === t.dataset.cassign); if (!c) return; const os = c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(o => o && OPEN_FUL.has(o.fulfillment)); for (const o of os) await updateOrder(o, { assignee: t.value }); toast(`${c.name} → ${t.value ? memberName(t.value) : "Unassigned"} (${os.length} open order${os.length === 1 ? "" : "s"}; new orders follow).`); render(); return; }
   if (t.id === "psel-all") { packList().forEach(o => t.checked ? S.sel.add(o.id) : S.sel.delete(o.id)); render(); return; }
-  if (t.dataset.lset) {
-    const pr = S.products.find(x => x.id === t.dataset.id); if (!pr) return; const f = t.dataset.lset;
-    let v = t.value.trim(); if (t.classList.contains("money")) v = v.replace(/,/g, "");
-    if (f === "price" || f === "stock") { if (v === "" || isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return; } v = f === "stock" ? Math.round(Number(v)) : Number(v); }
-    if (f === "compareAt" || f === "cost") { if (v !== "" && isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return; } v = v === "" ? null : Number(v); }
-    if (String(pr[f] ?? "") === String(v ?? "")) return;
-    const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", category: "collection" }[f] || f;
-    const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" || f === "compareAt" || f === "cost" ? (v == null ? "none" : peso(v)) : f === "category" ? (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : (v === "" ? "none" : v);
-    await patch("products", pr.id, { [f]: v, ...(f === "cost" ? {} : { webSync: "pending" }), editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(pr, [`changed ${lab} to ${shown}`]) });
-    toast(`${pr.name}: ${lab} → ${shown}`); if (!S.db) render(); return;
-  }
+  if (t.dataset.lset) return listSet(t);
+  if (t.classList.contains("addr-sel")) return addrCascade(t);
+  if (t.id === "o-dtype") return updateOrderTotal();
   if (t.id === "sp-ful") { S.sp.ful = t.value; render(); return; }
   if (t.id === "sp-pay") { S.sp.pay = t.value; render(); return; }
   if (t.classList.contains("jnt-f")) { jntField(t, t.tagName === "INPUT"); return; } // text boxes update in place: redrawing here would swap out the box being clicked into next
@@ -6740,7 +6884,7 @@ document.addEventListener("change", guard(async ev => {
 
 document.addEventListener("input", ev => {
   const t = ev.target;
-  if (t.matches(".it-q, .it-price")) return updateOrderTotal();
+  if (t.matches(".it-q, .it-price, #o-disc")) return updateOrderTotal();
   if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-disc")) return eiTotal();
   if (t.id === "p-frag-text") { if (t.value.trim()) fragFill(fragFromText(t.value), true); return; }
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
