@@ -1074,17 +1074,65 @@ function nextNum() {
 }
 
 /* ---------- data layer ---------- */
+/* ---------- Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z) ----------
+   Every write made right after a click, change or key press is one "step": we keep each record as it was before.
+   Undo puts those records back (and deletes ones the step created); redo re-applies them. Background syncs aren't recorded. */
+const UNDO = { stack: [], redo: [], gesture: 0, at: 0, busy: false };
+["pointerdown", "change", "keydown", "submit"].forEach(t => document.addEventListener(t, e => { if (e.type === "keydown" && (e.metaKey || e.ctrlKey) && /^z$/i.test(e.key)) return; UNDO.gesture++; UNDO.at = Date.now(); }, true));
+const undoArr = col => col === "orders" ? [...(S.orders || []), ...(S.archived || [])] : Array.isArray(S[col]) ? S[col] : null;
+function undoNote(col, id) {
+  if (UNDO.busy || Date.now() - UNDO.at > 6000 || (col === "webmeta" && String(id).startsWith("_"))) return;
+  const arr = undoArr(col); if (!arr) return;
+  const cur = arr.find(r => r.id === id);
+  if (!cur && S.loaded && S.loaded[col] === false) return; // not loaded yet: can't tell what was there
+  let g = UNDO.stack[UNDO.stack.length - 1];
+  if (!g || g.gesture !== UNDO.gesture) { g = { gesture: UNDO.gesture, at: Date.now(), items: [] }; UNDO.stack.push(g); if (UNDO.stack.length > 40) UNDO.stack.shift(); UNDO.redo = []; }
+  if (g.items.some(x => x.col === col && x.id === id)) return;
+  g.items.push({ col, id, prev: cur ? JSON.parse(JSON.stringify(clean(cur))) : null });
+}
+const undoName = x => { const d = x.prev || (undoArr(x.col) || []).find(r => r.id === x.id) || {};
+  return x.col === "orders" ? "order " + (d.num ? "#" + String(d.num).replace(/^#/, "") : "") : x.col === "products" ? "listing " + (d.name || "") : x.col === "tasks" ? "task " + (d.title || "") : x.col === "attendance" ? "attendance" : x.col === "customers" ? "customer " + (d.name || "") : x.col.replace(/s$/, ""); };
+async function undoApply(from, to, verb) {
+  const g = from.pop(); if (!g) { toast(verb === "Undid" ? "Nothing to undo." : "Nothing to redo."); return; }
+  UNDO.busy = true;
+  const names = [...new Set(g.items.map(undoName))];
+  try {
+    const back = { gesture: -1, at: Date.now(), items: [] };
+    for (const x of [...g.items].reverse()) {
+      const cur = (undoArr(x.col) || []).find(r => r.id === x.id);
+      back.items.unshift({ col: x.col, id: x.id, prev: cur ? JSON.parse(JSON.stringify(clean(cur))) : null });
+      const data = x.prev && x.col === "products" ? { ...x.prev, webSync: "pending" } : x.prev; // listing changes go back to the website too
+      if (data) await save(x.col, x.id, data); else await remove(x.col, x.id);
+    }
+    to.push(back);
+    toast(`${verb}: ${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2} more` : ""}${verb === "Undid" ? " · Ctrl+Shift+Z to redo" : ""}`);
+    if (g.items.some(x => x.col === "orders")) scheduleStatusSync();
+  } catch (e) { toast("Couldn't undo that: " + ((e && e.message) || "try again")); }
+  finally { UNDO.busy = false; }
+}
+document.addEventListener("keydown", e => {
+  if (!(e.metaKey || e.ctrlKey) || !/^z$/i.test(e.key) || S.readOnly) return;
+  const t = e.target; // typing in a box: let the browser undo the text instead
+  if (t && (t.isContentEditable || t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && !/^(checkbox|radio|button|submit|range|color|file)$/i.test(t.type)))) return;
+  e.preventDefault();
+  if (e.shiftKey) undoApply(UNDO.redo, UNDO.stack, "Redid"); else undoApply(UNDO.stack, UNDO.redo, "Undid");
+});
+document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && /^y$/i.test(e.key) && !S.readOnly && !(e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) { e.preventDefault(); undoApply(UNDO.redo, UNDO.stack, "Redid"); } });
+
 async function save(col, id, data) {
+  undoNote(col, id);
   if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).set(data); }
   else { const arr = S[col]; const i = arr.findIndex(r => r.id === id); const row = { id, ...data }; i >= 0 ? arr.splice(i, 1, row) : arr.push(row); render(); }
 }
 async function patch(col, id, data) {
+  undoNote(col, id);
   if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).update(data); }
   else { const r = S[col].find(r => r.id === id); if (r) Object.assign(r, data); render(); }
 }
 async function remove(col, id) {
+  undoNote(col, id);
   if (col === "products") scheduleWebPush(true);
   if (S.db) { await wdb().collection(col).doc(id).delete(); }
   else { S[col] = S[col].filter(r => r.id !== id); render(); }
@@ -1093,6 +1141,7 @@ const clean = r => { const { id, ...rest } = r; return rest; };
 async function adjustStock(productId, delta) {
   const p = S.products.find(x => x.id === productId);
   if (!p) return;
+  undoNote("products", productId); // before the local change below, so undo knows the old stock
   const next = (Number(p.stock) || 0) + delta;
   p.stock = next;
   // Stock changes from orders (sold, cancelled, restocked) go to regalspritz.com too, so sold-out items come off the site.
@@ -2501,8 +2550,10 @@ function goOrders(view) {
 
 /* ---------- website orders (regalspritz.com), read live from the website's backend ----------
    Only in the RS App (it has the /api/site server route). Customer details are never saved here: fetched live each time. */
-// Customers see Completed once an order ships (K, 2026-10-08): no separate Shipped / Delivered on the website.
-const WEB_STATUSES = ["Placed", "Confirmed", "Packed", "Completed", "Cancelled"];
+// Customers see "Completed" once an order ships (K, 2026-10-08). The website backend still stores Shipped;
+// the site add-on completed-status.html shows it (and any old Delivered) as Completed on regalspritz.com.
+const WEB_STATUSES = ["Placed", "Confirmed", "Packed", "Shipped", "Cancelled"];
+const webStatusName = s => /^(shipped|delivered)$/i.test(s || "") ? "Completed" : s || "";
 const webDone = o => /^(completed|shipped|delivered|cancelled)$/i.test(o.status || "");
 const webPayKind = o => /maya/i.test(o.payment || "") ? "maya" : /bdo/i.test(o.payment || "") ? "bdo" : "";
 const webBadge = o => o.paid ? `<span class="badge green">Paid${o.mayaPaid ? " via Maya" : ""}</span>` : `<span class="badge amber">Unpaid</span>`;
@@ -2586,7 +2637,7 @@ function webAsOrders() {
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
 // RS OS Fulfillment status is the one the team edits; the customer's profile on regalspritz.com shows this status for it.
 const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
-  sorted: "Packed", unfulfilled: "Packed", fulfilled: "Completed", delivered: "Completed", cancelled: "Cancelled" };
+  sorted: "Packed", unfulfilled: "Packed", fulfilled: "Shipped", delivered: "Shipped", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
   const site = {}, keep = {}, msgs = [];
@@ -2695,7 +2746,7 @@ function viewWebOrders() {
   return head + (S.web.err ? `<div class="notice">${esc(S.web.err)} Showing the last list.</div>` : "") + `<div class="table-wrap"><table class="otable"><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th class="r">Total / due</th><th>Payment</th><th>Status</th></tr></thead><tbody>
     ${rows.map(o => `<tr data-webo="${esc(o.ref)}" style="cursor:pointer"><td class="nowrap"><b>${esc(o.ref)}</b></td><td class="nowrap">${esc(webTime(o.date))}</td><td>${esc(o.name || "")}</td><td style="min-width:180px;max-width:280px">${esc(webItems(o))}</td>
       <td class="r num nowrap">${peso(o.total)}${Number(o.due) && Number(o.due) !== Number(o.total) ? `<br><small style="color:var(--muted)">due ${peso(o.due)}</small>` : ""}</td>
-      <td class="nowrap">${webBadge(o)}<br><small style="color:var(--muted)">${esc(o.payment || "")}</small></td><td class="nowrap">${esc(o.status || "")}${o.tracking ? `<br><small style="color:var(--muted)">${esc(o.tracking)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="7"><div class="empty">No website orders here.</div></td></tr>`}
+      <td class="nowrap">${webBadge(o)}<br><small style="color:var(--muted)">${esc(o.payment || "")}</small></td><td class="nowrap">${esc(webStatusName(o.status))}${o.tracking ? `<br><small style="color:var(--muted)">${esc(o.tracking)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="7"><div class="empty">No website orders here.</div></td></tr>`}
   </tbody></table></div>`;
 }
 // Customer cancellation requests from regalspritz.com (website backend v16). Pending ones are urgent: red count on Orders.

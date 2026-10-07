@@ -1,0 +1,66 @@
+<!--
+  Regal Spritz PH: customers see "Completed" instead of "Shipped" / "Delivered" (2026-10-08).
+  The website backend keeps storing Shipped; this only changes the label people read on regalspritz.com
+  (My Account order list, order details, tracking steps).
+  - A status label that says exactly "Shipped" or "Delivered" now says "Completed" (green).
+  - In a step-by-step tracker that shows both Shipped and Delivered, the Delivered step is hidden
+    so "Completed" shows once.
+  Only whole labels change: product names or sentences that merely contain the word are left alone.
+-->
+<style>
+  .rs-done{color:#2e7d4f!important}
+  .rs-done-bg{background:#e6f4ec!important;border-color:#2e7d4f!important;color:#2e7d4f!important}
+  .rs-done-hide{display:none!important}
+</style>
+<script>
+(function () {
+  var WORD = /^(shipped|delivered)$/i, SKIP = /^(SCRIPT|STYLE|TEXTAREA|INPUT|SELECT|OPTION|NOSCRIPT)$/;
+  function caseLike(src) { return src === src.toUpperCase() ? 'COMPLETED' : src === src.toLowerCase() ? 'completed' : 'Completed'; }
+  // Elements whose only content is one text node "Shipped" / "Delivered".
+  function labels(root) {
+    var out = [], all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i]; if (SKIP.test(el.tagName) || el.closest('[contenteditable="true"]')) continue;
+      if (el.children.length || !el.firstChild) continue;
+      var t = (el.textContent || '').trim(); if (WORD.test(t)) out.push(el);
+    }
+    return out;
+  }
+  // The step box of a tracker: climb while the parent holds just this one label.
+  function stepOf(el) {
+    var s = el;
+    while (s.parentElement && s.parentElement !== document.body && labels(s.parentElement).length === 1 && s.parentElement.children.length <= 3) s = s.parentElement;
+    return s;
+  }
+  // A step's own label (the step holds exactly one status-like label), or "".
+  function stepText(s) { var l = labels(s).concat(STEP.test((s.textContent || '').trim()) ? [s] : []); if (s.querySelectorAll('*').length > 12) return ''; var all = s.querySelectorAll('*'), hit = '';
+    for (var i = 0; i < all.length; i++) { var x = all[i]; if (!x.children.length && STEP.test((x.textContent || '').trim())) { if (hit) return ''; hit = x.textContent.trim(); } } return hit || (l[0] ? l[0].textContent.trim() : ''); }
+  var STEP = /^(placed|confirmed|packed|shipped|delivered|completed|cancelled)$/i;
+  // Tracker = a row of sibling steps that includes an earlier step (Placed / Confirmed / Packed) and a Shipped / Completed step.
+  function inTracker(step) {
+    var p = step.parentElement; if (!p) return false;
+    var sib = [].map.call(p.children, function (k) { return k === step ? '' : stepText(k); });
+    return sib.some(function (x) { return /^(placed|confirmed|packed)$/i.test(x); }) && sib.some(function (x) { return /^(shipped|completed)$/i.test(x); });
+  }
+  function fix() {
+    var ls = labels(document.body);
+    for (var i = 0; i < ls.length; i++) {
+      var el = ls[i], t = el.textContent.trim();
+      // Tracker with both steps: hide the Delivered one, keep Shipped as "Completed".
+      if (/^delivered$/i.test(t) && inTracker(stepOf(el))) { stepOf(el).classList.add('rs-done-hide'); continue; }
+      el.textContent = el.textContent.replace(t, caseLike(t));
+      el.classList.add('rs-done');
+      var p = el.parentElement, cs = el.ownerDocument.defaultView.getComputedStyle(el);
+      // Pill-style badges (a background colour on the label) turn green too.
+      if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent') el.classList.add('rs-done-bg');
+      else if (p && p.children.length === 1) { var ps = getComputedStyle(p); if (ps.backgroundColor !== 'rgba(0, 0, 0, 0)' && ps.borderRadius !== '0px') p.classList.add('rs-done-bg'); }
+    }
+  }
+  // Orders are drawn after the page loads (and again when the customer opens one), so keep watching.
+  var t, busy = false;
+  function run() { if (busy) return; busy = true; try { fix(); } catch (e) {} setTimeout(function () { busy = false; }, 0); }
+  new MutationObserver(function () { clearTimeout(t); t = setTimeout(run, 120); })
+    .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
+})();
+</script>

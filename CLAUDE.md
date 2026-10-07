@@ -34,7 +34,9 @@ This file is my profile. Read it at the start of every session and follow it.
 - Attendance: K (owner) works flexible hours: no fixed schedule, never Late or Absent. Overtime isn't paid (no Overtime line on payslips); everyone's Home and attendance card says so.
 - Create order: address uses J&T's Province → City → Barangay list. No platform fee box. Discount by changing the item price or the ₱/% Discount box. A first-time buyer is saved to Customers; if the email or phone already exists, staff are asked whether to merge.
 - Listings: drag the small square on a cell's corner to copy its value to other rows (like Excel).
-- Website order statuses customers see: Placed, Confirmed, Packed, Completed, Cancelled. A shipped order shows as **Completed** (no Shipped / Delivered on the buyer's end). RS OS no longer offers Delivered.
+- Website order statuses: a shipped order shows as **Completed** to buyers (site add-on `completed-status.html` relabels Shipped / Delivered; the backend still stores Shipped). RS OS no longer offers Delivered.
+- Undo: Ctrl/Cmd+Z undoes the last change in RS OS (one click or save = one step), Ctrl/Cmd+Shift+Z redoes.
+- When a fix can be done from the RS App (e.g. a site add-on), do it instead of asking K to paste into another chat.
 - Royal Receipt: every RS OS order with an email gets the Royal Receipt emailed automatically (store Gmail via the website backend `opsEmail`), and again when a pay link is added. The only payment button is the order's own pay link (Maya/BDO). Staff can copy it as text for chat when there's no email.
 - Don't add buttons or screens for one-off cleanups (like re-sorting categories or fixing photos). Just do the fix when I ask.
 - Website orders (regalspritz.com) are read live from the website's Apps Script backend through the RS App's `/api/site` route (key `RS_BACKEND_KEY` in Vercel only). Don't copy customer details into the dashboard database; only team fields (assignee, courier, tags, team note) are saved per order number in `webmeta`. RS OS is the single RS number counter (`/api/site` nextOrderNumber).
