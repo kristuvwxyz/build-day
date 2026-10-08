@@ -1339,7 +1339,16 @@ async function setCustomerOwner(o, mid) {
   toast(`${o.customer || "Customer"} → ${mid ? memberName(mid) : "Unassigned"}: ${others.length} more open order${others.length === 1 ? "" : "s"} moved too. New orders follow.`);
 }
 // Fills in the owner on unassigned open RS OS orders (website orders read it live). First run learns owners from orders already assigned.
-function scheduleOwnerSync() { clearTimeout(ownerT); ownerT = setTimeout(ownerSync, 3000); }
+function scheduleOwnerSync() { clearTimeout(ownerT); ownerT = setTimeout(() => { ownerSync(); archiveCancelled(); }, 3000); }
+// Every order with Fulfillment status Cancelled (e.g. cancelled on Shopify, or set before auto-archive) is archived. Owner devices only.
+let archBusy = false;
+async function archiveCancelled() {
+  if (archBusy || S.readOnly || !S.db || !canAll() || !S.loaded.orders) return;
+  const todo = S.orders.filter(o => o.fulfillment === "cancelled" && !o.archived); if (!todo.length) return;
+  archBusy = true; const at = UNDO.at; UNDO.at = 0;
+  try { for (const o of todo) { await archiveOrder(o, "Cancelled", { archivedPrev: { payment: o.payment, fulfillment: "to_confirm" } }); await new Promise(r => setTimeout(r, 60)); } }
+  catch (e) { console.warn("archive cancelled", e); } finally { UNDO.at = at; archBusy = false; }
+}
 async function ownerSync() {
   if (ownerBusy || S.readOnly || !S.db || !canAll() || !S.loaded.orders || !S.loaded.webmeta || (S.site && !S.web.loaded)) return;
   if (!S.webmeta.some(d => d.id === "_owners")) {
@@ -1383,6 +1392,9 @@ async function updateOrderCore(o, ch) {
   if (!by && upd.fulfillment && upd.fulfillment !== o.fulfillment) custMailStep(o, upd.fulfillment);
   else if (!by && upd.payment && VOIDPAY.has(upd.payment) && !VOIDPAY.has(o.payment)) custMailStep(o, "cancelled");
   if (stockDelta) { if (o.stockTaken) await applyStockMap(o.stockTaken, stockDelta); else for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, stockDelta * (Number(i.qty) || 0)); }
+  // Cancelled = archived: the order moves to Archived orders (unarchive brings it back as To Confirm).
+  if (upd.fulfillment === "cancelled" && o.fulfillment !== "cancelled") { const cur = S.orders.find(x => x.id === o.id) || Object.assign({}, o, upd);
+    await archiveOrder(cur, "Cancelled", { archivedPrev: { payment: o.payment, fulfillment: o.fulfillment } }).catch(e => console.warn("auto-archive", e)); }
   return stockDelta;
 }
 
@@ -3434,6 +3446,7 @@ function filteredOrders() {
   const q = S.of.q.trim().toLowerCase();
   const vw = S.of.view;
   return allOrderRows().filter(o => {
+    if (o.web && o.fulfillment === "cancelled" && S.of.ful !== "cancelled") return false; // shown in Archived orders
     if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
     if (S.of.sup && S.of.sup !== "all" && !(o.tags || []).some(t => t.toUpperCase() === S.of.sup)) return false;
     if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
@@ -3698,7 +3711,7 @@ function viewOrders() {
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
   const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT;
-  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or archived"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Archived <span style="color:var(--muted)">${S.archived.length}</span></button>` : ""}</div>` : "";
+  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or archived"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Archived <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
   if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
   if (arOn) return `${cxTabs}${viewArchived()}`;
   const nBdo = S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0;
@@ -3823,18 +3836,25 @@ function viewDisputes() {
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No disputes. Add the DISPUTE tag to an order to track it here.</div>`}</div>`;
 }
 S.asel = new Set();
+// Cancelled website orders show in Archived orders too (read-only: the website keeps them as Cancelled).
+function webArchived() {
+  const meta = new Map(S.webmeta.map(d => [d.ref, d]));
+  return webAsOrders().filter(o => o.fulfillment === "cancelled").map(o => { const l = ((meta.get(o.ref) || {}).log || []).find(x => /cancel/i.test(x.msg || ""));
+    return Object.assign(Object.create(o), { archived: true, archivedAt: l ? l.at : o.createdAt, archivedReason: "Cancelled", archivedBy: l ? l.by || "" : "Website" }); });
+}
+const archivedCount = () => S.archived.length + webArchived().length;
 function viewArchived() {
   const q = (S.aq || "").trim().toLowerCase();
-  const rows = S.archived.filter(o => !q || [o.num, ...(o.merged || []), o.customer, o.archivedReason, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
+  const rows = [...S.archived, ...webArchived()].filter(o => !q || [o.num, ...(o.merged || []), o.customer, o.archivedReason, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
   [...S.asel].forEach(id => { if (!S.archived.some(o => o.id === id)) S.asel.delete(id); });
-  const ca = canAll(), n = S.asel.size, allOn = rows.length && rows.every(o => S.asel.has(o.id));
+  const ca = canAll(), n = S.asel.size, allOn = rows.some(o => !o.web) && rows.filter(o => !o.web).every(o => S.asel.has(o.id));
   const bulk = ca && n ? `<div class="bulk"><strong>${n} selected</strong><button class="btn sm primary" type="button" data-act="a-unarch">Unarchive</button><button class="btn ghost sm" type="button" data-act="a-del">Delete forever</button><button class="btn ghost sm" type="button" data-act="a-clear">Clear</button></div>` : "";
   return `<div class="toolbar"><input id="aq" type="search" placeholder="Search archived orders" value="${esc(S.aq || "")}" aria-label="Search archived orders"></div>
   ${bulk}
   <div class="table-wrap"><table>
     <thead><tr>${ca ? `<th style="width:34px"><input type="checkbox" data-aselall="1" aria-label="Select all" ${allOn ? "checked" : ""}></th>` : ""}<th>Order</th><th>Customer</th><th>Items</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Archived</th><th>Why</th><th>By</th><th></th></tr></thead>
-    <tbody>${rows.map(o => `<tr data-row="${o.id}">${ca ? `<td><input type="checkbox" data-asel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.asel.has(o.id) ? "checked" : ""}></td>` : ""}<td class="nowrap"><span class="onum">${esc(onum(o))}</span> ${disputeChip(o)}</td><td>${custLink(o)}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td>${badge(pay("voided"))}</td><td>${badge(ful("cancelled"))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
-      <td class="nowrap">${ca ? `<button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button> <button class="btn ghost sm" type="button" data-act="ask-del-forever" data-id="${o.id}">Delete forever</button>` : ""}</td></tr>`).join("")}</tbody>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}">${ca && o.web ? "<td></td>" : ""}${ca && !o.web ? `<td><input type="checkbox" data-asel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.asel.has(o.id) ? "checked" : ""}></td>` : ""}<td class="nowrap">${o.web ? `<button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">${esc(onum(o))}</button> <span class="chip">Website</span>` : `<span class="onum">${esc(onum(o))}</span>`} ${disputeChip(o)}</td><td>${custLink(o)}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td>${badge(pay("voided"))}</td><td>${badge(ful("cancelled"))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
+      <td class="nowrap">${ca && !o.web ? `<button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button> <button class="btn ghost sm" type="button" data-act="ask-del-forever" data-id="${o.id}">Delete forever</button>` : ""}</td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No archived orders. “Archive” on an order moves it here as Cancelled · Voided; you can unarchive it any time.</div>`}</div>`;
 }
 async function archiveOrder(o, reason, extra = {}) {
@@ -3874,7 +3894,7 @@ async function statusSync() {
 }
 async function restoreOrder(o) {
   const pv = o.archivedPrev || {};
-  const payment = pv.payment || o.shopPay || "pending", fulfillment = pv.fulfillment || o.shopFul || "unfulfilled";
+  const payment = pv.payment || o.shopPay || "pending", fulfillment0 = pv.fulfillment || o.shopFul || "unfulfilled", fulfillment = fulfillment0 === "cancelled" ? "to_confirm" : fulfillment0;
   const upd = { archived: false, archivedAt: 0, archivedReason: "", mergedInto: "", payment, fulfillment, log: logAdd(o, [`unarchived the order (back to ${pay(payment).name} · ${ful(fulfillment).name})`]) };
   if (S.db) await wdb().collection("orders").doc(o.id).update(upd);
   else { S.archived = S.archived.filter(x => x.id !== o.id); S.orders.push(Object.assign(o, upd)); render(); }
