@@ -4915,10 +4915,54 @@ const ANN_CODE = { code: "NEWHOME100", off: 100, min: 3000, until: "Dec 31, 2026
 let annPickMemo = { at: 0, list: [] };
 // 4 on-hand pieces with photos for the "Fresh picks" grid (new arrivals first), linked to their own page on the website.
 function annPicks() {
+  const prep = S.webmeta.find(d => d.id === "_annpicks");
+  if (prep && Array.isArray(prep.picks) && prep.picks.length >= 2) {
+    let W = []; try { W = webProducts(); } catch (e) {}
+    const L = prep.picks.map(x => { const p = W.find(w => w.id === x.id); return p ? { ...p, imgs: [x.img || p.imgs[0]], cut: !!x.img } : null; }).filter(Boolean);
+    if (L.length >= 2) return L.slice(0, L.length >= 4 ? 4 : 2);
+  }
   if (Date.now() - annPickMemo.at < 60000 && annPickMemo.list.length) return annPickMemo.list;
   let L = []; try { L = webProducts().filter(p => p.kind === "onhand" && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
   L.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
   annPickMemo = { at: Date.now(), list: L.slice(0, L.length >= 4 ? 4 : 2) }; return annPickMemo.list;
+}
+// Email photos: cut the bottle out of each picked listing photo (in the owner's browser) and place it on our
+// ivory / lilac template backdrop with a thin gold frame. Saved to photo storage; picks + URLs in webmeta/_annpicks.
+const BGR_LIB = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm";
+let annPrepBusy = null;
+async function annCutout(src) {
+  const blob = await fetch(src, { mode: "cors" }).then(r => { if (!r.ok) throw new Error("photo " + r.status); return r.blob(); });
+  let cut = null;
+  try { const m = await import(BGR_LIB).catch(() => import("https://esm.sh/@imgly/background-removal@1.4.5")); const rb = m.removeBackground || m.default; cut = await rb(blob, { model: "small", output: { format: "image/png" } }); }
+  catch (e) { console.warn("cutout", e); throw new Error("couldn't cut out the photo"); }
+  const im = await createImageBitmap(cut), W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
+  const bg = g.createRadialGradient(W / 2, H * .42, 40, W / 2, H / 2, W * .75); bg.addColorStop(0, "#FDFBF7"); bg.addColorStop(.6, "#F7F1F6"); bg.addColorStop(1, "#E9DFEC");
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "rgba(168,134,76,.55)"; g.lineWidth = 2; g.strokeRect(22, 22, W - 44, H - 44);
+  // trim transparent edges so every bottle is sized the same
+  const t = document.createElement("canvas"); t.width = im.width; t.height = im.height; const tg = t.getContext("2d"); tg.drawImage(im, 0, 0);
+  const px = tg.getImageData(0, 0, t.width, t.height).data; let x0 = t.width, y0 = t.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < t.height; y += 2) for (let x = 0; x < t.width; x += 2) if (px[(y * t.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 <= x0 || y1 <= y0) throw new Error("nothing found in the photo");
+  const bw = x1 - x0, bh = y1 - y0, sc = Math.min((W * .72) / bw, (H * .72) / bh), dw = bw * sc, dh = bh * sc, dx = (W - dw) / 2, dy = H * .86 - dh;
+  const sh = g.createRadialGradient(W / 2, H * .87, 4, W / 2, H * .87, dw * .6); sh.addColorStop(0, "rgba(42,18,64,.22)"); sh.addColorStop(1, "rgba(42,18,64,0)");
+  g.save(); g.translate(W / 2, H * .87); g.scale(1, .14); g.translate(-W / 2, -H * .87); g.fillStyle = sh; g.beginPath(); g.arc(W / 2, H * .87, dw * .6, 0, Math.PI * 2); g.fill(); g.restore();
+  g.drawImage(t, x0, y0, bw, bh, dx, dy, dw, dh);
+  return cv.toDataURL("image/jpeg", .9);
+}
+async function annPrepare() {
+  if (annPrepBusy) return annPrepBusy;
+  const have = S.webmeta.find(d => d.id === "_annpicks"); if (have && (have.picks || []).filter(x => x.img).length >= 2) return true;
+  if (!S.photos || S.readOnly || S.viewAs) return false;
+  annPrepBusy = (async () => {
+    annPickMemo.at = 0; const raw = annPicks().map(p => ({ id: p.id, src: p.imgs[0] })); if (raw.length < 2) return false;
+    toast("Preparing the email photos (cutting out the bottles)… about a minute.");
+    const picks = [];
+    for (const x of raw) { try { const data = await annCutout(x.src); const r = await S.photos.save({ data }); picks.push({ id: x.id, img: r && r.ok && r.url ? r.url : "" }); } catch (e) { console.warn("ann photo", e); picks.push({ id: x.id, img: "" }); } }
+    if (picks.filter(x => x.img).length < 2) { toast("Couldn't prepare the email photos, so the original photos are used."); return false; }
+    UNDO.at = 0; await save("webmeta", "_annpicks", { picks, at: Date.now(), by: actor() }); toast("Email photos ready."); return true;
+  })().finally(() => { annPrepBusy = null; });
+  return annPrepBusy;
 }
 function annHTML(name) {
   const c = RR, e = esc, SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',serif", SANS = "'Jost','Helvetica Neue',Helvetica,Arial,sans-serif", P = "#4A2265", PD = "#2A1240", G = "#A8864C", SITE_URL = "https://www.regalspritz.com/";
@@ -4927,7 +4971,7 @@ function annHTML(name) {
   const btnGold = (href, label) => `<a class="rs-btn2" href="${href}" target="_blank" style="display:inline-block;background:transparent;color:${PD};text-decoration:none;font-family:${SANS};font-weight:500;font-size:11.5px;letter-spacing:3px;text-transform:uppercase;padding:14px 30px;border-radius:2px;border:1px solid ${G}">${label}</a>`;
   const picks = annPicks();
   const card = p => `<td width="50%" valign="top" style="padding:6px"><a href="${e(SITE_URL + "#/p/" + encodeURIComponent(p.id))}" target="_blank" style="text-decoration:none;color:${c.ink};display:block;border:1px solid ${c.line};border-radius:2px;overflow:hidden;background:#ffffff">
-    <img src="${e(p.imgs[0])}" width="240" alt="${e([p.brand, p.name].join(" "))}" style="display:block;width:100%;height:auto;border:0;background:${c.bg}">
+    <img src="${e(p.imgs[0])}" width="240" alt="${e([p.brand, p.name].join(" "))}" style="display:block;width:100%;height:auto;border:0;background:#FDFBF7">
     <div style="padding:10px 12px 12px">${p.isNew ? `<div style="font-size:10px;letter-spacing:2px;font-weight:800;color:${c.gold}">NEW ARRIVAL</div>` : ""}<div style="font-size:11px;letter-spacing:1px;color:${c.muted};text-transform:uppercase">${e(p.brand || "")}</div><div style="font-size:14px;font-weight:700;line-height:1.3;margin-top:2px">${e(p.name)}${p.size ? ` <span style="font-weight:400;color:${c.muted}">${e(p.size)}</span>` : ""}</div><div style="font-size:15px;font-weight:800;color:${P};margin-top:6px">${peso(p.price)}</div></div></a></td>`;
   const grid = picks.length >= 2 ? `<tr><td style="padding:8px 22px 0"><div style="text-align:center;font-size:11px;letter-spacing:4px;font-weight:800;color:${c.gold}">&#10022; FRESH PICKS ON-HAND &#10022;</div><div style="text-align:center;font-family:${SERIF};font-weight:500;font-size:28px;color:${c.ink};margin:6px 0 8px">Ready to ship this week</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${[0, 2].filter(i => picks[i]).map(i => `<tr>${card(picks[i])}${picks[i + 1] ? card(picks[i + 1]) : `<td width="50%"></td>`}</tr>`).join("")}</table>
@@ -7328,9 +7372,9 @@ document.addEventListener("click", guard(async ev => {
     case "edit-contact": return openContactEdit(b.dataset.id);
     case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
-    case "ann-preview": { const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
-    case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; const r = await S.site.email({ to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
-    case "ann-start": { if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
+    case "ann-preview": { if (S.photos && !S.webmeta.some(d => d.id === "_annpicks")) { b.disabled = true; await annPrepare(); b.disabled = false; } const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
+    case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; await annPrepare(); const r = await S.site.email({ to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
+    case "ann-start": { await annPrepare(); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
     case "ann-pause": { const d = annDoc(); if (d) await save("webmeta", "_announce", { ...clean(d), status: "paused", at: Date.now() }); toast("Paused. Tap Start sending to continue."); render(); return; }
     case "rr-sf-save": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const v = numv("rr-sf"), free = !!($("#rr-free") && $("#rr-free").checked);
       if (v === (Number(o.shipFee) || 0) && free === !!o.shipFree) { toast("No change."); return; }
