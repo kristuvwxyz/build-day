@@ -3026,6 +3026,7 @@ function openWebOrder(ref) {
   const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
   openSheet(`<h2 style="margin:0">#${esc(String(o.ref || "").replace(/^#/, ""))} ${webBadge(o)}</h2>
     <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date, o))} · ${esc(o.payment || "")}${o.payRef && !/bdo\.com\.ph/i.test(o.payRef) ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
+    ${(() => { const m = S.webmeta.find(d => d.ref === o.ref), sh = o.shippedAt ? webTime(o.shippedAt) : m && m.shippedAt ? webTime(m.shippedAt) : "", rc = o.receivedAt ? webTime(o.receivedAt) : ""; return sh || rc ? `<div style="font-size:13px;display:flex;gap:14px;flex-wrap:wrap">${sh ? `<span>🚚 Shipped <b>${esc(sh)}</b></span>` : ""}${rc ? `<span>✅ Buyer tapped Order received <b>${esc(rc)}</b></span>` : `<span style="color:var(--muted)">Not marked received by the buyer yet</span>`}</div>` : ""; })()}
     ${o.shipPref && SHIP_PREF[o.shipPref] ? `<div style="font-size:13px">${shipPrefChip(o)} <span style="color:var(--muted)">${esc(SHIP_PREF_TIP[o.shipPref].replace(/^Buyer chose at checkout: /, ""))}</span></div>` : ""}
     <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
       <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
