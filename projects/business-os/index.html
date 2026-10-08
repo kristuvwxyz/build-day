@@ -709,6 +709,7 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .ordtable .badge { padding-top: 1px; padding-bottom: 1px; }
 .ordtable .hist-btn { gap: 0; }
 .ik-cell { display: inline-flex; gap: 4px; flex-wrap: nowrap; }
+.iktip { position: fixed; z-index: 9999; display: none; max-width: 340px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 8px 10px; font-size: 12.5px; line-height: 1.45; pointer-events: none; } .iktip b { display: block; margin-bottom: 3px; font-size: 12px; color: var(--muted); }
 .chip.ik-oh { background: var(--good-bg); color: var(--good); } .chip.ik-po { background: color-mix(in srgb, #8B5CF6 14%, var(--surface)); color: #7C3AED; }
 .src-cell { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; }
 .src-cell .badge, .src-cell .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; gap: 4px; line-height: 1.4; }
@@ -3569,7 +3570,17 @@ const kindCounts = o => { const c = { onhand: 0, preorder: 0 }; for (const i of 
 const hasPreorder = o => (o.items || []).some(i => !isFreeItem(i) && itemKind(i, o) === "preorder");
 const kindSummary = o => { const c = kindCounts(o); return [c.onhand ? `${c.onhand} × On hand` : "", c.preorder ? `${c.preorder} × Pre-order` : ""].filter(Boolean).join(", "); };
 const SHIP_PREF = { ahead: "Ship on-hand ahead", together: "Ship all together" };
-const kindCell = o => { const c = kindCounts(o); return `<span class="ik-cell">${o.shipPref && SHIP_PREF[o.shipPref] ? `<span class="chip" title="Buyer's shipping choice at checkout">${SHIP_PREF[o.shipPref]}</span>` : ""}${c.onhand ? `<span class="chip ik-oh">${c.onhand} × On hand</span>` : ""}${c.preorder ? `<span class="chip ik-po">${c.preorder} × Pre-order</span>` : ""}${!c.onhand && !c.preorder ? `<span style="color:var(--muted)">–</span>` : ""}</span>`; };
+// Hovering an On hand / Pre-order chip shows the items of that kind (floating box, so table scrolling doesn't clip it).
+const kindItems = (o, k) => (o.items || []).filter(i => itemKind(i, o) === k).map(i => `${Number(i.qty) || 1} × ${String(i.name || "").trim()}`).join("\n");
+const kindCell = o => { const c = kindCounts(o); return `<span class="ik-cell">${o.shipPref && SHIP_PREF[o.shipPref] ? `<span class="chip" title="Buyer's shipping choice at checkout">${SHIP_PREF[o.shipPref]}</span>` : ""}${c.onhand ? `<span class="chip ik-oh" data-iktip="${esc(kindItems(o, "onhand"))}">${c.onhand} × On hand</span>` : ""}${c.preorder ? `<span class="chip ik-po" data-iktip="${esc(kindItems(o, "preorder"))}">${c.preorder} × Pre-order</span>` : ""}${!c.onhand && !c.preorder ? `<span style="color:var(--muted)">–</span>` : ""}</span>`; };
+(() => { let tip = null;
+  const hide = () => { if (tip) tip.style.display = "none"; };
+  document.addEventListener("mouseover", e => { const el = e.target.closest && e.target.closest("[data-iktip]"); if (!el) return hide();
+    if (!tip) { tip = document.createElement("div"); tip.className = "iktip"; document.body.appendChild(tip); }
+    tip.innerHTML = `<b>${esc(el.textContent)}</b>` + el.dataset.iktip.split("\n").filter(Boolean).map(l => `<div>${esc(l)}</div>`).join("");
+    tip.style.display = "block"; const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px"; tip.style.top = (r.bottom + h + 12 > innerHeight ? r.top - h - 6 : r.bottom + 6) + "px"; });
+  addEventListener("scroll", hide, true); })();
 // Each sales person keeps one color in "Assigned to" (Unassigned stays grey).
 const ASSIGN_ST = ["st-blue", "st-teal", "st-violet", "st-pink", "st-orange", "st-green", "st-amber", "st-red"];
 const assigneeSt = id => { if (!id) return "st-grey"; const team = [...S.team].sort((a, b) => String(a.id).localeCompare(String(b.id))); let i = team.findIndex(m => m.id === id);
