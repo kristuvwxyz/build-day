@@ -716,6 +716,12 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-right: 6px; vertical-align: 1px; animation: livep 1.6s ease-in-out infinite; }
 @keyframes livep { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+.brk-alarm { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.55); display: grid; place-items: center; padding: 16px; }
+.brk-card { background: var(--surface); color: var(--fg); border-radius: 16px; padding: 22px 24px; max-width: 340px; text-align: center; display: grid; gap: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+.brk-card b { font-size: 18px; } .brk-card p { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+.acct-av[data-act] .av > img, .acct-av[data-act] .av > span:first-child { cursor: pointer; }
+.acct-edit { position: absolute; left: -2px; bottom: -2px; z-index: 2; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+.install-steps { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 .bc-cell { display: inline-flex; align-items: center; gap: 4px; }
 .bigsearch { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 4px 14px; position: relative; }
 .bigsearch:focus-within { border-color: var(--fg); }
@@ -1894,8 +1900,8 @@ function renderNav() {
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
     visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : ""), "desktop-only dept-item")).join("") +
-    item('data-nav="account"', "account", "My account", S.view === "account", "", "account-item mobile-only") +
-    (() => { const m = member(myMemberId()) || {}; return `<button type="button" class="me-chip desktop-only" data-nav="account" ${S.view === "account" ? 'aria-current="page"' : ""}>${m.id ? avatar(m, 32, false) : svg("account")}<span class="me-t"><b>${esc(m.nickname || m.name || "My account")}</b><small>${esc(m.role || (dept(m.department) || {}).name || "My account")}</small></span><span class="me-go">›</span></button>`; })();
+    item('data-nav="account"', "account", "My Account", S.view === "account", "", "account-item mobile-only") +
+    (() => { const m = member(myMemberId()) || {}; return `<button type="button" class="me-chip desktop-only" data-nav="account" ${S.view === "account" ? 'aria-current="page"' : ""}>${m.id ? avatar(m, 32, false) : svg("account")}<span class="me-t"><b>${esc(m.nickname || m.name || "My Account")}</b><small>${esc(m.role || (dept(m.department) || {}).name || "My Account")}</small></span><span class="me-go">›</span></button>`; })();
 }
 
 function moduleKey() { return S.view === "dept" ? S.tab : S.view; }
@@ -2008,7 +2014,7 @@ function bounceHome(v) {
 function renderInner() {
   renderNav();
   const d = dept(S.dept);
-  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My account", depts: "Departments", orders: "Orders", listings: "Listings", gallery: "Photo gallery", eom: "Employee of the Month" }[S.view] || d.name;
+  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My Account", depts: "Departments", orders: "Orders", listings: "Listings", gallery: "Photo gallery", eom: "Employee of the Month" }[S.view] || d.name;
   $("#view-title").textContent = title;
   const dc = S.view === "dept" ? DEPT_COLORS[S.dept] : "";
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
@@ -2472,6 +2478,31 @@ function openTaskForm(id, date, forceDept, preset = {}) {
   });
 }
 
+/* ---------- app on the phone's Home Screen ---------- */
+const APP_HOME = "https://regal-spritz-os.vercel.app/", APP_INSTALL_LINK = APP_HOME + "?install=1";
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; });
+window.addEventListener("appinstalled", () => { installEvt = null; toast("RS OS is on your Home Screen."); });
+const isStandalone = () => { try { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { return false; } };
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const installHidden = () => { try { return !!localStorage.getItem("rs-install-hide"); } catch (e) { return false; } };
+function openInstall() {
+  const ios = isIOS(), android = /Android/i.test(navigator.userAgent), chromeIOS = ios && /CriOS/.test(navigator.userAgent);
+  const steps = !APP_BUILD ? `<ol class="install-steps"><li>On your phone, open <b>${esc(APP_HOME.replace(/^https:\/\//, "").replace(/\/$/, ""))}</b> (use the link below).</li><li>Sign in, then tap <b>📲 Add to Home Screen</b> on Home.</li></ol>`
+    : isStandalone() ? `<div class="empty" style="text-align:left">✓ You're already using RS OS from your Home Screen.</div>`
+    : installEvt ? `<button type="button" class="btn primary" data-act="install-go">📲 Add to Home Screen</button>`
+    : ios ? `<ol class="install-steps">${chromeIOS ? `<li>Tap the <b>Share</b> button <b>⎋</b> at the top right, next to the address bar.</li>` : `<li>Tap the <b>Share</b> button <b>⎋</b> at the bottom of Safari (a square with an arrow up).</li>`}<li>Scroll down and tap <b>Add to Home Screen</b> ➕.</li><li>Tap <b>Add</b>. The Regal Spritz icon appears on your Home Screen.</li></ol>${chromeIOS || /Safari/.test(navigator.userAgent) ? "" : `<div style="font-size:12px;color:var(--muted)">If you don't see these, open this page in Safari first.</div>`}`
+    : android ? `<ol class="install-steps"><li>Tap the <b>⋮</b> menu at the top right of Chrome.</li><li>Tap <b>Add to Home screen</b> (or <b>Install app</b>).</li><li>Tap <b>Install</b> / <b>Add</b>.</li></ol>`
+    : `<ol class="install-steps"><li>On a computer: click the install icon ⊕ at the right of the address bar (Chrome / Edge), then <b>Install</b>.</li><li>On a phone: open the link below on the phone and follow the steps there.</li></ol>`;
+  openSheet(`<h3>📲 RS OS on your Home Screen</h3>
+    <div style="font-size:14px">Open RS OS like an app: one tap from your phone's Home Screen, full screen, and you stay signed in.</div>
+    ${steps}
+    <div class="field"><label>Link for the team</label><div style="display:flex;gap:6px;flex-wrap:wrap"><input value="${esc(APP_INSTALL_LINK)}" readonly style="flex:1;min-width:200px"><button type="button" class="btn sm" data-copy="${esc(APP_INSTALL_LINK)}">Copy link</button>${navigator.share ? `<button type="button" class="btn sm" data-act="install-share">Share</button>` : ""}</div>
+      <div style="font-size:12px;color:var(--muted)">Send this to staff. It opens RS OS and shows them these steps for their phone.</div></div>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null);
+}
+if (APP_BUILD && /[?&]install=1/.test(location.search)) { let n = 0; const t = setInterval(() => { if (++n > 120) return clearInterval(t); if (!S.uid || gated() || !$("#scrim").hidden) return; clearInterval(t); openInstall(); try { history.replaceState(null, "", location.pathname); } catch (e) {} }, 1000); }
+
 /* ---------- home ---------- */
 // Live visitors on regalspritz.com (site add-on live-visitors.html → /api/live). RS App only; hidden when it can't be read.
 S.live = null;
@@ -2535,12 +2566,13 @@ function viewHome() {
     <div class="att">${st ? `<b style="font-size:18px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
       : `<b style="font-size:18px">–</b><span>Attendance · not linked</span>`}</div>
   </section>
+  ${APP_BUILD && !isStandalone() && !installHidden() ? `<div class="panel install-card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px"><span style="font-size:22px">📲</span><span style="flex:1;min-width:180px;font-size:14px"><b>Add RS OS to your Home Screen</b><br><span style="color:var(--muted);font-size:12.5px">Open it like an app, in one tap.</span></span><button type="button" class="btn sm primary" data-act="install-open">Show me how</button><button type="button" class="btn ghost sm" data-act="install-hide" aria-label="Hide this">✕</button></div>` : ""}
   <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>
   ${duesAlert()}
   <div class="home-grid${side ? " has-side" : ""}">
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
     ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>${mine.length > 6 ? `<button type="button" class="linkish" data-nav="tasks" style="font-size:12.5px">+${mine.length - 6} more in Tasks</button>` : ""}` : `<div class="empty">You're all caught up.</div>`)
-      : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My account</button> to see your tasks here.</div>`}
+      : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My Account</button> to see your tasks here.</div>`}
   </section>
   ${side ? `<div class="home-side">${side}</div>` : ""}
   </div>
@@ -2893,7 +2925,7 @@ function viewAccount() {
   const tab = S.acctTab, d = m ? dept(m.department) : null;
   const tabs = [["overview", "Overview"], ["pay", "Pay"], ["prefs", "Preferences"], ["access", "Access & security"]];
   const body = tab === "pay" ? mySalary() || `<div class="panel"><div class="empty">No salary set up for you yet.</div></div>`
-    : tab === "prefs" ? `${workStylePanel()}<section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div class="acct-note">System follows your device's light or dark setting. Saved on this device.</div></section>`
+    : tab === "prefs" ? `<section class="panel"><h2>App on your phone</h2><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px;font-size:14px">${isStandalone() ? "✓ You're using RS OS from your Home Screen." : "Put RS OS on your phone's Home Screen and open it like an app."}</span><button type="button" class="btn sm" data-act="install-open">📲 Add to Home Screen</button></div></section>${workStylePanel()}<section class="panel"><h2>Appearance</h2>${themeSeg("theme-acct")}<div class="acct-note">System follows your device's light or dark setting. Saved on this device.</div></section>`
     : tab === "access" ? `<section class="panel"><h2>Department access</h2>
         ${S.isOwner ? `<div class="acct-note">You own this app, so you can open every department.</div>` : `
         <div class="acct-note">${visDepts().length ? `You can open: ${visDepts().map(x => x.name).join(", ")}.` : "Your account isn't linked to the team directory yet."}</div>
@@ -2909,10 +2941,10 @@ function viewAccount() {
   return `<section class="acct-hero">
       <div class="acct-band"></div>
       <div class="acct-body">
-        <div class="acct-av">${m ? avatar(m, 84) : S.me && S.me.avatarUrl ? `<img src="${esc(S.me.avatarUrl)}" alt="" width="84" height="84" style="border-radius:50%">` : ""}</div>
+        <div class="acct-av" ${m && !S.readOnly ? 'data-act="my-photo-pick" title="Tap your photo to change it"' : ""}>${m && !S.readOnly ? `<label class="acct-edit" for="my-photo" title="Change photo" aria-label="Change photo">📷</label>` : ""}${m ? avatar(m, 84) : S.me && S.me.avatarUrl ? `<img src="${esc(S.me.avatarUrl)}" alt="" width="84" height="84" style="border-radius:50%">` : ""}</div>
         <div class="acct-id"><h2 class="acct-name">${esc((m && m.name) || (S.me && S.me.name) || "Signed-in user")}</h2>
           <div class="acct-sub">${m ? esc(m.role || (d || {}).name || "") : ""}${m && m.started ? ` · since ${new Date(m.started + "T12:00:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" })}` : ""}</div>
-          <div class="acct-chips">${d ? `<span class="dchip" style="--dc:${DEPT_COLORS[d.id]}">${esc(d.name)}</span>` : ""}<span class="chip">${lvl} access</span>${m && m.idNumber ? `<span class="chip">ID ${esc(m.idNumber)}</span>` : ""}${m && !S.readOnly ? `<label class="chip acct-photo" for="my-photo">Change photo</label><input id="my-photo" type="file" accept="image/*" hidden>` : ""}</div></div>
+          <div class="acct-chips">${d ? `<span class="dchip" style="--dc:${DEPT_COLORS[d.id]}">${esc(d.name)}</span>` : ""}<span class="chip">${lvl} access</span>${m && m.idNumber ? `<span class="chip">ID ${esc(m.idNumber)}</span>` : ""}${m && !S.readOnly ? `<input id="my-photo" type="file" accept="image/*" hidden>` : ""}</div>${m && !S.readOnly ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">Tap your photo to change it · tap the perfume bottle for your signature scent</div>` : ""}</div>
       </div>
       ${m ? `<div class="acct-stats">
         <div><b class="num">${open.length}</b><span>Open tasks</span></div>
@@ -5361,7 +5393,37 @@ const astat = id => ATT_STATUS.find(s => s.id === id) || ATT_STATUS[7];
 // The owner (and anyone marked flexible) has no fixed hours: never late or absent.
 const isFlex = mid => { const m = member(mid), own = ownerMember(); return !!m && (m.flex === true || (!!own && own.id === mid)); };
 const OT_NOTE = "Overtime isn't paid. Be on time and make the most of your scheduled work hours.";
-const attCfg = () => ({ start: "09:00", end: "18:00", grace: 15, breakMin: 60, workdays: [1, 2, 3, 4, 5, 6], ...(S.attSettings || {}) });
+const attCfg = () => ({ start: "09:00", end: "18:00", grace: 15, breakMin: 60, breakAt: "12:00", workdays: [1, 2, 3, 4, 5, 6], ...(S.attSettings || {}) });
+// Break alarm: 10 minutes before break time (wrap up), and a chime at break time. Only for people timed in and not on break.
+let alarmCtx = null;
+const alarmUnlock = () => { try { alarmCtx = alarmCtx || new (window.AudioContext || window.webkitAudioContext)(); if (alarmCtx.state === "suspended") alarmCtx.resume(); } catch (e) {} };
+["pointerdown", "keydown"].forEach(t => document.addEventListener(t, alarmUnlock, { passive: true }));
+function alarmSound(times) {
+  alarmUnlock(); const c = alarmCtx; if (!c) return;
+  for (let i = 0; i < times; i++) for (const [f, d] of [[880, 0], [1175, .18]]) {
+    const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + i * .7 + d;
+    o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.35, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + .45);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + .5);
+  }
+  try { navigator.vibrate && navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) {}
+}
+function alarmShow(title, msg, times) {
+  alarmSound(times);
+  let el = $("#brk-alarm"); if (el) el.remove();
+  el = document.createElement("div"); el.id = "brk-alarm"; el.className = "brk-alarm"; el.setAttribute("role", "alertdialog");
+  el.innerHTML = `<div class="brk-card"><div style="font-size:34px">⏰</div><b>${esc(title)}</b><p>${esc(msg)}</p><button type="button" class="btn primary">OK</button></div>`;
+  el.querySelector("button").onclick = () => el.remove(); document.body.appendChild(el);
+  try { if (window.Notification && Notification.permission === "granted" && document.hidden) new Notification(title, { body: msg, icon: "/icons/icon-192.png" }); } catch (e) {}
+}
+function breakAlarmTick() {
+  const mid = myMemberId(), at = attCfg().breakAt; if (!mid || !at || isFlex(mid)) return;
+  const r = myAtt(); if (!r || !r.in || r.out || onBreak(r) || ownBreakMs(r)) return;
+  const d = new Date(Date.now() + 8 * 3600e3), now = d.getUTCHours() * 60 + d.getUTCMinutes(), b = toMin(at);
+  const once = k => { const key = "rs-brkalarm-" + mToday() + "-" + k; try { if (localStorage.getItem(key)) return false; localStorage.setItem(key, "1"); } catch (e) {} return true; };
+  if (now >= b - 10 && now < b - 7 && once("warn")) alarmShow("Break in 10 minutes", `Start wrapping up so you can take your break at ${fmtHM(b)} on the dot.`, 3);
+  else if (now >= b && now < b + 3 && once("now")) alarmShow("Break time", "It's break time. Tap ☕ Break in Attendance when you step away.", 2);
+}
+setInterval(breakAlarmTick, 20000); setTimeout(breakAlarmTick, 5000);
 const onBreak = r => !!(r && r.in && !r.out && r.breaks && r.breaks.length && !r.breaks[r.breaks.length - 1].e);
 const breakMs = r => !r || !r.breaks ? 0 : r.breaks.reduce((a, b) => a + Math.max(0, (b.e || r.out || (mDate(b.s) === mToday() ? Date.now() : b.s)) - b.s), 0);
 const fmtMin = ms => { const m = Math.round(ms / 6e4); return m <= 0 ? "–" : m < 60 ? m + "m" : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`; };
@@ -5524,7 +5586,8 @@ function viewAttendance() {
       <div class="row"><div class="field"><label for="ac-start">Shift starts</label><input id="ac-start" type="time" value="${esc(c.start)}"></div><div class="field"><label for="ac-end">Shift ends</label><input id="ac-end" type="time" value="${esc(c.end)}"></div></div>
       <div class="row"><div class="field"><label for="ac-grace">Grace period before "Late" (minutes)</label><input id="ac-grace" type="number" min="0" step="1" value="${Number(c.grace) || 0}"></div>
         <div class="field"><label for="ac-break">Break time allowed per day (minutes)</label><input id="ac-break" type="number" min="0" step="5" value="${Number(c.breakMin) || 0}"></div></div>
-      <div style="font-size:12px;color:var(--muted)">Break time is not counted in hours worked. Going over the allowed break shows in orange.</div>
+      <div class="row"><div class="field"><label for="ac-breakat">Break starts at <span style="font-weight:400;color:var(--muted)">(alarm 10 min before)</span></label><input id="ac-breakat" type="time" value="${esc(c.breakAt || "")}"></div><div class="field"></div></div>
+      <div style="font-size:12px;color:var(--muted)">Break time is not counted in hours worked. Going over the allowed break shows in orange. Everyone who is timed in hears an alarm 10 minutes before break time to wrap up, and a chime when break starts. Leave blank for no alarm.</div>
       <fieldset class="field" style="border:0;padding:0;margin:0"><legend style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">Work days</legend><div style="display:flex;gap:10px;flex-wrap:wrap">${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => `<label style="display:flex;gap:4px;align-items:center;font-size:13px"><input type="checkbox" name="ac-wd" value="${i}" ${c.workdays.includes(i) ? "checked" : ""}> ${d}</label>`).join("")}</div></fieldset>
       <div><button class="btn primary" type="submit">Save settings</button></div>
     </form></details>` : "";
@@ -6521,7 +6584,7 @@ function openDrawer() {
     `<div class="drawer-l">Departments</div>` +
     visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, `<i class="dc"></i>`, d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : ""))).join("") +
     `<div class="drawer-l">Me</div>` +
-    item('data-nav="account"', ic("account"), esc(m.nickname || m.name || "My account"), S.view === "account") +
+    item('data-nav="account"', ic("account"), esc(m.nickname || m.name || "My Account"), S.view === "account") +
     `<div class="drawer-sync">${esc(($("#sync") || {}).textContent || "")}</div>`;
   $("#drawer").hidden = false;
   document.querySelectorAll(".menu-btn").forEach(b => b.setAttribute("aria-expanded", "true"));
@@ -6646,6 +6709,7 @@ document.addEventListener("click", guard(async ev => {
   if (prp) { S.prPerson = prp.dataset.prp; render(); return; }
   const sc = ev.target.closest("[data-scent]");
   if (sc) return openScentForm(sc.dataset.scent);
+  if (ev.target.closest('[data-act="my-photo-pick"]') && !ev.target.closest("label")) { const f = $("#my-photo"); if (f) f.click(); return; }
   const pwb = ev.target.closest("[data-pw]");
   if (pwb) return loginPwAction(pwb.dataset.pw, pwb.dataset.do);
   const th = ev.target.closest("[data-theme-set]");
@@ -6874,6 +6938,10 @@ document.addEventListener("click", guard(async ev => {
     case "bdo-clear": return webUpdate(b.dataset.ref, { bdoLink: "" }, b);
     case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
       await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
+    case "install-open": return openInstall();
+    case "install-hide": try { localStorage.setItem("rs-install-hide", "1"); } catch (e) {} render(); toast("Hidden. Find it again in My Account → Preferences."); return;
+    case "install-go": if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; } closeSheet(); return;
+    case "install-share": try { await navigator.share({ title: "Regal Spritz OS", text: "Add RS OS to your phone's Home Screen:", url: APP_INSTALL_LINK }); } catch (e) {} return;
     case "live-now": liveTick(true); toast("Live visitors updated."); return;
     case "refresh": {
       // RS App: Refresh is a hard refresh (like Cmd/Ctrl+Shift+R): clear the saved app files and load the newest version, same page and scroll.
@@ -7083,7 +7151,7 @@ document.addEventListener("submit", guard(async ev => {
   if (ev.target.id === "eom-cfg") { ev.preventDefault(); return saveEomCfg(); }
   if (ev.target.id === "att-cfg") {
     ev.preventDefault();
-    const data = { start: val("ac-start") || "09:00", end: val("ac-end") || "18:00", grace: Math.max(0, Math.round(numv("ac-grace"))), breakMin: Math.max(0, Math.round(numv("ac-break"))), workdays: [...document.querySelectorAll('input[name="ac-wd"]:checked')].map(x => Number(x.value)) };
+    const data = { start: val("ac-start") || "09:00", end: val("ac-end") || "18:00", grace: Math.max(0, Math.round(numv("ac-grace"))), breakMin: Math.max(0, Math.round(numv("ac-break"))), breakAt: val("ac-breakat") || "", workdays: [...document.querySelectorAll('input[name="ac-wd"]:checked')].map(x => Number(x.value)) };
     if (S.db) await wdb().doc("config/attendance").set(data); else S.attSettings = data;
     toast("Attendance settings saved."); render(); return;
   }

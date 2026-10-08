@@ -41,6 +41,10 @@ This file is my profile. Read it at the start of every session and follow it.
 - Tasks: each person sees a badge on Tasks with their own due-today + overdue count (red if any overdue, amber if only due today).
 - Refresh button (RS App) = hard refresh: clears saved app files and loads the newest version, same page and scroll. Never tell K to press Cmd/Ctrl+Shift+R; say "tap Refresh".
 - Home shows "Live on website" (people on regalspritz.com now): site add-on live-visitors.html pings /api/live every 30s with a random tab id (no personal data); Supabase table live_visits, functions live_ping / live_count.
+- Break alarm: Attendance settings "Break starts at" (default 12:00). Everyone timed in (not K) gets an alarm sound + pop-up 10 min before, and a chime at break time. Only while RS OS is open.
+- Add to Home Screen: Home banner + My Account → Preferences open steps for the phone; staff link https://regal-spritz-os.vercel.app/?install=1 opens the steps.
+- Name the page "My Account" (capital A).
+- My Account: tap the photo to change it, tap the perfume bottle for the signature scent (no separate Change photo chip).
 - Undo: Ctrl/Cmd+Z undoes the last change in RS OS (one click or save = one step), Ctrl/Cmd+Shift+Z redoes.
 - When a fix can be done from the RS App (e.g. a site add-on), do it instead of asking K to paste into another chat.
 - Royal Receipt: every RS OS order with an email gets the Royal Receipt emailed automatically (store Gmail via the website backend `opsEmail`), and again when a pay link is added. The only payment button is the order's own pay link (Maya/BDO). Staff can copy it as text for chat when there's no email.
