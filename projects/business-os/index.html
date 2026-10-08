@@ -401,6 +401,8 @@ tr.u-row.u-soon td:first-child { box-shadow: inset 4px 0 0 var(--amber); }
 .dues-alert .urg-sum { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; }
 .nbadge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 800; display: inline-grid; place-items: center; }
 .seg .nbadge { margin-left: 4px; }
+.nbadge.amber { background: var(--warn); color: var(--warn-bg); }
+.tgrp .nbadge { margin-left: 8px; vertical-align: 1px; }
 .sp-mode { margin-bottom: 4px; }
 th.ck, td.ck { width: 36px; }
 tr.selrow td { background: var(--surface-2); }
@@ -1873,7 +1875,7 @@ function renderNav() {
     `<div class="nav-label desktop-only">Workspace</div>` +
     timeNavItem() +
     item('data-nav="home"', "home", "Home", S.view === "home") +
-    item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks") +
+    item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks", myTaskBadge()) +
     (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders", cxBadge()) : "") +
     (canListings() ? item('data-nav="listings"', "tag", "Listings", S.view === "listings", "", "desktop-only") : "") +
     (canListings() ? item('data-nav="gallery"', "image", "Gallery", S.view === "gallery", "", "desktop-only") : "") +
@@ -2235,6 +2237,14 @@ const onDay = (t, d) => t.due && d >= (t.start && t.start <= t.due ? t.start : t
 const inMonth = (t, ym) => t.due && ((t.start || t.due).slice(0, 7) <= ym && t.due.slice(0, 7) >= ym);
 const pbar = p => `<div class="pbar" role="img" aria-label="${Number(p) || 0}% done"><i style="width:${Math.max(0, Math.min(100, Number(p) || 0))}%"></i></div>`;
 const isOverdue = t => t.due && t.due < today() && (t.status === "todo" || t.status === "in_progress");
+// A person's open tasks that are due today or overdue (for the Tasks badge and the person picker).
+const dueTasksOf = mid => !mid ? [] : S.tasks.filter(t => t.assigneeId === mid && t.due && t.due <= today() && (t.status === "todo" || t.status === "in_progress"));
+function myTaskBadge() {
+  const ts = dueTasksOf(myMemberId()); if (!ts.length) return "";
+  const over = ts.filter(isOverdue).length, now = ts.length - over;
+  const tip = [over ? `${over} overdue` : "", now ? `${now} due today` : ""].filter(Boolean).join(", ");
+  return `<span class="nbadge${over ? "" : " amber"}" title="My tasks: ${tip}" aria-label="My tasks: ${tip}">${ts.length}</span>`;
+}
 
 // Tasks: CEO sees all, Admin all except CEO's, everyone else only their own department (plus tasks assigned to them).
 const taskDepts = () => allowedDepts();
@@ -2317,7 +2327,7 @@ function viewTasks(forceDept) {
   const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name;
   const controls = `<div class="toolbar">
     ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[["team", fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name], ["person", "Per person"], ...(taskDepts().length > 1 ? [["dept", "Per department"]] : [])].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
-    ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${taskTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
+    ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${taskTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}${(() => { const ts = dueTasksOf(m.id), o = ts.filter(isOverdue).length; return ts.length ? ` · ${o ? o + " overdue" : ""}${o && ts.length - o ? ", " : ""}${ts.length - o ? ts.length - o + " due today" : ""}` : ""; })()}</option>`).join("")}</select>` : ""}
     ${S.t.scope === "dept" ? `<select id="t-dept" aria-label="Department"><option value="">${fullTaskView() ? "All departments" : "All my departments"}</option>${DEPTS.filter(d => taskDepts().includes(d.id)).map(d => `<option value="${d.id}" ${S.t.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>` : ""}`}
     <span style="flex:1"></span>
     <div class="seg" role="group" aria-label="Layout">${[["calendar", "Calendar"], ["list", "List"]].map(([k, l]) => `<button type="button" data-tmode="${k}" aria-pressed="${S.t.mode === k}">${l}</button>`).join("")}</div>
@@ -2347,7 +2357,7 @@ function viewTasks(forceDept) {
       main = groupBy ? `<div class="tboard">${groups.map(r => `<div class="tcol"><div class="tcol-h">${esc(r.name)}<span>${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? ` · ${r.ts.length - openCount(r.ts)} done` : ""}</span></div>${r.ts.length ? r.ts.map(taskPill).join("") : `<div style="font-size:12px;color:var(--muted)">Nothing today</div>`}</div>`).join("")}</div>`
         : `<div class="tboard"><div class="tcol">${todayTasks.length ? groups[0].ts.map(taskPill).join("") : `<div style="font-size:12px;color:var(--muted)">Nothing today</div>`}</div></div>`;
     } else {
-      const rows = groupBy ? groups.filter(r => r.ts.length).map(r => `<tr class="tgrp"><td colspan="6">${esc(r.name)} · ${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? `, ${r.ts.length - openCount(r.ts)} done` : ""}</td></tr>${r.ts.map(taskRow).join("")}`).join("") : (groups[0] ? groups[0].ts.map(taskRow).join("") : "");
+      const rows = groupBy ? groups.filter(r => r.ts.length).map(r => `<tr class="tgrp"><td colspan="6">${esc(r.name)} · ${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? `, ${r.ts.length - openCount(r.ts)} done` : ""}${r.ts.filter(isOverdue).length ? `<span class="nbadge" title="Overdue">${r.ts.filter(isOverdue).length} overdue</span>` : ""}</td></tr>${r.ts.map(taskRow).join("")}`).join("") : (groups[0] ? groups[0].ts.map(taskRow).join("") : "");
       main = `<div class="table-wrap"><table>
       <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
       <tbody>${rows}</tbody></table>${todayTasks.length ? "" : `<div class="empty" style="padding:16px">No tasks for today.</div>`}</div>`;
