@@ -4743,7 +4743,7 @@ function viewListings() {
   const th = (k, l, c) => sortTh(k, l, c || "", ls, "lsort");
   const etaOpts = p => { const opts2 = [...new Set([...MONTHS, p.eta].filter(Boolean))]; return `<option value="">–</option>${opts2.map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}`; };
   return `${webPushErr && counts.pending ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending} change${counts.pending === 1 ? "" : "s"} couldn’t reach <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet (${esc(webPushErr)}). RS OS keeps trying on its own.</span></div>` : ""}
-    <div class="bigsearch">${svg("search")}<input id="liq" type="search" placeholder="Search name, brand, SKU, barcode or ETA" value="${esc(S.liq || "")}" aria-label="Search listings" autocomplete="off"></div>
+    <div class="bigsearch">${svg("search")}<input id="liq" type="search" placeholder="Search name, brand, SKU, barcode or ETA" value="${esc(S.liq || "")}" aria-label="Search listings" autocomplete="off"><button type="button" class="btn sm" data-act="liq-scan" title="Find a listing by scanning its barcode" aria-label="Scan barcode to search" style="flex:none">📷 Scan</button><input id="liq-cam" type="file" accept="image/*" capture="environment" hidden></div>
     <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
       <select id="l-brand" aria-label="Filter by brand"><option value="">All brands</option>${brands.map(b => `<option ${b === lb ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
       <select id="l-cat" aria-label="Filter by collection"><option value="">All collections</option>${WEB_CATS.map(([k, l]) => `<option value="${k}" ${k === lc ? "selected" : ""}>${l}</option>`).join("")}</select>
@@ -4984,9 +4984,9 @@ async function bcDecodeCanvas(src) {
   return "";
 }
 // Live camera scan for the Barcode field. Falls back to taking a photo when the camera can't be opened.
-async function scanBarcodeLive() {
-  const input = $("#p-barcode"); if (!input) return;
-  const photo = () => { const c = $("#p-bc-cam"); if (c) c.click(); };
+async function scanBarcodeLive(onCode, camId = "p-bc-cam") {
+  const input = $("#p-barcode"); if (!onCode && !input) return;
+  const photo = () => { const c = $("#" + camId); if (c) c.click(); };
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { photo(); return; }
   const ov = document.createElement("div");
   ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px";
@@ -5008,7 +5008,7 @@ async function scanBarcodeLive() {
         frame.width = video.videoWidth; frame.height = video.videoHeight;
         frame.getContext("2d", { willReadFrequently: true }).drawImage(video, 0, 0);
         const code = await bcDecodeCanvas(frame);
-        if (code && !done) { close(); input.value = code; toast("Barcode scanned: " + code); return; }
+        if (code && !done) { close(); if (onCode) onCode(code); else { input.value = code; toast("Barcode scanned: " + code); } return; }
         if (Date.now() - t0 > 12000) { const m = ov.querySelector(".bc-msg"); if (m) m.textContent = "Still looking… Move a little closer or tilt to avoid glare, or take a photo instead."; }
       }
       await new Promise(r => setTimeout(r, 120));
@@ -5033,6 +5033,13 @@ async function scanPhoto(file, target) {
   return target === "pack" ? handlePackScan(code) : handleScan(code);
 }
 const findByCode = code => { const c = String(code).trim().toLowerCase(); return S.products.find(p => String(p.barcode || "").toLowerCase() === c) || S.products.find(p => String(p.sku || "").toLowerCase() === c); };
+// Listings search: scan a barcode → search for it, and open the listing when one matches.
+function listingScanFound(code) {
+  const p = findByCode(code);
+  S.liq = code; S.lfilter = "all"; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render();
+  if (p) { toast(`Found: ${p.name}`); openProductForm(p.id); }
+  else toast(`No listing has barcode ${code} yet.${S.readOnly ? "" : " Open a listing and paste it in its Barcode box, or add a new listing."}`);
+}
 async function handleScan(code) {
   const p = findByCode(code), mode = S.scanMode || "in";
   if (!p) { S.lastScan = { code, missing: true }; render(); if (!S.readOnly) openProductForm(null, { barcode: code }); return; }
@@ -6745,6 +6752,7 @@ document.addEventListener("click", guard(async ev => {
     case "scan-undo": return scanUndo();
     case "p-frag-get": return fragGet(b);
     case "p-bc-scan": return scanBarcodeLive();
+    case "liq-scan": return scanBarcodeLive(listingScanFound, "liq-cam");
     case "p-photo-clear": return;
     case "pg": { const l = pgalGet(), i = Number(b.dataset.i), op = b.dataset.op;
       if (op === "del") l.splice(i, 1); else if (op === "main") l.unshift(...l.splice(i, 1)); else { const j = op === "left" ? i - 1 : i + 1; if (j >= 0 && j < l.length) [l[i], l[j]] = [l[j], l[i]]; }
@@ -6971,6 +6979,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "p-photo-file" && t.files[0]) { try { const l = pgalGet(); for (const f of [...t.files]) { const d = await resizeImage(f, 1600, false); const r = S.photos ? await S.photos.save({ data: d }).catch(() => null) : null; l.push(r && r.ok && r.url ? r.url : await resizeImage(f, 600, false)); } pgalSet(l); t.value = ""; } catch (e) { sheetError(e.message); } return; }
   if (t.id === "scan-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; return scanPhoto(f, "scan"); }
   if (t.id === "pack-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; return scanPhoto(f, "pack"); }
+  if (t.id === "liq-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; toast("Reading barcode…"); const c = await decodeBarcode(f); if (c) listingScanFound(c); else toast("No barcode found in that photo. Try again closer and in good light."); return; }
   if (t.id === "p-bc-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; const c = await decodeBarcode(f); if (c) $("#p-barcode").value = c; else sheetError("No barcode found in that photo. Try again closer and in good light."); return; }
   if (t.id === "li-file" && t.files[0]) return readListingFile(t.files[0]);
   if (t.id === "lq") return;
