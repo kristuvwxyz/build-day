@@ -35,7 +35,8 @@ This file is my profile. Read it at the start of every session and follow it.
 - Create order: address uses J&T's Province → City → Barangay list. No platform fee box. Discount by changing the item price or the ₱/% Discount box. A first-time buyer is saved to Customers; if the email or phone already exists, staff are asked whether to merge.
 - Listings search has a 📷 Scan button: scanning a barcode searches for it and opens the matching listing. The Listings table has a Barcode column with a 📷 button per row to scan and save that item's barcode (duplicates are blocked).
 - Listing barcodes were copied once from Shopify variant barcodes (bulk export matched by website handle; only blank barcodes filled; source webmeta/_bcsrc, flag webmeta/_bcimp, runs on the owner's device).
-- Listing Cost was copied once from Shopify "Cost per item" (matched by handle; only blank costs filled; flag webmeta/_costimp).
+- Listing Cost is copied once from Shopify "Cost per item" (exact website handle match, 654 listings; only blank costs filled; source webmeta/_costsrc, flag webmeta/_costimp, runs on the owner's device).
+- New-website email: K wants to approve the preview first; ask K again before sending (and only after NEWHOME100 works on the website).
 - Listings: the column titles stay frozen at the top while scrolling the table. Badge filter (All badges / Any / each badge / No badge) next to collections; bulk bar has Add badge… / Remove badge…. Badge "Clearance sale" feeds the website's Clearance Sale section (docs/handoffs/website-clearance.md).
 - Tasks calendar: "+N more" / "+N payments" expands that day to show everything (Show less folds it).
 - Listings: drag the small square on a cell's corner to copy its value to other rows (like Excel).

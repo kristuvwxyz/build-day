@@ -8031,6 +8031,15 @@ async function costImportOnce(c) {
   const t0 = Date.now();
   while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 60000) return; await new Promise(r => setTimeout(r, 1000)); }
   if (S.webmeta.some(d => d.id === "_costimp")) return;
+  // Prepared copy of Shopify "Cost per item" (matched by website handle) in webmeta/_costsrc: fill blank costs from it.
+  const src = S.webmeta.find(d => d.id === "_costsrc");
+  if (src && src.map) {
+    await save("webmeta", "_costimp", { at: Date.now(), by: actor(), running: true }); let n = 0;
+    try { for (const [id, v] of Object.entries(src.map)) { const p = S.products.find(x => x.id === id); if (!p || Number(p.cost) > 0 || !(Number(v) > 0)) continue;
+      UNDO.at = 0; await patch("products", id, { cost: Number(v), costFrom: "Shopify", log: logAdd(p, [`cost set to ${peso(v)} from Shopify`]) }); n++; } } catch (e) { console.warn("cost import", e); }
+    await save("webmeta", "_costimp", { at: Date.now(), by: actor(), count: n });
+    if (n) toast(`Imported Shopify cost for ${n} listing${n === 1 ? "" : "s"}.`); return;
+  }
   const mcp = S.mcp || (c?.use ? await c.use("mcp").catch(() => null) : null); if (!mcp) return;
   try {
     const cost = new Map(); let after = null, pages = 0;
