@@ -48,7 +48,8 @@ This file is my profile. Read it at the start of every session and follow it.
 - Home: one "Orders to ship" tile = To ship orders only (RS OS + website). No Unpaid website / Website to ship tiles.
 - Orders table: compact rows. "Mode of payment" column: website orders show the buyer's pick; RS OS orders have a dropdown (Maya, BDO, GCash, Bank transfer, Cash, COD, Card, Other), guessed from the pay link until set. Colors: Maya green, BDO blue, GCash teal, Bank transfer violet, Cash amber, COD orange, Card pink; Courier J&T red, SDD violet. Source column uses small same-size pills.
 - Top bar shows the live date and time (Manila), every page; phones show the time only.
-- All dashboard dates and times are Manila time (GMT+8) on every device. Website order dates without a time zone are read as Manila time.
+- All dashboard dates and times are Manila time (GMT+8) on every device. Website order dates come without a time zone in the backend's UK clock (7h behind Manila in summer): RS OS learns the real gap from the "stock taken off" log of orders it saw arrive, else reads them as UK time.
+- Assigned to dropdown: each person has their own color (Unassigned grey).
 - Speed / live sync (RS App): data is kept on the device (IndexedDB, cleared on sign out) and only changes are downloaded. Live channel + an 8s "anything changed?" check; screen updates are batched. Changing a website order makes other devices reload website orders at once (webmeta siteAt). Server-side change times + delete list: supabase/fast-sync.sql.
 - Admin → Logins: A–Z by Account (ignores quotes/symbols), always split into Active accounts then Inactive accounts; clicking a column header sorts inside each group. Any table with group rows sorts the same way.
 - Expenses: Admin has an Expenses tab (same list as Finance): Paid with, OR/receipt photo, By, plus Cash on hand (Cash in entries minus expenses paid with Cash on hand, from Oct 8, 2026). Cash in rows don't count as expenses.

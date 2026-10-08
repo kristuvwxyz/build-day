@@ -987,8 +987,31 @@ const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const NF0 = new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 }), NF2 = new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const DF_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }), DF_TIME = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" }), DF_WD = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", weekday: "long" }), DF_MD = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" }), DF_MDY = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" });
 // All dates/times show in Manila time (GMT+8) on every device. Website dates without a time zone are read as Manila time.
-const webMs = d => { if (!d) return 0; if (typeof d === "number") return d; const t = new Date(d).getTime(); if (isNaN(t)) return 0;
-  return /Z$|[+-]\d{2}:?\d{2}$|GMT|UTC/i.test(String(d).trim()) ? t : t - (new Date(t).getTimezoneOffset() + 480) * 60000; };
+// Website order dates come without a time zone, written in the website backend's own clock (UK time, GMT+1 in summer, GMT in winter),
+// not Manila. RS OS learns the real gap from orders it saw arrive (the "stock taken off" log, written within a minute) and falls back to UK time.
+const naiveUTC = d => { const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(d).trim());
+  if (m) return Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)); const t = new Date(d).getTime(); return isNaN(t) ? NaN : t - new Date(t).getTimezoneOffset() * 60000; };
+const zoneOffset = (tz, t) => { try { const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(t)).map(x => [x.type, x.value]));
+  return Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(t / 1000) * 1000; } catch (e) { return 0; } };
+let webGap = { key: "", h: null };
+function webClockGap() {
+  if (!S.web || !S.web.orders || !S.web.orders.length) return null;
+  const key = S.web.orders.length + ":" + S.webmeta.length + ":" + (S.web.at || ""); if (webGap.key === key) return webGap.h;
+  const meta = new Map(S.webmeta.map(d => [d.ref, d])), votes = {};
+  for (const o of S.web.orders.slice(0, 300)) {
+    if (!o.date || /Z$|[+-]\d{2}:?\d{2}$|GMT|UTC/i.test(String(o.date).trim())) continue;
+    const m = meta.get(o.ref), l = m && (m.log || [])[0]; if (!l || !/^stock taken off/.test(l.msg || "")) continue;
+    const diff = l.at - naiveUTC(o.date), h = Math.round(diff / 3600e3), res = diff - h * 3600e3;
+    if (res > -120e3 && res < 600e3 && Math.abs(h) <= 14) votes[h] = (votes[h] || 0) + 1;
+  }
+  const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
+  webGap = { key, h: best && best[1] >= 3 ? Number(best[0]) : null }; return webGap.h;
+}
+const webMs = d => { if (!d) return 0; if (typeof d === "number") return d; const str = String(d).trim();
+  if (/Z$|[+-]\d{2}:?\d{2}$|GMT|UTC/i.test(str)) { const t = new Date(str).getTime(); return isNaN(t) ? 0 : t; }
+  const n = naiveUTC(str); if (isNaN(n)) return 0;
+  const h = webClockGap(); if (h != null) return n + h * 3600e3;
+  return n - zoneOffset("Europe/London", n); };
 const peso = n => "₱" + NF0.format(Number(n) || 0);
 const peso2 = n => (n < 0 ? "-" : "") + "₱" + NF2.format(Math.abs(Number(n) || 0));
 const dstr = t => DF_DAY.format(new Date(t));
@@ -3527,6 +3550,10 @@ const hasPreorder = o => (o.items || []).some(i => !isFreeItem(i) && itemKind(i,
 const kindSummary = o => { const c = kindCounts(o); return [c.onhand ? `${c.onhand} × On hand` : "", c.preorder ? `${c.preorder} × Pre-order` : ""].filter(Boolean).join(", "); };
 const SHIP_PREF = { ahead: "Ship on-hand ahead", together: "Ship all together" };
 const kindCell = o => { const c = kindCounts(o); return `<span class="ik-cell">${o.shipPref && SHIP_PREF[o.shipPref] ? `<span class="chip" title="Buyer's shipping choice at checkout">${SHIP_PREF[o.shipPref]}</span>` : ""}${c.onhand ? `<span class="chip ik-oh">${c.onhand} × On hand</span>` : ""}${c.preorder ? `<span class="chip ik-po">${c.preorder} × Pre-order</span>` : ""}${!c.onhand && !c.preorder ? `<span style="color:var(--muted)">–</span>` : ""}</span>`; };
+// Each sales person keeps one color in "Assigned to" (Unassigned stays grey).
+const ASSIGN_ST = ["st-blue", "st-teal", "st-violet", "st-pink", "st-orange", "st-green", "st-amber", "st-red"];
+const assigneeSt = id => { if (!id) return "st-grey"; const team = [...S.team].sort((a, b) => String(a.id).localeCompare(String(b.id))); let i = team.findIndex(m => m.id === id);
+  if (i < 0) { i = 0; for (const ch of String(id)) i = (i * 31 + ch.charCodeAt(0)) >>> 0; } return ASSIGN_ST[i % ASSIGN_ST.length]; };
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
   if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
@@ -3539,7 +3566,7 @@ function orderCell(k, o, table) {
     case "ikind": return `<td class="nowrap">${kindCell(o)}</td>`;
     case "customer": return `<td class="strike cust-td">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
     case "assigned": { const team = salesTeam(); const cur = o.assignee && !team.some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [];
-      return canAll() ? `<td><select class="status st-grey" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
+      return canAll() ? `<td><select class="status ${assigneeSt(o.assignee)}" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "total": return `<td class="r num strike nowrap">${peso2(total(o))}</td>`;
     case "payment": return `<td>${canPay() ? st(pay(o.payment), "payment", opts(PAYMENTS, o.payment)) : badge(pay(o.payment))}</td>`;
     case "mop": { const m = mopOf(o);
