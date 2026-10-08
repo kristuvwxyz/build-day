@@ -2989,6 +2989,18 @@ function viewWebOrders() {
 // Customer cancellation requests from regalspritz.com (website backend v16). Pending ones are urgent: red count on Orders.
 const cxPending = () => S.web.orders.filter(o => o.cancel && o.cancel.status === "Pending").length;
 const cxBadge = () => { const n = S.web.loaded ? (S.web.cancelRequests || cxPending()) : 0; return n ? `<span class="badge red cx-n" title="${n} cancellation request${n > 1 ? "s" : ""} waiting">${n}</span>` : ""; };
+// BDO link requests: website orders paying by BDO with no link yet, plus RS OS orders set to BDO BNPL with no link.
+const rsBdoNeeds = () => S.orders.filter(o => o.payVia === "bdo" && rrPayable(o) && !/bdo\.com\.ph/i.test(o.payLink || ""));
+const bdoCount = () => (S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0) + rsBdoNeeds().length;
+const bdoBadge = () => { const n = bdoCount(); return n ? `<span class="badge amber cx-n" title="${n} BDO link${n > 1 ? "s" : ""} needed">${n}</span>` : ""; };
+function bdoPanel() {
+  const web = S.web.loaded ? S.web.orders.filter(bdoNeeds).sort((a, b) => webOMs(a) - webOMs(b)) : [], rs = rsBdoNeeds();
+  if (!S.web.loaded && !rs.length) return `<div class="panel"><div class="empty">Loading website orders…</div></div>`;
+  if (!web.length && !rs.length) return `<div class="panel"><div class="empty">No BDO links needed. 🎉</div></div>`;
+  return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Make each link in BDO Checkout (copy the fields), paste it and Save: the buyer is emailed the link. Oldest first.</div>
+  <div class="cx-list">${web.map(o => `<div class="panel cx-card"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(String(o.ref || "").replace(/^#/, ""))}</button><span>${esc(o.name || "")}</span><span class="cx-when">${esc(webTime(o.date, o))} · Website</span></div>${bdoBox(o)}</div>`).join("")}
+  ${rs.map(o => `<div class="panel cx-card"><div class="cx-top"><button type="button" class="onum linkish" data-open="${o.id}">${esc(onum(o))}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${esc(relTime(o.createdAt))} · RS OS · ${peso(rrDue(o))}</span></div><div class="bdo-act" style="padding:0 14px 12px"><button class="btn sm primary" type="button" data-act="receipt" data-id="${o.id}">Make BDO link</button></div></div>`).join("")}</div>`;
+}
 function cancelPanel() {
   const all = S.web.orders.filter(o => o.cancel && o.cancel.status), f = S.cx.f;
   const list = all.filter(o => f === "pending" ? o.cancel.status === "Pending" : o.cancel.status !== "Pending").sort((a, b) => String(b.cancel.date || "").localeCompare(String(a.cancel.date || "")));
@@ -3055,7 +3067,7 @@ function bdoBox(o) {
     <div class="bdo-act"><button type="button" class="btn sm" data-copy="${esc(f.map(([k, v]) => k + ": " + v).join("\n"))}">Copy all</button>
       <a class="btn sm primary" href="https://checkout.bdo.com.ph/AutoMailPaymentDetails.asp" target="_blank" rel="noopener">Open BDO Checkout (email bill)</a>
       <a class="btn sm" href="https://checkout.bdo.com.ph/MailPaymentDetails.asp" target="_blank" rel="noopener">Create a payment link</a></div>
-    <div class="bdo-paste"><input id="bdo-link" type="url" placeholder="Paste the BDO link here (https://…bdo.com.ph/…)" value="${esc(saved)}" autocomplete="off"><button type="button" class="btn sm primary" data-act="bdo-save" data-ref="${esc(o.ref)}">Save</button>${saved ? `<button type="button" class="btn sm ghost" data-act="bdo-clear" data-ref="${esc(o.ref)}">Clear</button>` : ""}</div>
+    <div class="bdo-paste"><input id="bdo-link" class="bdo-link" type="url" placeholder="Paste the BDO link here (https://…bdo.com.ph/…)" value="${esc(saved)}" autocomplete="off"><button type="button" class="btn sm primary" data-act="bdo-save" data-ref="${esc(o.ref)}">Save</button>${saved ? `<button type="button" class="btn sm ghost" data-act="bdo-clear" data-ref="${esc(o.ref)}">Clear</button>` : ""}</div>
     ${saved ? `<div style="font-size:12.5px;color:var(--muted);word-break:break-all">Customer sees a <b>Pay with BDO</b> button in My Account: <a href="${esc(saved)}" target="_blank" rel="noopener">${esc(saved)}</a></div>` : `<div style="font-size:12.5px;color:var(--muted)">Amount is the Due Today amount (pre-orders may be a down payment). After the customer pays, check BDO's report, then click Mark paid.</div>`}</div>`;
 }
 async function webUpdate(ref, patch, btn) {
@@ -3065,7 +3077,7 @@ async function webUpdate(ref, patch, btn) {
     const r = await S.site.update(ref, patch);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't save it.");
     const i = S.web.orders.findIndex(x => x.ref === ref); if (i >= 0 && r.order) { S.web.orders[i] = r.order; S.web.dirty = true; }
-    toast(`${ref} updated on the website.`); S.sheetNoPush = true; openWebOrder(ref); return true;
+    toast(`${ref} updated on the website.`); if (!$("#scrim").hidden) { S.sheetNoPush = true; openWebOrder(ref); } else render(); return true;
   } catch (e) { sheetError((e && e.message) || "Couldn't save."); if (btn) { btn.disabled = false; btn.textContent = "Try again"; } return false; }
 }
 
@@ -3711,13 +3723,12 @@ function viewOrders() {
       ${canFul() || canAll() ? `<button class="btn sm cancel-btn" type="button" data-bulk="cancel">✕ Cancel order${S.sel.size === 1 ? "" : "s"}</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
-  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT;
-  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
+  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT, bdOn = S.cx.show === "bdo" && S.site && canPay();
+  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn && !bdOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${S.site && canPay() ? `<button type="button" data-cx="bdo" aria-pressed="${!!bdOn}">BDO link requests${bdoBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
   if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
   if (arOn) return `${cxTabs}${viewArchived()}`;
-  const nBdo = S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0;
-  const bdoNote = nBdo && S.of.view !== "bdo" ? `<div class="notice" style="background:var(--warn-bg);color:var(--warn, #8a5a00)"><span><strong>${nBdo} BDO order${nBdo > 1 ? "s need" : " needs"} a payment link.</strong> Make the link in BDO Checkout and paste it in the order.</span><button class="btn sm" type="button" data-bdoview="1">Show ${nBdo > 1 ? "them" : "it"}</button></div>` : "";
-  return `${webErrNotice()}${cxTabs}${bdoNote}
+  if (bdOn) return `${webErrNotice()}${cxTabs}${bdoPanel()}`;
+  return `${webErrNotice()}${cxTabs}
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${S.site && canOrders() ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 4px">Website orders: <span id="web-state">${S.web.loading || !S.web.loaded ? "Loading…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" }) + (S.web.ms ? ` · ${(S.web.ms / 1e3).toFixed(1)}s` : "") : ""}</span></div>` : ""}
   ${ctxDept() === "CEO" ? statsStrip() : ""}
@@ -7062,7 +7073,7 @@ document.addEventListener("click", guard(async ev => {
   const js = ev.target.closest("[data-jntsave]"); if (js && S.jnt) { js.disabled = true; await jntSaveBack(Number(js.dataset.jntsave)); js.disabled = false; return; }
   const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
   const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
-  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
+  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
   const cxf = ev.target.closest("[data-cxf]"); if (cxf) { S.cx.f = cxf.dataset.cxf; render(); return; }
   const cxd = ev.target.closest("[data-cxdec]"); if (cxd) { const ref = cxd.dataset.ref, d = cxd.dataset.cxdec;
     if (d === "Approved" && !confirm(`Cancel order #${String(ref).replace(/^#/, "")}? The customer will see it as Cancelled.`)) return;
@@ -7316,7 +7327,7 @@ document.addEventListener("click", guard(async ev => {
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
-    case "bdo-save": { const v = ($("#bdo-link").value || "").trim(); if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\//i.test(v)) return sheetError("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).");
+    case "bdo-save": { const inp = (b.closest(".bdo-box") || document).querySelector(".bdo-link, #bdo-link"), v = ((inp && inp.value) || "").trim(); if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\//i.test(v)) return !$("#scrim").hidden ? sheetError("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).") : toast("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).");
       const ok = await webUpdate(b.dataset.ref, { bdoLink: v }, b); if (ok) { const wo = webAsOrders().find(x => x.ref === b.dataset.ref); if (wo && wo.email) custMail(wo, "paylink", { url: v, method: "BDO" }).then(s => s && toast(`BDO payment link emailed to ${wo.email}.`)); } return; }
     case "bdo-clear": return webUpdate(b.dataset.ref, { bdoLink: "" }, b);
     case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
