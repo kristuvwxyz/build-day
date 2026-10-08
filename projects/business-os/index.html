@@ -3037,6 +3037,7 @@ function openWebOrder(ref) {
     </div>
     <div class="table-wrap" style="flex-shrink:0"><table class="otable"><tbody>${(o.items || []).map(i => `<tr><td>${esc(i.title || "")}${i.variant ? `<br><small style="color:var(--muted)">${esc(i.variant)}</small>` : ""}</td><td class="r num">${Number(i.qty) || 1} × ${peso(i.price)}</td></tr>`).join("")}
       ${Number(o.shipping) ? `<tr><td>Shipping</td><td class="r num">${peso(o.shipping)}</td></tr>` : ""}
+      ${(() => { const w = (Number(o.discount) || 0) - (Number(o.voucherOff) || 0), c = o.discountCode && o.discountCode !== o.voucher ? o.discountCode : ""; return c && w > 0 ? `<tr><td>Welcome code ${esc(c)}</td><td class="r num">−${peso(w)}</td></tr>` : ""; })()}
       ${Number(o.voucherOff) ? `<tr><td>Voucher ${esc(o.voucher || "")}</td><td class="r num">−${peso(o.voucherOff)}</td></tr>` : ""}
       ${Number(o.pointsUsed) ? `<tr><td>Royal Points used</td><td class="r num">${esc(String(o.pointsUsed))}</td></tr>` : ""}
       <tr><td><b>Total</b></td><td class="r num"><b>${peso(o.total)}</b></td></tr>
