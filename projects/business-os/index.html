@@ -2586,7 +2586,7 @@ function viewHome() {
   const mine = S.tasks.filter(t => (t.assigneeId && t.assigneeId === mid || isAllTask(t)) && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
   const dueToday = visTasks().filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
   const showOrders = canOrders() && (canSee("SALES") || canSee("PACKING") || visDepts().length > 0);
-  const toShip = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
+  const toShip = S.orders.filter(o => !isVoid(o) && o.fulfillment === "unfulfilled").length; // only orders ready to pack now (pre-order stages like On hold / Arrived-Hold / DP are not parcels yet)
   const st = mid && member(mid) ? attStatus(mToday(), mid) : "";
   const r = mid ? attRec(mToday(), mid) : null;
   const goals = (h.goals || "").split("\n").map(x => x.trim()).filter(Boolean);
