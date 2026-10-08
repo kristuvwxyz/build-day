@@ -2586,7 +2586,7 @@ function viewHome() {
   const mine = S.tasks.filter(t => (t.assigneeId && t.assigneeId === mid || isAllTask(t)) && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
   const dueToday = visTasks().filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
   const showOrders = canOrders() && (canSee("SALES") || canSee("PACKING") || visDepts().length > 0);
-  const toShip = S.orders.filter(o => !isVoid(o) && o.fulfillment === "unfulfilled").length; // only orders ready to pack now (pre-order stages like On hold / Arrived-Hold / DP are not parcels yet)
+  const toShip = allOrderRows().filter(o => !isVoid(o) && o.fulfillment === "unfulfilled").length; // To ship only (RS OS + website); pre-order stages like On hold / Arrived-Hold / DP are not parcels yet
   const st = mid && member(mid) ? attStatus(mToday(), mid) : "";
   const r = mid ? attRec(mToday(), mid) : null;
   const goals = (h.goals || "").split("\n").map(x => x.trim()).filter(Boolean);
@@ -2602,7 +2602,6 @@ function viewHome() {
     <button type="button" data-nav="tasks"${overdue ? ' class="hot"' : ""}><b class="num">${mine.length}</b><span>My open tasks${overdue ? ` · ${overdue} late` : ""}</span></button>
     <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
     ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="tasks"><b class="num">${visTasks().filter(t => t.status === "in_progress").length}</b><span>In progress</span></button>`}
-    ${web ? (() => { const wu = S.web.orders.filter(o => !o.paid && !/cancel/i.test(o.status || "")).length, ws = S.web.orders.filter(o => o.paid && !webDone(o)).length; return `<button type="button" data-goweb="unpaid"><b class="num">${wu}</b><span>Unpaid website</span></button><button type="button" data-goweb="toship"><b class="num">${ws}</b><span>Website to ship</span></button>`; })() : ""}
     ${showOrders && S.live != null ? `<button type="button" data-act="live-now" title="People on regalspritz.com right now (updates every 30 seconds)"><b class="num" id="live-n">${S.live}</b><span><span class="live-dot"></span>Live on website</span></button>` : ""}
     <div class="att">${st ? `<b style="font-size:18px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
       : `<b style="font-size:18px">–</b><span>Attendance · not linked</span>`}</div>
