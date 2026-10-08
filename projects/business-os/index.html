@@ -150,6 +150,7 @@ h2 { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: u
 .btn.ghost { border-color: transparent; background: none; color: var(--muted); padding: 6px 8px; }
 .btn.ghost:hover { color: var(--fg); background: var(--surface-2); }
 .btn.danger { color: var(--bad); }
+.btn.cancel-btn, .btn.cancel-btn:hover { background: var(--bad); border-color: var(--bad); color: #fff; font-weight: 700; } .btn.cancel-btn[data-sure] { box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 30%, transparent); }
 .btn.sm { padding: 4px 10px; font-size: 13px; }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -1076,7 +1077,7 @@ const DEPTS = [
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "customers", "dtasks"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Archived orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -1392,7 +1393,7 @@ async function updateOrderCore(o, ch) {
   if (!by && upd.fulfillment && upd.fulfillment !== o.fulfillment) custMailStep(o, upd.fulfillment);
   else if (!by && upd.payment && VOIDPAY.has(upd.payment) && !VOIDPAY.has(o.payment)) custMailStep(o, "cancelled");
   if (stockDelta) { if (o.stockTaken) await applyStockMap(o.stockTaken, stockDelta); else for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, stockDelta * (Number(i.qty) || 0)); }
-  // Cancelled = archived: the order moves to Archived orders (unarchive brings it back as To Confirm).
+  // Cancelled = the order moves to Cancelled orders (Restore brings it back as To Confirm).
   if (upd.fulfillment === "cancelled" && o.fulfillment !== "cancelled") { const cur = S.orders.find(x => x.id === o.id) || Object.assign({}, o, upd);
     await archiveOrder(cur, "Cancelled", { archivedPrev: { payment: o.payment, fulfillment: o.fulfillment } }).catch(e => console.warn("auto-archive", e)); }
   return stockDelta;
@@ -2113,7 +2114,7 @@ function globalSearch(inp) {
   const res = inp.parentElement.querySelector(".gs-res"); const q = inp.value.trim().toLowerCase().replace(/^#/, "");
   if (!q) { res.hidden = true; return; }
   const list = [...S.orders, ...S.archived].filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 8);
-  res.innerHTML = list.length ? list.map(o => `<button type="button" data-gso="${o.id}"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span><small>${o.archived ? "Archived" : esc(ful(o.fulfillment).name)} · ${peso(total(o))}</small></button>`).join("") : `<div class="gs-empty">No orders match “${esc(inp.value)}”.</div>`;
+  res.innerHTML = list.length ? list.map(o => `<button type="button" data-gso="${o.id}"><b>${esc(onum(o))}</b><span>${esc(o.customer || "")}</span><small>${o.archived ? "Cancelled" : esc(ful(o.fulfillment).name)} · ${peso(total(o))}</small></button>`).join("") : `<div class="gs-empty">No orders match “${esc(inp.value)}”.</div>`;
   res.hidden = false;
 }
 // A page the person can't open sends them Home, but only once the team list has loaded;
@@ -3446,7 +3447,7 @@ function filteredOrders() {
   const q = S.of.q.trim().toLowerCase();
   const vw = S.of.view;
   return allOrderRows().filter(o => {
-    if (o.web && o.fulfillment === "cancelled" && S.of.ful !== "cancelled") return false; // shown in Archived orders
+    if (o.web && o.fulfillment === "cancelled" && S.of.ful !== "cancelled") return false; // shown in Cancelled orders
     if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
     if (S.of.sup && S.of.sup !== "all" && !(o.tags || []).some(t => t.toUpperCase() === S.of.sup)) return false;
     if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
@@ -3707,11 +3708,11 @@ function viewOrders() {
       ${canAll() ? `<input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
       <button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>` : ""}
       ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FUL_PICK)}</select>` : ""}
-      ${canAll() ? `<button class="btn sm" type="button" data-bulk="archive">Archive</button>` : ""}
+      ${canFul() || canAll() ? `<button class="btn sm cancel-btn" type="button" data-bulk="cancel">✕ Cancel order${S.sel.size === 1 ? "" : "s"}</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
   const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT;
-  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or archived"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Archived <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
+  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
   if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
   if (arOn) return `${cxTabs}${viewArchived()}`;
   const nBdo = S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0;
@@ -3731,7 +3732,7 @@ function viewOrders() {
     <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
   </div>
   ${S.of.q && !all.length && ofActive() && (S.of.month || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all") && S.orders.some(o => orderMatchesQ(o, S.of.q.trim().toLowerCase())) ? `<div class="notice">Some orders match “${esc(S.of.q)}” but your filters hide them. <button class="btn sm" type="button" data-act="of-clear-keepq">Show them</button></div>` : ""}
-  ${(() => { const q = (S.of.q || "").trim().toLowerCase(); if (!q) return ""; const am = S.archived.filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10); return am.length ? `<div class="panel shopfind"><div class="head"><h2>In Archived orders</h2><span class="s">${am.length} match${am.length === 1 ? "" : "es"}</span></div>${am.map(o => `<div class="sf-row"><div style="min-width:0"><b>${esc(onum(o))}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date || dstr(o.createdAt || 0))}${o.archivedReason ? " · " + esc(o.archivedReason) : ""} · archived ${esc(relTime(o.archivedAt))}</div></div><button class="btn sm" type="button" data-open="${o.id}">Open</button></div>`).join("")}</div>` : ""; })()}
+  ${(() => { const q = (S.of.q || "").trim().toLowerCase(); if (!q) return ""; const am = S.archived.filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10); return am.length ? `<div class="panel shopfind"><div class="head"><h2>In Cancelled orders</h2><span class="s">${am.length} match${am.length === 1 ? "" : "es"}</span></div>${am.map(o => `<div class="sf-row"><div style="min-width:0"><b>${esc(onum(o))}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date || dstr(o.createdAt || 0))}${o.archivedReason ? " · " + esc(o.archivedReason) : ""} · archived ${esc(relTime(o.archivedAt))}</div></div><button class="btn sm" type="button" data-open="${o.id}">Open</button></div>`).join("")}</div>` : ""; })()}
   <div id="shopfind-slot">${shopFindPanel()}</div>
   ${bulk}
   ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
@@ -3831,12 +3832,12 @@ function viewDisputes() {
   <div style="font-size:12.5px;color:var(--muted)">Orders tagged DISPUTE. Open one to check it, then press <b>Resolved</b> to remove the tag.</div>
   <div class="table-wrap"><table>
     <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Note</th><th></th></tr></thead>
-    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Archived</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td><td>${o.archived ? "–" : badge(pay(o.payment))}</td><td>${o.archived ? "–" : badge(ful(o.fulfillment))}${risky.includes(o) ? " ⚠️" : ""}</td><td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Cancelled</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td><td>${o.archived ? "–" : badge(pay(o.payment))}</td><td>${o.archived ? "–" : badge(ful(o.fulfillment))}${risky.includes(o) ? " ⚠️" : ""}</td><td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
       <td class="nowrap">${canAll() || isUnlocked("ADMIN") ? `<button class="btn sm" type="button" data-act="disp-ok" data-id="${o.id}">Resolved</button>` : ""}</td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No disputes. Add the DISPUTE tag to an order to track it here.</div>`}</div>`;
 }
 S.asel = new Set();
-// Cancelled website orders show in Archived orders too (read-only: the website keeps them as Cancelled).
+// Cancelled website orders show in Cancelled orders too (read-only: the website keeps them as Cancelled).
 function webArchived() {
   const meta = new Map(S.webmeta.map(d => [d.ref, d]));
   return webAsOrders().filter(o => o.fulfillment === "cancelled").map(o => { const l = ((meta.get(o.ref) || {}).log || []).find(x => /cancel/i.test(x.msg || ""));
@@ -3848,17 +3849,17 @@ function viewArchived() {
   const rows = [...S.archived, ...webArchived()].filter(o => !q || [o.num, ...(o.merged || []), o.customer, o.archivedReason, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
   [...S.asel].forEach(id => { if (!S.archived.some(o => o.id === id)) S.asel.delete(id); });
   const ca = canAll(), n = S.asel.size, allOn = rows.some(o => !o.web) && rows.filter(o => !o.web).every(o => S.asel.has(o.id));
-  const bulk = ca && n ? `<div class="bulk"><strong>${n} selected</strong><button class="btn sm primary" type="button" data-act="a-unarch">Unarchive</button><button class="btn ghost sm" type="button" data-act="a-del">Delete forever</button><button class="btn ghost sm" type="button" data-act="a-clear">Clear</button></div>` : "";
-  return `<div class="toolbar"><input id="aq" type="search" placeholder="Search archived orders" value="${esc(S.aq || "")}" aria-label="Search archived orders"></div>
+  const bulk = ca && n ? `<div class="bulk"><strong>${n} selected</strong><button class="btn sm primary" type="button" data-act="a-unarch">Restore</button><button class="btn ghost sm" type="button" data-act="a-del">Delete forever</button><button class="btn ghost sm" type="button" data-act="a-clear">Clear</button></div>` : "";
+  return `<div class="toolbar"><input id="aq" type="search" placeholder="Search cancelled orders" value="${esc(S.aq || "")}" aria-label="Search cancelled orders"></div>
   ${bulk}
   <div class="table-wrap"><table>
-    <thead><tr>${ca ? `<th style="width:34px"><input type="checkbox" data-aselall="1" aria-label="Select all" ${allOn ? "checked" : ""}></th>` : ""}<th>Order</th><th>Customer</th><th>Items</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Archived</th><th>Why</th><th>By</th><th></th></tr></thead>
+    <thead><tr>${ca ? `<th style="width:34px"><input type="checkbox" data-aselall="1" aria-label="Select all" ${allOn ? "checked" : ""}></th>` : ""}<th>Order</th><th>Customer</th><th>Items</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Cancelled</th><th>Why</th><th>By</th><th></th></tr></thead>
     <tbody>${rows.map(o => `<tr data-row="${o.id}">${ca && o.web ? "<td></td>" : ""}${ca && !o.web ? `<td><input type="checkbox" data-asel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.asel.has(o.id) ? "checked" : ""}></td>` : ""}<td class="nowrap">${o.web ? `<button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">${esc(onum(o))}</button> <span class="chip">Website</span>` : `<span class="onum">${esc(onum(o))}</span>`} ${disputeChip(o)}</td><td>${custLink(o)}</td><td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td><td class="r num nowrap">${peso2(total(o))}</td><td>${badge(pay("voided"))}</td><td>${badge(ful("cancelled"))}</td><td class="nowrap" data-sort="${o.archivedAt || 0}">${relTime(o.archivedAt)}</td><td style="font-size:12.5px">${esc(o.archivedReason || "")}</td><td style="font-size:12.5px">${esc(o.archivedBy || "")}</td>
-      <td class="nowrap">${ca && !o.web ? `<button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button> <button class="btn ghost sm" type="button" data-act="ask-del-forever" data-id="${o.id}">Delete forever</button>` : ""}</td></tr>`).join("")}</tbody>
-  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No archived orders. “Archive” on an order moves it here as Cancelled · Voided; you can unarchive it any time.</div>`}</div>`;
+      <td class="nowrap">${ca && !o.web ? `<button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Restore</button> <button class="btn ghost sm" type="button" data-act="ask-del-forever" data-id="${o.id}">Delete forever</button>` : ""}</td></tr>`).join("")}</tbody>
+  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No cancelled orders. Cancelling an order moves it here as Cancelled · Voided; Restore brings it back (as To Confirm).</div>`}</div>`;
 }
 async function archiveOrder(o, reason, extra = {}) {
-  const upd = { archived: true, archivedAt: Date.now(), archivedBy: actor(), archivedReason: reason || "", archivedPrev: { payment: o.payment, fulfillment: o.fulfillment }, payment: "voided", fulfillment: "cancelled", log: logAdd(o, [(reason ? `archived the order (${reason})` : "archived the order") + " · Fulfillment → Cancelled · Payment → Voided"]), ...extra };
+  const upd = { archived: true, archivedAt: Date.now(), archivedBy: actor(), archivedReason: reason || "", archivedPrev: { payment: o.payment, fulfillment: o.fulfillment }, payment: "voided", fulfillment: "cancelled", log: logAdd(o, [(reason ? `cancelled the order (${reason})` : "cancelled the order") + " · Fulfillment → Cancelled · Payment → Voided"]), ...extra };
   await patch("orders", o.id, upd);
   if (!S.db) { S.orders = S.orders.filter(x => x.id !== o.id); S.archived.push(Object.assign(o, upd)); }
   S.sel.delete(o.id);
@@ -3895,7 +3896,7 @@ async function statusSync() {
 async function restoreOrder(o) {
   const pv = o.archivedPrev || {};
   const payment = pv.payment || o.shopPay || "pending", fulfillment0 = pv.fulfillment || o.shopFul || "unfulfilled", fulfillment = fulfillment0 === "cancelled" ? "to_confirm" : fulfillment0;
-  const upd = { archived: false, archivedAt: 0, archivedReason: "", mergedInto: "", payment, fulfillment, log: logAdd(o, [`unarchived the order (back to ${pay(payment).name} · ${ful(fulfillment).name})`]) };
+  const upd = { archived: false, archivedAt: 0, archivedReason: "", mergedInto: "", payment, fulfillment, log: logAdd(o, [`restored the order (back to ${pay(payment).name} · ${ful(fulfillment).name})`]) };
   if (S.db) await wdb().collection("orders").doc(o.id).update(upd);
   else { S.archived = S.archived.filter(x => x.id !== o.id); S.orders.push(Object.assign(o, upd)); render(); }
   scheduleStatusSync();
@@ -3926,7 +3927,7 @@ function openMerge() {
   openSheet(`<h3>Merge ${os.length} orders into 1 shipment</h3>
     ${names.size > 1 ? `<div class="notice">Heads up: these orders are for different customers.</div>` : ""}
     <div class="field"><label>Keep this order #</label>${os.map((o, i) => `<label class="radio-line"><input type="radio" name="mg-main" value="${o.id}" ${i === 0 ? "checked" : ""}> <b>${esc(onum(o))}</b> · ${esc(o.customer || "")} · ${itemsLabel(o)} · ${peso2(total(o))}</label>`).join("")}</div>
-    <div style="font-size:13px">All items move into the order you keep, each marked with the order # it came from. The other orders go to <b>Archived orders</b> (you can unmerge later). Combined total <b>${peso2(os.reduce((a, o) => a + total(o), 0))}</b>.</div>
+    <div style="font-size:13px">All items move into the order you keep, each marked with the order # it came from. The other orders go to <b>Cancelled orders</b> (you can unmerge later). Combined total <b>${peso2(os.reduce((a, o) => a + total(o), 0))}</b>.</div>
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Merge</button></div>`,
   async () => {
@@ -4171,7 +4172,12 @@ function viewPacking() {
 async function bulkAction(kind) {
   const targets = allOrderRows().filter(o => S.sel.has(o.id));
   if (kind === "clear") { S.sel.clear(); render(); return; }
-  if (kind === "archive") { const own = targets.filter(o => !o.web); for (const o of own) await archiveOrder(o, ""); toast(`Archived ${own.length} order${own.length === 1 ? "" : "s"}.` + (own.length < targets.length ? " Website orders stay on the website." : "")); S.sel.clear(); render(); return; }
+  if (kind === "cancel") {
+    const btn = document.querySelector('[data-bulk="cancel"]'), todo = targets.filter(o => o.fulfillment !== "cancelled");
+    if (btn && !btn.dataset.sure) { btn.dataset.sure = "1"; btn.textContent = `Tap again to cancel ${todo.length}`; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.sure; btn.textContent = `✕ Cancel order${S.sel.size === 1 ? "" : "s"}`; } }, 4000); return; }
+    // Cancelled = moves to Cancelled orders (RS OS orders; website orders are cancelled on the website), and the buyer is emailed.
+    for (const o of todo) await updateOrder(o, { fulfillment: "cancelled" });
+    toast(`Cancelled ${todo.length} order${todo.length === 1 ? "" : "s"} · moved to Cancelled orders.`); S.sel.clear(); render(); return; }
   if (kind === "tag") {
     const t = val("bulk-tag").toUpperCase(); if (!t) { toast("Type a tag first."); return; }
     for (const o of targets) if (!(o.tags || []).includes(t)) await updateOrder(o, { tags: [...(o.tags || []), t] });
@@ -4861,12 +4867,12 @@ function openOrderDetails(id) {
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
     <div class="sheet-title"><h3>${esc(onum(o))}</h3></div>
-    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}<button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
+    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}<button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm cancel-btn" type="button" data-act="archive-order" data-id="${o.id}">✕ Cancel order</button></div>` : ""}
     ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${arch ? "" : `<button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}`}${cp ? `<button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button>` : ""}</div>` : ""}
     ${(() => { const ts = S.tasks.filter(t => t.orderId === o.id).sort((a, b) => (a.due || "").localeCompare(b.due || "")); return ts.length ? `<div class="oactions" style="font-size:13px">📅 On the calendar: ${ts.map(t => `<button type="button" class="chip" data-task="${t.id}">${t.due ? fmtDate(t.due) : "No date"} · ${esc(t.title.slice(0, 40))} · ${esc(tstat(t.status).name)}</button>`).join("")}</div>` : ""; })()}
     ${isDispute(o) ? `<div class="notice" style="border-color:var(--bad);color:var(--bad)">⚠️ <b>Dispute.</b> Check that this is resolved before dispatch. Remove the DISPUTE tag once it is.</div>` : ""}
     <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
-    ${arch ? `<div class="notice">Archived ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Unarchive</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(COURIER_LABEL[courierOf(o)])}</span></div>`}
+    ${arch ? `<div class="notice">Cancelled ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Restore</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(COURIER_LABEL[courierOf(o)])}</span></div>`}
     <div><div style="font-weight:700">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</div><div style="color:var(--muted);font-size:13px;user-select:all">${[o.email, o.phone].filter(Boolean).map(esc).join(" · ")}</div>${o.address ? `<div style="color:var(--muted);font-size:13px">${esc(o.address)}</div>` : o.pickup ? `<div style="color:var(--muted);font-size:13px">Pickup${o.shipTitle ? " · " + esc(o.shipTitle) : ""}</div>` : ""}</div>
     <div class="list">${(o.items || []).map(i => `<div class="li"><div class="main"><div class="t"><button type="button" class="linkish item-link" data-act="item-inv" data-pid="${esc(i.productId || "")}" data-name="${esc(i.name)}" title="Open in inventory">${esc(i.qty)}× ${esc(i.name)}</button></div><div class="s num">${showFrom ? `<span class="from">${i.from ? "from #" + esc(i.from) : "order # unknown"}</span> ` : ""}${peso2(i.price)} each${i.cost ? " · cost " + peso2(i.cost) : ""}${i.sku ? " · " + esc(i.sku) : ""}</div></div><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("")}</div>
     ${multi && (o.items || []).some(i => !i.from) && all ? `<button class="btn sm" type="button" data-act="trace-items" data-id="${o.id}" style="align-self:flex-start">Find which order # each item came from (Shopify)</button>` : ""}
@@ -4884,7 +4890,7 @@ function openOrderDetails(id) {
     ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
     ${cp || cf ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)">Status: <span class="badge ${pay(o.payment).cls || ""}">${esc(pay(o.payment).name)}</span><span class="badge ${ful(o.fulfillment).cls || ""}">${esc(ful(o.fulfillment).name)}</span> · change these in the Orders table.</div>` : ""}
     ${all ? `${tagField(o.tags)}
-    <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Delete moves the order to Archived orders.</div>` : ""}
+    <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Cancel order moves it to Cancelled orders.</div>` : ""}
     ${cs ? `<div class="field"><label for="d-track">Tracking # (waybill) · ${esc(COURIER_LABEL[courierOf(o)] || "")}</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>${o.tracking ? `<div style="font-size:12.5px">🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${editable ? "Cancel" : "Close"}</button>${editable ? `<button class="btn primary" type="submit">Save changes</button>` : ""}</div>
@@ -7272,11 +7278,14 @@ document.addEventListener("click", guard(async ev => {
     case "sheet-back": { const f = S.sheetStack.pop(); if (f) { S.sheetNoPush = true; f(); } return; }
     case "unmerge": { const o = findOrder(id); if (o) { closeSheet(); await unmergeOrder(o); } return; }
     case "trace-items": { const o = findOrder(id); if (o) await traceItems(o); return; }
-    case "archive-order": { const o = findOrder(id); if (o) { await archiveOrder(o, ""); closeSheet(); render(); toast(`${onum(o)} moved to Archived orders.`); } return; }
-    case "restore-order": { const o = findOrder(id); if (o) { await restoreOrder(o); S.asel.delete(id); closeSheet(); toast(`${onum(o)} unarchived · back to ${pay(o.archivedPrev?.payment || o.shopPay || "pending").name} · ${ful(o.archivedPrev?.fulfillment || o.shopFul || "unfulfilled").name}.`); } return; }
+    case "archive-order": { const o = findOrder(id); if (!o) return;
+      if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again to cancel"; return; }
+      if (o.fulfillment !== "cancelled") await updateOrder(o, { fulfillment: "cancelled" }); else await archiveOrder(o, "Cancelled");
+      closeSheet(); render(); toast(`${onum(o)} cancelled · moved to Cancelled orders.`); return; }
+    case "restore-order": { const o = findOrder(id); if (o) { await restoreOrder(o); S.asel.delete(id); closeSheet(); toast(`${onum(o)} restored · back to ${pay(o.archivedPrev?.payment || o.shopPay || "pending").name} · ${ful(o.archivedPrev?.fulfillment || o.shopFul || "unfulfilled").name}.`); } return; }
     case "disp-ok": { const o = findOrder(id); if (!o) return; await patch("orders", o.id, { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) }); toast(`${onum(o)}: dispute resolved.`); if (!S.db) render(); return; }
     case "a-clear": S.asel.clear(); render(); return;
-    case "a-unarch": { const os = S.archived.filter(o => S.asel.has(o.id)); for (const o of os) await restoreOrder(o); S.asel.clear(); render(); toast(`Unarchived ${os.length} order${os.length === 1 ? "" : "s"} with their last statuses.`); return; }
+    case "a-unarch": { const os = S.archived.filter(o => S.asel.has(o.id)); for (const o of os) await restoreOrder(o); S.asel.clear(); render(); toast(`Restored ${os.length} order${os.length === 1 ? "" : "s"} with their last statuses.`); return; }
     case "a-del": { const os = S.archived.filter(o => S.asel.has(o.id)); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to delete ${os.length} forever`; b.classList.add("danger"); return; } for (const o of os) await remove("orders", o.id); if (!S.db) S.archived = S.archived.filter(x => !S.asel.has(x.id)); S.asel.clear(); render(); toast(`Deleted ${os.length} order${os.length === 1 ? "" : "s"} for good.`); return; }
     case "ask-del-forever": { const o = findOrder(id); if (!o) return; if (b.dataset.sure) { await remove("orders", id); if (!S.db) { S.archived = S.archived.filter(x => x.id !== id); render(); } toast(`${onum(o)} deleted for good.`); } else { b.dataset.sure = "1"; b.textContent = "Tap again to delete forever"; b.classList.add("danger"); } return; }
     case "sup-list": return openSupplierList();
