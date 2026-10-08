@@ -7871,6 +7871,24 @@ async function costImportOnce(c) {
     if (n) toast(`Imported Shopify cost for ${n} listing${n === 1 ? "" : "s"}.`);
   } catch (e) { console.warn("cost import", e); }
 }
+// One time (owner's device): barcodes recorded in Shopify → listings. webmeta/_bcsrc.map = { listing id: barcode } (Shopify export,
+// matched by the listing's website handle). Only empty barcodes are filled, so barcodes saved in RS OS are kept. Flag webmeta/_bcimp.
+async function barcodeImportOnce() {
+  if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
+  const t0 = Date.now();
+  while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 90000) return; await new Promise(r => setTimeout(r, 1000)); }
+  const src = S.webmeta.find(d => d.id === "_bcsrc"); if (!src || S.webmeta.some(d => d.id === "_bcimp")) return;
+  await save("webmeta", "_bcimp", { at: Date.now(), by: actor(), running: true });
+  let n = 0;
+  try {
+    for (const [id, bc] of Object.entries(src.map || {})) {
+      const p = S.products.find(x => x.id === id); if (!p || String(p.barcode || "").trim() || !/^\d{6,14}$/.test(String(bc))) continue;
+      UNDO.at = 0; await patch("products", id, { barcode: String(bc), log: logAdd(p, [`barcode set to ${bc} from Shopify`]) }); n++;
+    }
+  } catch (e) { console.warn("barcode import", e); }
+  await save("webmeta", "_bcimp", { at: Date.now(), by: actor(), count: n });
+  if (n) toast(`Imported ${n} barcode${n === 1 ? "" : "s"} from Shopify into Listings.`);
+}
 // One time (owner's device): open pre-order orders marked Fully paid were only 50% DP → Partially paid. Flag webmeta/_dpfix.
 async function dpFixOnce() {
   if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
@@ -7887,6 +7905,7 @@ async function dpFixOnce() {
 async function startShopSync(c) {
   costImportOnce(c);
   dpFixOnce().catch(e => console.warn("dp fix", e));
+  barcodeImportOnce().catch(e => console.warn("barcode import", e));
   reconcileStages();
   shopHistoryBackfill(c);
   if (c?.use) Promise.resolve().then(() => c.use("photos")).then(ph => { if (!ph || !ph.save) return; S.photos = ph; const go = () => { if (S.loaded.products) photoCopyRun(); else setTimeout(go, 2000); if (S.loaded.webmeta) payQrUpload(); }; setTimeout(go, 8000); setInterval(() => { photoCopyRun(); payQrUpload(); }, 30 * 60e3); }).catch(() => {});
