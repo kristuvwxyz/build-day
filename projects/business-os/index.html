@@ -2702,8 +2702,16 @@ function navRefresh() {
   if (S.baseDb && S.baseDb._refresh) S.baseDb._refresh().catch(() => {});
   if (S.site) webLoad(true);
 }
+// Someone changed a website order's payment / status on another device: reload website orders now (not on the next 60s check).
+let webSiteAt = 0, webSoonT = 0;
+function webMetaSeen() {
+  const t = Math.max(0, ...S.webmeta.map(d => Number(d.siteAt) || 0));
+  if (webSiteAt && t > webSiteAt && S.site) { clearTimeout(webSoonT); webSoonT = setTimeout(() => webLoad(true), 400); }
+  webSiteAt = Math.max(webSiteAt, t) || 1;
+}
 async function webLoad(quiet) {
-  if (!S.site || webBusy || !canOrders()) return;
+  if (webBusy) { S.web.again = true; return; }
+  if (!S.site || !canOrders()) return;
   webBusy = true; S.web.loading = true; S.web.t0 = Date.now(); if (!quiet) paintWebState();
   try {
     let r = await S.site.list({ limit: 300 });
@@ -2713,7 +2721,7 @@ async function webLoad(quiet) {
     if (fresh.length) toast(fresh.length === 1 ? `New website order ${fresh[0].ref}${fresh[0].name ? " from " + fresh[0].name : ""}` : `${fresh.length} new website orders`);
     S.web.orders = r.orders || []; S.web.cancelRequests = Number(r.cancelRequests) || (r.orders || []).filter(o => o.cancel && o.cancel.status === "Pending").length; S.web.at = r.at || new Date().toISOString(); S.web.ms = Date.now() - S.web.t0; S.web.backendMs = Number(r.backendMs) || 0; S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
-  finally { webBusy = false; S.web.loading = false; bgRender(); }
+  finally { webBusy = false; S.web.loading = false; bgRender(); if (S.web.again) { S.web.again = false; setTimeout(() => webLoad(true), 300); } }
   webStockSync(); scheduleOwnerSync(); webStatusSync(); scheduleStatusSync(3000);
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
@@ -2795,7 +2803,7 @@ async function webOrderUpdate(o, ch) {
     const i = S.web.orders.findIndex(x => x.ref === o.ref); if (i >= 0 && r.order) S.web.orders[i] = r.order;
   }
   const id = String(o.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {};
-  await save("webmeta", id, { ...clean(cur), ...keep, ref: o.ref, log: [...(cur.log || []), { at: Date.now(), by: actor(), msg: "changed " + msgs.join(", ") }].slice(-50), at: Date.now() });
+  await save("webmeta", id, { ...clean(cur), ...keep, ...(Object.keys(site).length ? { siteAt: (webSiteAt = Date.now()) } : {}), ref: o.ref, log: [...(cur.log || []), { at: Date.now(), by: actor(), msg: "changed " + msgs.join(", ") }].slice(-50), at: Date.now() });
   S.web.dirty = true; bgRender();
 }
 const allOrderRows = () => [...S.orders, ...webAsOrders()];
@@ -7623,6 +7631,7 @@ render();
         else S[col] = docs;
         S.loaded[col] = true;
         if (col === "orders" || col === "webmeta") { S.web.dirty = true; scheduleOwnerSync(); }
+        if (col === "webmeta") webMetaSeen();
         bgRender();
       }, () => { S.loaded[col] = true; $("#sync").textContent = "Connection lost · reload the page"; render(); });
     }

@@ -49,6 +49,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Orders table: compact rows. "Mode of payment" column: website orders show the buyer's pick; RS OS orders have a dropdown (Maya, BDO, GCash, Bank transfer, Cash, COD, Card, Other), guessed from the pay link until set. Colors: Maya green, BDO blue, GCash teal, Bank transfer violet, Cash amber, COD orange, Card pink; Courier J&T red, SDD violet. Source column uses small same-size pills.
 - Top bar shows the live date and time (Manila), every page; phones show the time only.
 - All dashboard dates and times are Manila time (GMT+8) on every device. Website order dates without a time zone are read as Manila time.
+- Speed / live sync (RS App): data is kept on the device (IndexedDB, cleared on sign out) and only changes are downloaded. Live channel + an 8s "anything changed?" check; screen updates are batched. Changing a website order makes other devices reload website orders at once (webmeta siteAt). Server-side change times + delete list: supabase/fast-sync.sql.
 - Admin → Logins: A–Z by Account (ignores quotes/symbols), always split into Active accounts then Inactive accounts; clicking a column header sorts inside each group. Any table with group rows sorts the same way.
 - Undo: Ctrl/Cmd+Z undoes the last change in RS OS (one click or save = one step), Ctrl/Cmd+Shift+Z redoes.
 - When a fix can be done from the RS App (e.g. a site add-on), do it instead of asking K to paste into another chat.

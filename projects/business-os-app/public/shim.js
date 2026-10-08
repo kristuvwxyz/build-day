@@ -103,6 +103,19 @@
       draw();
     });
   }
+  /* ---------- on-device copy of the data (IndexedDB) ----------
+     Opening RS OS shows the saved copy at once, then downloads only what changed. Cleared on sign out. */
+  const CACHE_V = 1;
+  let idbP = null;
+  const idbOpen = () => idbP || (idbP = new Promise((res, rej) => {
+    try { const r = indexedDB.open("rs-cache", 1); r.onupgradeneeded = () => r.result.createObjectStore("cols"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error("blocked")); } catch (e) { rej(e); }
+  }));
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
+  const idbDo = (mode, fn) => withTimeout(idbOpen().then(db => new Promise((res, rej) => { const t = db.transaction("cols", mode), q = fn(t.objectStore("cols")); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); })), 4000);
+  const cacheGet = k => idbDo("readonly", st => st.get(k)).catch(() => null);
+  const cachePut = (k, v) => idbDo("readwrite", st => st.put(v, k)).catch(() => {});
+  const cacheClear = () => idbDo("readwrite", st => st.clear()).catch(() => {});
+
   /* ---------- start-up: config, client, session ---------- */
   const ready = (async () => {
     const cfg = await fetch("/api/config").then(r => r.json());
@@ -117,44 +130,124 @@
     const isOwner = !!owner && !!email && owner.toLowerCase() === email;
     const memEmail = mem && String(mem.email || "").split(/[\s,;]+/).filter(Boolean)[0];
     const me = { id: user.id, name: (mem && mem.name) || "", email: email || (memEmail || "").toLowerCase() || null, isOwner, canEdit: isOwner || ["CEO", "ADMIN"].includes(mem && mem.department), avatarUrl: "", color: "#4A2545" };
-    sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") location.reload(); });
+    sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") cacheClear().finally(() => location.reload()); });
     return { sb, me, cfg };
   })();
   ready.catch(e => { document.addEventListener("DOMContentLoaded", () => { document.body.insertAdjacentHTML("afterbegin", `<div style="padding:16px;background:#FBE4E2;color:#B3261E;font:14px system-ui">${String(e.message || e)}</div>`); }); });
 
   /* ---------- database (same shape the app uses on claude.ai) ---------- */
   function makeDb(sb, me) {
-    const cols = new Map();   // col -> { rows: Map(id -> data), loaded, subs:Set }
+    const cols = new Map();   // col -> { rows: Map(id -> data), loaded, subs:Set, since: ms }
     const docs = new Map();   // path -> { subs:Set }
-    const colOf = c => { if (!cols.has(c)) cols.set(c, { rows: new Map(), loaded: false, subs: new Set() }); return cols.get(c); };
-    const snapC = c => { const x = colOf(c); return { docs: [...x.rows].map(([id, d]) => ({ id, data: () => clone(d) })), size: x.rows.size, empty: !x.rows.size }; };
+    const colOf = c => { if (!cols.has(c)) cols.set(c, { rows: new Map(), loaded: false, subs: new Set(), since: 0 }); return cols.get(c); };
+    // Each row is copied once per change (not on every screen update): 9,000 orders stay quick.
+    const cloned = new WeakMap();
+    const cloneRow = d => { if (d === null || typeof d !== "object") return d; let v = cloned.get(d); if (!v) { v = clone(d); cloned.set(d, v); } return v; };
+    const snapC = c => { const x = colOf(c); return { docs: [...x.rows].map(([id, d]) => ({ id, data: () => cloneRow(d) })), size: x.rows.size, empty: !x.rows.size }; };
     const docVal = p => { const c = cols.get(parentOf(p)); return c ? c.rows.get(leafOf(p)) : undefined; };
     const snapD = p => { const d = docVal(p); return { id: leafOf(p), exists: d !== undefined, data: () => clone(d) }; };
-    const emit = p => {
-      const c = cols.get(parentOf(p)); if (c && c.loaded) c.subs.forEach(f => { try { f(snapC(parentOf(p))); } catch (e) { console.error(e); } });
-      const d = docs.get(p); if (d) d.subs.forEach(f => { try { f(snapD(p)); } catch (e) { console.error(e); } });
-    };
-    const put = (p, data) => { const c = colOf(parentOf(p)); c.ver = (c.ver || 0) + 1; if (data === undefined) c.rows.delete(leafOf(p)); else c.rows.set(leafOf(p), data); };
+    const emitCol = c => { const x = cols.get(c); if (x && x.loaded) x.subs.forEach(f => { try { f(snapC(c)); } catch (e) { console.error(e); } }); };
+    const emitDoc = p => { const d = docs.get(p); if (d) d.subs.forEach(f => { try { f(snapD(p)); } catch (e) { console.error(e); } }); };
+    const emit = p => { emitCol(parentOf(p)); emitDoc(p); };
+    // Changes from other people arrive in bursts: show them together (one screen update), within a fraction of a second.
+    const pendC = new Set(), pendD = new Set(); let pendT = 0;
+    const emitSoon = p => { pendC.add(parentOf(p)); if (docs.has(p)) pendD.add(p); if (!pendT) pendT = setTimeout(() => { pendT = 0; const cs = [...pendC], ds = [...pendD]; pendC.clear(); pendD.clear(); cs.forEach(emitCol); ds.forEach(emitDoc); }, 40); };
+    // Saved copy on this device, written a few seconds after changes.
+    const dirty = new Set(); let saveT = 0;
+    const ckey = c => me.id + ":" + c;
+    const flush = () => { clearTimeout(saveT); saveT = 0; const cs = [...dirty]; dirty.clear(); cs.forEach(c => { const x = cols.get(c); if (x && x.loaded && !NOCACHE.test(c)) cachePut(ckey(c), { v: CACHE_V, at: Date.now(), since: x.since, rows: [...x.rows] }); }); };
+    const markDirty = c => { dirty.add(c); if (!saveT) saveT = setTimeout(flush, 20000); };
+    const NOCACHE = /^invfiles|^accessreq/;
+    let gSince = 0;  // newest server change time seen (ms)
+    const seen = t => { const ms = typeof t === "number" ? t : Date.parse(t || ""); if (ms && ms <= Date.now() + 120e3) { if (ms > gSince) gSince = ms; return ms; } return 0; };
+    const put = (p, data) => { const c = colOf(parentOf(p)); c.ver = (c.ver || 0) + 1; if (data === undefined) c.rows.delete(leafOf(p)); else c.rows.set(leafOf(p), data); markDirty(parentOf(p)); };
+    const same = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
+    const SLACK = 120e3; // read a little before the last change time, so nothing is missed between devices
+    let hasTomb = null;  // doc_deletes table (supabase/fast-sync.sql) remembers deletions
+    async function tombsSince(c, fromIso) {
+      if (hasTomb === false) return null;
+      let q = sb.from("doc_deletes").select("path,col,at").gt("at", fromIso).limit(5000); if (c) q = q.eq("col", c);
+      const { data, error } = await q; if (error) { hasTomb = false; return null; } hasTomb = true; return data;
+    }
+    // Rows of one collection changed since its last sync, plus deletions.
+    async function deltaCol(c) {
+      const x = colOf(c), from = new Date(Math.max(0, (x.since || 0) - SLACK)).toISOString();
+      let changed = false, max = x.since || 0;
+      for (let off = 0; ; off += 1000) {
+        const { data, error } = await sb.from("docs").select("id,data,updated_at").eq("col", c).gt("updated_at", from).order("updated_at").range(off, off + 999);
+        if (error) throw error;
+        for (const r of data) { max = Math.max(max, seen(r.updated_at)); if (!same(x.rows.get(r.id), r.data)) { x.rows.set(r.id, r.data); changed = true; } }
+        if (data.length < 1000) break;
+      }
+      const tomb = await tombsSince(c, from);
+      if (tomb) { for (const t of tomb) { const id = leafOf(t.path); if (x.rows.has(id)) { x.rows.delete(id); changed = true; } } }
+      else {
+        // No deletion list on the server yet: compare ids (small) to drop rows deleted while this device was away.
+        const ids = new Set();
+        for (let off = 0; ; off += 1000) { const { data, error } = await sb.from("docs").select("id").eq("col", c).order("id").range(off, off + 999); if (error) throw error; data.forEach(r => ids.add(r.id)); if (data.length < 1000) break; }
+        for (const id of [...x.rows.keys()]) if (!ids.has(id)) { x.rows.delete(id); changed = true; }
+      }
+      x.since = max;
+      if (changed) { x.ver = (x.ver || 0) + 1; markDirty(c); emitCol(c); docs.forEach((d, p) => { if (parentOf(p) === c) emitDoc(p); }); }
+      return changed;
+    }
     async function loadCol(c) {
       const x = colOf(c); if (x.loading) return x.loading;
       x.loading = (async () => {
-        // Big collections (Orders has ~9,000) load 4 pages of 1,000 at a time instead of one after another.
-        const page = 1000, get = from => sb.from("docs").select("id,data").eq("col", c).order("id").range(from, from + page - 1);
-        const first = await get(0); if (first.error) throw first.error; first.data.forEach(r => x.rows.set(r.id, r.data));
+        const saved = NOCACHE.test(c) ? null : await cacheGet(ckey(c));
+        if (saved && saved.v === CACHE_V && Array.isArray(saved.rows) && Date.now() - (saved.at || 0) < 25 * 864e5) {
+          for (const [id, d] of saved.rows) if (!x.rows.has(id)) x.rows.set(id, d);
+          x.since = saved.since || 0; seen(x.since); x.loaded = true;
+          deltaCol(c).catch(() => {});   // show the saved copy now, then catch up in the background
+          return;
+        }
+        // First time on this device: download everything. Big collections (Orders has ~9,000) load 4 pages of 1,000 at a time.
+        let max = 0;
+        const page = 1000, get = from => sb.from("docs").select("id,data,updated_at").eq("col", c).order("id").range(from, from + page - 1);
+        const take = rows => rows.forEach(r => { if (!x.rows.has(r.id) || !x.ver) x.rows.set(r.id, r.data); max = Math.max(max, seen(r.updated_at)); });
+        const first = await get(0); if (first.error) throw first.error; take(first.data);
         for (let from = page, more = first.data.length === page; more; from += page * 4) {
           const res = await Promise.all([0, 1, 2, 3].map(k => get(from + k * page)));
-          for (const { data, error } of res) { if (error) throw error; data.forEach(r => x.rows.set(r.id, r.data)); if (data.length < page) more = false; }
+          for (const { data, error } of res) { if (error) throw error; take(data); if (data.length < page) more = false; }
         }
-        x.loaded = true;
+        x.since = max; x.loaded = true; dirty.add(c); clearTimeout(saveT); saveT = setTimeout(flush, 3000); // save the first copy soon
       })();
+      x.loading.catch(() => { x.loading = null; });
       return x.loading;
     }
+    // Safety net for the live channel: every few seconds ask "anything changed since …?" (usually nothing, a tiny request).
+    let polling = false;
+    async function pollAll(force) {
+      if (polling || !gSince || (document.hidden && !force)) return; polling = true;
+      try {
+        const from = new Date(gSince - SLACK).toISOString(), touched = new Set();
+        for (let off = 0; ; off += 1000) {
+          const { data, error } = await sb.from("docs").select("path,col,id,data,updated_at").gt("updated_at", from).order("updated_at").range(off, off + 999);
+          if (error) return;
+          for (const r of data) {
+            seen(r.updated_at); const x = cols.get(r.col);
+            if (!(x && x.loaded) && !docs.has(r.path)) continue;
+            if (!same(docVal(r.path), r.data)) { put(r.path, r.data); touched.add(r.path); }
+            if (x) x.since = Math.max(x.since || 0, Date.parse(r.updated_at) || 0);
+          }
+          if (data.length < 1000) break;
+        }
+        const tomb = await tombsSince(null, from);
+        if (tomb) for (const t of tomb) if (docVal(t.path) !== undefined) { put(t.path, undefined); touched.add(t.path); }
+        touched.forEach(emitSoon);
+      } finally { polling = false; }
+    }
+    setInterval(pollAll, 8000);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) flush(); else pollAll(); });
+    window.addEventListener("online", () => pollAll());
+    window.addEventListener("pagehide", flush);
     // one live channel for everything
     sb.channel("rs-docs").on("postgres_changes", { event: "*", schema: "public", table: "docs" }, ch => {
       const p = (ch.new && ch.new.path) || (ch.old && ch.old.path); if (!p) return;
       const c = cols.get(parentOf(p)); if (!c && !docs.has(p)) return;
-      put(p, ch.eventType === "DELETE" ? undefined : ch.new.data); emit(p);
-    }).subscribe();
+      if (ch.new && ch.new.updated_at) { const t = seen(ch.new.updated_at); if (c && t) c.since = Math.max(c.since || 0, t); }
+      put(p, ch.eventType === "DELETE" ? undefined : ch.new.data); emitSoon(p);
+    }).subscribe(st => { if (st === "SUBSCRIBED") pollAll(); });
     const fail = e => { const err = { code: /row-level security|permission|42501/i.test((e && (e.message || e.code)) || "") ? "permission_denied" : "unavailable", message: (e && e.message) || String(e) }; throw err; };
     const docRef = p => ({
       id: leafOf(p), path: p,
@@ -189,21 +282,8 @@
         new Set(rows.map(r => parentOf(r.path))).forEach(c => { const x = cols.get(c); if (x && x.loaded) x.subs.forEach(f => f(snapC(c))); });
       },
       _cached: c => cols.get(c),
-      // re-read every loaded collection and watched doc from the server (catches anything the live channel missed)
-      async _refresh() {
-        await Promise.all([...cols].filter(([, x]) => x.loaded && !x.refreshing).map(async ([c, x]) => {
-          x.refreshing = true; const ver = x.ver || 0, fresh = new Map();
-          try {
-            for (let from = 0; ; from += 1000) {
-              const { data, error } = await sb.from("docs").select("id,data").eq("col", c).order("id").range(from, from + 999);
-              if (error) return; data.forEach(r => fresh.set(r.id, r.data)); if (data.length < 1000) break;
-            }
-            if ((x.ver || 0) !== ver || JSON.stringify([...fresh]) === JSON.stringify([...x.rows])) return; // a local write landed meanwhile, or nothing changed
-            x.rows = fresh; x.subs.forEach(f => { try { f(snapC(c)); } catch (e) { console.error(e); } });
-            docs.forEach((d, p) => { if (parentOf(p) === c) d.subs.forEach(f => { try { f(snapD(p)); } catch (e) { console.error(e); } }); });
-          } finally { x.refreshing = false; }
-        }));
-      },
+      // catch up with anything the live channel missed (only the changes are downloaded)
+      async _refresh() { if (!gSince) return; await pollAll(true); },
     };
   }
 
@@ -263,7 +343,7 @@
   // "Sign out of Claude" means sign out of this app here.
   document.addEventListener("click", async e => {
     const a = e.target.closest('a[href*="claude.ai/logout"]'); if (!a) return;
-    e.preventDefault(); const { sb } = await ready; await sb.auth.signOut(); location.reload();
+    e.preventDefault(); const { sb } = await ready; await sb.auth.signOut(); await cacheClear(); location.reload();
   }, true);
 
   // Installable app (works offline for the app shell)
