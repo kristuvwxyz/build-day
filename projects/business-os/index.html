@@ -3545,11 +3545,11 @@ const ORDER_COLS = {
   tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, note: { label: "Note" }, activity: { label: "History" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
 const TABLE_COLS = {
-  orders: { all: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
+  orders: { all: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, barcode: { label: "Barcode" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r pcell" }, compare: { label: "Compare at", cls: "r pcell" }, cost: { label: "Cost", cls: "r pcell" }, stock: { label: "In stock", cls: "r" }, committed: { label: "Committed", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
     all: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"], show: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"] },
-  packing: { all: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
+  packing: { all: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "assigned", "total", "actions"], show: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
 // Listings columns are saved per person; order tables per department.
 const colKey = table => TABLE_COLS[table].personal ? `u_${myMemberId() || S.uid || "me"}_${table}` : `${ctxDept()}_${table}`;
@@ -3644,7 +3644,7 @@ function orderCell(k, o, table) {
     case "courier": return `<td>${canShip() ? `<select class="status ${COURIER_ST[courierOf(o)] || "st-grey"}" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
-    case "note": { const extra = `${o.siteNote ? `<div class="note-t" style="color:var(--muted)" title="Customer note: ${esc(o.siteNote)}">Customer: ${esc(o.siteNote)}</div>` : ""}${(o.comments || []).length ? noteIcons({ ...o, note: "" }) : ""}`;
+    case "note": { const extra = `${oldTagsNote(o)}${o.siteNote ? `<div class="note-t" style="color:var(--muted)" title="Customer note: ${esc(o.siteNote)}">Customer: ${esc(o.siteNote)}</div>` : ""}${(o.comments || []).length ? noteIcons({ ...o, note: "" }) : ""}`;
       return canAll() && !o.archived ? `<td class="note-cell" data-noteedit="${o.id}" title="Click to edit the note">${o.note ? `<div class="note-t">${esc(o.note)}</div>` : `<span class="tag-add">+ Note</span>`}${extra}</td>` : `<td>${o.note ? `<div class="note-t">${esc(o.note)}</div>` : extra ? "" : `<span style="color:var(--muted)">–</span>`}${extra}</td>`; }
     case "activity": { const l = o.log || [], last = l[l.length - 1]; return `<td>${last ? `<button type="button" class="hist-btn" data-hist="${o.id}" title="${esc((last.by || "") + " " + (last.msg || ""))} · click for full history"><span class="hist-t"><b>${esc(String(last.by || "").split(",")[0])}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length}` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "tags": return canAll() && !o.archived ? `<td class="tag-cell" data-tagedit="${o.id}" title="Click to edit tags">${tagCell(o.tags)}${(o.tags || []).length ? "" : `<span class="tag-add">+ Tag</span>`}</td>` : `<td>${tagCell(o.tags)}</td>`;
@@ -3729,8 +3729,7 @@ function viewOrders() {
   // In the order the team works: payment → tag → merge → fulfillment → archive / clear. J&T booking sits at the far right.
   const bulk = S.sel.size && (canPay() || canShip()) ? `<div class="bulk"><strong>${S.sel.size} selected</strong>
       ${canPay() ? `<select id="bulk-pay" aria-label="Set payment status"><option value="">Set payment…</option>${opts(PAYMENTS)}</select>` : ""}
-      ${canAll() ? `<input id="bulk-tag" placeholder="Tag e.g. DISPUTE, S-JEFF" aria-label="Tag to add" autocomplete="off"><button class="btn sm" type="button" data-bulk="tag">Add tag</button>
-      <button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>` : ""}
+      ${canAll() ? `<button class="btn sm" type="button" data-act="merge">Merge into 1 shipment</button>` : ""}
       ${canFul() ? `<select id="bulk-ful" aria-label="Set fulfillment status"><option value="">Set fulfillment…</option>${opts(FUL_PICK)}</select>` : ""}
       ${canFul() || canAll() ? `<button class="btn sm cancel-btn" type="button" data-bulk="cancel">✕ Cancel order${S.sel.size === 1 ? "" : "s"}</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
@@ -3857,7 +3856,7 @@ function viewDisputes() {
     <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Note</th><th></th></tr></thead>
     <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Cancelled</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td><td>${o.archived ? "–" : badge(pay(o.payment))}</td><td>${o.archived ? "–" : badge(ful(o.fulfillment))}${risky.includes(o) ? " ⚠️" : ""}</td><td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
       <td class="nowrap">${canAll() || isUnlocked("ADMIN") ? `<button class="btn sm" type="button" data-act="disp-ok" data-id="${o.id}">Resolved</button>` : ""}</td></tr>`).join("")}</tbody>
-  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No disputes. Add the DISPUTE tag to an order to track it here.</div>`}</div>`;
+  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No disputes. Open an order and tap ⚠️ Mark as dispute to track it here.</div>`}</div>`;
 }
 S.asel = new Set();
 // Cancelled website orders show in Cancelled orders too (read-only: the website keeps them as Cancelled).
@@ -4398,6 +4397,9 @@ function sheetError(msg) { const el = $("#sheet-err"); if (el) { el.textContent 
 const parseTags = s => [...new Set(s.split(",").map(t => t.trim().toUpperCase()).filter(Boolean))];
 const opts = (list, sel) => list.map(s => `<option value="${s.id}" ${sel === s.id ? "selected" : ""}>${s.name}</option>`).join("");
 function allTags() { const m = new Map(); for (const o of S.orders) for (const t of o.tags || []) m.set(t, (m.get(t) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]); }
+// Tags are no longer used on orders (Oct 2026). Old orders keep theirs, shown as a note line ("🏷 OH · LALA MANDA").
+// Internal markers (PO/OH for item type, DISPUTE for Disputes) still work behind the scenes.
+const oldTagsNote = o => { const t = (o.tags || []).filter(x => normTag(x) !== "DISPUTE"); return t.length ? `<div class="note-t" style="color:var(--muted);font-size:12px" title="Old tags, kept as a note">🏷 ${esc(t.join(" · "))}</div>` : ""; };
 function tagField(tags) {
   const have = new Set((tags || []).map(normTag));
   const sug = ["DISPUTE", ...allTags().filter(t => t !== "DISPUTE").slice(0, 14)].filter(t => !have.has(normTag(t)));
@@ -4504,7 +4506,6 @@ function openOrderForm() {
       <div class="field"><label for="o-pay">Payment status</label><select id="o-pay">${opts(PAYMENTS.filter(p => !VOIDPAY.has(p.id)), "pending")}</select></div>
       <div class="field"><label for="o-ful">Fulfillment status</label><select id="o-ful">${opts(FUL_PICK, "to_confirm")}</select></div>
     </div>
-    ${tagField([])}
     <div class="field"><label for="o-note">Note</label><textarea id="o-note" rows="2"></textarea></div>
     <div class="field"><label for="o-ref">Platform order # (optional)</label><input id="o-ref" autocomplete="off" placeholder="Shopee / TikTok ref"></div>
     <div class="total-line"><span>Order total</span><span id="order-total" class="num">₱0.00</span></div>
@@ -4531,7 +4532,7 @@ function openOrderForm() {
     const rsv = S.site && S.site.nextNumber ? await S.site.nextNumber().catch(() => null) : null;
     if (S.site && S.site.nextNumber && !(rsv && rsv.ok && /^RS\d+$/.test(rsv.ref || ""))) return sheetError((rsv && rsv.error) || "Couldn't get the next RS number. Try again.");
     const fnum = (rsv && rsv.ref) || num;
-    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: custName, ref: val("o-ref"), ...cc, items, fees: 0, shipping: numv("o-ship"), shipFee: numv("o-sf"), payVia: val("o-via"), ...(val("o-via") === "maya" ? { mop: "Maya" } : val("o-via") === "bdo" ? { mop: "BDO" } : {}), adjust: 0, discount: orderDisc(items), discountNote: orderDisc(items) ? val("o-dnote") : "", payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
+    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: custName, ref: val("o-ref"), ...cc, items, fees: 0, shipping: numv("o-ship"), shipFee: numv("o-sf"), payVia: val("o-via"), ...(val("o-via") === "maya" ? { mop: "Maya" } : val("o-via") === "bdo" ? { mop: "BDO" } : {}), adjust: 0, discount: orderDisc(items), discountNote: orderDisc(items) ? val("o-dnote") : "", payment: val("o-pay"), fulfillment, tags: [], note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
     if (order.payment === "paid" && hasPreorder(order)) { order.payment = "partial"; S.dpNote = true; }
     const take = isCancelled(order.payment, fulfillment) ? {} : stockTake(items);
     order.stockTaken = take;
@@ -5021,7 +5022,7 @@ function openOrderDetails(id) {
     </div>
     ${o.editedItemsAt ? `<div style="font-size:12px;color:var(--muted)">Items/prices edited internally ${relTime(o.editedItemsAt)}${o.editedBy ? " by " + esc(o.editedBy) : ""}. Not changed in Shopify.</div>` : ""}
     ${cp || cf ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)">Status: <span class="badge ${pay(o.payment).cls || ""}">${esc(pay(o.payment).name)}</span><span class="badge ${ful(o.fulfillment).cls || ""}">${esc(ful(o.fulfillment).name)}</span> · change these in the Orders table.</div>` : ""}
-    ${all ? `${tagField(o.tags)}
+    ${all ? `${(o.tags || []).filter(x => normTag(x) !== "DISPUTE").length ? `<div class="notebox"><div><div class="olog-h">Old tags (kept as a note)</div><div>🏷 ${esc(o.tags.filter(x => normTag(x) !== "DISPUTE").join(" · "))}</div></div></div>` : ""}<div><button class="btn sm${isDispute(o) ? "" : " ghost"}" type="button" data-act="dispute-toggle" data-id="${o.id}">${isDispute(o) ? "✓ Dispute resolved" : "⚠️ Mark as dispute"}</button></div>
     <div style="font-size:12px;color:var(--muted)">${o.noStock ? "Imported orders don't change inventory." : "Setting payment to Refunded or Voided puts the items back in stock."} Cancel order moves it to Cancelled orders.</div>` : ""}
     ${cs ? `<div class="field"><label for="d-track">Tracking # (waybill) · ${esc(COURIER_LABEL[courierOf(o)] || "")}</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>${o.tracking ? `<div style="font-size:12.5px">🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
@@ -5029,7 +5030,7 @@ function openOrderDetails(id) {
     ${(o.log || []).length ? `<div class="olog"><div class="olog-h">Team activity</div>${[...o.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>` : ""}`,
   editable ? async () => {
     const ch = {};
-    if (all) Object.assign(ch, { tags: parseTags(val("o-tags")), assignee: val("d-assign") });
+    if (all) Object.assign(ch, { assignee: val("d-assign") });
     if (cs) { const tr = val("d-track").trim(); if (tr !== (o.tracking || "")) Object.assign(ch, { tracking: tr, trackingAt: tr ? Date.now() : 0 }); }
     const disp = (ch.tags || o.tags || []).some(t => normTag(t) === "DISPUTE");
     if (disp && ["unfulfilled", "fulfilled"].includes(ch.fulfillment) && ch.fulfillment !== o.fulfillment && !S.dispOk) { S.dispOk = true; return sheetError(`⚠️ This order has a DISPUTE tag. Make sure it's resolved before it goes to ${ful(ch.fulfillment).name}. Press Save again to continue.`); }
@@ -7423,6 +7424,9 @@ document.addEventListener("click", guard(async ev => {
       if (o.fulfillment !== "cancelled") await updateOrder(o, { fulfillment: "cancelled" }); else await archiveOrder(o, "Cancelled");
       closeSheet(); render(); toast(`${onum(o)} cancelled · moved to Cancelled orders.`); return; }
     case "restore-order": { const o = findOrder(id); if (o) { await restoreOrder(o); S.asel.delete(id); closeSheet(); toast(`${onum(o)} restored · back to ${pay(o.archivedPrev?.payment || o.shopPay || "pending").name} · ${ful(o.archivedPrev?.fulfillment || o.shopFul || "unfulfilled").name}.`); } return; }
+    case "dispute-toggle": { const o = findOrder(id); if (!o) return; const on = isDispute(o);
+      await patch("orders", o.id, on ? { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) } : { tags: [...(o.tags || []), "DISPUTE"], log: logAdd(o, ["marked the order as a dispute"]) });
+      toast(on ? `${onum(o)}: dispute resolved.` : `${onum(o)} marked as a dispute (see Disputes).`); openOrderDetails(o.id); return; }
     case "disp-ok": { const o = findOrder(id); if (!o) return; await patch("orders", o.id, { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) }); toast(`${onum(o)}: dispute resolved.`); if (!S.db) render(); return; }
     case "a-clear": S.asel.clear(); render(); return;
     case "a-unarch": { const os = S.archived.filter(o => S.asel.has(o.id)); for (const o of os) await restoreOrder(o); S.asel.clear(); render(); toast(`Restored ${os.length} order${os.length === 1 ? "" : "s"} with their last statuses.`); return; }
