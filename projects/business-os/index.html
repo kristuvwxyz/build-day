@@ -4959,37 +4959,71 @@ function loadZXing() {
   if (window.ZXing) return Promise.resolve(window.ZXing);
   return zxingP ||= new Promise((ok, bad) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"; s.onload = () => ok(window.ZXing); s.onerror = () => { zxingP = null; bad(new Error("Couldn't load the scanner. Check your internet and try again.")); }; document.head.appendChild(s); });
 }
+// Reads a barcode from a canvas: tries the whole picture, the middle, and a zoomed-in middle band
+// (small or slightly blurry phone barcodes), with the formats perfume boxes use.
+const BC_FORMATS = ["EAN_13", "EAN_8", "UPC_A", "UPC_E", "CODE_128", "CODE_39", "ITF", "QR_CODE", "DATA_MATRIX"];
+let bcReader = null;
+function bcCrops(src) {
+  const W = src.width, H = src.height, out = [];
+  const cut = (x, y, w, h, z) => { const c = document.createElement("canvas"); c.width = Math.round(w * z); c.height = Math.round(h * z); const g = c.getContext("2d", { willReadFrequently: true }); g.imageSmoothingEnabled = true; g.drawImage(src, x, y, w, h, 0, 0, c.width, c.height); return c; };
+  const big = Math.max(W, H), k = big > 1600 ? 1600 / big : 1;
+  out.push(cut(0, 0, W, H, k));
+  out.push(cut(W * .15, H * .2, W * .7, H * .6, Math.min(2, 1200 / (W * .7))));
+  out.push(cut(W * .05, H * .3, W * .9, H * .4, Math.min(2.5, 1600 / (W * .9))));
+  return out;
+}
+async function bcDecodeCanvas(src) {
+  if (window.BarcodeDetector) { try { const r = await new window.BarcodeDetector().detect(src); if (r[0]) return r[0].rawValue; } catch (e) {} }
+  const Z = await loadZXing();
+  if (!bcReader) { bcReader = new Z.MultiFormatReader(); bcReader.setHints(new Map([[Z.DecodeHintType.TRY_HARDER, true], [Z.DecodeHintType.POSSIBLE_FORMATS, BC_FORMATS.map(f => Z.BarcodeFormat[f])]])); }
+  for (const c of bcCrops(src)) {
+    for (const Bin of [Z.HybridBinarizer, Z.GlobalHistogramBinarizer]) {
+      try { return bcReader.decodeWithState(new Z.BinaryBitmap(new Bin(new Z.HTMLCanvasElementLuminanceSource(c)))).getText(); } catch (e) {}
+    }
+  }
+  return "";
+}
 // Live camera scan for the Barcode field. Falls back to taking a photo when the camera can't be opened.
 async function scanBarcodeLive() {
   const input = $("#p-barcode"); if (!input) return;
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("#p-bc-cam").click(); return; }
+  const photo = () => { const c = $("#p-bc-cam"); if (c) c.click(); };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { photo(); return; }
   const ov = document.createElement("div");
   ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px";
-  ov.innerHTML = `<video playsinline muted style="width:min(480px,100%);max-height:60vh;border-radius:12px;background:#000"></video><div style="color:#fff;font-size:14px">Point the camera at the barcode</div><button class="btn" type="button">Cancel</button>`;
+  ov.innerHTML = `<div style="position:relative;width:min(480px,100%)"><video playsinline muted autoplay style="width:100%;max-height:60vh;border-radius:12px;background:#000;display:block;object-fit:cover"></video><div style="position:absolute;left:6%;right:6%;top:32%;bottom:32%;border:2px solid rgba(255,255,255,.85);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.25);pointer-events:none"></div></div><div class="bc-msg" style="color:#fff;font-size:14px;text-align:center">Fit the barcode inside the box. Hold steady, about a hand's length away.</div><div style="display:flex;gap:8px"><button class="btn" type="button" data-bc="photo">📷 Take a photo instead</button><button class="btn" type="button" data-bc="cancel">Cancel</button></div>`;
   document.body.appendChild(ov);
-  const video = ov.querySelector("video"); let reader = null, done = false;
-  const close = () => { done = true; try { reader && reader.reset(); } catch (e) {} const st = video.srcObject; if (st) st.getTracks().forEach(t => t.stop()); ov.remove(); };
-  ov.querySelector("button").onclick = close;
+  const video = ov.querySelector("video"); let done = false, stream = null;
+  const close = () => { done = true; if (stream) stream.getTracks().forEach(t => t.stop()); ov.remove(); };
+  ov.querySelector('[data-bc="cancel"]').onclick = close;
+  ov.querySelector('[data-bc="photo"]').onclick = () => { close(); photo(); };
   try {
-    const Z = await loadZXing(); if (done) return;
-    reader = new Z.BrowserMultiFormatReader(new Map([[Z.DecodeHintType.TRY_HARDER, true]]));
-    const res = await reader.decodeOnceFromConstraints({ video: { facingMode: "environment" } }, video);
-    if (done) return; close();
-    input.value = res.getText(); toast("Barcode scanned: " + input.value);
+    const [st] = await Promise.all([navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } }), loadZXing()]);
+    stream = st; if (done) { close(); return; }
+    video.srcObject = stream; await video.play().catch(() => {});
+    const tr = stream.getVideoTracks()[0];
+    try { const cap = tr.getCapabilities ? tr.getCapabilities() : {}; if (cap.focusMode && cap.focusMode.includes("continuous")) await tr.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch (e) {}
+    const frame = document.createElement("canvas"), t0 = Date.now();
+    while (!done) {
+      if (video.videoWidth) {
+        frame.width = video.videoWidth; frame.height = video.videoHeight;
+        frame.getContext("2d", { willReadFrequently: true }).drawImage(video, 0, 0);
+        const code = await bcDecodeCanvas(frame);
+        if (code && !done) { close(); input.value = code; toast("Barcode scanned: " + code); return; }
+        if (Date.now() - t0 > 12000) { const m = ov.querySelector(".bc-msg"); if (m) m.textContent = "Still looking… Move a little closer or tilt to avoid glare, or take a photo instead."; }
+      }
+      await new Promise(r => setTimeout(r, 120));
+    }
   } catch (e) {
     if (done) return; close();
     toast(/load the scanner/.test((e && e.message) || "") ? e.message : "Couldn't open the camera. Take a photo of the barcode instead.");
-    $("#p-bc-cam") && $("#p-bc-cam").click();
+    photo();
   }
 }
 async function decodeBarcode(file) {
   try {
-    if ("BarcodeDetector" in window) { const bmp = await createImageBitmap(file); const r = await new window.BarcodeDetector().detect(bmp); if (r[0]) return r[0].rawValue; }
-  } catch (e) {}
-  try {
-    const Z = await loadZXing(); const url = URL.createObjectURL(file);
-    try { const hints = new Map([[Z.DecodeHintType.TRY_HARDER, true]]); const res = await new Z.BrowserMultiFormatReader(hints).decodeFromImageUrl(url); return res.getText(); }
-    finally { URL.revokeObjectURL(url); }
+    const bmp = await createImageBitmap(file);
+    const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; c.getContext("2d").drawImage(bmp, 0, 0);
+    return await bcDecodeCanvas(c);
   } catch (e) { if (e && /load the scanner/.test(e.message || "")) toast(e.message); return ""; }
 }
 async function scanPhoto(file, target) {
