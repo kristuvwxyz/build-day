@@ -206,6 +206,12 @@ td .s { font-size: 12px; color: var(--muted); }
 .fill-sel { background: color-mix(in srgb, var(--brand) 16%, transparent) !important; box-shadow: inset 0 0 0 1px var(--brand); }
 body.filling, body.filling * { cursor: crosshair !important; user-select: none !important; }
 input.it-price.disc { color: var(--good); font-weight: 700; }
+.jnt-num { text-align: left; } .jnt-num b { font-size: 14px; }
+.jnt-info td { background: var(--surface-2); padding: 10px 14px !important; }
+.jnt-det { display: flex; flex-direction: column; gap: 10px; }
+.jnt-det-f { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px 18px; font-size: 13px; }
+.jnt-det-f > div { display: flex; gap: 8px; align-items: center; min-width: 0; } .jnt-det-f span { color: var(--muted); min-width: 84px; } .jnt-det-f b { font-weight: 600; overflow-wrap: anywhere; } .jnt-det-f b.miss { color: var(--bad); }
+.jnt-det-act { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .cfs { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .cfs legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
 .rr-bar, .rr-act { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -3756,19 +3762,37 @@ async function openJntFile() {
   let A; try { A = await jntAddr(); } catch (e) { toast(e.message); return; }
   let d = {}; try { d = JSON.parse(localStorage.getItem("rs-jnt") || "{}"); } catch (e) {}
   S.jnt = { express: d.express || "EZ", parcel: "COSMETICS", weight: d.weight || "0.5", rows: os.map(o => { const sh = shipOf(o), m = jntMatch(A, sh); return { id: o.id, num: onum(o), name: sh.name || o.customer || "", phone: jntPhone(sh.phone || o.phone), addr: [sh.address1, sh.address2].filter(Boolean).join(", "), ...m, weight: "", parcels: 1, value: 500, cod: o.payment === "paid" ? 0 : o.payment === "pending" ? Math.round(total(o)) : "", remarks: onum(o) }; }) };
+  for (const r of S.jnt.rows) r.open = !(r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== ""); // incomplete ones start open
   renderJnt();
 }
 function jntRowHTML(r, i) {
   const A = JNT_ADDR, cities = r.prov ? Object.keys(A[r.prov]) : [], bs = r.prov && r.city ? A[r.prov][r.city] : [];
   const okAll = r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== "";
   const sel = (f, list, v) => `<select class="jnt-f" data-i="${i}" data-f="${f}"><option value="">Choose…</option>${list.map(x => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
-  return `<tr class="${okAll ? "" : "warnrow"}"><td class="nowrap"><b>${esc(r.num)}</b><div style="font-size:11px">${okAll ? `<span style="color:var(--good)">✓ ready</span>` : `<span style="color:var(--bad)">fix highlighted</span>`}</div></td>
+  return `<tr class="${okAll ? "" : "warnrow"}"><td class="nowrap"><button type="button" class="linkish jnt-num" data-jntinfo="${i}" aria-expanded="${!!r.open}" title="Show shipping details"><b>${esc(r.num)}</b> ${r.open ? "▴" : "▾"}</button><div style="font-size:11px">${okAll ? `<span style="color:var(--good)">✓ ready</span>` : `<span style="color:var(--bad)">fix highlighted</span>`}</div></td>
     <td><input class="jnt-f" data-i="${i}" data-f="name" value="${esc(r.name)}"></td><td><input class="jnt-f" data-i="${i}" data-f="phone" value="${esc(r.phone)}" style="width:130px"></td>
     <td><input class="jnt-f" data-i="${i}" data-f="addr" value="${esc(r.addr)}" style="min-width:200px"></td>
     <td class="${r.prov ? "" : "need"}">${sel("prov", Object.keys(A).sort(), r.prov)}</td><td class="${r.city ? "" : "need"}">${sel("city", cities.slice().sort(), r.city)}</td><td class="${r.brgy ? "" : "need"}">${sel("brgy", bs.slice().sort(), r.brgy)}</td>
     <td><input class="jnt-f num" data-i="${i}" data-f="weight" value="${esc(r.weight)}" placeholder="${esc(S.jnt.weight)}" style="width:60px"></td>
     <td class="${r.cod === "" ? "need" : ""}"><input class="jnt-f num" data-i="${i}" data-f="cod" value="${esc(r.cod)}" placeholder="COD" style="width:80px"></td>
-    <td><input class="jnt-f num" data-i="${i}" data-f="value" value="${esc(r.value)}" style="width:80px"></td></tr>`;
+    <td><input class="jnt-f num" data-i="${i}" data-f="value" value="${esc(r.value)}" style="width:80px"></td></tr>${r.open ? jntInfoHTML(r, i) : ""}`;
+}
+// Shipping details saved on the order, shown under its row so staff can fill the booking without leaving this sheet.
+function jntInfoHTML(r, i) {
+  const o = allOrderRows().find(x => x.id === r.id);
+  if (!o) return `<tr class="jnt-info"><td colspan="10">Order not found.</td></tr>`;
+  const sh = shipOf(o), web = !!o.web;
+  const f = (k, v) => `<div><span>${k}</span>${v ? `<b>${esc(v)}</b><button type="button" class="btn ghost sm" data-copy="${esc(v)}">Copy</button>` : `<b class="miss">Missing</b>`}</div>`;
+  return `<tr class="jnt-info"><td colspan="10"><div class="jnt-det">
+    <div class="jnt-det-f">${f("Customer", o.customer)}${sh.name && sh.name !== o.customer ? f("Ship to", sh.name) : ""}${f("Phone", o.phone || sh.phone)}${f("Email", o.email)}${f("Full address", o.address || addrLine(sh))}${o.note ? f("Order note", o.note) : ""}</div>
+    <div class="jnt-det-act">${web ? `<span style="font-size:12px;color:var(--muted)">Website order: type the missing details in the row above. Fix the address on the website if it's wrong.</span>` : `<button type="button" class="btn sm" data-jntsave="${i}">Save this row's details to ${esc(r.num)}</button><span style="font-size:12px;color:var(--muted)">Type the missing details in the row above, then save so the next booking is ready.</span>`}</div>
+  </div></td></tr>`;
+}
+async function jntSaveBack(i) {
+  const r = S.jnt.rows[i], o = r && findOrder(r.id); if (!o || o.web) return;
+  const ship = { ...(o.ship || {}), name: r.name && r.name !== o.customer ? r.name : (o.ship || {}).name || "", phone: r.phone, address1: r.addr, address2: r.brgy, city: r.city, province: r.prov, zip: (o.ship || shipOf(o)).zip || "" };
+  await patch("orders", o.id, { ship, phone: o.phone || r.phone, address: addrLine(ship), log: logAdd(o, ["saved shipping details from the J&T booking sheet"]) });
+  toast(`Shipping details saved to ${r.num}.`); setTimeout(jntBodyPaint, 300);
 }
 function renderJnt() {
   const J = S.jnt, ready = J.rows.filter(r => r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== "").length;
@@ -3783,13 +3807,14 @@ function renderJnt() {
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button><button class="btn primary" type="button" data-act="jnt-dl">Download J&T file (.xls)</button></div>`, null);
   $("#sheet").classList.add("wide");
 }
+function jntBodyPaint() { const body = $("#jnt-body"); if (body) body.innerHTML = S.jnt.rows.map(jntRowHTML).join(""); }
 function jntField(t, typing) {
   const J = S.jnt, f = t.dataset.f;
   if (t.dataset.i === undefined) { J[f] = t.value; try { localStorage.setItem("rs-jnt", JSON.stringify({ express: J.express, parcel: J.parcel, weight: J.weight })); } catch (e) {} return; }
   const r = J.rows[Number(t.dataset.i)]; r[f] = t.value;
   if (f === "prov") { r.city = ""; r.brgy = ""; } if (f === "city") r.brgy = "";
   if (typing) { const ready = J.rows.filter(x => x.name && x.phone && x.addr && x.prov && x.city && x.brgy && x.cod !== "").length; const s2 = $("#jnt-sum b"); if (s2) s2.textContent = ready; return; }
-  const body = $("#jnt-body"); if (body) body.innerHTML = J.rows.map(jntRowHTML).join("");
+  jntBodyPaint();
   const s2 = $("#jnt-sum b"); if (s2) s2.textContent = J.rows.filter(x => x.name && x.phone && x.addr && x.prov && x.city && x.brgy && x.cod !== "").length;
 }
 let XLSX_LIB = null;
@@ -6537,6 +6562,8 @@ document.addEventListener("click", guard(async ev => {
   const go = ev.target.closest("[data-goorders]");
   if (go) { S.oSrc = "all"; return goOrders(go.dataset.goorders); }
   const gw = ev.target.closest("[data-goweb]"); if (gw) { S.of.q = ""; return goOrders(gw.dataset.goweb === "unpaid" ? "unpaid" : "unfulfilled"); }
+  const ji = ev.target.closest("[data-jntinfo]"); if (ji && S.jnt) { const r = S.jnt.rows[Number(ji.dataset.jntinfo)]; if (r) { r.open = !r.open; jntBodyPaint(); } return; }
+  const js = ev.target.closest("[data-jntsave]"); if (js && S.jnt) { js.disabled = true; await jntSaveBack(Number(js.dataset.jntsave)); js.disabled = false; return; }
   const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
   const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
   const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
