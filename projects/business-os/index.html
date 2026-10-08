@@ -2244,7 +2244,10 @@ const inMonth = (t, ym) => t.due && ((t.start || t.due).slice(0, 7) <= ym && t.d
 const pbar = p => `<div class="pbar" role="img" aria-label="${Number(p) || 0}% done"><i style="width:${Math.max(0, Math.min(100, Number(p) || 0))}%"></i></div>`;
 const isOverdue = t => t.due && t.due < today() && (t.status === "todo" || t.status === "in_progress");
 // A person's open tasks that are due today or overdue (for the Tasks badge and the person picker).
-const dueTasksOf = mid => !mid ? [] : S.tasks.filter(t => t.assigneeId === mid && t.due && t.due <= today() && (t.status === "todo" || t.status === "in_progress"));
+// Department "all" = a task for everyone: it shows on every Tasks list and calendar.
+const isAllTask = t => t.department === "all";
+const taskDeptName = id => id === "all" ? "Everyone" : (dept(id) || { name: "–" }).name;
+const dueTasksOf = mid => !mid ? [] : S.tasks.filter(t => (t.assigneeId === mid || isAllTask(t)) && t.due && t.due <= today() && (t.status === "todo" || t.status === "in_progress"));
 function myTaskBadge() {
   const ts = dueTasksOf(myMemberId()); if (!ts.length) return "";
   const over = ts.filter(isOverdue).length, now = ts.length - over;
@@ -2256,7 +2259,7 @@ function myTaskBadge() {
 const taskDepts = () => allowedDepts();
 const fullTaskView = () => taskDepts().length === DEPTS.length;
 function taskVisible(t) {
-  if (fullTaskView()) return true;
+  if (fullTaskView() || isAllTask(t)) return true;
   if (t.assigneeId && t.assigneeId === myMemberId()) return true;
   const ds = taskDepts(), am = member(t.assigneeId), td = t.department || (am && am.department) || "";
   if (am && am.department && !ds.includes(am.department)) return false;
@@ -2266,6 +2269,7 @@ const visTasks = () => S.tasks.filter(taskVisible);
 const taskTeam = () => activeTeam().filter(m => fullTaskView() || taskDepts().includes(m.department) || m.id === myMemberId());
 function scopeTasks(forceDept) {
   return visTasks().filter(t => {
+    if (isAllTask(t)) return true;
     if (forceDept) return t.department === forceDept;
     if (S.t.scope === "person" && S.t.person) return t.assigneeId === S.t.person;
     if (S.t.scope === "dept" && S.t.dept) return t.department === S.t.dept;
@@ -2288,7 +2292,7 @@ function workload(list, by) {
   const rows = [...groups.entries()].map(([k, ts]) => {
     const live = ts.filter(t => t.status !== "cancelled");
     const avg = live.length ? Math.round(live.reduce((a, t) => a + (t.status === "done" ? 100 : Number(t.progress) || 0), 0) / live.length) : 0;
-    const name = by === "dept" ? (dept(k) || { name: "No department" }).name : memberName(k);
+    const name = by === "dept" ? (k ? taskDeptName(k) : "No department") : memberName(k);
     const sub = by === "dept" ? "" : (member(k) ? (dept(member(k).department) || {}).name || "" : "");
     return { k, name, sub, n: ts.length, ip: ts.filter(t => t.status === "in_progress").length, done: ts.filter(t => t.status === "done").length, avg, over: ts.filter(isOverdue).length };
   }).sort((a, b) => b.n - a.n);
@@ -2308,7 +2312,7 @@ function taskRow(t) {
   return `<tr data-task="${t.id}" style="cursor:pointer">
     <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}${t.orderId && findOrder(t.orderId) ? ` <button type="button" class="chip" data-open="${t.orderId}">📦 #${esc(findOrder(t.orderId).num)}</button>` : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
     <td class="nowrap">${esc(memberName(t.assigneeId))}</td>
-    <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc((dept(t.department) || { name: "–" }).name)}</span>` : "–"}</td>
+    <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc(taskDeptName(t.department))}</span>` : "–"}</td>
     <td class="nowrap">${ed ? `<input type="date" class="tq-date" data-tq="due" data-id="${t.id}" value="${esc(t.due || "")}" aria-label="Due date">` : t.due ? fmtDate(t.due) : "No date"} ${taskUrg(t) ? urgChip(taskUrg(t)) : ""}</td>
     <td style="min-width:120px"><div style="display:flex;gap:8px;align-items:center">${pbar(pr)}${ed ? `<select class="status" data-tq="progress" data-id="${t.id}" aria-label="Progress">${[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(n => `<option value="${n}" ${n === Math.round(pr / 10) * 10 ? "selected" : ""}>${n}%</option>`).join("")}</select>` : `<span class="num" style="font-size:12px;color:var(--muted)">${pr}%</span>`}</div></td>
     <td class="nowrap">${ed ? `<select class="status tq-st ${tstat(t.status).cls}" data-tq="status" data-id="${t.id}" aria-label="Status">${TASK_STATUS.map(x => `<option value="${x.id}" ${t.status === x.id ? "selected" : ""}>${x.name}</option>`).join("")}</select> <select class="status" data-tq="priority" data-id="${t.id}" aria-label="Priority">${PRIORITIES.map(x => `<option value="${x.id}" ${(t.priority || "normal") === x.id ? "selected" : ""}>${x.name}</option>`).join("")}</select>` : `<span class="chip ${tstat(t.status).cls}">${tstat(t.status).name}</span>`}</td></tr>`;
@@ -2350,7 +2354,7 @@ function viewTasks(forceDept) {
     if (groupBy === "dept") for (const d of DEPTS.filter(d => taskDepts().includes(d.id))) g.set(d.id, []);
     const ord = t => [t.status === "done" ? 2 : isOverdue(t) ? 0 : 1, t.due || ""];
     for (const t of todayTasks) { const k = groupBy === "dept" ? t.department || "" : groupBy === "person" ? t.assigneeId || "" : "all"; if (!g.has(k)) g.set(k, []); g.get(k).push(t); }
-    return [...g.entries()].map(([k, ts]) => ({ k, ts: ts.sort((a, b) => { const x = ord(a), y = ord(b); return x[0] - y[0] || x[1].localeCompare(y[1]); }), name: groupBy === "dept" ? (dept(k) || { name: "No department" }).name : groupBy === "person" ? memberName(k) : "" }))
+    return [...g.entries()].map(([k, ts]) => ({ k, ts: ts.sort((a, b) => { const x = ord(a), y = ord(b); return x[0] - y[0] || x[1].localeCompare(y[1]); }), name: groupBy === "dept" ? (k ? taskDeptName(k) : "No department") : groupBy === "person" ? memberName(k) : "" }))
       .filter(r => r.ts.length || groupBy === "person").sort((a, b) => (b.ts.filter(t => t.status !== "done").length - a.ts.filter(t => t.status !== "done").length) || a.name.localeCompare(b.name));
   };
   const openCount = ts => ts.filter(t => t.status !== "done").length;
@@ -2422,7 +2426,7 @@ function openTaskForm(id, date, forceDept, preset = {}) {
     <div class="field"><label for="k-title">Task</label><input id="k-title" value="${esc(t.title || "")}" placeholder="e.g. Pack Shopee orders for pickup" ${ro ? "disabled" : ""}></div>
     <div class="field"><label for="k-notes">Details</label><textarea id="k-notes" rows="3" ${ro ? "disabled" : ""}>${esc(t.notes || "")}</textarea></div>
     <div class="row">
-      <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option>${DEPTS.filter(d => taskDepts().includes(d.id) || d.id === t.department).map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
+      <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option><option value="all" ${isAllTask(t) ? "selected" : ""}>All (everyone)</option>${DEPTS.filter(d => taskDepts().includes(d.id) || d.id === t.department).map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
       <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.filter(m => (m.status !== "inactive" && (fullTaskView() || taskDepts().includes(m.department) || m.id === myMemberId())) || m.id === t.assigneeId).map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
     </div>
     <div class="row">
@@ -2492,7 +2496,7 @@ function quoteOfDay() {
 function viewHome() {
   const fn = firstName(), h = S.home || {}, mid = myMemberId();
   const [q, who] = quoteOfDay();
-  const mine = S.tasks.filter(t => t.assigneeId && t.assigneeId === mid && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
+  const mine = S.tasks.filter(t => (t.assigneeId && t.assigneeId === mid || isAllTask(t)) && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
   const dueToday = visTasks().filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
   const showOrders = canOrders() && (canSee("SALES") || canSee("PACKING") || visDepts().length > 0);
   const toShip = S.orders.filter(o => !isVoid(o) && OPEN_FUL.has(o.fulfillment)).length;
@@ -6943,7 +6947,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "rv-stars" || t.id === "rv-status" || t.id === "rv-sort" || t.id === "rv-source") { S.rv[t.id.slice(3)] = t.value; render(); return; }
   if (t.dataset.eomrate) return eomRate(t.dataset.eomrate, Number(t.value));
   if (t.matches(".ws-num")) return setWorkStyle({ [t.dataset.k]: Math.max(1, Math.round(Number(t.value) || 1)) });
-  if (t.id === "k-who" && t.value) { const m = member(t.value), d = $("#k-dept"); if (m && m.department && d && [...d.options].some(o => o.value === m.department)) d.value = m.department; return; }
+  if (t.id === "k-who" && t.value) { const m = member(t.value), d = $("#k-dept"); if (m && m.department && d && d.value !== "all" && [...d.options].some(o => o.value === m.department)) d.value = m.department; return; }
   if (false && t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await wdb().doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
   if (t.id === "ei-dtype") return eiTotal();
