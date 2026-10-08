@@ -46,7 +46,8 @@ This file is my profile. Read it at the start of every session and follow it.
 - Name the page "My Account" (capital A).
 - My Account: tap the photo to change it, tap the perfume bottle for the signature scent (no separate Change photo chip).
 - Home: one "Orders to ship" tile = To ship orders only (RS OS + website). No Unpaid website / Website to ship tiles.
-- Orders table: compact rows. "Mode of payment" column: website orders show the buyer's pick; RS OS orders have a dropdown (Maya, BDO, GCash, Bank transfer, Cash, COD, Card, Other), guessed from the pay link until set.
+- Orders table: compact rows. "Mode of payment" column: website orders show the buyer's pick; RS OS orders have a dropdown (Maya, BDO, GCash, Bank transfer, Cash, COD, Card, Other), guessed from the pay link until set. Colors: Maya green, BDO blue, GCash teal, Bank transfer violet, Cash amber, COD orange, Card pink; Courier J&T red, SDD violet. Source column uses small same-size pills.
+- Top bar shows the live date and time (Manila), every page; phones show the time only.
 - Undo: Ctrl/Cmd+Z undoes the last change in RS OS (one click or save = one step), Ctrl/Cmd+Shift+Z redoes.
 - When a fix can be done from the RS App (e.g. a site add-on), do it instead of asking K to paste into another chat.
 - Royal Receipt: every RS OS order with an email gets the Royal Receipt emailed automatically (store Gmail via the website backend `opsEmail`), and again when a pay link is added. The only payment button is the order's own pay link (Maya/BDO). Staff can copy it as text for chat when there's no email.

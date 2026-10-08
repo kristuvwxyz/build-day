@@ -708,6 +708,10 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .ordtable select.status { padding: 2px 5px; }
 .ordtable .badge { padding-top: 1px; padding-bottom: 1px; }
 .ordtable .hist-btn { gap: 0; }
+.src-cell { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; }
+.src-cell .badge, .src-cell .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; gap: 4px; line-height: 1.4; }
+.mop-pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 6px; }
+.status.st-pink { background: color-mix(in srgb, #EC4899 14%, var(--surface)); color: #BE185D; border-color: transparent; }
 .osearch { display: flex; align-items: center; gap: 8px; flex: 1 1 280px; min-width: 220px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 0 10px; }
 .osearch:focus-within { border-color: var(--fg); }
 .osearch.big { flex: 1 1 100%; min-height: 48px; border: 2px solid var(--brand); border-radius: 12px; padding: 0 14px; box-shadow: 0 2px 10px rgba(74, 37, 69, .12); }
@@ -780,6 +784,11 @@ body.no-orders .gs { display: none !important; }
 .nav .tclock.brk { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
 .nav .tclock span { white-space: nowrap; }
 .nav .tclock .wt { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); font-weight: 600; }
+.nowclock { margin-left: auto; display: inline-flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nowclock b { color: var(--fg); font-weight: 700; font-size: 14px; }
+.nowclock:empty { display: none; }
+.nowclock ~ .wclock { margin-left: 0; }
+@media (max-width: 720px) { .nowclock { font-size: 12px; } .nowclock b { font-size: 12.5px; } .nowclock .nc-d { display: none; } }
 .wclock { margin-left: auto; margin-right: 8px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--good); color: var(--fg); background: color-mix(in srgb, var(--good) 10%, var(--surface)); border-radius: 999px; padding: 6px 12px; font-weight: 650; font-size: 13px; font-variant-numeric: tabular-nums; }
 .wclock i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: wpulse 1.6s ease-in-out infinite; }
 .wclock.brk { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); } .wclock.brk i { background: var(--warn); animation: none; }
@@ -863,6 +872,7 @@ select.status:not([multiple]), select.lcell:not([multiple]) { background-positio
       <button type="button" class="menu-btn mobile-only" data-act="menu" aria-label="Open main menu" aria-controls="drawer" aria-expanded="false"></button>
       <button type="button" class="btn rf-btn" id="rf-btn" data-act="refresh" title="Refresh this page" aria-label="Refresh this page"><span>Refresh</span></button>
       <h1 id="view-title">Home</h1>
+      <div id="nowclock" class="nowclock" aria-live="off" title="Date and time now (Manila)"></div>
       <button type="button" id="wclock" class="wclock" data-act="tclock" hidden></button>
       <div class="actions" id="head-actions"></div>
     </div>
@@ -949,6 +959,7 @@ const canSuppliers = () => S.isOwner || myDept() === "CEO" || isSeniorSales();
 const canInvoices = () => S.isOwner || myDept() === "CEO" || myDept() === "FINANCE" || isSeniorSales();
 const tabAllowed = t => t === "budget" ? canInvoices() : t === "orders" || t === "archived" ? canOrders() && (t === "orders" || canAll()) : t === "suppliers" ? canSuppliers() : t === "archived" ? canAll() : true;
 const ctxDept = () => S.view === "dept" ? S.dept : (myDept() || "SALES");
+const COURIER_ST = { "J&T": "st-red", SDD: "st-violet" };
 const COURIER_LABEL = { "J&T": "J&T", SDD: "SDD / Pickup" };
 const clsKey = st => String(st.cls || "").split(" ")[0] || "grey";
 const ORDER_VIEWS = [
@@ -1736,6 +1747,12 @@ function timeNavItem() {
   const label = !r || !r.in || canResume(mToday(), mid0, r) ? "Time in" + sn : r.out ? "Done today" : brk ? "On break" : "Time out";
   return `<button type="button" class="tclock${on ? (brk ? " brk" : " on") : ""}" data-act="tclock">${svg("clock")}<span>${label}</span><span class="wt" data-wtime>${r && r.in ? hms(workedMs(r)) : ""}</span></button>`;
 }
+function tickNow() {
+  const el = $("#nowclock"); if (!el) return; const d = new Date();
+  const f = o => d.toLocaleString("en-PH", { timeZone: TZ, ...o });
+  el.innerHTML = `<span class="nc-d">${f({ weekday: "short" })}, ${f({ month: "short", day: "numeric", year: "numeric" })}</span><b>${f({ hour: "numeric", minute: "2-digit", second: "2-digit" }).replace(/\s?(AM|PM)/i, (m, x) => " " + x.toUpperCase())}</b>`;
+}
+setInterval(tickNow, 1000); setTimeout(tickNow);
 function tickWorkClock() {
   const r = myAtt(), on = r && r.in && !r.out, brk = on && onBreak(r), el = document.getElementById("wclock");
   if (el) { const idle = !!myMemberId() && (!r || !r.in); el.hidden = !on && !idle; el.classList.toggle("idle", idle); if (idle && el.dataset.h !== "idle") { el.innerHTML = "⏱ Time in"; el.dataset.h = "idle"; } if (on) { const h = `<i></i>${brk ? "On break · " : ""}${hms(workedMs(r))} worked`; if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } el.classList.toggle("brk", !!brk); el.title = brk ? "On break. Tap to end break or time out." : "Timed in at " + mTime(r.in) + ". Tap to take a break or time out."; } }
@@ -3434,6 +3451,8 @@ function openColumns(table) {
 
 // Mode of payment: website orders show what the buyer picked; RS OS orders pick one (guessed from the pay link until set).
 const MOPS = ["Maya", "BDO", "GCash", "Bank transfer", "Cash", "COD", "Card", "Other"];
+const MOP_ST = { maya: "green", bdo: "blue", gcash: "teal", "bank transfer": "violet", cash: "amber", cod: "orange", card: "pink" };
+const mopSt = m => "st-" + (MOP_ST[String(m || "").toLowerCase()] || (/maya/i.test(m) ? "green" : /bdo/i.test(m) ? "blue" : /gcash/i.test(m) ? "teal" : "grey"));
 const mopOf = o => o.web ? String(o.payMethod || "").replace(/\s*checkout$/i, "") : (o.mop || (/maya/i.test(o.payLink || "") ? "Maya" : /bdo/i.test(o.payLink || "") ? "BDO" : ""));
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
@@ -3441,7 +3460,7 @@ function orderCell(k, o, table) {
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
     case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
-    case "source": return `<td class="nowrap">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>${o.cancel && o.cancel.status === "Pending" ? ` <span class="badge red">Cancel request</span>` : ""}${bdoNeeds(S.web.orders.find(x => x.ref === o.ref)) ? ` <span class="badge amber" title="Make a BDO Checkout link for this order">BDO link needed</span>` : ""}` : `<span class="chip">${esc(orderSource(o))}</span>`}${disputeChip(o)}${exChip(o)}</td>`;
+    case "source": return `<td class="nowrap src-td"><div class="src-cell">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>${o.cancel && o.cancel.status === "Pending" ? ` <span class="badge red">Cancel request</span>` : ""}${bdoNeeds(S.web.orders.find(x => x.ref === o.ref)) ? ` <span class="badge amber" title="Make a BDO Checkout link for this order">BDO link needed</span>` : ""}` : `<span class="chip">${esc(orderSource(o))}</span>`}${disputeChip(o)}${exChip(o)}</div></td>`;
     case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
     case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
     case "customer": return `<td class="strike cust-td">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
@@ -3450,9 +3469,9 @@ function orderCell(k, o, table) {
     case "total": return `<td class="r num strike nowrap">${peso2(total(o))}</td>`;
     case "payment": return `<td>${canPay() ? st(pay(o.payment), "payment", opts(PAYMENTS, o.payment)) : badge(pay(o.payment))}</td>`;
     case "mop": { const m = mopOf(o);
-      return !o.web && canPay() && !o.archived ? `<td><select class="status st-grey" data-oset="mop" data-id="${o.id}" aria-label="Mode of payment"><option value="">–</option>${[...MOPS, ...(m && !MOPS.includes(m) ? [m] : [])].map(x => `<option ${m === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></td>` : `<td class="nowrap" style="font-size:12.5px">${m ? esc(m) : `<span style="color:var(--muted)">–</span>`}</td>`; }
+      return !o.web && canPay() && !o.archived ? `<td><select class="status ${m ? mopSt(m) : "st-grey"}" data-oset="mop" data-id="${o.id}" aria-label="Mode of payment"><option value="">–</option>${[...MOPS, ...(m && !MOPS.includes(m) ? [m] : [])].map(x => `<option ${m === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></td>` : `<td class="nowrap">${m ? `<span class="status mop-pill ${mopSt(m)}">${esc(m)}</span>` : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(o.fulfillment === "delivered" ? FULFILLMENTS : FUL_PICK, o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
-    case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
+    case "courier": return `<td>${canShip() ? `<select class="status ${COURIER_ST[courierOf(o)] || "st-grey"}" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
     case "note": { const extra = `${o.siteNote ? `<div class="note-t" style="color:var(--muted)" title="Customer note: ${esc(o.siteNote)}">Customer: ${esc(o.siteNote)}</div>` : ""}${(o.comments || []).length ? noteIcons({ ...o, note: "" }) : ""}`;
