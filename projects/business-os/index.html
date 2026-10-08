@@ -7376,7 +7376,36 @@ async function shopHistoryBackfill(c) {
     try { await cfg.set({ ...st, startedAt: 0, lastError: String((e && e.message) || e).slice(0, 300), lastErrorAt: Date.now() }); } catch (e2) {}
   }
 }
+// One-time copy of Shopify's "Cost per item" into listings (matched by the listing's website handle, which came from Shopify).
+// Runs once in the owner's app; fills only listings with no cost yet, so costs typed in RS OS are kept.
+const SHOP_COST_Q = `query RSCost($first: Int!, $after: String) { productVariants(first: $first, after: $after) { pageInfo { hasNextPage endCursor } nodes { product { handle } inventoryItem { unitCost { amount } } } } }`;
+async function costImportOnce(c) {
+  if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
+  const t0 = Date.now();
+  while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 60000) return; await new Promise(r => setTimeout(r, 1000)); }
+  if (S.webmeta.some(d => d.id === "_costimp")) return;
+  const mcp = S.mcp || (c?.use ? await c.use("mcp").catch(() => null) : null); if (!mcp) return;
+  try {
+    const cost = new Map(); let after = null, pages = 0;
+    do {
+      const res = await shopCall(SHOP_COST_Q, after ? { first: 50, after } : { first: 50 }, 50, mcp);
+      const conn = dig(res, "productVariants"); if (!conn) throw new Error("Shopify sent back an unexpected answer.");
+      for (const n of conn.nodes || []) { const h = n.product && n.product.handle, v = Number(n.inventoryItem && n.inventoryItem.unitCost && n.inventoryItem.unitCost.amount) || 0; if (h && v > 0) cost.set(h, Math.max(cost.get(h) || 0, v)); }
+      const pi = conn.pageInfo || {}; after = pi.hasNextPage ? pi.endCursor : null;
+    } while (after && ++pages < 200);
+    let n = 0;
+    for (const p of S.products) {
+      if (Number(p.cost) > 0 || !p.webId) continue;
+      const w = p.webId, h = [w, w.replace(/^preorder-/, ""), "preorder-" + w].find(x => cost.has(x)); if (!h) continue;
+      UNDO.at = 0; // a background import, not a Ctrl+Z step
+      await patch("products", p.id, { cost: cost.get(h), costFrom: "Shopify", log: logAdd(p, [`cost set to ${peso(cost.get(h))} from Shopify`]) }); n++;
+    }
+    await save("webmeta", "_costimp", { at: Date.now(), count: n, handles: cost.size });
+    if (n) toast(`Imported Shopify cost for ${n} listing${n === 1 ? "" : "s"}.`);
+  } catch (e) { console.warn("cost import", e); }
+}
 async function startShopSync(c) {
+  costImportOnce(c);
   reconcileStages();
   shopHistoryBackfill(c);
   if (c?.use) Promise.resolve().then(() => c.use("photos")).then(ph => { if (!ph || !ph.save) return; S.photos = ph; const go = () => { if (S.loaded.products) photoCopyRun(); else setTimeout(go, 2000); }; setTimeout(go, 8000); setInterval(photoCopyRun, 30 * 60e3); }).catch(() => {});

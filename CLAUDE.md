@@ -34,6 +34,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Attendance: K (owner) works flexible hours: no fixed schedule, never Late or Absent. Overtime isn't paid (no Overtime line on payslips); everyone's Home and attendance card says so.
 - Create order: address uses J&T's Province → City → Barangay list. No platform fee box. Discount by changing the item price or the ₱/% Discount box. A first-time buyer is saved to Customers; if the email or phone already exists, staff are asked whether to merge.
 - Listings search has a 📷 Scan button: scanning a barcode searches for it and opens the matching listing. The Listings table has a Barcode column with a 📷 button per row to scan and save that item's barcode (duplicates are blocked).
+- Listing Cost was copied once from Shopify "Cost per item" (matched by handle; only blank costs filled; flag webmeta/_costimp).
 - Listings: drag the small square on a cell's corner to copy its value to other rows (like Excel).
 - Website order statuses: a shipped order shows as **Completed** to buyers (site add-on `completed-status.html` relabels Shipped / Delivered; the backend still stores Shipped). RS OS no longer offers Delivered.
 - Tasks: Department "All (everyone)" makes a task show on every person's and department's Tasks list and calendar (and in everyone's badge). An All task has no Assigned to; it shows "Created by" (whoever made it) instead.
