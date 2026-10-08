@@ -1,0 +1,63 @@
+<!--
+  Regal Spritz PH: reviews live from RS OS (2026-10-08).
+  1. Loads the shown reviews from https://regal-spritz-os.vercel.app/api/reviews (refreshed every ~10 s on the server),
+     so a review approved, edited or hidden in RS OS → Reviews shows on the website without a site update.
+  2. "Write a review" sends the review to RS OS (Reviews → To approve) instead of Judge.me (closed with Shopify).
+     The email box is only checked here, never sent or stored.
+-->
+<script>
+(function () {
+  var API = "https://regal-spritz-os.vercel.app/api/reviews";
+  var sig = function (R) { return R ? [R.total, R.list && R.list[0] && R.list[0][0], R.avg].join("|") : ""; };
+  function apply(d) {
+    if (!d || !Array.isArray(d.list)) return;
+    var R = window.RS_REVIEWS, before = sig(R);
+    if (!R) { window.RS_REVIEWS = d; return; }
+    R.list.length = 0; d.list.forEach(function (x) { R.list.push(x); });
+    Object.keys(R.by || {}).forEach(function (k) { delete R.by[k]; });
+    R.by = R.by || {}; Object.keys(d.by || {}).forEach(function (k) { R.by[k] = d.by[k]; });
+    R.total = d.total; R.avg = d.avg;
+    // Redraw the page once if the reviews changed and the visitor is still near the top.
+    if (sig(R) !== before && (window.scrollY || 0) < 300 && document.querySelector(".pdp-reviews, .rv-grid, .card-rv")) {
+      try { window.dispatchEvent(new HashChangeEvent("hashchange")); } catch (e) {}
+    }
+  }
+  var busy = false;
+  function load() {
+    if (busy) return; busy = true;
+    fetch(API, { mode: "cors", credentials: "omit" }).then(function (r) { return r.ok ? r.json() : null; }).then(apply).catch(function () {}).then(function () { busy = false; });
+  }
+  load();
+  window.addEventListener("hashchange", function (e) { if (e.isTrusted) setTimeout(load, 50); });
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") load(); });
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  document.addEventListener("submit", function (e) {
+    var form = e.target; if (!form || !form.matches || !form.matches("form.rv-form")) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    var f = form.elements, ok = true;
+    form.querySelectorAll("[required]").forEach(function (i) {
+      var bad = !i.value.trim() || (i.type === "email" && !/^\S+@\S+\.\S+$/.test(i.value));
+      var fld = i.closest(".field"); if (fld) fld.classList.toggle("err", bad); if (bad) ok = false;
+    });
+    var msg = form.querySelector(".rv-msg");
+    if (!ok) { if (msg) { msg.hidden = false; msg.textContent = "Please complete the highlighted fields."; } return; }
+    var btn = form.querySelector("[type=submit]"); if (btn) { btn.disabled = true; btn.textContent = "Sending…"; } if (msg) msg.hidden = true;
+    var m = /#\/p\/([^/?#]+)/.exec(location.hash), handle = m ? decodeURIComponent(m[1]) : "";
+    var h1 = document.querySelector("h1");
+    var body = {
+      handle: handle, product: h1 ? h1.textContent.trim().slice(0, 200) : "",
+      customer: f.name ? f.name.value.trim() : "", anon: !!(f.anon && f.anon.checked),
+      rating: form.querySelectorAll(".rv-pick [data-r].on").length || 5,
+      title: f.title ? f.title.value.trim() : "", text: f.body ? f.body.value.trim() : ""
+    };
+    fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(body), mode: "cors", credentials: "omit" })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || !d.ok) throw new Error(d.error || "error " + r.status); }); })
+      .then(function () { form.innerHTML = '<p class="rv-thanks"><b>Thank you' + (body.customer ? ", " + esc(body.customer) : "") + "!</b> Your review was received and will appear here once it's approved.</p>"; })
+      .catch(function (err) {
+        if (btn) { btn.disabled = false; btn.textContent = "Submit review"; }
+        if (msg) { msg.hidden = false; msg.textContent = "Sorry, your review couldn't be sent (" + err.message + "). Please try again, or message us on Facebook."; }
+      });
+  }, true);
+})();
+</script>

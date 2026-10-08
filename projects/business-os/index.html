@@ -473,6 +473,8 @@ button.org-node { cursor: pointer; } button.org-node:hover { border-color: var(-
 .rv-dist i { display: block; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .rv-dist i s { display: block; height: 100%; background: var(--gold); text-decoration: none; }
 .rv-text { min-width: 240px; max-width: 520px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+tr.rv-pend > td { background: color-mix(in srgb, var(--gold) 9%, transparent); }
+.tabs .nbadge { margin-left: 6px; vertical-align: 1px; }
 tr.dim td { opacity: .55; }
 /* salary */
 .blur-amt .amt { filter: blur(7px); user-select: none; }
@@ -1436,19 +1438,27 @@ const headIdx = (H, test) => H.findIndex(test);
 
 /* ---------- reviews (Admin, Marketing) ---------- */
 const RV_SOURCES = ["Website", "Shopee", "Facebook", "Instagram", "TikTok", "Lazada", "Viber / Messenger", "Other"];
+const rvPending = () => S.reviews.filter(r => r.status === "pending");
+const rvSees = () => canSee("ADMIN") || canSee("MARKETING");
+const rvBadge = () => { const n = rvPending().length; return n ? `<span class="nbadge" title="${n} review${n > 1 ? "s" : ""} to approve">${n}</span>` : ""; };
+function rvApproveAlert() {
+  const n = rvPending().length; if (!n || !rvSees() || S.viewAs) return "";
+  const go = canSee("ADMIN") ? "ADMIN" : "MARKETING";
+  return `<section class="panel" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--gold)"><b>⭐ ${n} review${n > 1 ? "s" : ""} to approve</b><span style="font-size:13px;color:var(--muted);flex:1">Written on regalspritz.com. Approve to show them on the website.</span><button class="btn sm primary" type="button" data-act="rv-go" data-id="${go}">Review now</button></section>`;
+}
 const starsHTML = n => { n = Math.max(0, Math.min(5, Math.round(Number(n) || 0))); return `<span class="stars" role="img" aria-label="${n} out of 5 stars">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`; };
 function rvFiltered() {
   const R = S.rv, q = (S.rvq || "").toLowerCase().trim();
   const list = S.reviews.filter(r => (!R.stars || Math.round(Number(r.rating) || 0) === Number(R.stars))
-    && (!R.status || (R.status === "hidden" ? r.status === "hidden" : r.status !== "hidden"))
+    && (!R.status || (R.status === "hidden" || R.status === "pending" ? r.status === R.status : r.status !== "hidden" && r.status !== "pending"))
     && (!R.source || r.source === R.source)
     && (!q || [r.customer, r.product, r.text, r.reply].join(" ").toLowerCase().includes(q)));
   const dt = r => r.date || "";
   const sorter = { high: (a, b) => (b.rating || 0) - (a.rating || 0) || dt(b).localeCompare(dt(a)), low: (a, b) => (a.rating || 0) - (b.rating || 0) || dt(b).localeCompare(dt(a)), new: (a, b) => dt(b).localeCompare(dt(a)), old: (a, b) => dt(a).localeCompare(dt(b)) }[R.sort] || (() => 0);
-  return list.sort(sorter);
+  return list.sort((a, b) => (b.status === "pending") - (a.status === "pending") || sorter(a, b));
 }
 function viewReviews() {
-  const all = S.reviews, R = S.rv, can = !S.readOnly;
+  const all = S.reviews.filter(r => r.status !== "pending"), R = S.rv, can = !S.readOnly, pend = rvPending().length;
   const avg = all.length ? all.reduce((a, r) => a + (Number(r.rating) || 0), 0) / all.length : 0;
   const dist = [5, 4, 3, 2, 1].map(n => [n, all.filter(r => Math.round(Number(r.rating) || 0) === n).length]);
   const max = Math.max(1, ...dist.map(d => d[1]));
@@ -1457,24 +1467,24 @@ function viewReviews() {
   const sel = (id, label, opts, cur) => `<select id="${id}" aria-label="${label}">${opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
   if (S.loaded.reviews && S.canEdit && !S.readOnly && !S.rvImporting && !rvCfg().imported && !S.reviews.some(r => r.jmId) && S.rvCfgLoaded) setTimeout(importWebsiteReviews, 50);
   return `${rvSyncLine()}<section class="panel"><div class="rv-sum">
-      <div class="rv-avg"><b class="num">${all.length ? avg.toFixed(1) : "–"}</b>${starsHTML(avg)}<span style="font-size:12px;color:var(--muted)">${all.length} review${all.length === 1 ? "" : "s"} · ${all.filter(r => r.status === "hidden").length} hidden</span></div>
+      <div class="rv-avg"><b class="num">${all.length ? avg.toFixed(1) : "–"}</b>${starsHTML(avg)}<span style="font-size:12px;color:var(--muted)">${all.length} review${all.length === 1 ? "" : "s"} · ${all.filter(r => r.status === "hidden").length} hidden</span>${pend ? `<button class="btn sm primary" type="button" data-act="rv-pend" style="margin-top:6px">⭐ ${pend} to approve</button>` : ""}</div>
       <div class="rv-dist">${dist.map(([n, c]) => `<button type="button" data-rvstars="${n}" aria-pressed="${String(R.stars) === String(n)}"><span>${n} ★</span><i><s style="width:${c / max * 100}%"></s></i><span class="num">${c}</span></button>`).join("")}</div>
     </div></section>
     <div class="toolbar"><input id="rvq" type="search" placeholder="Search customer, product, review" value="${esc(S.rvq)}" aria-label="Search reviews">
       ${sel("rv-stars", "Rating", [["", "All ratings"], ...[5, 4, 3, 2, 1].map(n => [n, n + " star" + (n === 1 ? "" : "s")])], R.stars)}
-      ${sel("rv-status", "Status", [["", "Shown and hidden"], ["shown", "Shown"], ["hidden", "Hidden"]], R.status)}
+      ${sel("rv-status", "Status", [["", "All statuses"], ["pending", "To approve"], ["shown", "Shown"], ["hidden", "Hidden"]], R.status)}
       ${sel("rv-source", "Source", [["", "All sources"], ...RV_SOURCES.map(x => [x, x])], R.source)}
       ${sel("rv-sort", "Sort", [["high", "Highest rating first"], ["low", "Lowest rating first"], ["new", "Newest first"], ["old", "Oldest first"]], R.sort)}
       ${active ? `<button class="btn ghost sm" type="button" data-act="rv-clear">✕ Clear filters</button>` : ""}</div>
     <div class="table-wrap"><table class="otable"><thead><tr><th>Rating</th><th>Customer</th><th>Product</th><th>Review</th><th>Source</th><th>Date</th><th>Status</th>${can ? "<th></th>" : ""}</tr></thead>
-      <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>
+      <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : r.status === "pending" ? "rv-pend" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>
         <td data-sort="${Number(r.rating) || 0}">${starsHTML(r.rating)}</td><td style="font-weight:600">${esc(r.customer || "Anonymous")}</td><td>${esc(r.product || "")}</td>
-        <td><div class="rv-text">${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}</td>
+        <td><div class="rv-text">${r.title ? `<b>${esc(r.title)}</b> · ` : ""}${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}</td>
         <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap">${r.date ? fmtDate(r.date) : ""}</td>
-        <td><span class="chip ${r.status === "hidden" ? "" : "good"}">${r.status === "hidden" ? "Hidden" : "Shown"}</span></td>
-        ${can ? `<td class="r nowrap"><button class="btn sm ghost" type="button" data-act="rv-toggle" data-id="${r.id}">${r.status === "hidden" ? "Show" : "Hide"}</button></td>` : ""}</tr>`).join("")}</tbody></table>
+        <td><span class="chip ${r.status === "hidden" ? "" : r.status === "pending" ? "warn" : "good"}">${r.status === "hidden" ? "Hidden" : r.status === "pending" ? "To approve" : "Shown"}</span></td>
+        ${can ? `<td class="r nowrap">${r.status === "pending" ? `<button class="btn sm primary" type="button" data-act="rv-approve" data-id="${r.id}">✓ Approve</button> <button class="btn sm ghost" type="button" data-act="rv-reject" data-id="${r.id}">Hide</button>` : `<button class="btn sm ghost" type="button" data-act="rv-toggle" data-id="${r.id}">${r.status === "hidden" ? "Show" : "Hide"}</button>`}</td>` : ""}</tr>`).join("")}</tbody></table>
       ${list.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No reviews match these filters." : "No reviews yet. Add one, or import them from a spreadsheet."}</div>`}</div>
-    <div style="font-size:12px;color:var(--muted)">Hidden reviews stay here for your records but are taken off the website. Click a review to edit or delete it; changes go to the website automatically.</div>`;
+    <div style="font-size:12px;color:var(--muted)">Reviews written on regalspritz.com arrive here as <b>To approve</b>. Approve to show them; hidden reviews stay here for your records but are off the website. Click a review to edit or delete it. The website updates within seconds.</div>`;
 }
 function openReviewForm(id) {
   const r = id ? S.reviews.find(x => x.id === id) : { rating: 5, status: "shown", date: mToday(), source: "Website" };
@@ -1487,7 +1497,7 @@ function openReviewForm(id) {
     <div class="field"><label for="rv-reply">Our reply (optional)</label><textarea id="rv-reply" rows="2">${esc(r.reply || "")}</textarea></div>
     <div class="row"><div class="field"><label for="rv-date">Date</label><input id="rv-date" type="date" value="${esc(r.date || "")}"></div>
       <div class="field"><label for="rv-src">Source</label><select id="rv-src">${RV_SOURCES.map(x => `<option ${r.source === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
-      <div class="field"><label for="rv-st">Status</label><select id="rv-st"><option value="shown" ${r.status !== "hidden" ? "selected" : ""}>Shown</option><option value="hidden" ${r.status === "hidden" ? "selected" : ""}>Hidden</option></select></div></div>
+      <div class="field"><label for="rv-st">Status</label><select id="rv-st">${r.status === "pending" ? `<option value="pending" selected>To approve</option>` : ""}<option value="shown" ${r.status !== "hidden" && r.status !== "pending" ? "selected" : ""}>Shown</option><option value="hidden" ${r.status === "hidden" ? "selected" : ""}>Hidden</option></select></div></div>
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-review" data-id="${id}">Delete review</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -1556,25 +1566,9 @@ function rvNewChunk() {
 const rvNextOrd = () => S.reviews.reduce((a, r) => Math.max(a, Number(r.ord) || 0), 0) + 1;
 const RV_UPSERT = `mutation RSRev($h: MetaobjectHandleInput!, $m: MetaobjectUpsertInput!) { metaobjectUpsert(handle: $h, metaobject: $m) { metaobject { id handle } userErrors { field message code } } }`;
 S.rvDirty = new Set(); let rvTimer = 0;
-function rvQueue(chunks) { (chunks || []).filter(Boolean).forEach(c => S.rvDirty.add(c)); clearTimeout(rvTimer); rvTimer = setTimeout(rvFlush, 1500); }
-async function rvFlush() {
-  if (!S.rvDirty.size) return;
-  if (!S.mcp) { S.rvSync = { err: "Open the app in claude.ai with Shopify connected to update the website." }; render(); return; }
-  const list = [...S.rvDirty]; S.rvDirty.clear(); S.rvSync = { busy: true, n: list.length }; render();
-  try {
-    for (const c of list) {
-      const items = S.reviews.filter(r => r.chunk === c && r.status !== "hidden").sort(rvOrder).map(rvSite);
-      await shopMut(RV_UPSERT, { h: { type: RV_TYPE, handle: "rs-reviews-" + c }, m: { fields: [{ key: "data", value: JSON.stringify(items) }] } });
-    }
-    S.rvSync = { at: Date.now() };
-    if (S.db && S.canEdit) wdb().doc("config/reviews").set({ ...rvCfg(), lastSync: Date.now() }).catch(() => {});
-  } catch (e) {
-    list.forEach(c => S.rvDirty.add(c));
-    const m = e && e.code === "needs_reauth" ? "Shopify needs you to sign in again (claude.ai → Settings → Connectors)." : e && e.code === "not_in_manifest" ? "Allow Shopify for this page in its Permissions menu." : (e && e.message) || "couldn't reach Shopify.";
-    S.rvSync = { err: m };
-  }
-  render();
-}
+// The website reads reviews live from /api/reviews (Supabase reviews_public, ~10 s CDN cache), so nothing is pushed anymore.
+function rvQueue() {}
+async function rvFlush() {}
 const rvAllChunks = () => [...new Set(S.reviews.map(r => r.chunk).filter(Boolean))];
 async function importWebsiteReviews() {
   if (S.rvImporting) return; S.rvImporting = { done: 0, total: 0 }; render();
@@ -1596,12 +1590,8 @@ async function importWebsiteReviews() {
   render();
 }
 function rvSyncLine() {
-  const st = S.rvSync || {}, cfg = rvCfg();
-  const live = cfg.token ? "Website reads changes live" : "Website not connected yet";
-  const s = S.rvImporting ? `Importing website reviews… ${S.rvImporting.done}/${S.rvImporting.total || "…"}`
-    : st.busy ? "Updating the website…" : st.err ? `Website not updated: ${esc(st.err)}` : st.at || cfg.lastSync ? `Website updated ${relTime(st.at || cfg.lastSync)}` : "";
-  return `<div class="toolbar" style="font-size:12.5px;color:var(--muted)"><span class="chip ${st.err ? "bad" : cfg.token ? "good" : "warn"}">${live}</span><span>${s}</span><span style="flex:1"></span>
-    ${!S.readOnly ? `${st.err ? `<button class="btn sm" type="button" data-act="rv-sync">Try again</button>` : ""}<button class="btn sm" type="button" data-act="rv-sync-all">Push all to website</button><button class="btn sm" type="button" data-act="rv-web">Website setup</button>` : ""}</div>`;
+  const s = S.rvImporting ? `Importing website reviews… ${S.rvImporting.done}/${S.rvImporting.total || "…"}` : "Approved and shown reviews appear on regalspritz.com within seconds. New reviews from the website arrive here as To approve.";
+  return `<div class="toolbar" style="font-size:12.5px;color:var(--muted)"><span class="chip good">● Live on website</span><span>${s}</span></div>`;
 }
 function rvWebsiteCode() {
   const cfg = rvCfg(), alias = cfg.alias || {};
@@ -2021,7 +2011,7 @@ function renderNav() {
     (isCEO() ? item('data-nav="eom"', "award", "Awards", S.view === "eom") : "") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
-    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : ""), "desktop-only dept-item")).join("") +
+    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : d.id === "ADMIN" || d.id === "MARKETING" ? rvBadge() : ""), "desktop-only dept-item")).join("") +
     item('data-nav="account"', "account", "My Account", S.view === "account", "", "account-item mobile-only") +
     (() => { const m = member(myMemberId()) || {}; return `<button type="button" class="me-chip desktop-only" data-nav="account" ${S.view === "account" ? 'aria-current="page"' : ""}>${m.id ? avatar(m, 32, false) : svg("account")}<span class="me-t"><b>${esc(m.nickname || m.name || "My Account")}</b><small>${esc(m.role || (dept(m.department) || {}).name || "My Account")}</small></span><span class="me-go">›</span></button>`; })();
 }
@@ -2170,7 +2160,7 @@ function renderInner() {
   if (!isUnlocked(S.dept)) { v.innerHTML = viewLock(d); const pw = $("#unlock-pw"); if (pw) pw.focus(); return; }
   const dtabs = d.tabs.filter(tabAllowed);
   if (!dtabs.includes(S.tab)) S.tab = dtabs[0];
-  const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}</button>`).join("")}</div>`;
+  const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}${t === "reviews" ? rvBadge() : ""}</button>`).join("")}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), budget: viewBudget, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
     dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
@@ -2698,7 +2688,7 @@ function viewHome() {
   const overdue = mine.filter(t => t.due && t.due < today()).length;
   const web = S.site && S.web.loaded && canOrders();
   const side = (isCEO() ? eomHomeCard() : "") + (goals.length ? `<section class="panel quiet goals-card"><h2>Our goals</h2><ul>${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ul></section>` : "");
-  return `${birthdayBanner()}${announceCard()}
+  return `${birthdayBanner()}${rvApproveAlert()}${announceCard()}
   <section class="hero" aria-label="Welcome">
     <div class="hero-l"><h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}</h2><span class="hero-date">${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span></div>
     <figure class="hero-q" title="${esc(q)}${who ? " — " + esc(who) : ""}"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure>
@@ -4913,27 +4903,48 @@ function annList() {
     const t = o.createdAt || 0, had = by.get(e); if (!had || t > had.t) by.set(e, { email: e, name: String(o.customer || "").split(" ")[0], t }); }
   return [...by.values()].sort((a, b) => b.t - a.t);
 }
+const ANN_HERO = "https://regal-spritz-os.vercel.app/email/new-home.gif";
+let annPickMemo = { at: 0, list: [] };
+// 4 on-hand pieces with photos for the "Fresh picks" grid (new arrivals first), linked to their own page on the website.
+function annPicks() {
+  if (Date.now() - annPickMemo.at < 60000 && annPickMemo.list.length) return annPickMemo.list;
+  let L = []; try { L = webProducts().filter(p => p.kind === "onhand" && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
+  L.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+  annPickMemo = { at: Date.now(), list: L.slice(0, L.length >= 4 ? 4 : 2) }; return annPickMemo.list;
+}
 function annHTML(name) {
-  const c = RR, e = esc, f = (ic, t, d) => `<tr><td width="38" valign="top" style="padding:8px 0;font-size:22px">${ic}</td><td style="padding:8px 0;font-size:14px;line-height:1.5;color:${c.ink}"><b>${t}</b><br><span style="color:${c.muted}">${d}</span></td></tr>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${e(ANN_SUBJECT)}</title></head>
+  const c = RR, e = esc, SITE_URL = "https://www.regalspritz.com/";
+  const tile = (ic, t, d) => `<td width="50%" valign="top" style="padding:6px"><div style="background:${c.bg};border:1px solid ${c.line};border-radius:12px;padding:14px 14px 12px"><div style="font-size:24px;line-height:1">${ic}</div><div style="font-size:14px;font-weight:700;color:${c.ink};margin-top:8px">${t}</div><div style="font-size:12.5px;line-height:1.5;color:${c.muted};margin-top:3px">${d}</div></div></td>`;
+  const picks = annPicks();
+  const card = p => `<td width="50%" valign="top" style="padding:6px"><a href="${e(SITE_URL + "#/p/" + encodeURIComponent(p.id))}" target="_blank" style="text-decoration:none;color:${c.ink};display:block;border:1px solid ${c.line};border-radius:12px;overflow:hidden;background:#ffffff">
+    <img src="${e(p.imgs[0])}" width="240" alt="${e([p.brand, p.name].join(" "))}" style="display:block;width:100%;height:auto;border:0;background:${c.bg}">
+    <div style="padding:10px 12px 12px">${p.isNew ? `<div style="font-size:10px;letter-spacing:2px;font-weight:800;color:${c.gold}">NEW ARRIVAL</div>` : ""}<div style="font-size:11px;letter-spacing:1px;color:${c.muted};text-transform:uppercase">${e(p.brand || "")}</div><div style="font-size:14px;font-weight:700;line-height:1.3;margin-top:2px">${e(p.name)}${p.size ? ` <span style="font-weight:400;color:${c.muted}">${e(p.size)}</span>` : ""}</div><div style="font-size:15px;font-weight:800;color:${c.brand};margin-top:6px">${peso(p.price)}</div></div></a></td>`;
+  const grid = picks.length >= 2 ? `<tr><td style="padding:8px 22px 0"><div style="text-align:center;font-size:11px;letter-spacing:4px;font-weight:800;color:${c.gold}">&#10022; FRESH PICKS ON-HAND &#10022;</div><div style="text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${c.ink};margin:6px 0 8px">Ready to ship this week</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${[0, 2].filter(i => picks[i]).map(i => `<tr>${card(picks[i])}${picks[i + 1] ? card(picks[i + 1]) : `<td width="50%"></td>`}</tr>`).join("")}</table>
+    <div style="text-align:center;margin:10px 0 4px"><a href="${SITE_URL}" target="_blank" style="font-size:14px;font-weight:700;color:${c.brand}">See all perfumes &rarr;</a></div></td></tr>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light"><title>${e(ANN_SUBJECT)}</title>
+<style>@keyframes rsglow{0%,100%{box-shadow:0 0 0 0 rgba(184,145,58,.55)}50%{box-shadow:0 0 0 10px rgba(184,145,58,0)}}@keyframes rsfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}.rs-cta{animation:rsglow 2.2s ease-in-out infinite}.rs-float{display:inline-block;animation:rsfloat 3s ease-in-out infinite}@media (max-width:480px){.rs-pad{padding-left:16px!important;padding-right:16px!important}}</style></head>
 <body style="margin:0;padding:0;background:${c.bg};font-family:Helvetica,Arial,sans-serif;color:${c.ink}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg}"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:14px;overflow:hidden">
-<tr><td style="background:${c.brand};padding:30px 28px;text-align:center"><div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;color:#ffffff">Regal Spritz PH</div>
-  <div style="font-size:11px;letter-spacing:4px;color:${c.gold};margin-top:8px;font-weight:700">&#9819; OUR NEW WEBSITE IS LIVE &#9819;</div></td></tr>
-<tr><td style="padding:26px 28px 6px">
-  <p style="margin:0 0 12px;font-size:16px;line-height:1.5">Hi ${e(name || "there")},</p>
-  <p style="margin:0 0 14px;font-size:15px;line-height:1.6">Thank you for shopping with Regal Spritz PH! We've moved to our very own home: <b>regalspritz.com</b>. Same authentic perfumes, now easier to shop:</p>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-    ${f("🛍️", "On-hand and pre-order perfumes in one place", "Sealed, testers, decants and sets, with real photos and notes.")}
-    ${f("📦", "Track your orders in My Account", "See every order and its status, from confirmed to shipped.")}
-    ${f("💳", "Pay your way", "Card or Maya, BDO installment, GCash and bank transfer.")}
-    ${f("👑", "Royal Points", "Earn points on every order and use them on your next one.")}
-  </table>
-  <div style="text-align:center;margin:22px 0 10px"><a href="https://www.regalspritz.com/" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 38px;border-radius:10px;border-bottom:3px solid ${c.gold}">Visit regalspritz.com</a></div>
-  <p style="margin:12px 0 0;font-size:14px;line-height:1.5;color:${c.ink}">Use the same email you ordered with to create your account, so your past orders show up.</p>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">Shop on-hand and pre-order perfumes, track orders and earn Royal Points at regalspritz.com.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg}"><tr><td align="center" style="padding:24px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:16px;overflow:hidden">
+<tr><td style="background:${c.brand};padding:0;line-height:0"><a href="${SITE_URL}" target="_blank"><img src="${ANN_HERO}" width="560" alt="Regal Spritz PH · Our new home is live · regalspritz.com" style="display:block;width:100%;height:auto;border:0;color:#ffffff;font-family:Georgia,serif;font-size:24px;line-height:1.4;text-align:center;background:${c.brand}"></a></td></tr>
+<tr><td class="rs-pad" style="padding:26px 28px 4px">
+  <p style="margin:0 0 12px;font-size:17px;line-height:1.5">Hi ${e(name || "there")} <span class="rs-float">&#10024;</span></p>
+  <p style="margin:0 0 6px;font-size:15px;line-height:1.65">Thank you for shopping with Regal Spritz PH! We've moved into our very own home, <b>regalspritz.com</b>. Same 100% authentic perfumes, now easier to browse, order and track.</p>
+  <div style="text-align:center;margin:22px 0 18px"><a class="rs-cta" href="${SITE_URL}" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:800;font-size:16px;letter-spacing:.3px;padding:15px 40px;border-radius:999px;border:2px solid ${c.gold}">Shop the new website &rarr;</a></div>
 </td></tr>
-<tr><td style="padding:18px 28px 24px;text-align:center;font-size:12px;color:${c.muted};line-height:1.6">Questions? Just reply to this email or message us on Facebook / Instagram @regalspritzph.<br>You're getting this one-time email because you ordered from Regal Spritz PH. Don't want emails from us? Reply "unsubscribe".</td></tr>
+${grid}
+<tr><td class="rs-pad" style="padding:18px 22px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr>${tile("🛍️", "On-hand + pre-order", "Sealed, testers, decants and sets in one place, with real photos and notes.")}${tile("📦", "Track every order", "See your order go from confirmed to shipped in My Account.")}</tr>
+  <tr>${tile("💳", "Pay your way", "Card or Maya, BDO installment, GCash and bank transfer.")}${tile("👑", "Royal Points", "Earn points on every order and use them on your next one.")}</tr>
+</table></td></tr>
+<tr><td class="rs-pad" style="padding:14px 28px 6px"><div style="background:linear-gradient(135deg,#f6ecd6,#efe0bb);background-color:#f3e6c6;border:1px solid #e3cf9c;border-radius:14px;padding:16px 18px;text-align:center">
+  <div style="font-size:11px;letter-spacing:3px;font-weight:800;color:#8a6a22">&#9819; ROYAL WELCOME &#9819;</div>
+  <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;color:${c.ink};margin:6px 0 4px">Create your account with this email</div>
+  <div style="font-size:13px;line-height:1.55;color:#5b4a2a">Your past orders show up right away, and you start collecting Royal Points from your very first order.</div>
+  <div style="margin-top:12px"><a href="${SITE_URL}" target="_blank" style="display:inline-block;background:${c.gold};color:#ffffff;text-decoration:none;font-weight:800;font-size:14px;padding:10px 26px;border-radius:999px">Create my account</a></div></div></td></tr>
+<tr><td style="padding:20px 28px 26px;text-align:center;font-size:12px;color:${c.muted};line-height:1.7"><div style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${c.brand};margin-bottom:4px">Regal Spritz PH</div>Questions? Just reply to this email or message us on Facebook / Instagram <b>@regalspritzph</b>.<br>You're getting this one-time email because you ordered from Regal Spritz PH. Don't want emails from us? Reply "unsubscribe".</td></tr>
 </table></td></tr></table></body></html>`;
 }
 const annText = name => `Hi ${name || "there"},\n\nThank you for shopping with Regal Spritz PH! We've moved to our very own home: regalspritz.com.\n\n• On-hand and pre-order perfumes in one place\n• Track your orders in My Account\n• Pay with card / Maya, BDO installment, GCash or bank transfer\n• Earn Royal Points on every order\n\nVisit https://www.regalspritz.com/\n\nUse the same email you ordered with to create your account, so your past orders show up.\n\nDon't want emails from us? Reply "unsubscribe".`;
@@ -7085,7 +7096,7 @@ function openDrawer() {
     (canAttendance() ? item('data-nav="attendance"', ic("clock"), "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', ic("award"), "Awards", S.view === "eom") : "") +
     `<div class="drawer-l">Departments</div>` +
-    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, `<i class="dc"></i>`, d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : ""))).join("") +
+    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, `<i class="dc"></i>`, d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : d.id === "ADMIN" || d.id === "MARKETING" ? rvBadge() : ""))).join("") +
     `<div class="drawer-l">Me</div>` +
     item('data-nav="account"', ic("account"), esc(m.nickname || m.name || "My Account"), S.view === "account") +
     `<div class="drawer-sync">${esc(($("#sync") || {}).textContent || "")}</div>`;
@@ -7297,7 +7308,7 @@ document.addEventListener("click", guard(async ev => {
     case "edit-contact": return openContactEdit(b.dataset.id);
     case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
-    case "ann-preview": { const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
+    case "ann-preview": { const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
     case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; const r = await S.site.email({ to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
     case "ann-start": { if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
     case "ann-pause": { const d = annDoc(); if (d) await save("webmeta", "_announce", { ...clean(d), status: "paused", at: Date.now() }); toast("Paused. Tap Start sending to continue."); render(); return; }
@@ -7325,7 +7336,9 @@ document.addEventListener("click", guard(async ev => {
     case "ar-link": { const mid = val("ar-" + id); if (!mid) return toast("Choose who this is first."); await patch("team", mid, { uid: id }); await remove("accessreq", id); toast(`Linked to ${memberName(mid)}.`); return; }
     case "ar-del": await remove("accessreq", id); toast("Request removed."); return;
     case "rv-sync": return rvFlush();
-    case "rv-sync-all": rvQueue(rvAllChunks()); toast("Sending every review to the website…"); return;
+    case "rv-approve": case "rv-reject": { const r = S.reviews.find(x => x.id === id); if (!r) return; const ok = b.dataset.act === "rv-approve"; await patch("reviews", id, { status: ok ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); toast(ok ? "Approved. It shows on the website in a few seconds." : "Hidden. It stays here for your records."); return; }
+    case "rv-pend": S.rv.status = "pending"; render(); return;
+    case "rv-go": S.view = "dept"; S.dept = id; S.tab = "reviews"; S.rv.status = "pending"; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); navRefresh(); return;
     case "rv-web": return openRvWebsite();
     case "rv-copy": return rvCopyCode();
     case "rv-clear": S.rv = { stars: "", status: "", sort: S.rv.sort, source: "" }; S.rvq = ""; render(); return;
