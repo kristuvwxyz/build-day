@@ -1,6 +1,6 @@
 # Website: reviews live from RS OS (for the website chat)
 
-RS OS now runs reviews end to end. A site add-on (`site-addons/reviews-live.html`, already loaded through site-addons.js) does this today, so nothing is required. To build it into the site properly:
+RS OS now runs reviews end to end. The website now does this itself (done Oct 8, 2026; the old reviews-live add-on was removed). For reference:
 
 1. **Load reviews from** `https://regal-spritz-os.vercel.app/api/reviews` (JSON, CDN-cached ~10 s) instead of the embedded `window.RS_REVIEWS`.
    Same shape: `{ total, avg, list, by }`. List item: `[id, handle, product, rating, date, author, title, body, pics, reply]`. `by` maps product id → list indexes.

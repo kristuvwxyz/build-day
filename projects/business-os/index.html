@@ -1482,7 +1482,7 @@ function viewReviews() {
     <div class="table-wrap"><table class="otable"><thead><tr><th>Rating</th><th>Customer</th><th>Product</th><th>Review</th><th>Source</th><th>Date</th><th>Status</th>${can ? "<th></th>" : ""}</tr></thead>
       <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : r.status === "pending" ? "rv-pend" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>
         <td data-sort="${Number(r.rating) || 0}">${starsHTML(r.rating)}</td><td style="font-weight:600">${esc(r.customer || "Anonymous")}</td><td>${esc(r.product || "")}</td>
-        <td><div class="rv-text">${r.title ? `<b>${esc(r.title)}</b> · ` : ""}${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}</td>
+        <td><div class="rv-text">${r.title ? `<b>${esc(r.title)}</b> · ` : ""}${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}${Array.isArray(r.pics) && r.pics.length ? `<div style="display:flex;gap:4px;margin-top:4px">${r.pics.slice(0, 3).filter(u => /^https:\/\//.test(u)).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img src="${esc(u)}" alt="Review photo" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--line)"></a>`).join("")}</div>` : ""}</td>
         <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap">${r.date ? fmtDate(r.date) : ""}</td>
         <td><span class="chip ${r.status === "hidden" ? "" : r.status === "pending" ? "warn" : "good"}">${r.status === "hidden" ? "Hidden" : r.status === "pending" ? "To approve" : "Shown"}</span></td>
         ${can ? `<td class="r nowrap">${r.status === "pending" ? `<button class="btn sm primary" type="button" data-act="rv-approve" data-id="${r.id}">✓ Approve</button> <button class="btn sm ghost" type="button" data-act="rv-reject" data-id="${r.id}">Hide</button>` : `<button class="btn sm ghost" type="button" data-act="rv-toggle" data-id="${r.id}">${r.status === "hidden" ? "Show" : "Hide"}</button>`}</td>` : ""}</tr>`).join("")}</tbody></table>
@@ -2007,7 +2007,7 @@ function renderNav() {
     timeNavItem() +
     item('data-nav="home"', "home", "Home", S.view === "home") +
     item('data-nav="tasks"', "tasks", "Tasks", S.view === "tasks", myTaskBadge()) +
-    (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders", cxBadge()) : "") +
+    (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders", cxBadge() + retBadge()) : "") +
     (canListings() ? item('data-nav="listings"', "tag", "Listings", S.view === "listings", "", "desktop-only") : "") +
     (canListings() ? item('data-nav="gallery"', "image", "Gallery", S.view === "gallery", "", "desktop-only") : "") +
     (canAttendance() ? item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") : "") +
@@ -2692,7 +2692,7 @@ function viewHome() {
   const overdue = mine.filter(t => t.due && t.due < today()).length;
   const web = S.site && S.web.loaded && canOrders();
   const side = (isCEO() ? eomHomeCard() : "") + (goals.length ? `<section class="panel quiet goals-card"><h2>Our goals</h2><ul>${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ul></section>` : "");
-  return `${birthdayBanner()}${rvApproveAlert()}${announceCard()}
+  return `${birthdayBanner()}${rvApproveAlert()}${retAlert()}${announceCard()}
   <section class="hero" aria-label="Welcome">
     <div class="hero-l"><h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}</h2><span class="hero-date">${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span></div>
     <figure class="hero-q" title="${esc(q)}${who ? " — " + esc(who) : ""}"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure>
@@ -2757,10 +2757,11 @@ function goOrders(view) {
 
 /* ---------- website orders (regalspritz.com), read live from the website's backend ----------
    Only in the RS App (it has the /api/site server route). Customer details are never saved here: fetched live each time. */
-// Customers see "Completed" once an order ships (K, 2026-10-08). The website backend still stores Shipped;
-// the site add-on completed-status.html shows it (and any old Delivered) as Completed on regalspritz.com.
+// The website (backend v31) shows shipped orders under To Receive, then Completed (stage); RS OS shows the same via webStageName.
 const WEB_STATUSES = ["Placed", "Confirmed", "Packed", "Shipped", "Cancelled"];
 const webStatusName = s => /^(shipped|delivered)$/i.test(s || "") ? "Completed" : s || "";
+// Website backend v31 stage: shipped orders are "To receive" until the buyer confirms (or 3/5/7 days pass), then Completed.
+const webStageName = o => retRefunded(o) ? "Refunded" : o.stage === "toReceive" ? "Shipped · to receive" : o.stage === "done" ? "Completed" : webStatusName(o.status);
 const webDone = o => /^(completed|shipped|delivered|cancelled)$/i.test(o.status || "");
 const webPayKind = o => /maya/i.test(o.payment || "") ? "maya" : /bdo/i.test(o.payment || "") ? "bdo" : "";
 const webBadge = o => o.paid ? `<span class="badge green">Paid${o.mayaPaid ? " via Maya" : ""}</span>` : `<span class="badge amber">Unpaid</span>`;
@@ -2987,7 +2988,7 @@ function viewWebOrders() {
   return head + (S.web.err ? `<div class="notice">${esc(S.web.err)} Showing the last list.</div>` : "") + `<div class="table-wrap"><table class="otable"><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th class="r">Total / due</th><th>Payment</th><th>Status</th></tr></thead><tbody>
     ${rows.map(o => `<tr data-webo="${esc(o.ref)}" style="cursor:pointer"><td class="nowrap"><b>${esc(o.ref)}</b></td><td class="nowrap">${esc(webTime(o.date, o))}</td><td>${esc(o.name || "")}</td><td style="min-width:180px;max-width:280px">${esc(webItems(o))}</td>
       <td class="r num nowrap">${peso(o.total)}${Number(o.due) && Number(o.due) !== Number(o.total) ? `<br><small style="color:var(--muted)">due ${peso(o.due)}</small>` : ""}</td>
-      <td class="nowrap">${webBadge(o)}<br><small style="color:var(--muted)">${esc(o.payment || "")}</small></td><td class="nowrap">${esc(webStatusName(o.status))}${o.tracking ? `<br><small style="color:var(--muted)">${esc(o.tracking)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="7"><div class="empty">No website orders here.</div></td></tr>`}
+      <td class="nowrap">${webBadge(o)}<br><small style="color:var(--muted)">${esc(o.payment || "")}</small></td><td class="nowrap">${esc(webStageName(o))}${o.tracking ? `<br><small style="color:var(--muted)">${esc(o.tracking)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="7"><div class="empty">No website orders here.</div></td></tr>`}
   </tbody></table></div>`;
 }
 // Customer cancellation requests from regalspritz.com (website backend v16). Pending ones are urgent: red count on Orders.
@@ -3025,12 +3026,50 @@ async function cancelDecide(ref, decision, btn) {
   toast(decision === "Approved" ? `#${String(ref).replace(/^#/, "")} cancelled.` : `Cancellation for #${String(ref).replace(/^#/, "")} declined.`);
   await webLoad(true); renderNav && renderNav();
 }
+// Return / refund requests from regalspritz.com (website backend v31: opsOrders returnRequest; decide with opsReturnSet).
+const retReq = o => o.returnRequest && o.returnRequest.status ? o.returnRequest : null;
+const retPending = () => S.web.loaded ? S.web.orders.filter(o => (retReq(o) || {}).status === "Pending").length : 0;
+const retBadge = () => { const n = retPending(); return n ? `<span class="badge red cx-n" title="${n} return request${n > 1 ? "s" : ""} waiting">${n}</span>` : ""; };
+const retRefunded = o => /refund/i.test(o.status || "");
+function retAlert() {
+  const n = retPending(); if (!n || !S.site || !(canPay() || canFul()) || S.viewAs) return "";
+  return `<section class="panel" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--bad)"><b>↩️ ${n} return request${n > 1 ? "s" : ""} waiting</b><span style="font-size:13px;color:var(--muted);flex:1">From buyers on regalspritz.com. Approve or decline in Orders → Returns.</span><button class="btn sm primary" type="button" data-act="ret-go">Open Returns</button></section>`;
+}
+function returnsPanel() {
+  const all = S.web.orders.filter(retReq), f = S.cx.rf || "pending";
+  const isP = o => retReq(o).status === "Pending", isA = o => retReq(o).status === "Approved" && !retRefunded(o);
+  const list = all.filter(o => f === "pending" ? isP(o) : f === "approved" ? isA(o) : !isP(o) && !isA(o)).sort((a, b) => String(b.returnRequest.at || "").localeCompare(String(a.returnRequest.at || "")));
+  const nP = all.filter(isP).length, nA = all.filter(isA).length, can = canPay() || canFul();
+  const photo = (u, i) => /^https:\/\//i.test(String(u || "")) ? `<a class="btn ghost sm" href="${esc(u)}" target="_blank" rel="noopener">📷 Photo ${i + 1}</a>` : "";
+  return `<div class="seg" role="group" aria-label="Return filter" style="margin:4px 0 10px"><button type="button" data-retf="pending" aria-pressed="${f === "pending"}">Pending (${nP})</button><button type="button" data-retf="approved" aria-pressed="${f === "approved"}">Approved · to refund (${nA})</button><button type="button" data-retf="done" aria-pressed="${f === "done"}">Done (${all.length - nP - nA})</button></div>
+  ${!S.web.loaded ? `<div class="panel"><div class="empty">Loading website orders…</div></div>` : !list.length ? `<div class="panel"><div class="empty">${f === "pending" ? "No return requests waiting. 🎉" : f === "approved" ? "Nothing waiting for a refund." : "No finished return requests yet."}</div></div>` :
+  `<div class="cx-list">${list.map(o => { const r = retReq(o), pend = r.status === "Pending";
+    const chip = pend ? `<span class="badge red">Pending</span>` : retRefunded(o) ? `<span class="badge">Refunded</span>` : r.status === "Approved" ? `<span class="badge green">Approved${r.by ? " · " + esc(r.by) : ""}</span>` : `<span class="badge">Declined${r.by ? " · " + esc(r.by) : ""}</span>`;
+    return `<div class="panel cx-card${pend ? " pend" : ""}"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(String(o.ref || "").replace(/^#/, ""))}</button><span>${esc(o.name || "")}</span><span class="cx-when">Requested ${esc(r.at ? webTime(r.at) : "")}</span>${chip}</div>
+      <div class="cx-reason"><b>${esc(r.reason || "Other")}</b>${r.details ? "\n" + esc(r.details) : ""}</div>
+      ${(r.photos || []).length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${r.photos.slice(0, 3).map(photo).join("")}</div>` : ""}
+      ${r.note ? `<div style="font-size:13px;color:var(--muted)">Team note: ${esc(r.note)}</div>` : ""}
+      <div class="cx-foot"><span class="num">${peso(o.total)}</span> ${webBadge(o)} <span style="font-size:13px;color:var(--muted)">${esc(o.items ? webItems(o) : "")}</span>
+      ${can && pend ? `<span style="flex:1"></span><button class="btn sm" type="button" data-retdec="Declined" data-ref="${esc(o.ref)}">Decline</button><button class="btn primary sm" type="button" data-retdec="Approved" data-ref="${esc(o.ref)}">Approve return</button>` : ""}
+      ${can && r.status === "Approved" && !retRefunded(o) ? `<span style="flex:1"></span><button class="btn primary sm" type="button" data-retdone="${esc(o.ref)}">Mark refunded</button>` : ""}</div></div>`; }).join("")}</div>`}`;
+}
+async function returnDecide(ref, status, btn) {
+  if (!S.site || !S.site.returnSet) return;
+  const note = status === "Declined" ? prompt("Why is it declined? (the buyer may see this)", "") : "";
+  if (note === null) return; if (btn) btn.disabled = true;
+  const r = await S.site.returnSet({ ref, status, note: note || "" }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok) { toast("Website: " + ((r && r.error) || "couldn't save.")); if (btn) btn.disabled = false; return; }
+  const num = String(ref).replace(/^#/, "");
+  toast(status === "Approved" ? `Return for #${num} approved. Do the return / refund, then tap Mark refunded.` : `Return for #${num} declined.`);
+  await webLoad(true); renderNav && renderNav();
+}
 function openWebOrder(ref) {
   const o = S.web.orders.find(x => x.ref === ref); if (!o) return;
   const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
   openSheet(`<h2 style="margin:0">#${esc(String(o.ref || "").replace(/^#/, ""))} ${webBadge(o)}</h2>
     <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date, o))} · ${esc(o.payment || "")}${o.payRef && !/bdo\.com\.ph/i.test(o.payRef) ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
     ${(() => { const m = S.webmeta.find(d => d.ref === o.ref), sh = o.shippedAt ? webTime(o.shippedAt) : m && m.shippedAt ? webTime(m.shippedAt) : "", rc = o.receivedAt ? webTime(o.receivedAt) : ""; return sh || rc ? `<div style="font-size:13px;display:flex;gap:14px;flex-wrap:wrap">${sh ? `<span>🚚 Shipped <b>${esc(sh)}</b></span>` : ""}${rc ? `<span>✅ Buyer tapped Order received <b>${esc(rc)}</b></span>` : `<span style="color:var(--muted)">Not marked received by the buyer yet</span>`}</div>` : ""; })()}
+    ${retReq(o) ? `<div class="notice" style="border-left:4px solid var(--bad)">↩️ Return request · <b>${esc(retReq(o).status)}</b>: ${esc(retReq(o).reason || "")}${retReq(o).details ? " · " + esc(retReq(o).details) : ""} <button type="button" class="btn ghost sm" data-act="ret-go">Open Returns</button></div>` : ""}
     ${o.shipPref && SHIP_PREF[o.shipPref] ? `<div style="font-size:13px">${shipPrefChip(o)} <span style="color:var(--muted)">${esc(SHIP_PREF_TIP[o.shipPref].replace(/^Buyer chose at checkout: /, ""))}</span></div>` : ""}
     <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
       <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
@@ -3730,9 +3769,10 @@ function viewOrders() {
       ${canFul() || canAll() ? `<button class="btn sm cancel-btn" type="button" data-bulk="cancel">✕ Cancel order${S.sel.size === 1 ? "" : "s"}</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
-  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT, bdOn = S.cx.show === "bdo" && S.site && canPay();
-  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn && !bdOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button>` : ""}${S.site && canPay() ? `<button type="button" data-cx="bdo" aria-pressed="${!!bdOn}">BDO link requests${bdoBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
+  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT, bdOn = S.cx.show === "bdo" && S.site && canPay(), rtOn = S.cx.show === "ret" && S.site;
+  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn && !bdOn && !rtOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button><button type="button" data-cx="ret" aria-pressed="${!!rtOn}">Returns${retBadge()}</button>` : ""}${S.site && canPay() ? `<button type="button" data-cx="bdo" aria-pressed="${!!bdOn}">BDO link requests${bdoBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
   if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
+  if (rtOn) return `${webErrNotice()}${cxTabs}${returnsPanel()}`;
   if (arOn) return `${cxTabs}${viewArchived()}`;
   if (bdOn) return `${webErrNotice()}${cxTabs}${bdoPanel()}`;
   return `${webErrNotice()}${cxTabs}
@@ -7154,7 +7194,7 @@ function openDrawer() {
     `<div class="drawer-l">Workspace</div>` +
     item('data-nav="home"', ic("home"), "Home", S.view === "home") +
     item('data-nav="tasks"', ic("tasks"), "Tasks", S.view === "tasks") +
-    (canOrders() ? item('data-nav="orders"', ic("orders"), "Orders", S.view === "orders", cxBadge()) : "") +
+    (canOrders() ? item('data-nav="orders"', ic("orders"), "Orders", S.view === "orders", cxBadge() + retBadge()) : "") +
     (canListings() ? item('data-nav="listings"', ic("tag"), "Listings", S.view === "listings") : "") +
     (canListings() ? item('data-nav="gallery"', ic("image"), "Gallery", S.view === "gallery") : "") +
     (canAttendance() ? item('data-nav="attendance"', ic("clock"), "Attendance", S.view === "attendance") : "") +
@@ -7270,7 +7310,10 @@ document.addEventListener("click", guard(async ev => {
   const js = ev.target.closest("[data-jntsave]"); if (js && S.jnt) { js.disabled = true; await jntSaveBack(Number(js.dataset.jntsave)); js.disabled = false; return; }
   const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
   const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
-  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
+  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "ret" ? "ret" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
+  const rtf = ev.target.closest("[data-retf]"); if (rtf) { S.cx.rf = rtf.dataset.retf; render(); return; }
+  const rtd = ev.target.closest("[data-retdec]"); if (rtd) { await returnDecide(rtd.dataset.ref, rtd.dataset.retdec, rtd); return; }
+  const rtr = ev.target.closest("[data-retdone]"); if (rtr) { const ref = rtr.dataset.retdone; if (!confirm(`Mark #${String(ref).replace(/^#/, "")} as Refunded? Do this after the return / refund is finished. The buyer sees it under Cancelled.`)) return; rtr.disabled = true; const r = await S.site.update(ref, { status: "Refunded" }).catch(e => ({ ok: false, error: e && e.message })); if (!r || !r.ok) { toast("Website: " + ((r && r.error) || "couldn't save.")); rtr.disabled = false; return; } toast(`#${String(ref).replace(/^#/, "")} marked Refunded.`); await webLoad(true); return; }
   const cxf = ev.target.closest("[data-cxf]"); if (cxf) { S.cx.f = cxf.dataset.cxf; render(); return; }
   const cxd = ev.target.closest("[data-cxdec]"); if (cxd) { const ref = cxd.dataset.ref, d = cxd.dataset.cxdec;
     if (d === "Approved" && !confirm(`Cancel order #${String(ref).replace(/^#/, "")}? The customer will see it as Cancelled.`)) return;
@@ -7402,6 +7445,7 @@ document.addEventListener("click", guard(async ev => {
     case "rv-sync": return rvFlush();
     case "rv-approve": case "rv-reject": { const r = S.reviews.find(x => x.id === id); if (!r) return; const ok = b.dataset.act === "rv-approve"; await patch("reviews", id, { status: ok ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); toast(ok ? "Approved. It shows on the website in a few seconds." : "Hidden. It stays here for your records."); return; }
     case "rv-pend": S.rv.status = "pending"; render(); return;
+    case "ret-go": if (!$("#scrim").hidden) closeSheet(); S.view = "orders"; S.cx.show = "ret"; S.cx.rf = "pending"; S.sel.clear(); saveNav(); if (!S.web.loaded) webLoad(); render(); window.scrollTo(0, 0); return;
     case "rv-go": S.view = "dept"; S.dept = id; S.tab = "reviews"; S.rv.status = "pending"; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); navRefresh(); return;
     case "rv-web": return openRvWebsite();
     case "rv-copy": return rvCopyCode();

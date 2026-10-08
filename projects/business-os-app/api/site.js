@@ -3,7 +3,7 @@
 // The website backend key (RS_BACKEND_KEY) stays here on the server, never in the browser.
 // Customer details pass straight through: nothing is saved or logged here.
 const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbz7R17lKloaq_VaFMK-nDge-9AUXNFmNgaH7WZr2gWJjxRLMn1hEa6HubmeaDbaPzdU4g/exec";
-const STATUSES = new Set(["Placed", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"]);
+const STATUSES = new Set(["Placed", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled", "Refunded"]);
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -75,6 +75,13 @@ export default async function handler(req, res) {
     if (!subject || !html || html.length > 150000) return res.status(400).json({ ok: false, error: "The receipt is empty or too big." });
     const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
     call = { action: "opsEmail", key: KEY, to, subject, html, text, by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
+  } else if (body.action === "returnSet") {
+    // Return / refund request decision (website backend v31 opsReturnSet). The refund itself is done by the team.
+    const ref = String(body.ref || "").trim().replace(/^#/, "");
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(ref)) return res.status(400).json({ ok: false, error: "Missing order number." });
+    if (!["Approved", "Declined", "Pending"].includes(body.status)) return res.status(400).json({ ok: false, error: "Pick Approve or Decline." });
+    const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
+    call = { action: "opsReturnSet", key: KEY, ref, status: body.status, note: String(body.note || "").trim().slice(0, 500), by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
   } else if (body.action === "maya") {
     // Maya Checkout (cards / Maya wallet) link for an RS OS order. With MAYA_PUBLIC_KEY in Vercel the link is made here;
     // otherwise the website backend makes it with its own Maya key (opsMayaCheckout, see docs/handoffs/rs-os-maya-link.md).
@@ -112,6 +119,7 @@ export default async function handler(req, res) {
     if (!j.ok && call.action === "opsSetProducts" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website can't receive listings yet. Update the website backend to v15 (see the setup guide)." });
     if (!j.ok && call.action === "opsMayaCheckout" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "Maya links aren't set up yet (add MAYA_PUBLIC_KEY in Vercel)." });
     if (!j.ok && call.action === "opsEmail" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "the website backend can't send emails yet (needs the opsEmail update)" });
+    if (!j.ok && call.action === "opsReturnSet" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website backend can't take return decisions yet (needs v31)." });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });
     // Keep the shared counter above every website order number seen (covers numbers the website made on its own).
     if (call.action === "opsOrders" && j.ok && Array.isArray(j.orders)) {
