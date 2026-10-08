@@ -1141,7 +1141,7 @@ function relTime(t) {
 }
 
 const itemsTotal = o => (o.items || []).reduce((a, i) => a + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
-const total = o => itemsTotal(o) + (Number(o.adjust) || 0) - (Number(o.discount) || 0);
+const total = o => itemsTotal(o) + (Number(o.shipFee) || 0) + (Number(o.adjust) || 0) - (Number(o.discount) || 0);
 const itemCount = o => (o.items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0);
 const cogs = o => (o.items || []).reduce((a, i) => a + (Number(i.qty) || 0) * (Number(i.cost) || 0), 0);
 const profit = o => total(o) - cogs(o) - (Number(o.fees) || 0) - (Number(o.shipping) || 0);
@@ -2860,7 +2860,7 @@ function webAsOrders() {
     return { id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
       items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0, kind: i.kind === "preorder" || i.preorder === true ? "preorder" : i.kind === "onhand" ? "onhand" : "" })),
-      adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
+      shipFee: Number(o.shipping) || 0, adjust: (Number(o.total) || 0) - (Number(o.shipping) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
       payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
       tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", cancel: o.cancel || null, shipPref: o.shipPref || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
@@ -3936,8 +3936,8 @@ function openMerge() {
     const sum = k => rest.reduce((a, o) => a + (Number(o[k]) || 0), Number(main[k]) || 0);
     await patch("orders", main.id, {
       items: [...tagIt(main), ...rest.flatMap(tagIt)], merged: [...(main.merged || []), ...rest.flatMap(o => [o.num, ...(o.merged || [])])],
-      mergedParts: [...(main.mergedParts || []), ...rest.map(o => ({ id: o.id, num: o.num, ref: o.ref || "", adjust: Number(o.adjust) || 0, discount: Number(o.discount) || 0, nums: [o.num, ...(o.merged || [])] }))],
-      adjust: sum("adjust"), discount: sum("discount"), tags: [...new Set([...(main.tags || []), ...rest.flatMap(o => o.tags || [])])],
+      mergedParts: [...(main.mergedParts || []), ...rest.map(o => ({ id: o.id, num: o.num, ref: o.ref || "", adjust: Number(o.adjust) || 0, shipFee: Number(o.shipFee) || 0, discount: Number(o.discount) || 0, nums: [o.num, ...(o.merged || [])] }))],
+      adjust: sum("adjust"), shipFee: sum("shipFee"), discount: sum("discount"), tags: [...new Set([...(main.tags || []), ...rest.flatMap(o => o.tags || [])])],
       log: logAdd(main, [`merged ${rest.map(onum).join(", ")} into this order for 1 shipment`]),
     });
     for (const o of rest) await archiveOrder(o, `merged into #${main.num}`, { mergedInto: main.id });
@@ -3948,7 +3948,7 @@ async function unmergeOrder(o) {
   const parts = o.mergedParts || []; const nums = new Set(parts.flatMap(p => p.nums || [p.num]));
   for (const p of parts) { const a = S.archived.find(x => x.id === p.id); if (a) await restoreOrder(a); }
   const sub = k => (Number(o[k]) || 0) - parts.reduce((a, p) => a + (Number(p[k]) || 0), 0);
-  await patch("orders", o.id, { items: (o.items || []).filter(i => !nums.has(i.from)), merged: [], mergedParts: [], adjust: sub("adjust"), discount: sub("discount"), log: logAdd(o, [`unmerged ${[...nums].map(n => "#" + n).join(", ")}`]) });
+  await patch("orders", o.id, { items: (o.items || []).filter(i => !nums.has(i.from)), merged: [], mergedParts: [], adjust: sub("adjust"), shipFee: sub("shipFee"), discount: sub("discount"), log: logAdd(o, [`unmerged ${[...nums].map(n => "#" + n).join(", ")}`]) });
   toast("Unmerged. The other orders are active again.");
 }
 /* which order each item came from, for orders merged in Shopify (#RS2604 #RS2612) */
@@ -4437,7 +4437,7 @@ function updateOrderTotal() {
     t += q * v; srp += q * (p ? Number(p.price) || 0 : v);
     pr.classList.toggle("disc", !!p && pr.value !== "" && v < (Number(p.price) || 0)); pr.title = p && v < (Number(p.price) || 0) ? `SRP ${peso2(p.price)} · ${peso2((Number(p.price) || 0) - v)} off` : ""; });
   const d = orderDisc(null, t), el = $("#order-total");
-  if (el) el.innerHTML = (srp > t - d + 0.004 && srp ? `<s style="color:var(--muted);font-weight:400;font-size:13px">${peso2(srp)}</s> ` : "") + peso2(t - d);
+  if (el) el.innerHTML = (srp > t - d + 0.004 && srp ? `<s style="color:var(--muted);font-weight:400;font-size:13px">${peso2(srp)}</s> ` : "") + peso2(t - d + (numv("o-sf") || 0));
 }
 // Order-level discount from Create order (₱ or % of the items).
 function orderDisc(items, sub) {
@@ -4466,7 +4466,11 @@ function openOrderForm() {
       <div class="field"><label for="o-disc">Discount</label><div style="display:flex;gap:6px"><input inputmode="decimal" class="money" id="o-disc" placeholder="0" style="flex:1;min-width:0"><select id="o-dtype" aria-label="Discount type" style="width:auto"><option value="amt">₱</option><option value="pct">%</option></select></div></div>
       <div class="field"><label for="o-dnote">Discount reason (optional)</label><input id="o-dnote" placeholder="e.g. loyal buyer, promo code" autocomplete="off"></div>
     </div>
-    <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input inputmode="decimal" class="money" id="o-ship" placeholder="0"></div>
+    <div class="row">
+      <div class="field"><label for="o-sf">Shipping fee (buyer pays, ₱)</label><input inputmode="decimal" class="money" id="o-sf" placeholder="0"></div>
+      <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input inputmode="decimal" class="money" id="o-ship" placeholder="0"></div>
+    </div>
+    <div class="field"><label for="o-via">How will the buyer pay?</label><select id="o-via"><option value="">Choose later</option>${PAYVIA.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></div>
     <div class="row">
       <div class="field"><label for="o-pay">Payment status</label><select id="o-pay">${opts(PAYMENTS.filter(p => !VOIDPAY.has(p.id)), "pending")}</select></div>
       <div class="field"><label for="o-ful">Fulfillment status</label><select id="o-ful">${opts(FUL_PICK, "to_confirm")}</select></div>
@@ -4498,7 +4502,7 @@ function openOrderForm() {
     const rsv = S.site && S.site.nextNumber ? await S.site.nextNumber().catch(() => null) : null;
     if (S.site && S.site.nextNumber && !(rsv && rsv.ok && /^RS\d+$/.test(rsv.ref || ""))) return sheetError((rsv && rsv.error) || "Couldn't get the next RS number. Try again.");
     const fnum = (rsv && rsv.ref) || num;
-    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: custName, ref: val("o-ref"), ...cc, items, fees: 0, shipping: numv("o-ship"), adjust: 0, discount: orderDisc(items), discountNote: orderDisc(items) ? val("o-dnote") : "", payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
+    const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: custName, ref: val("o-ref"), ...cc, items, fees: 0, shipping: numv("o-ship"), shipFee: numv("o-sf"), payVia: val("o-via"), ...(val("o-via") === "maya" ? { mop: "Maya" } : val("o-via") === "bdo" ? { mop: "BDO" } : {}), adjust: 0, discount: orderDisc(items), discountNote: orderDisc(items) ? val("o-dnote") : "", payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
     if (order.payment === "paid" && hasPreorder(order)) { order.payment = "partial"; S.dpNote = true; }
     const take = isCancelled(order.payment, fulfillment) ? {} : stockTake(items);
     order.stockTaken = take;
@@ -4506,7 +4510,7 @@ function openOrderForm() {
     await applyStockMap(take, -1);
     const fresh = await buyerRecord(order, hit, S.mergeAns).catch(() => false); S.mergeAns = null;
     closeSheet(); toast(`Order #${fnum} saved. Inventory updated.${fresh ? " New buyer added to Customers." : ""}${S.dpNote ? " Pre-order → Partially paid (50% DP); set Fully paid when the balance is paid." : ""}`); S.dpNote = false;
-    if (order.email && !isCancelled(order.payment, fulfillment)) { const nw = S.orders.find(x => x.num === fnum); if (nw) receiptSend(nw, true); }
+    if (!isCancelled(order.payment, fulfillment)) { const nw = S.orders.find(x => x.num === fnum); if (nw) payViaStart(nw); }
   });
   addrInit();
 }
@@ -4626,13 +4630,76 @@ function openContactEdit(id) {
 }
 
 /* ---------- Royal Receipt: emailed invoice with a Pay now button, plus a copy-ready text version ---------- */
+// How the buyer pays an RS OS order (picked in Create order or on the Royal Receipt):
+// BDO BNPL = staff make a BDO Checkout link and paste it; Maya = RS OS makes a Maya Checkout link (cards / Maya wallet);
+// E-wallet / Bank transfer = the receipt shows our QR codes + accounts, the buyer replies with a screenshot, staff mark it paid.
+const PAYVIA = [["bdo", "BDO BNPL"], ["maya", "Card · Maya Checkout"], ["manual", "E-wallet / Bank transfer (QR)"]];
+// Our receiving accounts live in the database (webmeta/_paymethods), not in the code: { methods: [{ key, title, name, num, img, url }] }.
+const payMethods = () => ((S.webmeta.find(d => d.id === "_paymethods") || {}).methods || []);
+function rrManualHTML(o, forEmail) {
+  const c = RR, e = esc, ms = payMethods(), src = m => forEmail ? m.url || "" : m.url || m.img || "";
+  const cells = ms.filter(src).map(m => `<td width="50%" align="center" valign="top" style="padding:6px"><img src="${e(src(m))}" alt="${e(m.title + " " + m.num)}" width="240" style="display:block;width:100%;max-width:240px;height:auto;border:0;border-radius:14px"></td>`);
+  const rows = []; for (let i = 0; i < cells.length; i += 2) rows.push(`<tr>${cells[i]}${cells[i + 1] || '<td width="50%"></td>'}</tr>`);
+  return `<tr><td style="padding:18px 28px 4px">
+  <div style="font-size:16px;font-weight:700;color:${c.brand}">Pay by e-wallet or bank transfer</div>
+  <p style="font-size:14px;line-height:1.5;margin:6px 0 10px;color:${c.ink}">Scan a QR code or send to one of our accounts${rrDue(o) ? `. Amount: <b>${e(peso2(rrDue(o)))}</b>` : ""}.</p>
+  ${rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join("")}</table>` : ""}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;background:${c.bg};border-radius:10px">${ms.map(m => `<tr><td style="padding:7px 14px;font-size:13px;color:${c.muted};width:70px"><b style="color:${c.ink}">${e(m.title)}</b></td><td style="padding:7px 14px 7px 0;font-size:13px;color:${c.ink}">${e(m.name)} · <b style="color:${c.brand};white-space:nowrap">${e(m.num)}</b></td></tr>`).join("")}</table>
+  <div style="margin-top:14px;padding:12px 14px;border:1.5px solid ${c.gold};border-radius:10px;font-size:14px;line-height:1.5;color:${c.ink}"><b>After paying, reply to this email with a screenshot of your payment receipt.</b> Our team will check it and confirm your payment.</div>
+</td></tr>`;
+}
+// Owner device: copy the QR cards into our photo storage once, so emails can show them (email apps block embedded images).
+let payQrBusy = false;
+async function payQrUpload() {
+  const doc = S.webmeta.find(d => d.id === "_paymethods");
+  if (payQrBusy || !doc || !S.photos || S.readOnly || S.viewAs || !canAll() || !(doc.methods || []).some(m => m.img && !m.url)) return;
+  payQrBusy = true;
+  try { const methods = []; for (const m of doc.methods) { if (m.url || !m.img) { methods.push(m); continue; } const r = await S.photos.save({ data: m.img }).catch(() => null); methods.push(r && r.ok && r.url ? { ...m, url: r.url } : m); }
+    UNDO.at = 0; await save("webmeta", "_paymethods", { ...clean(doc), methods, at: Date.now() }); }
+  catch (e) { console.warn("pay QR upload", e); } finally { payQrBusy = false; }
+}
+// Maya Checkout link for an RS OS order (amount due), saved as the order's pay link; then the receipt is emailed.
+async function mayaLink(o, quiet) {
+  if (!S.site || !S.site.maya) { if (!quiet) toast("Maya links work in the RS App."); return false; }
+  const amount = rrDue(o); if (!(amount > 0)) { if (!quiet) toast("Nothing to pay on this order."); return false; }
+  const r = await S.site.maya({ ref: o.num, amount, name: o.customer || "", email: o.email || "", phone: o.phone || "", items: (o.items || []).map(i => ({ name: i.name, qty: i.qty, price: i.price })) }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok || !PAYLINK_RE.test(r.url || "")) { toast(`Maya link not made: ${(r && r.error) || "no answer"}.`); return false; }
+  const cur = S.orders.find(x => x.id === o.id) || o;
+  await patch("orders", o.id, { payLink: r.url, payVia: "maya", mop: "Maya", mayaId: r.id || "", log: logAdd(cur, [`made a Maya Checkout link (${peso2(amount)})`]) });
+  const nw = S.orders.find(x => x.id === o.id); if (nw && nw.email) await receiptSend(nw, true); else toast("Maya link ready. Copy it for the buyer.");
+  return true;
+}
+// After Create order: Maya makes the link then emails; BDO emails now and opens the BDO steps; QR / not chosen emails the receipt.
+async function payViaStart(o) {
+  if (o.payVia === "maya") { if (!(await mayaLink(o, true)) && o.email) receiptSend(o, true); return; }
+  if (o.email) receiptSend(o, true);
+  if (o.payVia === "bdo") setTimeout(() => openReceipt(o.id), 400);
+}
+function rrViaPanel(o) {
+  const v = o.payVia || "", pay = rrPayable(o);
+  const seg = `<div class="seg" role="group" aria-label="How the buyer pays">${PAYVIA.map(([k, l]) => `<button type="button" data-act="rr-via" data-id="${o.id}" data-v="${k}" aria-pressed="${v === k}">${l}</button>`).join("")}</div>`;
+  if (!pay) return "";
+  let body = "";
+  if (v === "maya") body = o.payLink ? `<div style="font-size:13px;word-break:break-all">Maya link: <a href="${esc(o.payLink)}" target="_blank" rel="noopener">${esc(o.payLink)}</a></div><div class="bdo-act"><button class="btn sm" type="button" data-copy="${esc(o.payLink)}">Copy link</button><button class="btn sm ghost" type="button" data-act="rr-maya" data-id="${o.id}">Make a new link</button></div>`
+    : `<div style="font-size:13px">Makes a Maya Checkout link for <b>${peso2(rrDue(o))}</b> (cards and Maya wallet) and emails the receipt with a Pay now button.</div><div class="bdo-act"><button class="btn sm primary" type="button" data-act="rr-maya" data-id="${o.id}">Create Maya link${o.email ? " & email" : ""}</button></div>`;
+  else if (v === "bdo") { const due = rrDue(o), out = due < BDO_MIN || due > BDO_MAX, desc = (`Regal Spritz PH · Order #${o.num} · ` + (o.items || []).map(i => (Number(i.qty) > 1 ? i.qty + "× " : "") + i.name).join(", ")).slice(0, 120);
+    const f = [["Customer Name", o.customer || ""], ["Mobile", o.phone || ""], ["Email", o.email || ""], ["Amount", due.toFixed(2)], ["Description", desc], ["Link Expiry", "1 day"]];
+    body = `${out ? `<div class="notice" style="font-size:13px;border-color:var(--bad)">BDO Checkout only takes ₱3,000 to ₱10,000 per payment (this is ${peso(due)}). Pick Maya or QR instead.</div>` : ""}
+    <div class="bdo-f">${f.map(([k, x]) => `<div><span>${k}</span><b>${esc(x || "–")}</b>${x && k !== "Link Expiry" ? `<button type="button" class="btn ghost sm" data-copy="${esc(x)}">Copy</button>` : ""}</div>`).join("")}</div>
+    <div class="bdo-act"><a class="btn sm primary" href="https://checkout.bdo.com.ph/MailPaymentDetails.asp" target="_blank" rel="noopener">Create BDO link</a><button type="button" class="btn sm" data-copy="${esc(f.map(([k, x]) => k + ": " + x).join("\n"))}">Copy all</button></div>
+    <div class="bdo-paste"><input id="rr-bdo" type="url" placeholder="Paste the BDO link here (https://…bdo.com.ph/…)" value="${esc(/bdo\.com\.ph/i.test(o.payLink || "") ? o.payLink : "")}" autocomplete="off"><button type="button" class="btn sm primary" data-act="rr-bdo-save" data-id="${o.id}">Save${o.email ? " & email" : ""}</button></div>`; }
+  else if (v === "manual") body = `<div style="font-size:13px">The receipt shows our QR codes and accounts (${payMethods().map(m => esc(m.title)).join(", ") || "none saved yet"}). The buyer replies with a screenshot; check it in the bank / GCash app, then set Payment Status → <b>Fully paid</b>.</div>`;
+  else body = `<div style="font-size:13px;color:var(--muted)">Pick how the buyer pays. The receipt changes to match.</div>`;
+  return `<div class="panel bdo-box"><div class="bdo-h"><b>How the buyer pays</b></div>${seg}${body}</div>`;
+}
+const payBtns = o => o.payLink && rrPayable(o) && o.payVia !== "manual" ? `<a class="btn sm" href="${esc(o.payLink)}" target="_blank" rel="noopener">💳 Pay link</a><button class="btn sm" type="button" data-copy="${esc(o.payLink)}">Copy pay link</button>` : "";
 const RR = { brand: "#3d1a6e", gold: "#b8913a", ink: "#2a2230", muted: "#7a6f80", line: "#e8e1ec", bg: "#faf7fb" };
 const rrDue = o => o.payment === "paid" || VOIDPAY.has(o.payment) ? 0 : total(o);
 const rrState = o => o.payment === "paid" ? "PAID" : o.payment === "partial" ? "PARTIALLY PAID" : VOIDPAY.has(o.payment) ? pay(o.payment).name.toUpperCase() : "UNPAID";
 const rrPayable = o => !["paid", "refunded", "voided", "to_refund"].includes(o.payment) && !o.archived;
 const rrDate = o => new Date(o.createdAt || Date.now()).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" });
-function receiptHTML(o) {
-  const e = esc, sh = shipOf(o), c = RR, link = rrPayable(o) && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
+function receiptHTML(o, forEmail) {
+  const e = esc, sh = shipOf(o), c = RR, manual = rrPayable(o) && o.payVia === "manual", link = rrPayable(o) && !manual && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
   const addr = addrLine(sh);
   const row = (l, v, b) => `<tr><td style="padding:4px 0;color:${b ? c.ink : c.muted};font-size:14px;${b ? "font-weight:700" : ""}">${l}</td><td align="right" style="padding:4px 0;color:${c.ink};font-size:14px;${b ? "font-weight:700" : ""}">${v}</td></tr>`;
   const st = rrState(o), stCol = st === "PAID" ? "#2e7d4f" : st === "UNPAID" ? "#b4541a" : c.brand;
@@ -4658,16 +4725,17 @@ function receiptHTML(o) {
   </table>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid ${c.ink};margin-top:4px;padding-top:6px">
     ${row("Subtotal", e(peso2(itemsTotal(o))))}
-    ${Number(o.adjust) ? row("Shipping fee & other charges", e(peso2(o.adjust))) : ""}
+    ${Number(o.shipFee) ? row("Shipping fee", e(peso2(o.shipFee))) : ""}
+    ${Number(o.adjust) ? row(Number(o.shipFee) ? "Other charges" : "Shipping fee & other charges", e(peso2(o.adjust))) : ""}
     ${Number(o.discount) ? row("Discount" + (o.discountNote ? " · " + e(o.discountNote) : ""), "−" + e(peso2(o.discount))) : ""}
     ${row("Total", e(peso2(total(o))), true)}
     ${o.payment === "paid" ? row("Amount due", e(peso2(0)), true) : o.payment === "partial" ? "" : rrPayable(o) ? row("Amount due", e(peso2(rrDue(o))), true) : ""}
   </table>
 </td></tr>
 ${link ? `<tr><td align="center" style="padding:18px 28px 6px">
-  <a href="${e(link)}" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 34px;border-radius:10px;border-bottom:3px solid ${c.gold}">Pay now${o.payment === "partial" ? "" : " · " + e(peso2(rrDue(o)))}</a>
+  <a href="${e(link)}" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 34px;border-radius:10px;border-bottom:3px solid ${c.gold}">${o.payVia === "bdo" ? "Pay with BDO" : o.payVia === "maya" ? "Pay now · card / Maya" : "Pay now"}${o.payment === "partial" ? "" : " · " + e(peso2(rrDue(o)))}</a>
   <div style="font-size:12px;color:${c.muted};margin-top:8px">Secure payment link. If the button doesn't work, open: <a href="${e(link)}" style="color:${c.brand};word-break:break-all">${e(link)}</a></div>
-</td></tr>` : rrPayable(o) ? `<tr><td style="padding:14px 28px 0;font-size:13px;color:${c.muted}">Our team will send your payment link shortly.</td></tr>` : ""}
+</td></tr>` : manual ? rrManualHTML(o, forEmail) : rrPayable(o) ? `<tr><td style="padding:14px 28px 0;font-size:13px;color:${c.muted}">Our team will send your payment link shortly.</td></tr>` : ""}
 <tr><td style="padding:18px 28px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg};border-radius:10px"><tr>
     <td valign="top" style="padding:14px 16px;font-size:13px;line-height:1.5;width:50%"><div style="font-size:11px;letter-spacing:1.5px;color:${c.muted};font-weight:700">BILLED TO</div>${e(o.customer || "")}${o.email ? "<br>" + e(o.email) : ""}${o.phone ? "<br>" + e(o.phone) : ""}</td>
@@ -4678,17 +4746,18 @@ ${link ? `<tr><td align="center" style="padding:18px 28px 6px">
 </table></td></tr></table></body></html>`;
 }
 function receiptText(o) {
-  const sh = shipOf(o), link = rrPayable(o) && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
+  const sh = shipOf(o), manual = rrPayable(o) && o.payVia === "manual", link = rrPayable(o) && !manual && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
   const addr = addrLine(sh);
   return [`👑 REGAL SPRITZ PH · ROYAL RECEIPT`, `Order ${onum(o)} · ${rrDate(o)} · ${rrState(o)}`, "",
     `Hi ${(o.customer || "").split(" ")[0] || "there"}, thank you for your order!`, "",
     ...(o.items || []).map(i => `• ${i.qty}× ${i.name} · ${peso2((Number(i.qty) || 0) * (Number(i.price) || 0))}`), "",
     `Subtotal: ${peso2(itemsTotal(o))}`,
-    ...(Number(o.adjust) ? [`Shipping & other charges: ${peso2(o.adjust)}`] : []),
+    ...(Number(o.shipFee) ? [`Shipping fee: ${peso2(o.shipFee)}`] : []),
+    ...(Number(o.adjust) ? [`${Number(o.shipFee) ? "Other charges" : "Shipping & other charges"}: ${peso2(o.adjust)}`] : []),
     ...(Number(o.discount) ? [`Discount: −${peso2(o.discount)}`] : []),
     `TOTAL: ${peso2(total(o))}`,
     ...(rrPayable(o) && o.payment !== "partial" ? [`Amount due: ${peso2(rrDue(o))}`] : []),
-    ...(link ? ["", `💳 Pay here: ${link}`] : rrPayable(o) ? ["", "We'll send your payment link shortly."] : []),
+    ...(link ? ["", `💳 Pay here: ${link}`] : manual ? ["", "💳 Pay by e-wallet or bank transfer:", ...payMethods().map(m => `• ${m.title} · ${m.name} · ${m.num}`), "After paying, reply with a screenshot of your payment receipt. Our team will check it and confirm your payment."] : rrPayable(o) ? ["", "We'll send your payment link shortly."] : []),
     "", `Ship to: ${addr ? `${sh.name || o.customer || ""}, ${addr}` : "to follow"}`,
     "", "Thank you! · regalspritz.com"].join("\n");
 }
@@ -4697,7 +4766,7 @@ const receiptSubject = o => `Your Royal Receipt · Regal Spritz PH order ${onum(
 async function receiptSend(o, quiet) {
   if (!o.email) { if (!quiet) toast("Add the customer's email first (Edit contact & shipping)."); return false; }
   if (!S.site || !S.site.email) { if (!quiet) toast("Emailing works in the RS App. Copy the receipt here instead."); return false; }
-  const r = await S.site.email({ to: o.email, subject: receiptSubject(o), html: receiptHTML(o), text: receiptText(o) }).catch(e => ({ ok: false, error: e && e.message }));
+  const r = await S.site.email({ to: o.email, subject: receiptSubject(o), html: receiptHTML(o, true), text: receiptText(o) }).catch(e => ({ ok: false, error: e && e.message }));
   if (!r || !r.ok) { toast(`Royal Receipt not sent: ${(r && r.error) || "the website didn't answer"}. Copy it from the order instead.`); return false; }
   const cur = S.orders.find(x => x.id === o.id) || o;
   await patch("orders", o.id, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
@@ -4775,7 +4844,8 @@ function openReceipt(id) {
       <button class="btn sm" type="button" data-act="rr-copyhtml" data-id="${o.id}">Copy formatted (for email)</button>
       ${S.canEdit || canAll() ? `<button class="btn ghost sm" type="button" data-act="edit-contact" data-id="${o.id}">Edit contact & pay link</button>` : ""}
     </div>
-    ${rrPayable(o) && !o.payLink ? `<div class="notice" style="font-size:13px">No payment link yet, so the receipt says "we'll send your payment link". Add the Maya or BDO link in <b>Edit contact & pay link</b> and the updated receipt is emailed automatically.</div>` : ""}
+    ${rrViaPanel(o)}
+    ${rrPayable(o) && !o.payLink && !o.payVia ? `<div class="notice" style="font-size:13px">No payment link yet, so the receipt says "we'll send your payment link". Add the Maya or BDO link in <b>Edit contact & pay link</b> and the updated receipt is emailed automatically.</div>` : ""}
     <iframe class="rr-frame" title="Royal Receipt preview" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="${esc(receiptHTML(o))}"></iframe>
     <details><summary style="cursor:pointer;font-weight:600;font-size:13px">Text version</summary><pre class="rr-text">${esc(receiptText(o))}</pre></details>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null);
@@ -4791,8 +4861,8 @@ function openOrderDetails(id) {
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
     <div class="sheet-title"><h3>${esc(onum(o))}</h3></div>
-    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button><button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
-    ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${arch ? "" : `<button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>`}${cp ? `<button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button>` : ""}</div>` : ""}
+    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}<button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm danger" type="button" data-act="archive-order" data-id="${o.id}">🗑 Delete</button></div>` : ""}
+    ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${arch ? "" : `<button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}`}${cp ? `<button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button>` : ""}</div>` : ""}
     ${(() => { const ts = S.tasks.filter(t => t.orderId === o.id).sort((a, b) => (a.due || "").localeCompare(b.due || "")); return ts.length ? `<div class="oactions" style="font-size:13px">📅 On the calendar: ${ts.map(t => `<button type="button" class="chip" data-task="${t.id}">${t.due ? fmtDate(t.due) : "No date"} · ${esc(t.title.slice(0, 40))} · ${esc(tstat(t.status).name)}</button>`).join("")}</div>` : ""; })()}
     ${isDispute(o) ? `<div class="notice" style="border-color:var(--bad);color:var(--bad)">⚠️ <b>Dispute.</b> Check that this is resolved before dispatch. Remove the DISPUTE tag once it is.</div>` : ""}
     <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
@@ -4802,7 +4872,8 @@ function openOrderDetails(id) {
     ${multi && (o.items || []).some(i => !i.from) && all ? `<button class="btn sm" type="button" data-act="trace-items" data-id="${o.id}" style="align-self:flex-start">Find which order # each item came from (Shopify)</button>` : ""}
     ${o.note || (o.comments || []).length ? `<div class="notebox">${o.note ? `<div><div class="olog-h">Order note</div><div style="white-space:pre-wrap">${esc(o.note)}</div></div>` : ""}${(o.comments || []).map(c => `<div><div class="olog-h">Shopify comment · ${relTime(c.at)}</div><div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join("")}</div>` : ""}
     <div class="list costs">
-      ${o.adjust ? `<div class="li"><span>Shipping fee & other charges</span><span class="num">${peso2(o.adjust)}</span></div>` : ""}
+      ${o.shipFee ? `<div class="li"><span>Shipping fee</span><span class="num">${peso2(o.shipFee)}</span></div>` : ""}
+      ${o.adjust ? `<div class="li"><span>${o.shipFee ? "Other charges" : "Shipping fee & other charges"}</span><span class="num">${peso2(o.adjust)}</span></div>` : ""}
       ${o.discount ? `<div class="li"><span>Discount${o.discountNote ? " · " + esc(o.discountNote) : ""}</span><span class="num">−${peso2(o.discount)}</span></div>` : ""}
       <div class="li"><span style="font-weight:700">Total</span><span class="num" style="font-weight:700">${peso2(total(o))}</span></div>
       <div class="li"><span>Platform fees</span><span class="num">−${peso2(o.fees)}</span></div>
@@ -4847,7 +4918,7 @@ function eiTotal() {
   const items = eiRead(), sub = items.reduce((a, i) => a + i.qty * i.price, 0);
   const pct = $("#ei-dtype") && $("#ei-dtype").value === "pct", dv = numv("ei-disc");
   const disc = pct ? Math.round(sub * dv) / 100 : dv;
-  const el = $("#ei-total"); if (el) el.textContent = peso2(sub + numv("ei-adj") - disc);
+  const el = $("#ei-total"); if (el) el.textContent = peso2(sub + numv("ei-sf") + numv("ei-adj") - disc);
   const ds = $("#ei-dshow"); if (ds) ds.textContent = disc ? "−" + peso2(disc) : "";
 }
 function openItemsEdit(id) {
@@ -4859,7 +4930,8 @@ function openItemsEdit(id) {
     <div class="field"><label>Items <span style="font-weight:400;color:var(--muted)">(name · qty · unit price)</span></label><div id="ei-items" style="display:flex;flex-direction:column;gap:6px">${(o.items || []).map(editItemRow).join("") || editItemRow()}</div>
       <button class="btn sm" type="button" data-act="ei-add" style="align-self:flex-start;margin-top:4px">+ Add item</button></div>
     <div class="row">
-      <div class="field"><label for="ei-adj">Shipping fee & other charges (₱)</label><input inputmode="decimal" class="money" id="ei-adj" value="${moneyFmt(Number(o.adjust) || "")}" placeholder="0"></div>
+      <div class="field"><label for="ei-sf">Shipping fee (₱)</label><input inputmode="decimal" class="money" id="ei-sf" value="${moneyFmt(Number(o.shipFee) || "")}" placeholder="0"></div>
+      <div class="field"><label for="ei-adj">${o.shipFee ? "Other charges" : "Shipping & other charges"} (₱)</label><input inputmode="decimal" class="money" id="ei-adj" value="${moneyFmt(Number(o.adjust) || "")}" placeholder="0"></div>
       <div class="field"><label for="ei-disc">Discount</label><div style="display:flex;gap:6px"><input inputmode="decimal" class="money" id="ei-disc" value="${moneyFmt(Number(o.discount) || "")}" placeholder="0" style="flex:1;min-width:0"><select id="ei-dtype" aria-label="Discount type" style="width:auto"><option value="amt">₱</option><option value="pct">%</option></select></div><span id="ei-dshow" style="font-size:12px;color:var(--muted)"></span></div>
     </div>
     <div class="field"><label for="ei-dnote">Discount reason (optional)</label><input id="ei-dnote" value="${esc(o.discountNote || "")}" placeholder="e.g. loyal buyer, promo code"></div>
@@ -4876,8 +4948,8 @@ function openItemsEdit(id) {
       items.forEach(i => { if (i.productId) by[i.productId] = (by[i.productId] || 0) - i.qty; });
       for (const [pid, d] of Object.entries(by)) if (d) await adjustStock(pid, d);
     }
-    await patch("orders", o.id, { items, adjust: numv("ei-adj"), discount, discountNote: val("ei-dnote"), editedItemsAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(o, [`edited items/prices (total ${peso2(total(o))} → ${peso2(sub + numv("ei-adj") - discount)})`]) });
-    closeSheet(); toast(`#${o.num} updated · total ${peso2(sub + numv("ei-adj") - discount)}`);
+    await patch("orders", o.id, { items, shipFee: numv("ei-sf"), adjust: numv("ei-adj"), discount, discountNote: val("ei-dnote"), editedItemsAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(o, [`edited items/prices (total ${peso2(total(o))} → ${peso2(sub + numv("ei-sf") + numv("ei-adj") - discount)})`]) });
+    closeSheet(); toast(`#${o.num} updated · total ${peso2(sub + numv("ei-sf") + numv("ei-adj") - discount)}`);
   });
   eiTotal();
 }
@@ -7086,8 +7158,17 @@ document.addEventListener("click", guard(async ev => {
     case "edit-contact": return openContactEdit(b.dataset.id);
     case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
+    case "rr-via": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const v = b.dataset.v;
+      await patch("orders", o.id, { payVia: v, ...(v === "maya" ? { mop: "Maya" } : v === "bdo" ? { mop: "BDO" } : {}), log: logAdd(o, [`set how the buyer pays → ${(PAYVIA.find(x => x[0] === v) || [, v])[1]}`]) });
+      openReceipt(o.id); return; }
+    case "rr-maya": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Making link…"; await mayaLink(o); openReceipt(o.id); return; }
+    case "rr-bdo-save": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const l = ($("#rr-bdo") || {}).value ? $("#rr-bdo").value.trim() : "";
+      if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\/\S*$/i.test(l)) { toast("Paste the BDO link (https://…bdo.com.ph/…)."); return; }
+      b.disabled = true; await patch("orders", o.id, { payLink: l, payVia: "bdo", mop: "BDO", log: logAdd(o, ["added the BDO payment link"]) });
+      const nw = S.orders.find(x => x.id === o.id); if (nw && nw.email) await receiptSend(nw, true); else toast("BDO link saved. Copy it for the buyer.");
+      openReceipt(o.id); return; }
     case "rr-send": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Sending…"; await receiptSend(o); if ($("#sheet") && S.sheetReopen) openReceipt(o.id); return; }
-    case "rr-copy": case "rr-copyhtml": { const o = S.orders.find(x => x.id === b.dataset.id) || S.archived.find(x => x.id === b.dataset.id); if (!o) return; const ok = b.dataset.act === "rr-copy" ? await navigator.clipboard.writeText(receiptText(o)).then(() => true, () => false) : await copyRich(receiptHTML(o), receiptText(o)); const was = b.textContent; b.textContent = ok ? "Copied ✓" : "Couldn't copy"; setTimeout(() => { b.textContent = was; }, 1400); return; }
+    case "rr-copy": case "rr-copyhtml": { const o = S.orders.find(x => x.id === b.dataset.id) || S.archived.find(x => x.id === b.dataset.id); if (!o) return; const ok = b.dataset.act === "rr-copy" ? await navigator.clipboard.writeText(receiptText(o)).then(() => true, () => false) : await copyRich(receiptHTML(o, true), receiptText(o)); const was = b.textContent; b.textContent = ok ? "Copied ✓" : "Couldn't copy"; setTimeout(() => { b.textContent = was; }, 1400); return; }
     case "lock-dept": S.unlocked.delete(S.dept); saveUnlocked(); render(); toast(`${dept(S.dept).name} locked.`); return;
     case "new-review": return openReviewForm();
     case "edit-review": return openReviewForm(id);
@@ -7413,8 +7494,8 @@ document.addEventListener("change", guard(async ev => {
 
 document.addEventListener("input", ev => {
   const t = ev.target;
-  if (t.matches(".it-q, .it-price, #o-disc")) return updateOrderTotal();
-  if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-disc")) return eiTotal();
+  if (t.matches(".it-q, .it-price, #o-disc, #o-sf")) return updateOrderTotal();
+  if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-sf, #ei-disc")) return eiTotal();
   if (t.id === "p-frag-text") { if (t.value.trim()) fragFill(fragFromText(t.value), true); return; }
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
   if (t.classList.contains("gs-in")) return globalSearch(t);
@@ -7799,7 +7880,7 @@ async function startShopSync(c) {
   dpFixOnce().catch(e => console.warn("dp fix", e));
   reconcileStages();
   shopHistoryBackfill(c);
-  if (c?.use) Promise.resolve().then(() => c.use("photos")).then(ph => { if (!ph || !ph.save) return; S.photos = ph; const go = () => { if (S.loaded.products) photoCopyRun(); else setTimeout(go, 2000); }; setTimeout(go, 8000); setInterval(photoCopyRun, 30 * 60e3); }).catch(() => {});
+  if (c?.use) Promise.resolve().then(() => c.use("photos")).then(ph => { if (!ph || !ph.save) return; S.photos = ph; const go = () => { if (S.loaded.products) photoCopyRun(); else setTimeout(go, 2000); if (S.loaded.webmeta) payQrUpload(); }; setTimeout(go, 8000); setInterval(() => { photoCopyRun(); payQrUpload(); }, 30 * 60e3); }).catch(() => {});
   if (!SHOPIFY_ON) return;
   S.mcp = c?.use ? await c.use("mcp").catch(() => null) : null;
   if (!S.mcp) { paintShop(); return; }

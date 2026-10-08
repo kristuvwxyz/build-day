@@ -75,6 +75,30 @@ export default async function handler(req, res) {
     if (!subject || !html || html.length > 150000) return res.status(400).json({ ok: false, error: "The receipt is empty or too big." });
     const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
     call = { action: "opsEmail", key: KEY, to, subject, html, text, by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
+  } else if (body.action === "maya") {
+    // Maya Checkout (cards / Maya wallet) link for an RS OS order. With MAYA_PUBLIC_KEY in Vercel the link is made here;
+    // otherwise the website backend makes it with its own Maya key (opsMayaCheckout, see docs/handoffs/rs-os-maya-link.md).
+    const ref = String(body.ref || "").trim().replace(/^#/, ""), amount = Math.round(Number(body.amount) * 100) / 100;
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(ref)) return res.status(400).json({ ok: false, error: "Missing order number." });
+    if (!(amount >= 1 && amount <= 500000)) return res.status(400).json({ ok: false, error: "The amount must be ₱1 to ₱500,000." });
+    const s = v => String(v || "").replace(/[\r\n<>]+/g, " ").trim();
+    const name = s(body.name).slice(0, 80), email = s(body.email).slice(0, 120), phone = s(body.phone).slice(0, 20);
+    const items = (Array.isArray(body.items) ? body.items : []).slice(0, 50).map(i => ({ name: s(i && i.name).slice(0, 120) || "Item", quantity: Math.max(1, Math.round(Number(i && i.qty) || 1)), totalAmount: { value: Math.round((Number(i && i.qty) || 1) * (Number(i && i.price) || 0) * 100) / 100 } }));
+    const back = "https://www.regalspritz.com/account";
+    if (process.env.MAYA_PUBLIC_KEY) {
+      const [first, ...rest] = name.split(" ");
+      const mb = { totalAmount: { value: amount, currency: "PHP" }, requestReferenceNumber: ref,
+        buyer: { firstName: first || "Customer", lastName: rest.join(" ") || "-", contact: { ...(email ? { email } : {}), ...(phone ? { phone } : {}) } },
+        items: items.length ? items : [{ name: "Order " + ref, quantity: 1, totalAmount: { value: amount } }],
+        redirectUrl: { success: back + "?paid=" + ref, failure: back, cancel: back } };
+      try {
+        const r = await fetch((process.env.MAYA_BASE_URL || "https://pg.maya.ph") + "/checkout/v1/checkouts", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Basic " + Buffer.from(process.env.MAYA_PUBLIC_KEY + ":").toString("base64") }, body: JSON.stringify(mb) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.redirectUrl) return res.status(502).json({ ok: false, error: "Maya didn't make the link: " + String(j.message || j.error || r.status).slice(0, 160) });
+        return res.status(200).json({ ok: true, url: j.redirectUrl, id: j.checkoutId || "" });
+      } catch (e) { return res.status(502).json({ ok: false, error: "Couldn't reach Maya." }); }
+    }
+    call = { action: "opsMayaCheckout", key: KEY, ref, amount, name, email, phone, items: items.map(i => ({ name: i.name, qty: i.quantity, total: i.totalAmount.value })) };
   } else return res.status(400).json({ ok: false, error: "That request isn't allowed." });
 
   // 3. Ask the website backend (Apps Script answers with a redirect, which fetch follows).
@@ -86,6 +110,7 @@ export default async function handler(req, res) {
     if (j && call.action === "opsOrders") j.backendMs = Date.now() - t0;
     if (!j) return res.status(502).json({ ok: false, error: "The website backend didn't answer (" + r.status + ")." });
     if (!j.ok && call.action === "opsSetProducts" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website can't receive listings yet. Update the website backend to v15 (see the setup guide)." });
+    if (!j.ok && call.action === "opsMayaCheckout" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "Maya links aren't set up yet (add MAYA_PUBLIC_KEY in Vercel)." });
     if (!j.ok && call.action === "opsEmail" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "the website backend can't send emails yet (needs the opsEmail update)" });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });
     // Keep the shared counter above every website order number seen (covers numbers the website made on its own).
