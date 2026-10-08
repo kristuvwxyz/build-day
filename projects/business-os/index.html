@@ -2246,6 +2246,7 @@ const isOverdue = t => t.due && t.due < today() && (t.status === "todo" || t.sta
 // A person's open tasks that are due today or overdue (for the Tasks badge and the person picker).
 // Department "all" = a task for everyone: it shows on every Tasks list and calendar.
 const isAllTask = t => t.department === "all";
+const myTaskName = () => (member(myMemberId()) || {}).name || (S.me && S.me.name) || "";
 const taskDeptName = id => id === "all" ? "Everyone" : (dept(id) || { name: "–" }).name;
 const dueTasksOf = mid => !mid ? [] : S.tasks.filter(t => (t.assigneeId === mid || isAllTask(t)) && t.due && t.due <= today() && (t.status === "todo" || t.status === "in_progress"));
 function myTaskBadge() {
@@ -2311,7 +2312,7 @@ function taskRow(t) {
   const ed = !S.readOnly, pr = t.status === "done" ? 100 : Number(t.progress) || 0;
   return `<tr data-task="${t.id}" style="cursor:pointer">
     <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}${t.orderId && findOrder(t.orderId) ? ` <button type="button" class="chip" data-open="${t.orderId}">📦 #${esc(findOrder(t.orderId).num)}</button>` : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
-    <td class="nowrap">${esc(memberName(t.assigneeId))}</td>
+    <td class="nowrap">${isAllTask(t) && !t.assigneeId ? `<span style="color:var(--muted)">By</span> ${esc(t.createdByName || memberName(t.createdById) || "–")}` : esc(memberName(t.assigneeId))}</td>
     <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc(taskDeptName(t.department))}</span>` : "–"}</td>
     <td class="nowrap">${ed ? `<input type="date" class="tq-date" data-tq="due" data-id="${t.id}" value="${esc(t.due || "")}" aria-label="Due date">` : t.due ? fmtDate(t.due) : "No date"} ${taskUrg(t) ? urgChip(taskUrg(t)) : ""}</td>
     <td style="min-width:120px"><div style="display:flex;gap:8px;align-items:center">${pbar(pr)}${ed ? `<select class="status" data-tq="progress" data-id="${t.id}" aria-label="Progress">${[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(n => `<option value="${n}" ${n === Math.round(pr / 10) * 10 ? "selected" : ""}>${n}%</option>`).join("")}</select>` : `<span class="num" style="font-size:12px;color:var(--muted)">${pr}%</span>`}</div></td>
@@ -2427,7 +2428,8 @@ function openTaskForm(id, date, forceDept, preset = {}) {
     <div class="field"><label for="k-notes">Details</label><textarea id="k-notes" rows="3" ${ro ? "disabled" : ""}>${esc(t.notes || "")}</textarea></div>
     <div class="row">
       <div class="field"><label for="k-dept">Department</label><select id="k-dept" ${ro ? "disabled" : ""}><option value="">None</option><option value="all" ${isAllTask(t) ? "selected" : ""}>All (everyone)</option>${DEPTS.filter(d => taskDepts().includes(d.id) || d.id === t.department).map(d => `<option value="${d.id}" ${t.department === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select></div>
-      <div class="field"><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.filter(m => (m.status !== "inactive" && (fullTaskView() || taskDepts().includes(m.department) || m.id === myMemberId())) || m.id === t.assigneeId).map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
+      <div class="field" id="k-by-f" ${isAllTask(t) ? "" : "hidden"}><label for="k-by">Created by</label><input id="k-by" value="${esc(id ? t.createdByName || memberName(t.createdById) || "–" : myTaskName())}" disabled></div>
+      <div class="field" id="k-who-f" ${isAllTask(t) ? "hidden" : ""}><label for="k-who">Assigned to</label><select id="k-who" ${ro ? "disabled" : ""}><option value="">Unassigned</option>${S.team.filter(m => (m.status !== "inactive" && (fullTaskView() || taskDepts().includes(m.department) || m.id === myMemberId())) || m.id === t.assigneeId).map(m => `<option value="${m.id}" ${t.assigneeId === m.id ? "selected" : ""}>${esc(m.name)}${m.department ? " · " + esc((dept(m.department) || {}).name || "") : ""}</option>`).join("")}</select></div>
     </div>
     <div class="row">
       <div class="field"><label for="k-order">Linked order <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input id="k-order" list="k-orders" value="${lo ? esc("#" + lo.num) : ""}" placeholder="Type order # or customer" autocomplete="off" ${ro ? "disabled" : ""}>
@@ -2458,8 +2460,8 @@ function openTaskForm(id, date, forceDept, preset = {}) {
     if (oq && !ord) return sheetError(`Order #${oq} wasn't found. Pick one from the list or leave it blank.`);
     const prod = iq ? S.products.find(p => (p.name || "").toLowerCase() === iq) : null;
     if (iq && !prod) return sheetError("That item isn't in the inventory. Pick one from the list or leave it blank.");
-    const data = { ...(id ? clean(t) : {}), orderId: ord ? ord.id : "", productId: prod ? prod.id : "", title: val("k-title"), notes: val("k-notes"), department: val("k-dept"), assigneeId: val("k-who"), start: start && start !== due ? start : "", due, status, progress, priority: val("k-pri"), updatedAt: Date.now() };
-    if (!id) { data.createdAt = Date.now(); data.createdByName = (member(myMemberId()) || {}).name || (S.me && S.me.name) || ""; }
+    const data = { ...(id ? clean(t) : {}), orderId: ord ? ord.id : "", productId: prod ? prod.id : "", title: val("k-title"), notes: val("k-notes"), department: val("k-dept"), assigneeId: val("k-dept") === "all" ? "" : val("k-who"), start: start && start !== due ? start : "", due, status, progress, priority: val("k-pri"), updatedAt: Date.now() };
+    if (!id) { data.createdAt = Date.now(); data.createdById = myMemberId(); data.createdByName = myTaskName(); }
     await save("tasks", id || uid("t"), data);
     if (due) { S.t.day = due; S.t.month = due.slice(0, 7); }
     closeSheet(); toast(id ? "Task updated." : "Task added.");
@@ -6952,6 +6954,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "rv-stars" || t.id === "rv-status" || t.id === "rv-sort" || t.id === "rv-source") { S.rv[t.id.slice(3)] = t.value; render(); return; }
   if (t.dataset.eomrate) return eomRate(t.dataset.eomrate, Number(t.value));
   if (t.matches(".ws-num")) return setWorkStyle({ [t.dataset.k]: Math.max(1, Math.round(Number(t.value) || 1)) });
+  if (t.id === "k-dept") { const all = t.value === "all", a = $("#k-who-f"), c = $("#k-by-f"); if (a) a.hidden = all; if (c) c.hidden = !all; }
   if (t.id === "k-who" && t.value) { const m = member(t.value), d = $("#k-dept"); if (m && m.department && d && d.value !== "all" && [...d.options].some(o => o.value === m.department)) d.value = m.department; return; }
   if (false && t.id === "my-member") { const data = { ...S.profile, memberId: t.value }; S.profile = data; if (S.db && S.uid) await wdb().doc("data/users/" + S.uid + "/profile").set(data); render(); toast(t.value ? `Linked to ${memberName(t.value)}.` : "Unlinked."); return; }
   if (t.id === "of-platform") { S.of.platform = t.value; S.page = 0; render(); }
