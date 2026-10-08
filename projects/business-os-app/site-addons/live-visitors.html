@@ -1,0 +1,21 @@
+<!--
+  Regal Spritz PH: counts live visitors for the RS OS dashboard (2026-10-08).
+  Each open tab gets a random id (kept only for this tab) and tells RS OS "still here" every 30 seconds
+  while the page is visible. No names, emails, IPs or cookies are stored.
+-->
+<script>
+(function () {
+  var URL = "https://regal-spritz-os.vercel.app/api/live", sid = "";
+  try { sid = sessionStorage.getItem("rs-live-sid") || ""; } catch (e) {}
+  if (!sid) { sid = (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)); try { sessionStorage.setItem("rs-live-sid", sid); } catch (e) {} }
+  var last = 0;
+  function ping() {
+    if (document.visibilityState !== "visible" || Date.now() - last < 20000) return;
+    last = Date.now();
+    try { fetch(URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ sid: sid, path: location.pathname }), keepalive: true, mode: "cors", credentials: "omit" }).catch(function () {}); } catch (e) {}
+  }
+  ping();
+  setInterval(ping, 30000);
+  document.addEventListener("visibilitychange", ping);
+})();
+</script>

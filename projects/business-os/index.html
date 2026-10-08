@@ -713,6 +713,9 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .osearch svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
 .osearch input { border: 0; background: none; font-size: 14px; padding: 8px 0; flex: 1; min-width: 0; outline: none; color: inherit; }
 .scanbar .scanrow input#pack-scan { font-size: 14px; padding: 8px 10px; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-right: 6px; vertical-align: 1px; animation: livep 1.6s ease-in-out infinite; }
+@keyframes livep { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 .bc-cell { display: inline-flex; align-items: center; gap: 4px; }
 .bigsearch { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 4px 14px; position: relative; }
 .bigsearch:focus-within { border-color: var(--fg); }
@@ -2470,6 +2473,15 @@ function openTaskForm(id, date, forceDept, preset = {}) {
 }
 
 /* ---------- home ---------- */
+// Live visitors on regalspritz.com (site add-on live-visitors.html → /api/live). RS App only; hidden when it can't be read.
+S.live = null;
+async function liveTick(force) {
+  if (!APP_BUILD || (!force && (document.hidden || S.view !== "home"))) return;
+  try { const j = await (await fetch("/api/live", { cache: "no-store" })).json(); if (typeof j.count !== "number") return;
+    const was = S.live; S.live = j.count; const el = $("#live-n"); if (el) el.textContent = j.count; else if (was == null && S.view === "home") bgRender(); } catch (e) {}
+}
+setTimeout(() => liveTick(true), 1500); setInterval(liveTick, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) liveTick(); });
 const QUOTES = [
   ["A woman who doesn't wear perfume has no future.", "Coco Chanel"],
   ["Perfume is the indispensable complement to the personality of women, the finishing touch on a dress.", "Christian Dior"],
@@ -2519,6 +2531,7 @@ function viewHome() {
     <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
     ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="tasks"><b class="num">${visTasks().filter(t => t.status === "in_progress").length}</b><span>In progress</span></button>`}
     ${web ? (() => { const wu = S.web.orders.filter(o => !o.paid && !/cancel/i.test(o.status || "")).length, ws = S.web.orders.filter(o => o.paid && !webDone(o)).length; return `<button type="button" data-goweb="unpaid"><b class="num">${wu}</b><span>Unpaid website</span></button><button type="button" data-goweb="toship"><b class="num">${ws}</b><span>Website to ship</span></button>`; })() : ""}
+    ${showOrders && S.live != null ? `<button type="button" data-act="live-now" title="People on regalspritz.com right now (updates every 30 seconds)"><b class="num" id="live-n">${S.live}</b><span><span class="live-dot"></span>Live on website</span></button>` : ""}
     <div class="att">${st ? `<b style="font-size:18px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
       : `<b style="font-size:18px">–</b><span>Attendance · not linked</span>`}</div>
   </section>
@@ -6861,6 +6874,7 @@ document.addEventListener("click", guard(async ev => {
     case "bdo-clear": return webUpdate(b.dataset.ref, { bdoLink: "" }, b);
     case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
       await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
+    case "live-now": liveTick(true); toast("Live visitors updated."); return;
     case "refresh": {
       // RS App: Refresh is a hard refresh (like Cmd/Ctrl+Shift+R): clear the saved app files and load the newest version, same page and scroll.
       if (APP_BUILD) { if (b.classList.contains("spin")) return; b.classList.add("spin"); saveNav(); try { sessionStorage.setItem("rs-refresh-y", String(Math.round(window.scrollY))); } catch (e) {}
