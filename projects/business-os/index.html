@@ -4894,7 +4894,7 @@ async function reviewInvites() {
 /* ---------- "New website" announcement to every past buyer (owner starts it once, after a preview + test) ----------
    Sends in batches while the owner's RS App is open, keeping 30 of Gmail's daily emails for order emails.
    Progress is webmeta/_announce: only short hashes of the emails sent, never the emails themselves. */
-const ANN_SUBJECT = "Regal Spritz PH has a new home: regalspritz.com ✨";
+const ANN_SUBJECT = "Regal Spritz PH has a new home ✨ + ₱100 off inside";
 const emailHash = e => { let h = 2166136261; for (const ch of String(e).toLowerCase()) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); };
 function annList() {
   const by = new Map();
@@ -4904,6 +4904,8 @@ function annList() {
   return [...by.values()].sort((a, b) => b.t - a.t);
 }
 const ANN_HERO = "https://regal-spritz-os.vercel.app/email/new-home.gif";
+// Welcome code (website checkout honors it: docs/handoffs/website-welcome-code.md).
+const ANN_CODE = { code: "NEWHOME100", off: 100, min: 3000, until: "Dec 31, 2026" };
 let annPickMemo = { at: 0, list: [] };
 // 4 on-hand pieces with photos for the "Fresh picks" grid (new arrivals first), linked to their own page on the website.
 function annPicks() {
@@ -4925,7 +4927,7 @@ function annHTML(name) {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light"><title>${e(ANN_SUBJECT)}</title>
 <style>@keyframes rsglow{0%,100%{box-shadow:0 0 0 0 rgba(184,145,58,.55)}50%{box-shadow:0 0 0 10px rgba(184,145,58,0)}}@keyframes rsfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}.rs-cta{animation:rsglow 2.2s ease-in-out infinite}.rs-float{display:inline-block;animation:rsfloat 3s ease-in-out infinite}@media (max-width:480px){.rs-pad{padding-left:16px!important;padding-right:16px!important}}</style></head>
 <body style="margin:0;padding:0;background:${c.bg};font-family:Helvetica,Arial,sans-serif;color:${c.ink}">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">Shop on-hand and pre-order perfumes, track orders and earn Royal Points at regalspritz.com.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">A welcome gift inside: ${peso(ANN_CODE.off)} off your first website order of ${peso(ANN_CODE.min)}+ with code ${ANN_CODE.code}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg}"><tr><td align="center" style="padding:24px 10px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:16px;overflow:hidden">
 <tr><td style="background:${c.brand};padding:0;line-height:0"><a href="${SITE_URL}" target="_blank"><img src="${ANN_HERO}" width="560" alt="Regal Spritz PH · Our new home is live · regalspritz.com" style="display:block;width:100%;height:auto;border:0;color:#ffffff;font-family:Georgia,serif;font-size:24px;line-height:1.4;text-align:center;background:${c.brand}"></a></td></tr>
@@ -4934,6 +4936,12 @@ function annHTML(name) {
   <p style="margin:0 0 6px;font-size:15px;line-height:1.65">Thank you for shopping with Regal Spritz PH! We've moved into our very own home, <b>regalspritz.com</b>. Same 100% authentic perfumes, now easier to browse, order and track.</p>
   <div style="text-align:center;margin:22px 0 18px"><a class="rs-cta" href="${SITE_URL}" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:800;font-size:16px;letter-spacing:.3px;padding:15px 40px;border-radius:999px;border:2px solid ${c.gold}">Shop the new website &rarr;</a></div>
 </td></tr>
+<tr><td class="rs-pad" style="padding:0 28px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px dashed ${c.gold};border-radius:14px;background:#fffaf0"><tr>
+  <td style="padding:16px 18px;text-align:center"><div style="font-size:11px;letter-spacing:3px;font-weight:800;color:${c.gold}">&#127873; WELCOME GIFT</div>
+  <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;color:${c.brand};margin:4px 0 2px">${peso(ANN_CODE.off)} OFF</div>
+  <div style="font-size:13px;color:${c.ink}">your website order of ${peso(ANN_CODE.min)} and up</div>
+  <div style="display:inline-block;margin:12px 0 8px;padding:9px 22px;border-radius:8px;background:${c.brand};color:#ffffff;font-family:'Courier New',monospace;font-size:20px;font-weight:800;letter-spacing:3px">${ANN_CODE.code}</div>
+  <div style="font-size:11.5px;color:${c.muted}">Enter the code at checkout on regalspritz.com. One use per account, valid until ${ANN_CODE.until}.</div></td></tr></table></td></tr>
 ${grid}
 <tr><td class="rs-pad" style="padding:18px 22px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
   <tr>${tile("🛍️", "On-hand + pre-order", "Sealed, testers, decants and sets in one place, with real photos and notes.")}${tile("📦", "Track every order", "See your order go from confirmed to shipped in My Account.")}</tr>
@@ -4947,7 +4955,7 @@ ${grid}
 <tr><td style="padding:20px 28px 26px;text-align:center;font-size:12px;color:${c.muted};line-height:1.7"><div style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${c.brand};margin-bottom:4px">Regal Spritz PH</div>Questions? Just reply to this email or message us on Facebook / Instagram <b>@regalspritzph</b>.<br>You're getting this one-time email because you ordered from Regal Spritz PH. Don't want emails from us? Reply "unsubscribe".</td></tr>
 </table></td></tr></table></body></html>`;
 }
-const annText = name => `Hi ${name || "there"},\n\nThank you for shopping with Regal Spritz PH! We've moved to our very own home: regalspritz.com.\n\n• On-hand and pre-order perfumes in one place\n• Track your orders in My Account\n• Pay with card / Maya, BDO installment, GCash or bank transfer\n• Earn Royal Points on every order\n\nVisit https://www.regalspritz.com/\n\nUse the same email you ordered with to create your account, so your past orders show up.\n\nDon't want emails from us? Reply "unsubscribe".`;
+const annText = name => `Hi ${name || "there"},\n\nThank you for shopping with Regal Spritz PH! We've moved to our very own home: regalspritz.com.\n\n• On-hand and pre-order perfumes in one place\n• Track your orders in My Account\n• Pay with card / Maya, BDO installment, GCash or bank transfer\n• Earn Royal Points on every order\n\nWELCOME GIFT: ₱${ANN_CODE.off} off your website order of ₱${NF0.format(ANN_CODE.min)} and up. Code: ${ANN_CODE.code} (enter at checkout, one use per account, valid until ${ANN_CODE.until}).\n\nVisit https://www.regalspritz.com/\n\nUse the same email you ordered with to create your account, so your past orders show up.\n\nDon't want emails from us? Reply "unsubscribe".`;
 const annDoc = () => S.webmeta.find(d => d.id === "_announce") || null;
 function announceCard() {
   if (!S.realOwner || S.viewAs || !S.loaded.orders) return "";
@@ -4955,7 +4963,7 @@ function announceCard() {
   const n = annList().length, sent = d ? (d.sent || []).length : 0;
   return `<section class="panel ann-card" style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--gold)">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>📣 New website email</b>${d && d.status === "sending" ? `<span class="badge amber">Sending · ${sent} of ${n}</span>` : `<span class="badge grey">Not sent yet · ${n} past buyers</span>`}</div>
-    <div style="font-size:13px;color:var(--muted)">${d && d.status === "sending" ? "Goes out in batches while your RS App is open, keeping 30 of Gmail's daily emails for order emails. It picks up again tomorrow when the limit is reached." : "Preview it and send yourself a test. When it looks right, tap Start sending."}</div>
+    <div style="font-size:13px;color:var(--muted)">${d && d.status === "sending" ? "Goes out in batches while your RS App is open, keeping 30 of Gmail's daily emails for order emails. It picks up again tomorrow when the limit is reached." : `Preview it and send yourself a test. It carries the welcome code <b>${ANN_CODE.code}</b> (₱${ANN_CODE.off} off ₱${NF0.format(ANN_CODE.min)}+): tap Start sending once the website's checkout accepts it.`}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="ann-preview">Preview</button>${S.me && S.me.email ? `<button class="btn sm" type="button" data-act="ann-test">Send a test to me</button>` : ""}${d && d.status === "sending" ? `<button class="btn sm ghost" type="button" data-act="ann-pause">Pause</button>` : `<button class="btn sm primary" type="button" data-act="ann-start">Start sending</button>`}</div></section>`;
 }
 let annBusy = false;
