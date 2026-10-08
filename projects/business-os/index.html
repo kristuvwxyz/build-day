@@ -3767,7 +3767,7 @@ async function openJntFile() {
   if (!os.length) { toast("No J&T orders to book. Select orders, or filter to To ship."); return; }
   let A; try { A = await jntAddr(); } catch (e) { toast(e.message); return; }
   let d = {}; try { d = JSON.parse(localStorage.getItem("rs-jnt") || "{}"); } catch (e) {}
-  S.jnt = { express: d.express || "EZ", parcel: "COSMETICS", weight: d.weight || "0.5", rows: os.map(o => { const sh = shipOf(o), m = jntMatch(A, sh); return { id: o.id, num: onum(o), name: sh.name || o.customer || "", phone: jntPhone(sh.phone || o.phone), addr: [sh.address1, sh.address2].filter(Boolean).join(", "), ...m, weight: "", parcels: 1, value: 500, cod: o.payment === "paid" ? 0 : o.payment === "pending" ? Math.round(total(o)) : "", remarks: onum(o) }; }) };
+  S.jnt = { express: d.express || "EZ", parcel: "COSMETICS", weight: d.weight || "0.5", rows: os.map(o => { const sh = shipOf(o), m = jntMatch(A, sh); return { id: o.id, num: onum(o), name: sh.name || o.customer || "", phone: jntPhone(sh.phone || o.phone), addr: [sh.address1, sh.address2].filter(Boolean).join(", "), ...m, weight: "", parcels: itemCount(o) || 1, value: 500, cod: o.payment === "paid" ? 0 : o.payment === "pending" ? Math.round(total(o)) : "", remarks: onum(o) }; }) };
   for (const r of S.jnt.rows) r.open = !(r.name && r.phone && r.addr && r.prov && r.city && r.brgy && r.cod !== ""); // incomplete ones start open
   renderJnt();
 }
@@ -3779,6 +3779,7 @@ function jntRowHTML(r, i) {
     <td><input class="jnt-f" data-i="${i}" data-f="name" value="${esc(r.name)}"></td><td><input class="jnt-f" data-i="${i}" data-f="phone" value="${esc(r.phone)}" style="width:130px"></td>
     <td><input class="jnt-f" data-i="${i}" data-f="addr" value="${esc(r.addr)}" style="min-width:200px"></td>
     <td class="${r.prov ? "" : "need"}">${sel("prov", Object.keys(A).sort(), r.prov)}</td><td class="${r.city ? "" : "need"}">${sel("city", cities.slice().sort(), r.city)}</td><td class="${r.brgy ? "" : "need"}">${sel("brgy", bs.slice().sort(), r.brgy)}</td>
+    <td><input class="jnt-f num" data-i="${i}" data-f="parcels" value="${esc(r.parcels)}" inputmode="numeric" aria-label="Quantity" style="width:50px"></td>
     <td><input class="jnt-f num" data-i="${i}" data-f="weight" value="${esc(r.weight)}" placeholder="${esc(S.jnt.weight)}" style="width:60px"></td>
     <td class="${r.cod === "" ? "need" : ""}"><input class="jnt-f num" data-i="${i}" data-f="cod" value="${esc(r.cod)}" placeholder="COD" style="width:80px"></td>
     <td><input class="jnt-f num" data-i="${i}" data-f="value" value="${esc(r.value)}" style="width:80px"></td></tr>${r.open ? jntInfoHTML(r, i) : ""}`;
@@ -3786,10 +3787,10 @@ function jntRowHTML(r, i) {
 // Shipping details saved on the order, shown under its row so staff can fill the booking without leaving this sheet.
 function jntInfoHTML(r, i) {
   const o = allOrderRows().find(x => x.id === r.id);
-  if (!o) return `<tr class="jnt-info"><td colspan="10">Order not found.</td></tr>`;
+  if (!o) return `<tr class="jnt-info"><td colspan="11">Order not found.</td></tr>`;
   const sh = shipOf(o), web = !!o.web;
   const f = (k, v) => `<div><span>${k}</span>${v ? `<b>${esc(v)}</b><button type="button" class="btn ghost sm" data-copy="${esc(v)}">Copy</button>` : `<b class="miss">Missing</b>`}</div>`;
-  return `<tr class="jnt-info"><td colspan="10"><div class="jnt-det">
+  return `<tr class="jnt-info"><td colspan="11"><div class="jnt-det">
     <div class="jnt-det-f">${f("Customer", o.customer)}${sh.name && sh.name !== o.customer ? f("Ship to", sh.name) : ""}${f("Phone", o.phone || sh.phone)}${f("Email", o.email)}${f("Full address", o.address || addrLine(sh))}${o.note ? f("Order note", o.note) : ""}</div>
     <div class="jnt-det-act">${web ? `<span style="font-size:12px;color:var(--muted)">Website order: type the missing details in the row above. Fix the address on the website if it's wrong.</span>` : `<button type="button" class="btn sm" data-jntsave="${i}">Save this row's details to ${esc(r.num)}</button><span style="font-size:12px;color:var(--muted)">Type the missing details in the row above, then save so the next booking is ready.</span>`}</div>
   </div></td></tr>`;
@@ -3807,7 +3808,7 @@ function renderJnt() {
     <div class="row"><div class="field"><label>Express type</label><select class="jnt-f" data-f="express"><option ${J.express === "EZ" ? "selected" : ""}>EZ</option><option ${J.express === "SP" ? "selected" : ""}>SP</option></select></div>
       <div class="field"><label>Parcel name</label><input class="jnt-f" data-f="parcel" value="${esc(J.parcel)}"></div>
       <div class="field"><label>Default weight (kg)</label><input class="jnt-f num" data-f="weight" value="${esc(J.weight)}"></div></div>
-    <div class="table-wrap jnt-wrap"><table class="jnt-t" data-own="1"><thead><tr><th>Order</th><th>Receiver</th><th>Phone</th><th>Street address</th><th>Province</th><th>City</th><th>Barangay</th><th>Kg</th><th>COD ₱</th><th>Value ₱</th></tr></thead><tbody id="jnt-body">${J.rows.map(jntRowHTML).join("")}</tbody></table></div>
+    <div class="table-wrap jnt-wrap"><table class="jnt-t" data-own="1"><thead><tr><th>Order</th><th>Receiver</th><th>Phone</th><th>Street address</th><th>Province</th><th>City</th><th>Barangay</th><th>Qty</th><th>Kg</th><th>COD ₱</th><th>Value ₱</th></tr></thead><tbody id="jnt-body">${J.rows.map(jntRowHTML).join("")}</tbody></table></div>
     <div id="jnt-sum" style="font-size:13px"><b>${ready}</b> of ${J.rows.length} ready. COD is the amount J&T collects: 0 for Fully paid, the total for Unpaid. Type the balance for Partially paid.</div>
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button><button class="btn primary" type="button" data-act="jnt-dl">Download J&T file (.xls)</button></div>`, null);

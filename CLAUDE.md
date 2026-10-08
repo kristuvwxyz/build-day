@@ -30,7 +30,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - New orders (pre-order or on-hand, any channel) start at Fulfillment status **To Confirm**.
 - Access: Admin sees every department except CEO, Finance and Marketing.
 - Forms and pop-up sheets: Save / Cancel buttons go at the top, under the title. On phones, don't auto-focus a box or zoom the page.
-- J&T bookings: Parcel name is always COSMETICS and declared Value is always ₱500.
+- J&T bookings: Parcel name is always COSMETICS and declared Value is always ₱500. Total parcels (Qty) = the order's item quantity (editable in the sheet).
 - Attendance: K (owner) works flexible hours: no fixed schedule, never Late or Absent. Overtime isn't paid (no Overtime line on payslips); everyone's Home and attendance card says so.
 - Create order: address uses J&T's Province → City → Barangay list. No platform fee box. Discount by changing the item price or the ₱/% Discount box. A first-time buyer is saved to Customers; if the email or phone already exists, staff are asked whether to merge.
 - Listings: drag the small square on a cell's corner to copy its value to other rows (like Excel).
