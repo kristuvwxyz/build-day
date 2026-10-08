@@ -203,6 +203,8 @@ body .field select, body .item-row select { -webkit-appearance: none; appearance
 .toolbar input { flex: 1 1 200px; }
 
 .table-wrap, .strip, .tabs, .team-strip, .supbar { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.lwrap { max-height: calc(100vh - 150px); overflow-y: auto; }
+.lwrap > table > thead th { position: sticky; top: 0; z-index: 3; background: var(--surface); box-shadow: inset 0 -1px 0 var(--line); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -534,7 +536,8 @@ body.has-pomo #view { padding-bottom: 64px; }
 .tcol-h span { font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .tcol .tpill { font-size: 12.5px; padding: 4px 6px; }
 .tgrp td { background: var(--surface-2); font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .03em; }
-.cal-more { font-size: 11px; color: var(--muted); padding-left: 4px; }
+.cal-more { font-size: 11px; color: var(--muted); padding: 2px 4px; background: none; border: 0; font: inherit; font-size: 11px; text-align: left; cursor: pointer; border-radius: 6px; }
+.cal-more:hover { color: var(--fg); background: var(--surface-2, rgba(0,0,0,.05)); text-decoration: underline; }
 .cal-dots { display: none; gap: 3px; }
 .cal-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
 
@@ -2513,7 +2516,8 @@ function viewTasks(forceDept) {
       ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => `<div class="cal-h">${d}</div>`).join("")}
       ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)); const out = d.slice(0, 7) !== ym; const uc = moneyOn(d).map(moneyUrg).concat(ts.map(taskUrg)); return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${uc.includes("overdue") ? " u-overdue" : uc.includes("today") ? " u-today" : uc.includes("soon") ? " u-soon" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
         <div class="cal-n"><span>${Number(d.slice(8))}</span>${S.readOnly ? "" : `<button type="button" class="cal-add" data-act="new-task" data-date="${d}" aria-label="Add task on ${fmtDate(d)}">+</button>`}</div>
-        <div class="cal-items">${moneyOn(d).slice(0, 2).map(moneyPill).join("")}${moneyOn(d).length > 2 ? `<span class="cal-more">+${moneyOn(d).length - 2} payments</span>` : ""}${ts.slice(0, 3).map(taskPill).join("")}${ts.length > 3 ? `<span class="cal-more">+${ts.length - 3} more</span>` : ""}</div>
+        <div class="cal-items">${(() => { const op = (S.calOpen || (S.calOpen = new Set())).has(d), mo = moneyOn(d), mN = op ? mo.length : 2, tN = op ? ts.length : 3;
+          return `${mo.slice(0, mN).map(moneyPill).join("")}${mo.length > mN ? `<button type="button" class="cal-more" data-act="cal-more" data-date="${d}">+${mo.length - mN} payments</button>` : ""}${ts.slice(0, tN).map(taskPill).join("")}${ts.length > tN ? `<button type="button" class="cal-more" data-act="cal-more" data-date="${d}">+${ts.length - tN} more</button>` : ""}${op && (mo.length > 2 || ts.length > 3) ? `<button type="button" class="cal-more" data-act="cal-more" data-date="${d}">Show less</button>` : ""}`; })()}</div>
         ${ts.length || moneyOn(d).length ? `<div class="cal-dots" aria-hidden="true">${moneyOn(d).slice(0, 2).map(() => `<i class="s-money"></i>`).join("")}${ts.slice(0, 4).map(t => `<i class="s-${t.status}"${DEPT_COLORS[t.department] ? ` style="background:${DEPT_COLORS[t.department]}"` : ""}></i>`).join("")}</div>` : ""}
       </div>`; }).join("")}
     </div>
@@ -4916,44 +4920,47 @@ function annPicks() {
   annPickMemo = { at: Date.now(), list: L.slice(0, L.length >= 4 ? 4 : 2) }; return annPickMemo.list;
 }
 function annHTML(name) {
-  const c = RR, e = esc, SITE_URL = "https://www.regalspritz.com/";
-  const tile = (ic, t, d) => `<td width="50%" valign="top" style="padding:6px"><div style="background:${c.bg};border:1px solid ${c.line};border-radius:12px;padding:14px 14px 12px"><div style="font-size:24px;line-height:1">${ic}</div><div style="font-size:14px;font-weight:700;color:${c.ink};margin-top:8px">${t}</div><div style="font-size:12.5px;line-height:1.5;color:${c.muted};margin-top:3px">${d}</div></div></td>`;
+  const c = RR, e = esc, SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',serif", SANS = "'Jost','Helvetica Neue',Helvetica,Arial,sans-serif", P = "#4A2265", PD = "#2A1240", G = "#A8864C", SITE_URL = "https://www.regalspritz.com/";
+  const tile = (ic, t, d) => `<td width="50%" valign="top" style="padding:6px"><div style="background:${c.bg};border:1px solid ${c.line};border-radius:2px;padding:14px 14px 12px"><div style="font-size:24px;line-height:1">${ic}</div><div style="font-size:14px;font-weight:700;color:${c.ink};margin-top:8px">${t}</div><div style="font-size:12.5px;line-height:1.5;color:${c.muted};margin-top:3px">${d}</div></div></td>`;
+  const btn = (href, label) => `<a class="rs-btn" href="${href}" target="_blank" style="display:inline-block;background:${P};color:#ffffff;text-decoration:none;font-family:${SANS};font-weight:500;font-size:12px;letter-spacing:3px;text-transform:uppercase;padding:18px 38px;border-radius:2px;border:1px solid ${P};mso-padding-alt:0">${label}</a>`;
+  const btnGold = (href, label) => `<a class="rs-btn2" href="${href}" target="_blank" style="display:inline-block;background:transparent;color:${PD};text-decoration:none;font-family:${SANS};font-weight:500;font-size:11.5px;letter-spacing:3px;text-transform:uppercase;padding:14px 30px;border-radius:2px;border:1px solid ${G}">${label}</a>`;
   const picks = annPicks();
-  const card = p => `<td width="50%" valign="top" style="padding:6px"><a href="${e(SITE_URL + "#/p/" + encodeURIComponent(p.id))}" target="_blank" style="text-decoration:none;color:${c.ink};display:block;border:1px solid ${c.line};border-radius:12px;overflow:hidden;background:#ffffff">
+  const card = p => `<td width="50%" valign="top" style="padding:6px"><a href="${e(SITE_URL + "#/p/" + encodeURIComponent(p.id))}" target="_blank" style="text-decoration:none;color:${c.ink};display:block;border:1px solid ${c.line};border-radius:2px;overflow:hidden;background:#ffffff">
     <img src="${e(p.imgs[0])}" width="240" alt="${e([p.brand, p.name].join(" "))}" style="display:block;width:100%;height:auto;border:0;background:${c.bg}">
-    <div style="padding:10px 12px 12px">${p.isNew ? `<div style="font-size:10px;letter-spacing:2px;font-weight:800;color:${c.gold}">NEW ARRIVAL</div>` : ""}<div style="font-size:11px;letter-spacing:1px;color:${c.muted};text-transform:uppercase">${e(p.brand || "")}</div><div style="font-size:14px;font-weight:700;line-height:1.3;margin-top:2px">${e(p.name)}${p.size ? ` <span style="font-weight:400;color:${c.muted}">${e(p.size)}</span>` : ""}</div><div style="font-size:15px;font-weight:800;color:${c.brand};margin-top:6px">${peso(p.price)}</div></div></a></td>`;
-  const grid = picks.length >= 2 ? `<tr><td style="padding:8px 22px 0"><div style="text-align:center;font-size:11px;letter-spacing:4px;font-weight:800;color:${c.gold}">&#10022; FRESH PICKS ON-HAND &#10022;</div><div style="text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${c.ink};margin:6px 0 8px">Ready to ship this week</div>
+    <div style="padding:10px 12px 12px">${p.isNew ? `<div style="font-size:10px;letter-spacing:2px;font-weight:800;color:${c.gold}">NEW ARRIVAL</div>` : ""}<div style="font-size:11px;letter-spacing:1px;color:${c.muted};text-transform:uppercase">${e(p.brand || "")}</div><div style="font-size:14px;font-weight:700;line-height:1.3;margin-top:2px">${e(p.name)}${p.size ? ` <span style="font-weight:400;color:${c.muted}">${e(p.size)}</span>` : ""}</div><div style="font-size:15px;font-weight:800;color:${P};margin-top:6px">${peso(p.price)}</div></div></a></td>`;
+  const grid = picks.length >= 2 ? `<tr><td style="padding:8px 22px 0"><div style="text-align:center;font-size:11px;letter-spacing:4px;font-weight:800;color:${c.gold}">&#10022; FRESH PICKS ON-HAND &#10022;</div><div style="text-align:center;font-family:${SERIF};font-weight:500;font-size:28px;color:${c.ink};margin:6px 0 8px">Ready to ship this week</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${[0, 2].filter(i => picks[i]).map(i => `<tr>${card(picks[i])}${picks[i + 1] ? card(picks[i + 1]) : `<td width="50%"></td>`}</tr>`).join("")}</table>
-    <div style="text-align:center;margin:10px 0 4px"><a href="${SITE_URL}" target="_blank" style="font-size:14px;font-weight:700;color:${c.brand}">See all perfumes &rarr;</a></div></td></tr>` : "";
+    <div style="text-align:center;margin:10px 0 4px">${btnGold(SITE_URL, "See all perfumes")}</div></td></tr>` : "";
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light"><title>${e(ANN_SUBJECT)}</title>
-<style>@keyframes rsglow{0%,100%{box-shadow:0 0 0 0 rgba(184,145,58,.55)}50%{box-shadow:0 0 0 10px rgba(184,145,58,0)}}@keyframes rsfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}.rs-cta{animation:rsglow 2.2s ease-in-out infinite}.rs-float{display:inline-block;animation:rsfloat 3s ease-in-out infinite}@media (max-width:480px){.rs-pad{padding-left:16px!important;padding-right:16px!important}}</style></head>
-<body style="margin:0;padding:0;background:${c.bg};font-family:Helvetica,Arial,sans-serif;color:${c.ink}">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500&display=swap" rel="stylesheet">
+<style>.rs-btn:hover{background:${PD}!important}.rs-btn2:hover{background:#F4ECDD!important}@keyframes rsglow{0%,100%{box-shadow:0 0 0 0 rgba(168,134,76,.55)}50%{box-shadow:0 0 0 10px rgba(168,134,76,0)}}@keyframes rsfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}.rs-btn{animation:rsglow 2.6s ease-in-out infinite}.rs-float{display:inline-block;animation:rsfloat 3s ease-in-out infinite}@media (max-width:480px){.rs-pad{padding-left:16px!important;padding-right:16px!important}}</style></head>
+<body style="margin:0;padding:0;background:${c.bg};font-family:${SANS};color:${c.ink}">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">A welcome gift inside: ${peso(ANN_CODE.off)} off your first website order of ${peso(ANN_CODE.min)}+ with code ${ANN_CODE.code}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg}"><tr><td align="center" style="padding:24px 10px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:16px;overflow:hidden">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:4px;overflow:hidden">
 <tr><td style="background:${c.brand};padding:0;line-height:0"><a href="${SITE_URL}" target="_blank"><img src="${ANN_HERO}" width="560" alt="Regal Spritz PH · Our new home is live · regalspritz.com" style="display:block;width:100%;height:auto;border:0;color:#ffffff;font-family:Georgia,serif;font-size:24px;line-height:1.4;text-align:center;background:${c.brand}"></a></td></tr>
 <tr><td class="rs-pad" style="padding:26px 28px 4px">
   <p style="margin:0 0 12px;font-size:17px;line-height:1.5">Hi ${e(name || "there")} <span class="rs-float">&#10024;</span></p>
   <p style="margin:0 0 6px;font-size:15px;line-height:1.65">Thank you for shopping with Regal Spritz PH! We've moved into our very own home, <b>regalspritz.com</b>. Same 100% authentic perfumes, now easier to browse, order and track.</p>
-  <div style="text-align:center;margin:22px 0 18px"><a class="rs-cta" href="${SITE_URL}" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:800;font-size:16px;letter-spacing:.3px;padding:15px 40px;border-radius:999px;border:2px solid ${c.gold}">Shop the new website &rarr;</a></div>
+  <div style="text-align:center;margin:22px 0 18px">${btn(SITE_URL, "Shop the new website")}</div>
 </td></tr>
-<tr><td class="rs-pad" style="padding:0 28px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px dashed ${c.gold};border-radius:14px;background:#fffaf0"><tr>
+<tr><td class="rs-pad" style="padding:0 28px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px dashed ${c.gold};border-radius:2px;background:#fffaf0"><tr>
   <td style="padding:16px 18px;text-align:center"><div style="font-size:11px;letter-spacing:3px;font-weight:800;color:${c.gold}">&#127873; WELCOME GIFT</div>
-  <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;color:${c.brand};margin:4px 0 2px">${peso(ANN_CODE.off)} OFF</div>
+  <div style="font-family:${SERIF};font-weight:500;font-size:38px;color:${P};margin:4px 0 2px">${peso(ANN_CODE.off)} OFF</div>
   <div style="font-size:13px;color:${c.ink}">your website order of ${peso(ANN_CODE.min)} and up</div>
-  <div style="display:inline-block;margin:12px 0 8px;padding:9px 22px;border-radius:8px;background:${c.brand};color:#ffffff;font-family:'Courier New',monospace;font-size:20px;font-weight:800;letter-spacing:3px">${ANN_CODE.code}</div>
+  <div style="display:inline-block;margin:12px 0 8px;padding:9px 22px;border-radius:2px;background:${P};color:#ffffff;font-family:${SANS};font-size:18px;font-weight:500;letter-spacing:5px">${ANN_CODE.code}</div>
   <div style="font-size:11.5px;color:${c.muted}">Enter the code at checkout on regalspritz.com. One use per account, valid until ${ANN_CODE.until}.</div></td></tr></table></td></tr>
 ${grid}
 <tr><td class="rs-pad" style="padding:18px 22px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
   <tr>${tile("🛍️", "On-hand + pre-order", "Sealed, testers, decants and sets in one place, with real photos and notes.")}${tile("📦", "Track every order", "See your order go from confirmed to shipped in My Account.")}</tr>
   <tr>${tile("💳", "Pay your way", "Card or Maya, BDO installment, GCash and bank transfer.")}${tile("👑", "Royal Points", "Earn points on every order and use them on your next one.")}</tr>
 </table></td></tr>
-<tr><td class="rs-pad" style="padding:14px 28px 6px"><div style="background:linear-gradient(135deg,#f6ecd6,#efe0bb);background-color:#f3e6c6;border:1px solid #e3cf9c;border-radius:14px;padding:16px 18px;text-align:center">
+<tr><td class="rs-pad" style="padding:14px 28px 6px"><div style="background:linear-gradient(135deg,#f6ecd6,#efe0bb);background-color:#f3e6c6;border:1px solid #e3cf9c;border-radius:2px;padding:16px 18px;text-align:center">
   <div style="font-size:11px;letter-spacing:3px;font-weight:800;color:#8a6a22">&#9819; ROYAL WELCOME &#9819;</div>
-  <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;color:${c.ink};margin:6px 0 4px">Create your account with this email</div>
+  <div style="font-family:${SERIF};font-weight:500;font-size:24px;color:${c.ink};margin:6px 0 4px">Create your account with this email</div>
   <div style="font-size:13px;line-height:1.55;color:#5b4a2a">Your past orders show up right away, and you start collecting Royal Points from your very first order.</div>
-  <div style="margin-top:12px"><a href="${SITE_URL}" target="_blank" style="display:inline-block;background:${c.gold};color:#ffffff;text-decoration:none;font-weight:800;font-size:14px;padding:10px 26px;border-radius:999px">Create my account</a></div></div></td></tr>
-<tr><td style="padding:20px 28px 26px;text-align:center;font-size:12px;color:${c.muted};line-height:1.7"><div style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${c.brand};margin-bottom:4px">Regal Spritz PH</div>Questions? Just reply to this email or message us on Facebook / Instagram <b>@regalspritzph</b>.<br>You're getting this one-time email because you ordered from Regal Spritz PH. Don't want emails from us? Reply "unsubscribe".</td></tr>
+  <div style="margin-top:14px">${btnGold(SITE_URL, "Create my account")}</div></div></td></tr>
+<tr><td style="padding:20px 28px 26px;text-align:center;font-size:12px;color:${c.muted};line-height:1.7"><div style="font-family:${SERIF};font-weight:500;font-size:20px;color:${P};margin-bottom:4px">Regal Spritz PH</div>Questions? Just reply to this email or message us on Facebook / Instagram <b>@regalspritzph</b>.<br>You're getting this one-time email because you ordered from Regal Spritz PH. Don't want emails from us? Reply "unsubscribe".</td></tr>
 </table></td></tr></table></body></html>`;
 }
 const annText = name => `Hi ${name || "there"},\n\nThank you for shopping with Regal Spritz PH! We've moved to our very own home: regalspritz.com.\n\n• On-hand and pre-order perfumes in one place\n• Track your orders in My Account\n• Pay with card / Maya, BDO installment, GCash or bank transfer\n• Earn Royal Points on every order\n\nWELCOME GIFT: ₱${ANN_CODE.off} off your website order of ₱${NF0.format(ANN_CODE.min)} and up. Code: ${ANN_CODE.code} (enter at checkout, one use per account, valid until ${ANN_CODE.until}).\n\nVisit https://www.regalspritz.com/\n\nUse the same email you ordered with to create your account, so your past orders show up.\n\nDon't want emails from us? Reply "unsubscribe".`;
@@ -5158,7 +5165,7 @@ async function shopifyShip(o, manual) {
   }
 }
 
-const BADGES = ["New arrival", "Best seller", "Limited edition", "Last piece", "On sale", "Restocked", "Exclusive", "Gift pick"];
+const BADGES = ["New arrival", "Best seller", "Limited edition", "Last piece", "On sale", "Clearance sale", "Restocked", "Exclusive", "Gift pick"];
 const badgesOf = p => { const b = Array.isArray(p.badges) ? p.badges : []; return p.isNew && !b.includes("New arrival") ? ["New arrival", ...b] : b; };
 const COMMON_SIZES = ["1.5ml", "2ml", "5ml", "10ml", "15ml", "30ml", "40ml", "50ml", "60ml", "75ml", "80ml", "90ml", "100ml", "125ml", "150ml", "200ml"];
 const sizeKey = s => { const m = String(s).match(/^([\d.]+)\s*(ml|g)$/i); return m ? (m[2].toLowerCase() === "g" ? 1e4 : 0) + Number(m[1]) : 1e6; };
@@ -5287,12 +5294,12 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, compare: p => Number(p.compareAt) || 0, cost: p => Number(p.cost) || 0, stock: p => Number(p.stock) || 0, committed: p => committedOf(p), status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
-  const all = S.products, lb = S.lbrand || "", lc = S.lcat || "";
+  const all = S.products, lb = S.lbrand || "", lc = S.lcat || "", lbd = S.lbadge || "";
   const brands = [...new Set(all.map(p => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(p => p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
   const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
   const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? p.kind !== "preorder" && (Number(p.stock) || 0) <= 0 : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
-    && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc)
+    && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
     && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta].join(" ").toLowerCase().includes(q)))
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
   const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
@@ -5307,23 +5314,26 @@ function viewListings() {
     <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
       <select id="l-brand" aria-label="Filter by brand"><option value="">All brands</option>${brands.map(b => `<option ${b === lb ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
       <select id="l-cat" aria-label="Filter by collection"><option value="">All collections</option>${WEB_CATS.map(([k, l]) => `<option value="${k}" ${k === lc ? "selected" : ""}>${l}</option>`).join("")}</select>
-      ${f !== "all" || q || lb || lc ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
+      <select id="l-badge" aria-label="Filter by badge"><option value="">All badges</option><option value="_any" ${lbd === "_any" ? "selected" : ""}>Any badge</option>${BADGES.map(b => `<option ${b === lbd ? "selected" : ""}>${esc(b)}</option>`).join("")}<option value="_none" ${lbd === "_none" ? "selected" : ""}>No badge</option></select>
+      ${f !== "all" || q || lb || lc || lbd ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
       <button class="btn" type="button" data-act="columns" data-table="listings">⚙︎ Columns</button></div>
     ${can && S.lsel.size ? (() => { const o = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`; return `<div class="bulk"><strong>${S.lsel.size} selected</strong>
       <select data-lbulk="ptype" aria-label="Set type"><option value="">Set type…</option>${LIST_TYPES.map(t => o(t, t)).join("")}</select>
       <select data-lbulk="category" aria-label="Set collection"><option value="">Set collection…</option>${WEB_CATS.map(([k, l]) => o(k, l)).join("")}</select>
       <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}</select>
       <select data-lbulk="eta" aria-label="Set ETA"><option value="">Set ETA (pre-orders)…</option>${MONTHS.map(m => o(m, m)).join("")}</select>
+      <select data-lbadge="add" aria-label="Add badge"><option value="">Add badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
+      <select data-lbadge="remove" aria-label="Remove badge"><option value="">Remove badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
       <select data-lbulk="status" aria-label="Set status"><option value="">Set status…</option>${Object.entries(LIST_STATUS).map(([k, st]) => o(k, k === "hidden" ? "Inactive" : st.name)).join("")}</select>
       <input inputmode="decimal" class="money lb-num" id="lb-price" placeholder="SRP" aria-label="New SRP"><input inputmode="decimal" class="money lb-num" id="lb-compare" placeholder="Compare" aria-label="New compare-at price"><input inputmode="decimal" class="money lb-num" id="lb-cost" placeholder="Cost" aria-label="New cost">
       <button class="btn sm" type="button" data-act="lb-prices">Apply prices</button>
       <span id="lb-del-slot"><button class="btn sm danger" type="button" data-act="lb-ask-del">Delete…</button></span>
       <button class="btn ghost sm" type="button" data-act="lb-clear">Clear selection</button></div>`; })() : ""}
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
-    <div class="table-wrap"><table class="otable ltable" data-own="1"><thead><tr><th class="cb">${can ? `<input type="checkbox" id="l-selall" aria-label="Select all ${rows.length} listings in this view" ${rows.length && rows.every(p => S.lsel.has(p.id)) ? "checked" : ""}>` : ""}</th><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
+    <div class="table-wrap lwrap"><table class="otable ltable" data-own="1"><thead><tr><th class="cb">${can ? `<input type="checkbox" id="l-selall" aria-label="Select all ${rows.length} listings in this view" ${rows.length && rows.every(p => S.lsel.has(p.id)) ? "checked" : ""}>` : ""}</th><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
     <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}" class="${S.lsel.has(p.id) ? "sel" : ""}"><td class="cb">${can ? `<input type="checkbox" data-lsel="${p.id}" aria-label="Select ${esc(p.name)}" ${S.lsel.has(p.id) ? "checked" : ""}>` : ""}</td>
       <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
-      <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>
+      <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" || b === "Clearance sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>
       ${cols.map(k => ({
         size: () => `<td class="nowrap">${can ? `<input class="lcell" data-lset="size" data-id="${p.id}" list="l-size-list" value="${esc(p.size || "")}" aria-label="Size" style="width:78px">` : esc(p.size || "")}</td>`,
         type: () => `<td class="nowrap">${can ? `<select class="lcell" data-lset="ptype" data-id="${p.id}" aria-label="Type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : esc(p.ptype || "")}</td>`,
@@ -5349,7 +5359,7 @@ async function listingsBulk(upd, label) {
   let n = 0;
   for (const id of ids) {
     const pr = S.products.find(x => x.id === id); if (!pr) continue;
-    const u = { ...upd }; if ("eta" in u && pr.kind !== "preorder" && u.kind !== "preorder") delete u.eta;
+    const u = typeof upd === "function" ? upd(pr) : { ...upd }; if ("eta" in u && pr.kind !== "preorder" && u.kind !== "preorder") delete u.eta;
     for (const k of Object.keys(u)) if (String(pr[k] ?? "") === String(u[k] ?? "")) delete u[k];
     if (!Object.keys(u).length) continue;
     const webSide = Object.keys(u).some(k => k !== "cost");
@@ -7161,7 +7171,7 @@ document.addEventListener("click", guard(async ev => {
   const nt = ev.target.closest('[data-act="new-task"]');
   if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
   const dy = ev.target.closest("[data-day]");
-  if (dy) { S.t.day = dy.dataset.day; render(); return; }
+  if (dy && !ev.target.closest("[data-act]")) { S.t.day = dy.dataset.day; render(); return; }
   if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]") && !ev.target.closest("[data-notes]") && !ev.target.closest("[data-hist]")) closePop();
   if (!ev.target.closest(".gs")) document.querySelectorAll(".gs-res").forEach(r => r.hidden = true);
   const gsr = ev.target.closest("[data-gso]");
@@ -7479,7 +7489,8 @@ document.addEventListener("click", guard(async ev => {
     case "lb-ask-del": $("#lb-del-slot").innerHTML = `<span class="confirm">Delete ${S.lsel.size} listing${S.lsel.size === 1 ? "" : "s"}? This can't be undone. <button class="btn sm danger" type="button" data-act="lb-del">Yes, delete</button><button class="btn sm ghost" type="button" data-act="lb-clear-del">Cancel</button></span>`; return;
     case "lb-clear-del": render(); return;
     case "lb-del": { const ids = [...S.lsel]; for (const id of ids) await remove("products", id); S.lsel.clear(); toast(`Deleted ${ids.length} listing${ids.length === 1 ? "" : "s"}.`); render(); return; }
-    case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
+    case "cal-more": { const d = b.dataset.date, o = S.calOpen || (S.calOpen = new Set()); o.has(d) ? o.delete(d) : o.add(d); render(); return; }
+    case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lbadge = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
     case "bdo-save": { const inp = (b.closest(".bdo-box") || document).querySelector(".bdo-link, #bdo-link"), v = ((inp && inp.value) || "").trim(); if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\//i.test(v)) return !$("#scrim").hidden ? sheetError("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).") : toast("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).");
@@ -7610,6 +7621,9 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.lbulk) { const f = t.dataset.lbulk, v = t.value; if (!v) return;
     const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "status" ? "status → " + (v === "hidden" ? "Inactive" : (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
     await listingsBulk({ [f]: v }, lab); return; }
+  if (t.id === "l-badge") { S.lbadge = t.value; S.lpage = 0; render(); return; }
+  if (t.dataset.lbadge) { const v = t.value, add = t.dataset.lbadge === "add"; if (!v) return;
+    await listingsBulk(pr => { const b = add ? [...new Set([...badgesOf(pr), v])] : badgesOf(pr).filter(x => x !== v); return { badges: b, isNew: b.includes("New arrival") }; }, (add ? "added badge " : "removed badge ") + v); return; }
   if (t.id === "l-brand" || t.id === "l-cat") { S[t.id === "l-brand" ? "lbrand" : "lcat"] = t.value; S.lpage = 0; render(); return; }
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
