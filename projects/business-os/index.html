@@ -711,6 +711,7 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .ordtable .hist-btn { gap: 0; }
 .ik-cell { display: inline-flex; gap: 4px; flex-wrap: nowrap; }
 .iktip { position: fixed; z-index: 9999; display: none; max-width: 340px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 8px 10px; font-size: 12.5px; line-height: 1.45; pointer-events: none; } .iktip b { display: block; margin-bottom: 3px; font-size: 12px; color: var(--muted); }
+.chip.sp-chip { background: color-mix(in srgb, var(--gold) 18%, var(--surface)); color: color-mix(in srgb, var(--gold) 60%, var(--fg)); font-weight: 600; }
 .chip.ik-oh { background: var(--good-bg); color: var(--good); } .chip.ik-po { background: color-mix(in srgb, #8B5CF6 14%, var(--surface)); color: #7C3AED; }
 .src-cell { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; }
 .src-cell .badge, .src-cell .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; gap: 4px; line-height: 1.4; }
@@ -3026,6 +3027,7 @@ function openWebOrder(ref) {
   const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
   openSheet(`<h2 style="margin:0">#${esc(String(o.ref || "").replace(/^#/, ""))} ${webBadge(o)}</h2>
     <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date, o))} · ${esc(o.payment || "")}${o.payRef && !/bdo\.com\.ph/i.test(o.payRef) ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
+    ${o.shipPref && SHIP_PREF[o.shipPref] ? `<div style="font-size:13px">${shipPrefChip(o)} <span style="color:var(--muted)">${esc(SHIP_PREF_TIP[o.shipPref].replace(/^Buyer chose at checkout: /, ""))}</span></div>` : ""}
     <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
       <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
     </div>
@@ -3065,8 +3067,7 @@ function bdoBox(o) {
   return `<div class="panel bdo-box"><div class="bdo-h"><b>BDO payment link</b>${saved ? `<span class="badge green">Link sent ✓</span>` : `<span class="badge amber">Link needed</span>`}</div>
     <div class="bdo-f">${f.map(([k, v], i) => `<div><span>${k}</span><b>${esc(v || "–")}</b>${v && k !== "Link Expiry" ? `<button type="button" class="btn ghost sm" data-copy="${esc(v)}" aria-label="Copy ${k}">Copy</button>` : ""}</div>`).join("")}</div>
     <div class="bdo-act"><button type="button" class="btn sm" data-copy="${esc(f.map(([k, v]) => k + ": " + v).join("\n"))}">Copy all</button>
-      <a class="btn sm primary" href="https://checkout.bdo.com.ph/AutoMailPaymentDetails.asp" target="_blank" rel="noopener">Open BDO Checkout (email bill)</a>
-      <a class="btn sm" href="https://checkout.bdo.com.ph/MailPaymentDetails.asp" target="_blank" rel="noopener">Create a payment link</a></div>
+      <a class="btn sm primary" href="https://checkout.bdo.com.ph/MailPaymentDetails.asp" target="_blank" rel="noopener">Create a payment link</a></div>
     <div class="bdo-paste"><input id="bdo-link" class="bdo-link" type="url" placeholder="Paste the BDO link here (https://…bdo.com.ph/…)" value="${esc(saved)}" autocomplete="off"><button type="button" class="btn sm primary" data-act="bdo-save" data-ref="${esc(o.ref)}">Save</button>${saved ? `<button type="button" class="btn sm ghost" data-act="bdo-clear" data-ref="${esc(o.ref)}">Clear</button>` : ""}</div>
     ${saved ? `<div style="font-size:12.5px;color:var(--muted);word-break:break-all">Customer sees a <b>Pay with BDO</b> button in My Account: <a href="${esc(saved)}" target="_blank" rel="noopener">${esc(saved)}</a></div>` : `<div style="font-size:12.5px;color:var(--muted)">Amount is the Due Today amount (pre-orders may be a down payment). After the customer pays, check BDO's report, then click Mark paid.</div>`}</div>`;
 }
@@ -3598,7 +3599,9 @@ const kindSummary = o => { const c = kindCounts(o); return [c.onhand ? `${c.onha
 const SHIP_PREF = { ahead: "Ship on-hand ahead", together: "Ship all together" };
 // Hovering an On hand / Pre-order chip shows the items of that kind (floating box, so table scrolling doesn't clip it).
 const kindItems = (o, k) => (o.items || []).filter(i => itemKind(i, o) === k).map(i => `${Number(i.qty) || 1} × ${String(i.name || "").trim()}`).join("\n");
-const kindCell = o => { const c = kindCounts(o); return `<span class="ik-cell">${o.shipPref && SHIP_PREF[o.shipPref] ? `<span class="chip" title="Buyer's shipping choice at checkout">${SHIP_PREF[o.shipPref]}</span>` : ""}${c.onhand ? `<span class="chip ik-oh" data-iktip="${esc(kindItems(o, "onhand"))}">${c.onhand} × On hand</span>` : ""}${c.preorder ? `<span class="chip ik-po" data-iktip="${esc(kindItems(o, "preorder"))}">${c.preorder} × Pre-order</span>` : ""}${!c.onhand && !c.preorder ? `<span style="color:var(--muted)">–</span>` : ""}</span>`; };
+const SHIP_PREF_TIP = { ahead: "Buyer chose at checkout: ship on-hand items now, pre-order items later (2nd delivery has its own fee, added to the pre-order balance)", together: "Buyer chose at checkout: one parcel when the pre-order arrives" };
+const shipPrefChip = o => o.shipPref && SHIP_PREF[o.shipPref] ? `<span class="chip sp-chip sp-${o.shipPref}" title="${SHIP_PREF_TIP[o.shipPref]}">${o.shipPref === "ahead" ? "🚚 " : "📦 "}${SHIP_PREF[o.shipPref]}</span>` : "";
+const kindCell = o => { const c = kindCounts(o); return `<span class="ik-cell">${c.onhand ? `<span class="chip ik-oh" data-iktip="${esc(kindItems(o, "onhand"))}">${c.onhand} × On hand</span>` : ""}${c.preorder ? `<span class="chip ik-po" data-iktip="${esc(kindItems(o, "preorder"))}">${c.preorder} × Pre-order</span>` : ""}${shipPrefChip(o)}${!c.onhand && !c.preorder ? `<span style="color:var(--muted)">–</span>` : ""}</span>`; };
 (() => { let tip = null;
   const hide = () => { if (tip) tip.style.display = "none"; };
   document.addEventListener("mouseover", e => { const el = e.target.closest && e.target.closest("[data-iktip]"); if (!el) return hide();
