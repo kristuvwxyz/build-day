@@ -708,6 +708,8 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .ordtable select.status { padding: 2px 5px; }
 .ordtable .badge { padding-top: 1px; padding-bottom: 1px; }
 .ordtable .hist-btn { gap: 0; }
+.ik-cell { display: inline-flex; gap: 4px; flex-wrap: nowrap; }
+.chip.ik-oh { background: var(--good-bg); color: var(--good); } .chip.ik-po { background: color-mix(in srgb, #8B5CF6 14%, var(--surface)); color: #7C3AED; }
 .src-cell { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; }
 .src-cell .badge, .src-cell .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; gap: 4px; line-height: 1.4; }
 .mop-pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 6px; }
@@ -899,7 +901,7 @@ const PLATFORMS = [
 const orderSource = o => o.web ? "Website" : /^shopify/.test(o.source || "") ? "Shopify" : o.platform && o.platform !== "website" ? (PLATFORMS.find(p => p.id === o.platform) || {}).name || "Other" : "RS OS";
 const PAYMENTS = [
   { id: "pending", name: "Unpaid", cls: "orange hollow" },
-  { id: "partial", name: "Partially paid (DP+SF)", cls: "amber hollow" },
+  { id: "partial", name: "Partially paid", cls: "amber hollow" },
   { id: "paid", name: "Fully paid", cls: "green" },
   { id: "to_refund", name: "To refund", cls: "red hollow" },
   { id: "refunded", name: "Refunded", cls: "grey" },
@@ -972,6 +974,12 @@ const ORDER_VIEWS = [
   { id: "archived", name: "Completed" },
 ];
 const PAGE = 50;
+// Expenses are one shared list: Admin encodes them (with the OR photo), Finance sees the same rows. Cash in entries (kind "cashin") only feed Cash on hand.
+const EXP_PAID = ["Cash on hand", "GCash", "Bank transfer", "Card", "Other"];
+const isCashIn = e => e.kind === "cashin";
+const realExpenses = () => S.expenses.filter(e => !isCashIn(e));
+const CASH_FROM = "2026-10-08"; // Cash on hand counts entries from this day
+const cashOnHand = () => S.expenses.reduce((a, e) => (e.date || "") < CASH_FROM ? a : isCashIn(e) ? a + (Number(e.amount) || 0) : (e.paidWith || "") === "Cash on hand" ? a - (Number(e.amount) || 0) : a, 0);
 const EXP_CATS = ["Ingredients", "Packaging", "Ads & marketing", "Shipping", "Platform fees", "Salaries", "Rent & utilities", "Other"];
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -988,6 +996,7 @@ const today = () => dstr(Date.now());
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const plat = id => (PLATFORMS.find(p => p.id === id) || PLATFORMS[4]).name;
 const pay = id => PAYMENTS.find(s => s.id === id) || PAYMENTS[0];
+const paidish = p => p === "paid" || p === "partial"; // the website only knows paid / not paid; a 50% DP counts as paid there
 // Delivered is no longer offered (K, 2026-10-08); old Delivered orders still show it.
 const FUL_PICK = FULFILLMENTS.filter(f => f.id !== "delivered");
 const ful = id => FULFILLMENTS.find(s => s.id === id) || FULFILLMENTS[0];
@@ -1017,7 +1026,7 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "reviews", "logins", "homecontent", "dtasks"], blurb: "Directory, logins, Home page" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "reviews", "logins", "homecontent", "expenses", "dtasks"], blurb: "Directory, logins, Home page, expenses & cash" },
   { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["suppliers", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "customers", "dtasks"], blurb: "Channels, listings, audience" },
@@ -1327,6 +1336,8 @@ async function updateOrderCore(o, ch) {
   if (msgs.length) upd.log = logAdd(o, msgs, by);
   await patch("orders", o.id, upd);
   if (!o.web && "fulfillment" in upd) scheduleStatusSync();
+  if (!by && upd.fulfillment && upd.fulfillment !== o.fulfillment) custMailStep(o, upd.fulfillment);
+  else if (!by && upd.payment && VOIDPAY.has(upd.payment) && !VOIDPAY.has(o.payment)) custMailStep(o, "cancelled");
   if (stockDelta) { if (o.stockTaken) await applyStockMap(o.stockTaken, stockDelta); else for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, stockDelta * (Number(i.qty) || 0)); }
   return stockDelta;
 }
@@ -2702,6 +2713,29 @@ function navRefresh() {
   if (S.baseDb && S.baseDb._refresh) S.baseDb._refresh().catch(() => {});
   if (S.site) webLoad(true);
 }
+// Unpaid Maya Checkout website orders are cancelled 24 hours after they were placed (orders placed from Oct 8, 2026), and the buyer gets an email.
+// Runs on any team device that has RS OS open; webmeta/_autocancel stops two devices doing it at once.
+const AUTOCANCEL_FROM = Date.parse("2026-10-08T00:00:00+08:00"), PAY_WINDOW = 24 * 3600e3;
+let acBusy = false;
+async function autoCancelUnpaid() {
+  if (acBusy || !S.site || !S.web.loaded || !canOrders() || S.readOnly || S.viewAs || !S.loaded.webmeta) return;
+  const due = S.web.orders.filter(o => { const t = webMs(o.date); return t >= AUTOCANCEL_FROM && Date.now() - t > PAY_WINDOW && !o.paid && !o.mayaPaid && !o.payRef && /maya/i.test(o.payment || "") && /^placed$/i.test(o.status || "Placed") && !(o.cancel && o.cancel.status === "Pending"); });
+  if (!due.length) return;
+  const lock = S.webmeta.find(d => d.id === "_autocancel"); if (lock && Date.now() - (lock.at || 0) < 120e3 && lock.uid !== S.uid) return;
+  acBusy = true;
+  try {
+    await save("webmeta", "_autocancel", { at: Date.now(), uid: S.uid || "", by: actor() });
+    for (const src of due) {
+      const r = await S.site.update(src.ref, { status: "Cancelled" }).catch(() => null); if (!r || !r.ok) continue;
+      const i = S.web.orders.findIndex(x => x.ref === src.ref); if (i >= 0) S.web.orders[i] = r.order || { ...src, status: "Cancelled" };
+      const id = String(src.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {};
+      await save("webmeta", id, { ...clean(cur), ref: src.ref, siteAt: (webSiteAt = Date.now()), log: [...(cur.log || []), { at: Date.now(), by: "Auto", msg: "cancelled: not paid within 24 hours (Maya Checkout)" }].slice(-50), at: Date.now() });
+      S.web.dirty = true;
+      const wo = webAsOrders().find(x => x.ref === src.ref); if (wo) await custMail(wo, "cancelled", { reason: "we didn't receive the payment within 24 hours" }).catch(() => {});
+    }
+    toast(`${due.length} unpaid Maya order${due.length === 1 ? "" : "s"} cancelled (not paid within 24 hours).`); bgRender();
+  } finally { acBusy = false; }
+}
 // Someone changed a website order's payment / status on another device: reload website orders now (not on the next 60s check).
 let webSiteAt = 0, webSoonT = 0;
 function webMetaSeen() {
@@ -2722,7 +2756,7 @@ async function webLoad(quiet) {
     S.web.orders = r.orders || []; S.web.cancelRequests = Number(r.cancelRequests) || (r.orders || []).filter(o => o.cancel && o.cancel.status === "Pending").length; S.web.at = r.at || new Date().toISOString(); S.web.ms = Date.now() - S.web.t0; S.web.backendMs = Number(r.backendMs) || 0; S.web.err = ""; S.web.loaded = true; S.web.dirty = true;
   } catch (e) { S.web.err = (e && e.message) || "Couldn't load website orders."; }
   finally { webBusy = false; S.web.loading = false; bgRender(); if (S.web.again) { S.web.again = false; setTimeout(() => webLoad(true), 300); } }
-  webStockSync(); scheduleOwnerSync(); webStatusSync(); scheduleStatusSync(3000);
+  webStockSync(); scheduleOwnerSync(); webStatusSync(); scheduleStatusSync(3000); autoCancelUnpaid().catch(e => console.warn("auto-cancel", e));
   if (S.products.some(p => p.webSync === "pending") && !autoPushT) scheduleWebPush();
   // The full catalog also goes out every 6 hours (and right after the website backend is first set up), so the site never drifts.
   const last = S.webmeta.find(d => d.id === "_push");
@@ -2762,16 +2796,17 @@ function webAsOrders() {
   const meta = new Map(S.webmeta.map(d => [d.ref, d]));
   const rows = S.web.orders.map(o => {
     const t = webMs(o.date), cancel = /cancel/i.test(o.status || ""), m = meta.get(o.ref) || {};
-    const sitePay = cancel ? "voided" : o.paid ? "paid" : "pending", siteFul = WEB_FUL[String(o.status || "placed").toLowerCase()] || "unfulfilled";
+    const dpOnly = o.paid && Number(o.due) > 0 && Number(o.total) > 0 && Number(o.due) < Number(o.total) - 1;
+    const sitePay = cancel ? "voided" : o.paid ? (dpOnly ? "partial" : "paid") : "pending", siteFul = WEB_FUL[String(o.status || "placed").toLowerCase()] || "unfulfilled";
     // The website decides paid / unpaid and shipped / delivered / cancelled; the team's finer choices show when they agree with it.
-    const payment = m.payment && (m.payment === "paid") === (sitePay === "paid") && !cancel ? m.payment : sitePay;
+    const payment = m.payment && paidish(m.payment) === paidish(sitePay) && !cancel ? m.payment : sitePay;
     const fulfillment = ["fulfilled", "delivered", "cancelled"].includes(siteFul) || !m.fulfillment ? siteFul : m.fulfillment;
     return { id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
-      items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0 })),
+      items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0, kind: i.kind === "preorder" || i.preorder === true ? "preorder" : i.kind === "onhand" ? "onhand" : "" })),
       adjust: (Number(o.total) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
       payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
-      tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", cancel: o.cancel || null,
+      tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", cancel: o.cancel || null, shipPref: o.shipPref || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
   });
   webRowsMemo = { at: S.web.at, n: S.web.orders.length, m: S.webmeta, rows }; return rows;
@@ -2786,7 +2821,7 @@ async function webOrderUpdate(o, ch) {
   const site = {}, keep = {}, msgs = [];
   if ("payment" in ch && ch.payment !== o.payment) {
     keep.payment = ch.payment; msgs.push("Payment Status → " + pay(ch.payment).name);
-    if (VOIDPAY.has(ch.payment)) site.status = "Cancelled"; else if ((ch.payment === "paid") !== !!src.paid) site.paid = ch.payment === "paid";
+    if (VOIDPAY.has(ch.payment)) site.status = "Cancelled"; else if (paidish(ch.payment) !== !!src.paid) site.paid = paidish(ch.payment);
   }
   if ("fulfillment" in ch && ch.fulfillment !== o.fulfillment) {
     keep.fulfillment = ch.fulfillment; msgs.push("Fulfillment Status → " + ful(ch.fulfillment).name);
@@ -2805,6 +2840,8 @@ async function webOrderUpdate(o, ch) {
   const id = String(o.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {};
   await save("webmeta", id, { ...clean(cur), ...keep, ...(Object.keys(site).length ? { siteAt: (webSiteAt = Date.now()) } : {}), ref: o.ref, log: [...(cur.log || []), { at: Date.now(), by: actor(), msg: "changed " + msgs.join(", ") }].slice(-50), at: Date.now() });
   S.web.dirty = true; bgRender();
+  if ("fulfillment" in keep && keep.fulfillment !== o.fulfillment) custMailStep(o, keep.fulfillment);
+  else if (site.status === "Cancelled") custMailStep(o, "cancelled");
 }
 const allOrderRows = () => [...S.orders, ...webAsOrders()];
 
@@ -2971,8 +3008,8 @@ async function webUpdate(ref, patch, btn) {
     const r = await S.site.update(ref, patch);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't save it.");
     const i = S.web.orders.findIndex(x => x.ref === ref); if (i >= 0 && r.order) { S.web.orders[i] = r.order; S.web.dirty = true; }
-    toast(`${ref} updated on the website.`); S.sheetNoPush = true; openWebOrder(ref);
-  } catch (e) { sheetError((e && e.message) || "Couldn't save."); if (btn) { btn.disabled = false; btn.textContent = "Try again"; } }
+    toast(`${ref} updated on the website.`); S.sheetNoPush = true; openWebOrder(ref); return true;
+  } catch (e) { sheetError((e && e.message) || "Couldn't save."); if (btn) { btn.disabled = false; btn.textContent = "Try again"; } return false; }
 }
 
 function viewHomeContent() {
@@ -3213,7 +3250,7 @@ function viewDashboard() {
   const live = orders.filter(o => !isVoid(o));
   const sales = live.reduce((a, o) => a + total(o), 0);
   const gross = live.reduce((a, o) => a + profit(o), 0);
-  const exp = S.expenses.filter(e => inPeriod(e.date)).reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const exp = realExpenses().filter(e => inPeriod(e.date)).reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const net = gross - exp;
   const low = S.products.filter(p => stockState(p).cls !== "good");
   const expiring = S.products.filter(p => expiryState(p));
@@ -3423,16 +3460,16 @@ function tagCell(tags) {
 
 /* ---------- order table columns (arrangeable per department) ---------- */
 const ORDER_COLS = {
-  num: { label: "Order" }, source: { label: "Source" }, date: { label: "Date" }, items: { label: "Items" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
+  num: { label: "Order" }, source: { label: "Source" }, date: { label: "Date" }, items: { label: "Items" }, ikind: { label: "Item type" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
   total: { label: "Total", cls: "r" }, payment: { label: "Payment status" }, mop: { label: "Mode of payment" }, fulfillment: { label: "Fulfillment status" }, courier: { label: "Courier" },
   tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, note: { label: "Note" }, activity: { label: "History" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
 const TABLE_COLS = {
-  orders: { all: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
-    byDept: { PACKING: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
+  orders: { all: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
+    byDept: { PACKING: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, barcode: { label: "Barcode" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r pcell" }, compare: { label: "Compare at", cls: "r pcell" }, cost: { label: "Cost", cls: "r pcell" }, stock: { label: "In stock", cls: "r" }, committed: { label: "Committed", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
     all: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"], show: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"] },
-  packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
+  packing: { all: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
 // Listings columns are saved per person; order tables per department.
 const colKey = table => TABLE_COLS[table].personal ? `u_${myMemberId() || S.uid || "me"}_${table}` : `${ctxDept()}_${table}`;
@@ -3471,6 +3508,25 @@ const MOPS = ["Maya", "BDO", "GCash", "Bank transfer", "Cash", "COD", "Card", "O
 const MOP_ST = { maya: "green", bdo: "blue", gcash: "teal", "bank transfer": "violet", cash: "amber", cod: "orange", card: "pink" };
 const mopSt = m => "st-" + (MOP_ST[String(m || "").toLowerCase()] || (/maya/i.test(m) ? "green" : /bdo/i.test(m) ? "blue" : /gcash/i.test(m) ? "teal" : "grey"));
 const mopOf = o => o.web ? String(o.payMethod || "").replace(/\s*checkout$/i, "") : (o.mop || (/maya/i.test(o.payLink || "") ? "Maya" : /bdo/i.test(o.payLink || "") ? "BDO" : ""));
+// Item type per order line: the listing's On hand / Pre-order setting, else the item name ("(PREORDER)", "IN TRANSIT", "50% DP"), else the order's PO / OH tag.
+let kindIdx = null, kindIdxN = -1;
+const kindKey = x => String(x || "").toLowerCase().replace(/\(.*?\)|pre-?order|[^a-z0-9]/g, "");
+function itemKind(i, o) {
+  const n = String(i.name || i.title || "");
+  if (i.kind === "preorder" || i.kind === "onhand") return i.kind;
+  if (i.productId) { const p = S.products.find(x => x.id === i.productId); if (p) return p.kind === "preorder" ? "preorder" : "onhand"; }
+  if (/pre-?order|in tran|fastbreak|\bdp\b|50%\s*dp|upon arrival/i.test(n)) return "preorder";
+  if (kindIdxN !== S.products.length) { kindIdxN = S.products.length; kindIdx = new Map(); for (const p of S.products) for (const k of [kindKey(p.name), kindKey((p.brand || "") + p.name), kindKey((p.brand || "") + p.name + (p.size || ""))]) if (k.length > 5 && !kindIdx.has(k)) kindIdx.set(k, p.kind); }
+  const k = kindKey(n.split("|")[0]); if (kindIdx.has(k)) return kindIdx.get(k) === "preorder" ? "preorder" : "onhand";
+  const tg = (o && o.tags) || []; if (tg.includes("PO") && !tg.includes("OH")) return "preorder";
+  return "onhand";
+}
+const isFreeItem = i => /^\(free!?\)/i.test(String(i.name || ""));
+const kindCounts = o => { const c = { onhand: 0, preorder: 0 }; for (const i of o.items || []) c[itemKind(i, o)] += Number(i.qty) || 1; return c; };
+const hasPreorder = o => (o.items || []).some(i => !isFreeItem(i) && itemKind(i, o) === "preorder");
+const kindSummary = o => { const c = kindCounts(o); return [c.onhand ? `${c.onhand} × On hand` : "", c.preorder ? `${c.preorder} × Pre-order` : ""].filter(Boolean).join(", "); };
+const SHIP_PREF = { ahead: "Ship on-hand ahead", together: "Ship all together" };
+const kindCell = o => { const c = kindCounts(o); return `<span class="ik-cell">${o.shipPref && SHIP_PREF[o.shipPref] ? `<span class="chip" title="Buyer's shipping choice at checkout">${SHIP_PREF[o.shipPref]}</span>` : ""}${c.onhand ? `<span class="chip ik-oh">${c.onhand} × On hand</span>` : ""}${c.preorder ? `<span class="chip ik-po">${c.preorder} × Pre-order</span>` : ""}${!c.onhand && !c.preorder ? `<span style="color:var(--muted)">–</span>` : ""}</span>`; };
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
   if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
@@ -3480,6 +3536,7 @@ function orderCell(k, o, table) {
     case "source": return `<td class="nowrap src-td"><div class="src-cell">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>${o.cancel && o.cancel.status === "Pending" ? ` <span class="badge red">Cancel request</span>` : ""}${bdoNeeds(S.web.orders.find(x => x.ref === o.ref)) ? ` <span class="badge amber" title="Make a BDO Checkout link for this order">BDO link needed</span>` : ""}` : `<span class="chip">${esc(orderSource(o))}</span>`}${disputeChip(o)}${exChip(o)}</div></td>`;
     case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
     case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
+    case "ikind": return `<td class="nowrap">${kindCell(o)}</td>`;
     case "customer": return `<td class="strike cust-td">${o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "No customer"}</td>`;
     case "assigned": { const team = salesTeam(); const cur = o.assignee && !team.some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [];
       return canAll() ? `<td><select class="status st-grey" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
@@ -4178,20 +4235,23 @@ function openCustomer(key) {
 }
 
 function viewExpenses() {
-  const rows = S.expenses.filter(e => inPeriod(e.date)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const all = S.expenses.filter(e => inPeriod(e.date)).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.at || 0) - (a.at || 0));
+  const rows = all.filter(e => !isCashIn(e)), cash = cashOnHand();
   const tot = rows.reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const byCat = EXP_CATS.map(c => ({ c, v: rows.filter(e => e.category === c).reduce((a, e) => a + (Number(e.amount) || 0), 0) })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
   const max = Math.max(1, ...byCat.map(x => x.v));
   return `
   <div class="head">${periodSeg()}</div>
+  <section class="panel cash-panel"><div class="head"><h2>Cash on hand</h2>${S.readOnly ? "" : `<span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="new-cashin">+ Cash in</button><button class="btn sm primary" type="button" data-act="new-expense">− Cash out / expense</button></span>`}</div>
+    <div class="kpi" style="border:0;padding:0"><span class="value" style="color:${cash < 0 ? "var(--bad)" : "inherit"}">${peso2(cash)}</span><span class="sub">Cash in minus expenses paid with Cash on hand (from Oct 8, 2026). Admin and Finance see the same list.</span></div></section>
   <div class="grid-2">
     <section class="panel"><h2>Total ${periodLabel()}</h2><div class="kpi" style="border:0;padding:0"><span class="value">${peso(tot)}</span><span class="sub">${rows.length} expense${rows.length === 1 ? "" : "s"}</span></div></section>
     <section class="panel"><h2>By category</h2><div class="bars">${byCat.map(x => `<div class="bar-row"><span>${esc(x.c)}</span><div class="bar-track"><div class="bar-fill" style="width:${(x.v / max * 100).toFixed(1)}%;background:var(--gold)"></div></div><span class="num">${peso(x.v)}</span></div>`).join("") || `<div class="empty">No expenses ${periodLabel()}.</div>`}</div></section>
   </div>
   <div class="table-wrap"><table>
-    <thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="r">Amount</th><th></th></tr></thead>
-    <tbody>${rows.map(e => `<tr><td class="num">${fmtDate(e.date)}</td><td>${esc(e.category)}${exChip(e)}</td><td>${esc(e.note || "")}</td><td class="r num" style="font-weight:700">${peso(e.amount)}</td><td class="r">${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">Edit</button>`}</td></tr>`).join("")}</tbody>
-  </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No expenses ${periodLabel()}. Log ingredients, packaging, ads and other costs so net profit stays accurate.</div>`}</div>`;
+    <thead><tr><th>Date</th><th>Category</th><th>Note</th><th>Paid with</th><th>OR / receipt</th><th>By</th><th class="r">Amount</th><th></th></tr></thead>
+    <tbody>${all.map(e => `<tr><td class="num">${fmtDate(e.date)}</td><td>${isCashIn(e) ? `<span class="chip good">Cash in</span>` : esc(e.category)}${exChip(e)}</td><td>${esc(e.note || "")}</td><td>${isCashIn(e) ? "" : esc(e.paidWith || "")}</td><td>${e.file ? `<button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">📎 View</button>` : isCashIn(e) ? "" : `<span style="color:var(--muted)">–</span>`}</td><td style="font-size:12.5px">${esc(e.by || "")}</td><td class="r num" style="font-weight:700;${isCashIn(e) ? "color:var(--good)" : ""}">${isCashIn(e) ? "+" : ""}${peso(e.amount)}</td><td class="r">${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">Edit</button>`}</td></tr>`).join("")}</tbody>
+  </table>${all.length ? "" : `<div class="empty" style="padding:16px">No expenses ${periodLabel()}. Log ingredients, packaging, ads and other costs so net profit stays accurate.</div>`}</div>`;
 }
 
 /* ---------- sheets (forms) ---------- */
@@ -4361,12 +4421,13 @@ function openOrderForm() {
     if (S.site && S.site.nextNumber && !(rsv && rsv.ok && /^RS\d+$/.test(rsv.ref || ""))) return sheetError((rsv && rsv.error) || "Couldn't get the next RS number. Try again.");
     const fnum = (rsv && rsv.ref) || num;
     const order = { num: fnum, createdAt, date, platform: val("o-platform"), customer: custName, ref: val("o-ref"), ...cc, items, fees: 0, shipping: numv("o-ship"), adjust: 0, discount: orderDisc(items), discountNote: orderDisc(items) ? val("o-dnote") : "", payment: val("o-pay"), fulfillment, tags: parseTags(val("o-tags")), note: val("o-note"), restocked: false, fulfilledAt: fulfillment === "fulfilled" ? createdAt : 0, deliveredAt: 0, voidedAt: 0 };
+    if (order.payment === "paid" && hasPreorder(order)) { order.payment = "partial"; S.dpNote = true; }
     const take = isCancelled(order.payment, fulfillment) ? {} : stockTake(items);
     order.stockTaken = take;
     await save("orders", uid("o"), order);
     await applyStockMap(take, -1);
     const fresh = await buyerRecord(order, hit, S.mergeAns).catch(() => false); S.mergeAns = null;
-    closeSheet(); toast(`Order #${fnum} saved. Inventory updated.${fresh ? " New buyer added to Customers." : ""}`);
+    closeSheet(); toast(`Order #${fnum} saved. Inventory updated.${fresh ? " New buyer added to Customers." : ""}${S.dpNote ? " Pre-order → Partially paid (50% DP); set Fully paid when the balance is paid." : ""}`); S.dpNote = false;
     if (order.email && !isCancelled(order.payment, fulfillment)) { const nw = S.orders.find(x => x.num === fnum); if (nw) receiptSend(nw, true); }
   });
   addrInit();
@@ -4564,6 +4625,62 @@ async function receiptSend(o, quiet) {
   await patch("orders", o.id, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
   toast(`Royal Receipt emailed to ${o.email}.`); return true;
 }
+/* ---------- customer update emails (store Gmail via the website backend opsEmail) ----------
+   Sent once per step: payment link ready, order confirmed, pre-order arrived, packing, shipped, cancelled.
+   Internal steps (FWD, Billed, DP, On hold…) are one "confirmed" email, so customers aren't flooded. */
+const MAIL_STEP = { fwd: "confirmed", billed: "confirmed", dp: "confirmed", on_hold: "confirmed", arrived: "arrived", sorted: "arrived", arrived_hold: "arrived", unfulfilled: "packing", fulfilled: "shipped", delivered: "shipped", cancelled: "cancelled" };
+const SITE_ORDERS = "https://www.regalspritz.com/account";
+function custMailHTML(o, m) {
+  const e = esc, c = RR;
+  const items = (o.items || []).map(i => `<tr><td style="padding:3px 0;font-size:14px;color:${c.ink}">${Number(i.qty) > 1 ? i.qty + " × " : ""}${e(i.name || "")}</td></tr>`).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${e(m.subject)}</title></head>
+<body style="margin:0;padding:0;background:${c.bg};font-family:Helvetica,Arial,sans-serif;color:${c.ink}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.bg}"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:14px;overflow:hidden">
+<tr><td style="background:${c.brand};padding:22px 28px;text-align:center"><div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;color:#ffffff">Regal Spritz PH</div>
+  <div style="font-size:11px;letter-spacing:3px;color:${c.gold};margin-top:6px;font-weight:700">ORDER ${e(onum(o))}</div></td></tr>
+<tr><td style="padding:26px 28px">
+  <div style="font-size:20px;font-weight:700;color:${c.brand};margin-bottom:10px">${e(m.title)}</div>
+  ${m.lines.map(l => `<p style="margin:0 0 10px;font-size:15px;line-height:1.5;color:${c.ink}">${l}</p>`).join("")}
+  ${m.button ? `<div style="text-align:center;margin:20px 0 8px"><a href="${e(m.button.url)}" target="_blank" style="display:inline-block;background:${c.brand};color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 34px;border-radius:10px">${e(m.button.label)}</a></div>` : ""}
+  ${items ? `<div style="margin-top:18px;padding-top:12px;border-top:1px solid ${c.line}"><div style="font-size:12px;letter-spacing:2px;color:${c.muted};font-weight:700;margin-bottom:6px">YOUR ITEMS</div><table role="presentation" width="100%">${items}</table></div>` : ""}
+  <p style="margin:18px 0 0;font-size:13px;color:${c.muted}">Questions? Just reply to this email or message us on Facebook / Instagram @regalspritzph.</p>
+</td></tr></table></td></tr></table></body></html>`;
+}
+function custMailMsg(o, step, x) {
+  const n = esc((o.customer || "").split(" ")[0] || "there"), num = esc(onum(o)), pre = hasPreorder(o), part = o.payment === "partial";
+  const trk = o.tracking ? `Tracking number: <b>${esc(o.tracking)}</b>${o.courier || courierOf(o) ? ` (${esc(COURIER_LABEL[courierOf(o)] || courierOf(o))})` : ""}.` : "";
+  const M = {
+    paylink: { subject: `Your payment link is ready · order ${onum(o)}`, title: "Your payment link is ready", lines: [`Hi ${n}, your ${esc(x && x.method || "")} payment link for order <b>${num}</b> is ready.`, x && x.until ? `Please pay by <b>${esc(x.until)}</b> so we can keep your order.` : "Tap the button below to pay. Thank you!"], button: x && x.url ? { label: "Pay now", url: x.url } : null },
+    confirmed: { subject: `Order ${onum(o)} confirmed`, title: "Your order is confirmed", lines: [`Hi ${n}, thank you! Order <b>${num}</b> is confirmed${pre ? " and your pre-order is now being processed with our supplier" : " and we're preparing it"}.`, pre ? "We'll email you again when it arrives in the Philippines." : "We'll email you when it ships."] },
+    arrived: { subject: `Your pre-order has arrived · order ${onum(o)}`, title: "Your pre-order has arrived", lines: [`Hi ${n}, good news: your pre-order for order <b>${num}</b> has arrived in the Philippines.`, part ? "We'll send the remaining balance details, then ship it right away." : "We're getting it ready to ship."] },
+    packing: { subject: `We're packing order ${onum(o)}`, title: "We're packing your order", lines: [`Hi ${n}, order <b>${num}</b> is being packed and will ship soon.`] },
+    shipped: { subject: `Order ${onum(o)} has shipped`, title: "Your order is on its way", lines: [`Hi ${n}, order <b>${num}</b> has shipped.`, trk || "We'll share the tracking number if you need it."] },
+    cancelled: { subject: `Order ${onum(o)} cancelled`, title: "Your order was cancelled", lines: [`Hi ${n}, order <b>${num}</b> has been cancelled${x && x.reason ? ": " + esc(x.reason) : "."}`, "If this is a mistake or you'd still like the items, just reply to this email and we'll help you place it again."] },
+  };
+  const m = M[step]; if (!m) return null;
+  if (o.web && step !== "paylink") m.button = { label: "View my order", url: SITE_ORDERS };
+  return m;
+}
+const mailPaused = () => { try { return localStorage.getItem("rs-mail-pause") === mToday(); } catch (e) { return false; } };
+// Sends one update email (once per order + step). Returns true when sent.
+async function custMail(o, step, x) {
+  if (!o || !o.email || !S.site || !S.site.email || S.viewAs || S.readOnly || mailPaused()) return false;
+  const sentKey = step === "paylink" ? "paylink:" + ((x && x.url) || "") : step;
+  const meta = o.web ? (S.webmeta.find(d => d.ref === o.ref) || {}) : (S.orders.find(r => r.id === o.id) || o);
+  if ((meta.mailed || {})[sentKey]) return false;
+  const m = custMailMsg(o, step, x); if (!m) return false;
+  const text = [m.title, ...m.lines.map(l => l.replace(/<[^>]+>/g, "")), m.button ? m.button.label + ": " + m.button.url : ""].filter(Boolean).join("\n\n");
+  const r = await S.site.email({ to: o.email, subject: m.subject, html: custMailHTML(o, m), text }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok) { if (!S.mailErrShown) { S.mailErrShown = true; toast(`Customer email not sent: ${(r && r.error) || "the website didn't answer"}.`); } return false; }
+  if (typeof r.remaining === "number" && r.remaining < 5) { try { localStorage.setItem("rs-mail-pause", mToday()); } catch (e) {} toast("Gmail's daily email limit is almost used up. Customer update emails pause until tomorrow."); }
+  const mailed = { ...(meta.mailed || {}), [sentKey]: Date.now() }, msg = `emailed the customer: ${m.title}`;
+  if (o.web) { const id = String(o.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {}; await save("webmeta", id, { ...clean(cur), ref: o.ref, mailed, log: [...(cur.log || []), { at: Date.now(), by: actor(), msg }].slice(-50), at: Date.now() }).catch(() => {}); }
+  else { UNDO.at = 0; await patch("orders", o.id, { mailed, log: logAdd(meta, [msg]) }).catch(() => {}); }
+  return true;
+}
+// After a status change: email the step the customer cares about (fire and forget).
+function custMailStep(o, ful) { const step = MAIL_STEP[ful]; if (!step || !o.email) return; setTimeout(() => { const cur = o.web ? webAsOrders().find(x => x.ref === o.ref) : S.orders.find(x => x.id === o.id); custMail(cur || o, step).catch(() => {}); }, 1500); }
 async function copyRich(html, text) {
   try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]); return true; }
   catch (e) { try { await navigator.clipboard.writeText(text); return true; } catch (e2) { return false; } }
@@ -5235,24 +5352,33 @@ function openRestock(id) {
   });
 }
 
-function openExpenseForm(id) {
-  const e = id ? S.expenses.find(x => x.id === id) : {};
+function openExpenseForm(id, cashin) {
+  const e = id ? S.expenses.find(x => x.id === id) : { kind: cashin ? "cashin" : "", paidWith: "Cash on hand" }; if (!e) return;
+  const ci = isCashIn(e);
   openSheet(`
-    <h3>${id ? "Edit expense" : "Add expense"}</h3>
+    <h3>${ci ? (id ? "Edit cash in" : "Add cash in") : id ? "Edit expense" : "Add expense"}</h3>
     <div class="row">
       <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" value="${esc(e.date || today())}"></div>
       <div class="field"><label for="e-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="e-amt" value="${moneyFmt(e.amount ?? "")}"></div>
     </div>
-    <div class="field"><label for="e-cat">Category</label><select id="e-cat">${EXP_CATS.map(c => `<option ${e.category === c ? "selected" : ""}>${c}</option>`).join("")}</select></div>
-    <div class="field"><label for="e-note">Note</label><input id="e-note" value="${esc(e.note || "")}" placeholder="e.g. 500 amber bottles"></div>
+    ${ci ? "" : `<div class="row"><div class="field"><label for="e-cat">Category</label><select id="e-cat">${EXP_CATS.map(c => `<option ${e.category === c ? "selected" : ""}>${c}</option>`).join("")}</select></div>
+      <div class="field"><label for="e-paid">Paid with</label><select id="e-paid">${EXP_PAID.map(c => `<option ${(e.paidWith || "Cash on hand") === c ? "selected" : ""}>${c}</option>`).join("")}</select></div></div>`}
+    <div class="field"><label for="e-note">${ci ? "Where the cash came from" : "Note"}</label><input id="e-note" value="${esc(e.note || "")}" placeholder="${ci ? "e.g. Petty cash from K, COD collected" : "e.g. Lalamove to supplier, 200 bubble mailers"}"></div>
+    ${ci ? "" : `<div class="field"><label for="e-file">OR / receipt photo</label><input id="e-file" type="file" accept="image/*,application/pdf">
+      <div style="font-size:12.5px;color:var(--muted)">${e.file ? `Attached: ${esc(e.file.name || "receipt")} <button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">View</button>` : "Take a photo of the OR or receipt."}</div></div>`}
     <div id="sheet-err" class="confirm" hidden></div>
-    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-expense" data-id="${id}">Delete expense</button></div>` : ""}
-    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save expense</button></div>`,
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-expense" data-id="${id}">Delete</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
     if (numv("e-amt") <= 0) return sheetError("Enter an amount.");
-    const data = { ...(id ? clean(e) : {}), date: val("e-date") || today(), amount: numv("e-amt"), category: val("e-cat"), note: val("e-note") };
+    const fin = $("#e-file"), f = fin && fin.files && fin.files[0];
+    let file = e.file || null;
+    if (f) { try { const nf = await storeFile(f); if (e.file) await removeFile(e.file); file = nf; } catch (err) { return sheetError((err && err.message) || "Couldn't save the photo."); } }
+    const me = actor().split(",")[0];
+    const data = { ...(id ? clean(e) : {}), kind: ci ? "cashin" : "", date: val("e-date") || today(), amount: numv("e-amt"), note: val("e-note"),
+      ...(ci ? {} : { category: val("e-cat"), paidWith: val("e-paid"), file }), by: e.by || me, at: e.at || Date.now(), ...(id ? { editedBy: me } : {}) };
     await save("expenses", id || uid("e"), data);
-    closeSheet(); toast(id ? "Expense updated." : "Expense added.");
+    closeSheet(); toast(ci ? "Cash in saved." : id ? "Expense updated." : "Expense added. Finance sees it too.");
   });
 }
 
@@ -6639,7 +6765,7 @@ async function exportCol(col) {
   if (col === "payroll") { const per = payPeriod(); rows = [["Pay period", "ID Number", "Employee", "Position", "Rate / day", "Days worked", "Paid days", "Late days", "Late minutes", "Leave", "Absent", "Basic pay", ...ADD_FIELDS.map(f => f[1]), "Late deduction", ...DED_FIELDS.map(f => f[1]), "Net pay", "Status"], ...activeTeam().map(m => { const c = payCalc(m, per); return [per.label, m.idNumber, m.name, positionOf(m), c.rate, c.worked, c.paidDays, c.late, c.lateMin, c.leave, c.absent, c.basic, ...ADD_FIELDS.map(([k]) => Number(c.rec[k]) || 0), c.lateDed, ...DED_FIELDS.map(([k]) => Number(c.rec[k]) || 0), c.net, PAY_STATUS[c.status].name]; })]; }
   if (col === "investments") rows = [["Type", "Status", "INV Code", "Name", "FB Account", "Amount", "% Interest / Month", "Interest / Month", "Duration (Months)", "Total Interest", "Payment Start", "End Date", "Amount Due", "Status", "Payments Made", "Notes"], ...S.investments.map(v => [v.kind === "loan" ? "Loan" : "Investor", v.closed ? "Finished" : "Ongoing", v.code, v.name, v.fb, v.amount, v.rate, invMonthly(v), v.months, invTotalInterest(v), v.start, invEnd(v), v.kind === "loan" ? "" : invDue(v), invStatus(v).name, `${invSchedule(v).filter(p => p.paid).length}/${invSchedule(v).length}`, v.notes])];
   if (col === "products") rows = [["Name", "Brand", "Size", "Type", "Price", "Compare at", "Cost", "Stock", "SKU", "Barcode", "Category", "Status", "Description", "Website link", "Needs website sync"], ...S.products.map(p => [p.name, p.brand, p.size, p.ptype, p.price, p.compareAt, p.cost, p.stock, p.sku, p.barcode, p.category, (LIST_STATUS[p.status || "active"] || {}).name, p.description, webUrl(p), p.webSync === "pending" ? "Yes" : "No"])];
-  if (col === "expenses") rows = [["Date", "Category", "Note", "Amount"], ...S.expenses.map(e => [e.date, e.category, e.note, e.amount])];
+  if (col === "expenses") rows = [["Date", "Type", "Category", "Note", "Paid with", "By", "Amount"], ...S.expenses.map(e => [e.date, isCashIn(e) ? "Cash in" : "Expense", e.category || "", e.note, e.paidWith || "", e.by || "", e.amount])];
   if (col === "customers") rows = [["Name", "Email", "Phone", "Address", "Channels", "Orders", "Amount spent", "Last order", "Tags", "Note"], ...customerList().map(c => [c.name, c.email, c.phone, c.address, [...c.platforms].join("; "), c.orders, c.spent, c.last ? new Date(c.last).toLocaleDateString("en-CA") : "", (c.tags || []).join(", "), c.note])];
   if (col === "checks") rows = [["Check date", "Check no.", "Bank / account", "Payee", "Amount", "Purpose", "Status", "Issued", "Notes"], ...S.checks.map(c => [c.checkDate, c.checkNo, c.bank, c.payee, c.amount, c.purpose, CHECK_STATUS[c.status || "pending"].name, c.issued, c.notes])];
   if (col === "payrecords") rows = [["Pay date", "ID", "Name", "Position", "Daily rate", "Net pay", "Note"], ...payRecRows().map(r => [r.payDate, r.idNumber, r.name, r.position, r.rate, r.net, r.note])];
@@ -7022,7 +7148,8 @@ document.addEventListener("click", guard(async ev => {
     case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
-    case "bdo-save": { const v = ($("#bdo-link").value || "").trim(); if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\//i.test(v)) return sheetError("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph)."); return webUpdate(b.dataset.ref, { bdoLink: v }, b); }
+    case "bdo-save": { const v = ($("#bdo-link").value || "").trim(); if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\//i.test(v)) return sheetError("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).");
+      const ok = await webUpdate(b.dataset.ref, { bdoLink: v }, b); if (ok) { const wo = webAsOrders().find(x => x.ref === b.dataset.ref); if (wo && wo.email) custMail(wo, "paylink", { url: v, method: "BDO" }).then(s => s && toast(`BDO payment link emailed to ${wo.email}.`)); } return; }
     case "bdo-clear": return webUpdate(b.dataset.ref, { bdoLink: "" }, b);
     case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
       await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
@@ -7054,6 +7181,8 @@ document.addEventListener("click", guard(async ev => {
     case "edit-product": return openProductForm(id);
     case "restock": return openRestock(id);
     case "new-expense": return openExpenseForm();
+    case "new-cashin": return openExpenseForm(null, true);
+    case "exp-file": { const x = S.expenses.find(r => r.id === id); if (!x || !x.file) return; const w = window.open("", "_blank"); try { const u = await fileBlobUrl(x.file); if (w) w.location.href = u; else location.href = u; } catch (err) { if (w) w.close(); toast("Couldn't open the receipt."); } return; }
     case "edit-expense": return openExpenseForm(id);
     case "close": return closeSheet();
     case "add-item": $("#items").insertAdjacentHTML("beforeend", itemRow()); return;
@@ -7070,7 +7199,7 @@ document.addEventListener("click", guard(async ev => {
     }
     case "del-order": await remove("orders", id); closeSheet(); toast("Order deleted."); return;
     case "del-product": await remove("products", id); closeSheet(); toast("Product deleted."); return;
-    case "del-expense": await remove("expenses", id); closeSheet(); toast("Expense deleted."); return;
+    case "del-expense": { const x = S.expenses.find(r => r.id === id); await remove("expenses", id); if (x && x.file) removeFile(x.file); closeSheet(); toast("Deleted."); return; }
   }
 }));
 
@@ -7574,8 +7703,22 @@ async function costImportOnce(c) {
     if (n) toast(`Imported Shopify cost for ${n} listing${n === 1 ? "" : "s"}.`);
   } catch (e) { console.warn("cost import", e); }
 }
+// One time (owner's device): open pre-order orders marked Fully paid were only 50% DP → Partially paid. Flag webmeta/_dpfix.
+async function dpFixOnce() {
+  if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
+  const t0 = Date.now();
+  while (!S.loaded.products || !S.loaded.webmeta || !S.loaded.orders) { if (Date.now() - t0 > 90000) return; await new Promise(r => setTimeout(r, 1000)); }
+  if (S.webmeta.some(d => d.id === "_dpfix")) return;
+  const full = i => /full payment/i.test(String(i.name || ""));
+  const todo = S.orders.filter(o => o.payment === "paid" && !isVoid(o) && !["fulfilled", "delivered", "cancelled"].includes(o.fulfillment) && hasPreorder(o)
+    && !(o.items || []).filter(i => itemKind(i, o) === "preorder" && !isFreeItem(i)).every(full));
+  await save("webmeta", "_dpfix", { at: Date.now(), count: todo.length, ids: todo.map(o => o.id).slice(0, 500) });
+  for (const o of todo) { UNDO.at = 0; await patch("orders", o.id, { payment: "partial", log: logAdd(o, ["changed Payment Status → Partially paid (pre-order, 50% DP)"], "Auto · pre-order DP") }); }
+  if (todo.length) toast(`${todo.length} pre-order order${todo.length === 1 ? "" : "s"} changed from Fully paid to Partially paid (50% DP).`);
+}
 async function startShopSync(c) {
   costImportOnce(c);
+  dpFixOnce().catch(e => console.warn("dp fix", e));
   reconcileStages();
   shopHistoryBackfill(c);
   if (c?.use) Promise.resolve().then(() => c.use("photos")).then(ph => { if (!ph || !ph.save) return; S.photos = ph; const go = () => { if (S.loaded.products) photoCopyRun(); else setTimeout(go, 2000); }; setTimeout(go, 8000); setInterval(photoCopyRun, 30 * 60e3); }).catch(() => {});
