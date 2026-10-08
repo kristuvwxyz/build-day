@@ -37,6 +37,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Website order statuses: a shipped order shows as **Completed** to buyers (site add-on `completed-status.html` relabels Shipped / Delivered; the backend still stores Shipped). RS OS no longer offers Delivered.
 - Tasks: Department "All (everyone)" makes a task show on every person's and department's Tasks list and calendar (and in everyone's badge).
 - Tasks: each person sees a badge on Tasks with their own due-today + overdue count (red if any overdue, amber if only due today).
+- Refresh button (RS App) = hard refresh: clears saved app files and loads the newest version, same page and scroll. Never tell K to press Cmd/Ctrl+Shift+R; say "tap Refresh".
 - Undo: Ctrl/Cmd+Z undoes the last change in RS OS (one click or save = one step), Ctrl/Cmd+Shift+Z redoes.
 - When a fix can be done from the RS App (e.g. a site add-on), do it instead of asking K to paste into another chat.
 - Royal Receipt: every RS OS order with an email gets the Royal Receipt emailed automatically (store Gmail via the website backend `opsEmail`), and again when a pay link is added. The only payment button is the order's own pay link (Maya/BDO). Staff can copy it as text for chat when there's no email.

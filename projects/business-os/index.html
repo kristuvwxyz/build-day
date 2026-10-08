@@ -6814,7 +6814,12 @@ document.addEventListener("click", guard(async ev => {
     case "web-save": { const row = webAsOrders().find(w => w.ref === b.dataset.ref); if (!row) return; b.disabled = true; b.textContent = "Saving…";
       await updateOrder(row, { fulfillment: val("web-ful"), tracking: val("web-track") }); toast(`${b.dataset.ref} saved · customer sees ${WEB_STATUS_OF[val("web-ful")] || "no change"}.`); S.sheetNoPush = true; openWebOrder(b.dataset.ref); return; }
     case "refresh": {
-      if (await appUpdateCheck(true)) return; // a newer RS App version is out: load it (same page)
+      // RS App: Refresh is a hard refresh (like Cmd/Ctrl+Shift+R): clear the saved app files and load the newest version, same page and scroll.
+      if (APP_BUILD) { if (b.classList.contains("spin")) return; b.classList.add("spin"); saveNav(); try { sessionStorage.setItem("rs-refresh-y", String(Math.round(window.scrollY))); } catch (e) {}
+        try { if (window.caches) await Promise.all((await caches.keys()).map(k => caches.delete(k))); } catch (e) {}
+        try { const rg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (rg) await rg.update(); } catch (e) {}
+        try { await Promise.all([location.pathname, "/shim.js", "/build.txt"].map(u => fetch(u, { cache: "reload" }))); } catch (e) {}
+        location.reload(); return; }
       // Re-reads the data and redraws the same page: same tab, filters, search, page number, scroll and open form.
       if (S.baseDb && S.baseDb._refresh) { if (b.classList.contains("spin")) return; b.classList.add("spin");
         try { await Promise.all([S.baseDb._refresh(), S.site ? webLoad(true) : null]); toast("Up to date."); } catch (e) { toast("Couldn't refresh. Check the internet and try again."); }
