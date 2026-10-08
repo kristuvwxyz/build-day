@@ -1609,7 +1609,7 @@ function loginRows(text) {
     if (filled.length === 1 && !g(r, "pw") && !g(r, "username")) { section = /inactive|old|closed|unused/i.test(filled[0]) ? "inactive" : "active"; continue; }
     if (!g(r, "account")) continue;
     const st = g(r, "status");
-    out.push({ account: g(r, "account"), accountName: g(r, "accountName"), username: g(r, "username"), pw: g(r, "pw"), phone: g(r, "phone"), url: g(r, "url"), notes: g(r, "notes"), status: st ? (/inactive|old|closed/i.test(st) ? "inactive" : "active") : section });
+    out.push({ account: g(r, "account").replace(/^["“”']+|["“”']+$/g, ""), accountName: g(r, "accountName"), username: g(r, "username"), pw: g(r, "pw"), phone: g(r, "phone"), url: g(r, "url"), notes: g(r, "notes"), status: st ? (/inactive|old|closed/i.test(st) ? "inactive" : "active") : section });
   }
   return out;
 }
@@ -3384,9 +3384,15 @@ const cellVal = td => {
 };
 function sortTable(t, col, dir) {
   const tb = t.tBodies[0]; if (!tb) return;
-  const rows = [...tb.rows], d = dir === "asc" ? 1 : -1;
-  rows.sort((a, b) => { const x = cellVal(a.cells[col]), y = cellVal(b.cells[col]); if (x === "" && y !== "") return 1; if (y === "" && x !== "") return -1; const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "en", { numeric: true }); return c * d; });
-  rows.forEach(r => tb.appendChild(r));
+  const d = dir === "asc" ? 1 : -1;
+  // Group rows (tr.grp, e.g. Active / Inactive accounts) stay put; rows are sorted inside their own group.
+  const groups = [[]]; for (const r of tb.rows) { if (r.classList.contains("grp")) groups.push([r]); else groups[groups.length - 1].push(r); }
+  const plain = v => typeof v === "string" ? v.replace(/^[^\p{L}\p{N}]+/u, "") : v;
+  for (const g of groups) {
+    const head = g[0] && g[0].classList.contains("grp") ? [g.shift()] : [];
+    g.sort((a, b) => { const x = plain(cellVal(a.cells[col])), y = plain(cellVal(b.cells[col])); if (x === "" && y !== "") return 1; if (y === "" && x !== "") return -1; const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "en", { numeric: true, sensitivity: "base" }); return c * d; });
+    [...head, ...g].forEach(r => tb.appendChild(r));
+  }
   [...t.tHead.rows[0].cells].forEach((th, i) => { th.setAttribute("aria-sort", i === col ? (dir === "asc" ? "ascending" : "descending") : "none"); const a = th.querySelector(".sarr"); if (a) a.textContent = i === col ? (dir === "asc" ? "↑" : "↓") : "↕"; });
 }
 function enhanceTables() {
@@ -6385,12 +6391,12 @@ function viewLogins() {
       <div style="font-size:12px;color:var(--muted)">Locks again when you close or reload the page.</div></form>`;
   const q = S.lq.trim().toLowerCase();
   const list = S.logins.filter(l => !q || [l.account, l.accountName, l.username, l.phone, l.notes].join(" ").toLowerCase().includes(q))
-    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.account || "").localeCompare(b.account || ""));
+    .sort((a, b) => { const k = l => [l.account, l.accountName].map(x => String(x || "").replace(/^[^\p{L}\p{N}]+/u, "")).join(" "); return k(a).localeCompare(k(b), "en", { numeric: true, sensitivity: "base" }); });
   const can = !S.readOnly;
   const pwCell = l => !l.pw ? `<span style="color:var(--muted)">${esc(l.pwHint || "")}</span>` : `<span class="nowrap" style="display:inline-flex;gap:6px;align-items:center"><code class="pw">${S.pwShown[l.id] != null ? esc(S.pwShown[l.id]) : "••••••••"}</code>
     <button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="${S.pwShown[l.id] != null ? "hide" : "show"}">${S.pwShown[l.id] != null ? "Hide" : "Show"}</button><button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="copy">Copy</button></span>`;
   const section = (title, rows) => `<tr class="grp"><td colspan="6">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>
-      <td style="font-weight:600">${esc(l.account)}</td><td>${esc(l.accountName || "")}</td><td style="user-select:all">${esc(l.username || "")}</td>
+      <td style="font-weight:600">${esc(String(l.account || "").replace(/^["“”']+|["“”']+$/g, ""))}</td><td>${esc(l.accountName || "")}</td><td style="user-select:all">${esc(l.username || "")}</td>
       <td>${pwCell(l)}</td><td class="nowrap num">${esc(l.phone || "")}</td><td style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${esc(l.notes || "")}</td></tr>`).join("");
   return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins">${can ? `<span style="flex:1"></span><button class="btn" type="button" data-act="login-import">Import from spreadsheet</button>` : ""}</div>
     <div class="table-wrap"><table class="otable logins"><thead><tr><th>Account</th><th>Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th>Notes</th></tr></thead>
