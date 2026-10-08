@@ -701,6 +701,13 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .ordtable td .tags { justify-content: center; }
 .ordtable .hist-btn { align-items: center; text-align: center; margin: 0 auto; }
 .ordtable .note-t { text-align: center; }
+/* Compact rows */
+.ordtable td { padding-top: 3px; padding-bottom: 3px; line-height: 1.25; }
+.ordtable th { padding-top: 5px; padding-bottom: 5px; }
+.ordtable td .note-t { -webkit-line-clamp: 1; }
+.ordtable select.status { padding: 2px 5px; }
+.ordtable .badge { padding-top: 1px; padding-bottom: 1px; }
+.ordtable .hist-btn { gap: 0; }
 .osearch { display: flex; align-items: center; gap: 8px; flex: 1 1 280px; min-width: 220px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 0 10px; }
 .osearch:focus-within { border-color: var(--fg); }
 .osearch.big { flex: 1 1 100%; min-height: 48px; border: 2px solid var(--brand); border-radius: 12px; padding: 0 14px; box-shadow: 0 2px 10px rgba(74, 37, 69, .12); }
@@ -1297,7 +1304,7 @@ async function updateOrderCore(o, ch) {
   }
   const tr = stockTransition(o, upd.payment, upd.fulfillment);
   if (tr) { upd.restocked = tr.restocked; stockDelta = tr.sign; }
-  const L = { payment: ["Payment Status", v => pay(v).name], fulfillment: ["Fulfillment Status", v => ful(v).name], courier: ["Courier", v => v], tracking: ["Tracking #", v => v || "(cleared)"], assignee: ["Assigned to", v => v ? memberName(v) : "Unassigned"] };
+  const L = { payment: ["Payment Status", v => pay(v).name], fulfillment: ["Fulfillment Status", v => ful(v).name], courier: ["Courier", v => v], mop: ["Mode of payment", v => v || "(cleared)"], tracking: ["Tracking #", v => v || "(cleared)"], assignee: ["Assigned to", v => v ? memberName(v) : "Unassigned"] };
   const msgs = [];
   for (const [k, [lab, f]] of Object.entries(L)) if (upd[k] !== undefined && upd[k] !== (o[k] ?? (k === "courier" ? courierOf(o) : undefined))) msgs.push(`changed ${lab} → ${f(upd[k])}`);
   if (upd.tags) { const add = upd.tags.filter(t => !(o.tags || []).includes(t)), rm = (o.tags || []).filter(t => !upd.tags.includes(t)); if (add.length) msgs.push(`added tag ${add.join(", ")}`); if (rm.length) msgs.push(`removed tag ${rm.join(", ")}`); }
@@ -3383,15 +3390,15 @@ function tagCell(tags) {
 /* ---------- order table columns (arrangeable per department) ---------- */
 const ORDER_COLS = {
   num: { label: "Order" }, source: { label: "Source" }, date: { label: "Date" }, items: { label: "Items" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
-  total: { label: "Total", cls: "r" }, payment: { label: "Payment status" }, fulfillment: { label: "Fulfillment status" }, courier: { label: "Courier" },
+  total: { label: "Total", cls: "r" }, payment: { label: "Payment status" }, mop: { label: "Mode of payment" }, fulfillment: { label: "Fulfillment status" }, courier: { label: "Courier" },
   tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, note: { label: "Note" }, activity: { label: "History" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
 const TABLE_COLS = {
-  orders: { all: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
+  orders: { all: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "tags", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "tags", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, barcode: { label: "Barcode" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r pcell" }, compare: { label: "Compare at", cls: "r pcell" }, cost: { label: "Cost", cls: "r pcell" }, stock: { label: "In stock", cls: "r" }, committed: { label: "Committed", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
     all: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"], show: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"] },
-  packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
+  packing: { all: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "assigned", "total", "tags", "actions"], show: ["num", "date", "customer", "items", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
 // Listings columns are saved per person; order tables per department.
 const colKey = table => TABLE_COLS[table].personal ? `u_${myMemberId() || S.uid || "me"}_${table}` : `${ctxDept()}_${table}`;
@@ -3425,6 +3432,9 @@ function openColumns(table) {
   });
 }
 
+// Mode of payment: website orders show what the buyer picked; RS OS orders pick one (guessed from the pay link until set).
+const MOPS = ["Maya", "BDO", "GCash", "Bank transfer", "Cash", "COD", "Card", "Other"];
+const mopOf = o => o.web ? String(o.payMethod || "").replace(/\s*checkout$/i, "") : (o.mop || (/maya/i.test(o.payLink || "") ? "Maya" : /bdo/i.test(o.payLink || "") ? "BDO" : ""));
 const itemsLabel = o => { const n = itemCount(o); return `${n} item${n === 1 ? "" : "s"}`; };
 function orderCell(k, o, table) {
   if (o.web && k === "num") return `<td class="nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
@@ -3439,6 +3449,8 @@ function orderCell(k, o, table) {
       return canAll() ? `<td><select class="status st-grey" data-oset="assignee" data-id="${o.id}" aria-label="Assigned to"><option value="">Unassigned</option>${[...team, ...cur].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select></td>` : `<td class="nowrap">${o.assignee ? esc(memberName(o.assignee)) : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "total": return `<td class="r num strike nowrap">${peso2(total(o))}</td>`;
     case "payment": return `<td>${canPay() ? st(pay(o.payment), "payment", opts(PAYMENTS, o.payment)) : badge(pay(o.payment))}</td>`;
+    case "mop": { const m = mopOf(o);
+      return !o.web && canPay() && !o.archived ? `<td><select class="status st-grey" data-oset="mop" data-id="${o.id}" aria-label="Mode of payment"><option value="">–</option>${[...MOPS, ...(m && !MOPS.includes(m) ? [m] : [])].map(x => `<option ${m === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></td>` : `<td class="nowrap" style="font-size:12.5px">${m ? esc(m) : `<span style="color:var(--muted)">–</span>`}</td>`; }
     case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(o.fulfillment === "delivered" ? FULFILLMENTS : FUL_PICK, o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
     case "courier": return `<td>${canShip() ? `<select class="status st-grey" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
@@ -7132,7 +7144,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "ei-dtype") return eiTotal();
   if (t.dataset.asel) { t.checked ? S.asel.add(t.dataset.asel) : S.asel.delete(t.dataset.asel); render(); return; }
   if (t.dataset.aselall) { const q = (S.aq || "").trim().toLowerCase(); S.archived.filter(o => !q || [o.num, ...(o.merged || []), o.customer, o.archivedReason, ...(o.items || []).map(i => i.name)].join(" ").toLowerCase().includes(q)).forEach(o => t.checked ? S.asel.add(o.id) : S.asel.delete(o.id)); render(); return; }
-  if (t.dataset.oset) { const o = findOrder(t.dataset.id); if (!o) return; const f = t.dataset.oset; await updateOrder(o, { [f]: t.value }); const lab = { payment: pay(t.value).name, fulfillment: ful(t.value).name, courier: t.value, assignee: t.value ? memberName(t.value) : "Unassigned" }[f]; toast(f === "fulfillment" && isDispute(o) && ["unfulfilled", "fulfilled"].includes(t.value) ? `⚠️ ${onum(o)} has a DISPUTE tag. Double-check it's resolved before dispatch.` : `${onum(o)} → ${lab}`); if (!S.db) render(); return; }
+  if (t.dataset.oset) { const o = findOrder(t.dataset.id); if (!o) return; const f = t.dataset.oset; await updateOrder(o, { [f]: t.value }); const lab = { payment: pay(t.value).name, fulfillment: ful(t.value).name, courier: t.value, mop: t.value || "No mode of payment", assignee: t.value ? memberName(t.value) : "Unassigned" }[f]; toast(f === "fulfillment" && isDispute(o) && ["unfulfilled", "fulfilled"].includes(t.value) ? `⚠️ ${onum(o)} has a DISPUTE tag. Double-check it's resolved before dispatch.` : `${onum(o)} → ${lab}`); if (!S.db) render(); return; }
   if (t.dataset.cassign !== undefined) { const c = customerList().find(x => custKey(x) === t.dataset.cassign); if (!c) return; const os = c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(o => o && OPEN_FUL.has(o.fulfillment)); for (const o of os) await updateOrder(o, { assignee: t.value }); toast(`${c.name} → ${t.value ? memberName(t.value) : "Unassigned"} (${os.length} open order${os.length === 1 ? "" : "s"}; new orders follow).`); render(); return; }
   if (t.id === "psel-all") { packList().forEach(o => t.checked ? S.sel.add(o.id) : S.sel.delete(o.id)); render(); return; }
   if (t.dataset.lset) return listSet(t);
