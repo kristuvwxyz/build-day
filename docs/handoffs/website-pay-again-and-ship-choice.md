@@ -32,3 +32,6 @@ Please add these to regalspritz.com and the website backend. RS OS already does 
 - A 50% DP pre-order shows as **Partially paid** in RS OS when `paid` is true and `due` < `total`. Keep sending `due` and `total` in `opsOrders`.
 
 After saving: **Deploy → Manage deployments → Edit → New version → Deploy** (same web app URL).
+
+## 5. Order timestamps
+- In `opsOrders`, send each order's creation time with its time zone: `date: "2026-10-08T15:35:00+08:00"` (Manila) or ISO with `Z`, plus `createdAtMs` (milliseconds). RS OS uses these as is, for old and new orders.

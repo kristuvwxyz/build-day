@@ -986,32 +986,52 @@ const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 // Formatters are built once: making a new one per call is slow on low-end phones.
 const NF0 = new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 }), NF2 = new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const DF_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }), DF_TIME = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" }), DF_WD = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", weekday: "long" }), DF_MD = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" }), DF_MDY = new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" });
-// All dates/times show in Manila time (GMT+8) on every device. Website dates without a time zone are read as Manila time.
+// All dates/times show in Manila time (GMT+8) on every device.
 // Website order dates come without a time zone, written in the website backend's own clock (UK time, GMT+1 in summer, GMT in winter),
 // not Manila. RS OS learns the real gap from orders it saw arrive (the "stock taken off" log, written within a minute) and falls back to UK time.
 const naiveUTC = d => { const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(d).trim());
   if (m) return Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)); const t = new Date(d).getTime(); return isNaN(t) ? NaN : t - new Date(t).getTimezoneOffset() * 60000; };
 const zoneOffset = (tz, t) => { try { const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(t)).map(x => [x.type, x.value]));
   return Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(t / 1000) * 1000; } catch (e) { return 0; } };
-let webGap = { key: "", h: null };
-function webClockGap() {
-  if (!S.web || !S.web.orders || !S.web.orders.length) return null;
-  const key = S.web.orders.length + ":" + S.webmeta.length + ":" + (S.web.at || ""); if (webGap.key === key) return webGap.h;
-  const meta = new Map(S.webmeta.map(d => [d.ref, d])), votes = {};
-  for (const o of S.web.orders.slice(0, 300)) {
-    if (!o.date || /Z$|[+-]\d{2}:?\d{2}$|GMT|UTC/i.test(String(o.date).trim())) continue;
+// Gap votes: for each website order RS OS saw arrive, the whole-hour gap between its "stock taken off" log and its naive date.
+// Each order uses the gap most of its 7 nearest-in-time orders show, so a switch in the website's clock (e.g. after the website fixes
+// its timestamps) is followed on both sides of the switch. A date with a time zone (Z / +08:00) is always used as is.
+const ZONED = /Z$|[+-]\d{2}:?\d{2}$|GMT|UTC/i;
+let webGap = { key: "", votes: [] };
+function webGapVotes() {
+  if (!S.web || !S.web.orders || !S.web.orders.length) return [];
+  const key = S.web.orders.length + ":" + S.webmeta.length + ":" + (S.web.at || ""); if (webGap.key === key) return webGap.votes;
+  const meta = new Map(S.webmeta.map(d => [d.ref, d])), votes = [];
+  for (const o of S.web.orders) {
+    if (!o.date || ZONED.test(String(o.date).trim())) continue;
     const m = meta.get(o.ref), l = m && (m.log || [])[0]; if (!l || !/^stock taken off/.test(l.msg || "")) continue;
-    const diff = l.at - naiveUTC(o.date), h = Math.round(diff / 3600e3), res = diff - h * 3600e3;
-    if (res > -120e3 && res < 600e3 && Math.abs(h) <= 14) votes[h] = (votes[h] || 0) + 1;
+    const n = naiveUTC(o.date), diff = l.at - n, h = Math.round(diff / 3600e3), res = diff - h * 3600e3;
+    if (res > -120e3 && res < 600e3 && Math.abs(h) <= 14) votes.push({ n, h });
   }
-  const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
-  webGap = { key, h: best && best[1] >= 3 ? Number(best[0]) : null }; return webGap.h;
+  votes.sort((x, y) => x.n - y.n); webGap = { key, votes, memo: new Map() }; return votes;
 }
-const webMs = d => { if (!d) return 0; if (typeof d === "number") return d; const str = String(d).trim();
-  if (/Z$|[+-]\d{2}:?\d{2}$|GMT|UTC/i.test(str)) { const t = new Date(str).getTime(); return isNaN(t) ? 0 : t; }
+function webClockGap(n) {
+  const v = webGapVotes(); if (v.length < 3) return null;
+  const k = Math.round(n / 3600e3); if (webGap.memo.has(k)) return webGap.memo.get(k);
+  let lo = 0, hi = v.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (v[mid].n < n) lo = mid + 1; else hi = mid; }
+  let i = lo - 1, j = lo; const near = [];
+  while (near.length < 7 && (i >= 0 || j < v.length)) { if (j >= v.length || (i >= 0 && n - v[i].n <= v[j].n - n)) near.push(v[i--]); else near.push(v[j++]); }
+  const c = {}; for (const x of near) c[x.h] = (c[x.h] || 0) + 1;
+  const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0], h = best[1] >= 3 ? Number(best[0]) : null;
+  webGap.memo.set(k, h); return h;
+}
+// Real order time (ms). A website field with an exact time wins (epoch number or zoned ISO), then the date itself.
+const WEB_TIME_KEYS = ["createdAtMs", "createdMs", "ts", "timestamp", "createdAt", "created", "createdISO", "dateISO", "placedAt", "iso"];
+const webMs = (d, o) => {
+  if (o) for (const k of WEB_TIME_KEYS) { const v = o[k]; if (v == null || v === "") continue;
+    if (typeof v === "number" || /^\d{10,13}$/.test(String(v))) { const x = Number(v); return x < 1e12 ? x * 1000 : x; }
+    if (ZONED.test(String(v).trim())) { const t = new Date(String(v).trim()).getTime(); if (!isNaN(t)) return t; } }
+  if (!d) return 0; if (typeof d === "number") return d; const str = String(d).trim();
+  if (ZONED.test(str)) { const t = new Date(str).getTime(); return isNaN(t) ? 0 : t; }
   const n = naiveUTC(str); if (isNaN(n)) return 0;
-  const h = webClockGap(); if (h != null) return n + h * 3600e3;
+  const h = webClockGap(n); if (h != null) return n + h * 3600e3;
   return n - zoneOffset("Europe/London", n); };
+const webOMs = o => webMs(o && o.date, o);
 const peso = n => "₱" + NF0.format(Number(n) || 0);
 const peso2 = n => (n < 0 ? "-" : "") + "₱" + NF2.format(Math.abs(Number(n) || 0));
 const dstr = t => DF_DAY.format(new Date(t));
@@ -1282,7 +1302,7 @@ function openCommitted(pid) {
     <p style="margin:0;color:var(--muted);font-size:13px">Open orders not shipped yet that are holding this item. Tap an order to open it.</p>
     ${rows.length ? `<div class="olist">${rows.map(r => r.o
       ? `<button type="button" class="orow" data-open="${r.o.id}"><span class="onum">#${esc(r.o.num)}</span><span class="ocust">${esc(r.o.customer || "No customer")}<small>${relTime(r.o.createdAt)} · ${esc(orderSource(r.o))} · ${r.q} unit${r.q === 1 ? "" : "s"}</small></span>${badge(ful(r.o.fulfillment))}</button>`
-      : `<button type="button" class="orow" data-webopen="${esc(r.w.ref)}"><span class="onum">#${esc(String(r.w.ref || "").replace(/^#/, ""))}</span><span class="ocust">${esc(r.w.name || "")}<small>${esc(webTime(r.w.date))} · Website · ${r.q} unit${r.q === 1 ? "" : "s"}</small></span>${webBadge(r.w)}</button>`).join("")}</div>`
+      : `<button type="button" class="orow" data-webopen="${esc(r.w.ref)}"><span class="onum">#${esc(String(r.w.ref || "").replace(/^#/, ""))}</span><span class="ocust">${esc(r.w.name || "")}<small>${esc(webTime(r.w.date, r.w))} · Website · ${r.q} unit${r.q === 1 ? "" : "s"}</small></span>${webBadge(r.w)}</button>`).join("")}</div>`
       : `<div class="empty">No open orders found for this item.</div>`}
     <div class="actions"><button class="btn" type="button" data-act="close">Close</button></div>`);
 }
@@ -2726,7 +2746,7 @@ const webStatusName = s => /^(shipped|delivered)$/i.test(s || "") ? "Completed" 
 const webDone = o => /^(completed|shipped|delivered|cancelled)$/i.test(o.status || "");
 const webPayKind = o => /maya/i.test(o.payment || "") ? "maya" : /bdo/i.test(o.payment || "") ? "bdo" : "";
 const webBadge = o => o.paid ? `<span class="badge green">Paid${o.mayaPaid ? " via Maya" : ""}</span>` : `<span class="badge amber">Unpaid</span>`;
-const webTime = d => { const t = d ? new Date(webMs(d)) : null; return t && !isNaN(t) ? t.toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; };
+const webTime = (d, o) => { const ms = d || o ? webMs(d, o) : 0, t = ms ? new Date(ms) : null; return t && !isNaN(t) ? t.toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; };
 const webItems = o => (o.items || []).map(i => `${i.qty > 1 ? i.qty + "× " : ""}${i.title || ""}${i.variant ? " (" + i.variant + ")" : ""}`).join(", ");
 let webBusy = false;
 // Moving between pages quietly re-reads the latest data (team data + website orders), at most every 15s.
@@ -2742,7 +2762,7 @@ const AUTOCANCEL_FROM = Date.parse("2026-10-08T00:00:00+08:00"), PAY_WINDOW = 24
 let acBusy = false;
 async function autoCancelUnpaid() {
   if (acBusy || !S.site || !S.web.loaded || !canOrders() || S.readOnly || S.viewAs || !S.loaded.webmeta) return;
-  const due = S.web.orders.filter(o => { const t = webMs(o.date); return t >= AUTOCANCEL_FROM && Date.now() - t > PAY_WINDOW && !o.paid && !o.mayaPaid && !o.payRef && /maya/i.test(o.payment || "") && /^placed$/i.test(o.status || "Placed") && !(o.cancel && o.cancel.status === "Pending"); });
+  const due = S.web.orders.filter(o => { const t = webOMs(o); return t >= AUTOCANCEL_FROM && Date.now() - t > PAY_WINDOW && !o.paid && !o.mayaPaid && !o.payRef && /maya/i.test(o.payment || "") && /^placed$/i.test(o.status || "Placed") && !(o.cancel && o.cancel.status === "Pending"); });
   if (!due.length) return;
   const lock = S.webmeta.find(d => d.id === "_autocancel"); if (lock && Date.now() - (lock.at || 0) < 120e3 && lock.uid !== S.uid) return;
   acBusy = true;
@@ -2818,7 +2838,7 @@ function webAsOrders() {
   S.web.dirty = false;
   const meta = new Map(S.webmeta.map(d => [d.ref, d]));
   const rows = S.web.orders.map(o => {
-    const t = webMs(o.date), cancel = /cancel/i.test(o.status || ""), m = meta.get(o.ref) || {};
+    const t = webOMs(o), cancel = /cancel/i.test(o.status || ""), m = meta.get(o.ref) || {};
     const dpOnly = o.paid && Number(o.due) > 0 && Number(o.total) > 0 && Number(o.due) < Number(o.total) - 1;
     const sitePay = cancel ? "voided" : o.paid ? (dpOnly ? "partial" : "paid") : "pending", siteFul = WEB_FUL[String(o.status || "placed").toLowerCase()] || "unfulfilled";
     // The website decides paid / unpaid and shipped / delivered / cancelled; the team's finer choices show when they agree with it.
@@ -2888,7 +2908,7 @@ async function webStockSync() {
   if (!cfg) { await save("webmeta", "_stock", { from: Date.now(), at: Date.now() }).catch(() => {}); return; }
   const me = S.uid || myMemberId() || "rs", now = Date.now(), metaOf = o => S.webmeta.find(d => d.id === webMetaId(o.ref)) || {};
   const todo = S.web.orders.filter(o => {
-    const t = webMs(o.date); if (!o.ref || !t || t < cfg.from) return false;
+    const t = webOMs(o); if (!o.ref || !t || t < cfg.from) return false;
     const m = metaOf(o), cancel = /cancel/i.test(o.status || ""), taken = m.stock === "taken";
     if (cancel === !taken) return false;
     return !(m.stockClaim && m.stockClaim.by !== me && now - m.stockClaim.at < 60000);
@@ -2930,7 +2950,7 @@ function webFindPanel() {
   const q = (S.of.q || "").trim(); if (!S.site || !q || !S.web.loaded) return "";
   const qq = squash(q).replace(/rs/g, ""), m = S.web.orders.filter(o => squash([o.ref, o.name, o.mobile, o.email, o.tracking].join(" ")).replace(/rs/g, "").includes(qq)).slice(0, 10);
   if (!m.length) return "";
-  return `<div class="panel shopfind"><div class="head"><h2>On the website</h2><span class="s">${m.length} match${m.length === 1 ? "" : "es"}</span></div>${m.map(o => `<button type="button" class="orow" data-webo="${esc(o.ref)}"><span class="onum">${esc(o.ref)}</span><span class="ocust">${esc(o.name || "")}<small>${esc(webTime(o.date))} · ${esc(webItems(o))}</small></span><span class="ototal num">${peso(o.total)}</span>${webBadge(o)}</button>`).join("")}</div>`;
+  return `<div class="panel shopfind"><div class="head"><h2>On the website</h2><span class="s">${m.length} match${m.length === 1 ? "" : "es"}</span></div>${m.map(o => `<button type="button" class="orow" data-webo="${esc(o.ref)}"><span class="onum">${esc(o.ref)}</span><span class="ocust">${esc(o.name || "")}<small>${esc(webTime(o.date, o))} · ${esc(webItems(o))}</small></span><span class="ototal num">${peso(o.total)}</span>${webBadge(o)}</button>`).join("")}</div>`;
 }
 function srcSeg() {
   if (!S.site) return "";
@@ -2947,7 +2967,7 @@ function viewWebOrders() {
   if (S.web.err && !S.web.loaded) return head + `<div class="panel"><div class="empty" style="padding:22px">${esc(S.web.err)}</div></div>`;
   if (!S.web.loaded) return head + `<div class="panel"><div class="empty" style="padding:22px">Loading website orders…</div></div>`;
   return head + (S.web.err ? `<div class="notice">${esc(S.web.err)} Showing the last list.</div>` : "") + `<div class="table-wrap"><table class="otable"><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th class="r">Total / due</th><th>Payment</th><th>Status</th></tr></thead><tbody>
-    ${rows.map(o => `<tr data-webo="${esc(o.ref)}" style="cursor:pointer"><td class="nowrap"><b>${esc(o.ref)}</b></td><td class="nowrap">${esc(webTime(o.date))}</td><td>${esc(o.name || "")}</td><td style="min-width:180px;max-width:280px">${esc(webItems(o))}</td>
+    ${rows.map(o => `<tr data-webo="${esc(o.ref)}" style="cursor:pointer"><td class="nowrap"><b>${esc(o.ref)}</b></td><td class="nowrap">${esc(webTime(o.date, o))}</td><td>${esc(o.name || "")}</td><td style="min-width:180px;max-width:280px">${esc(webItems(o))}</td>
       <td class="r num nowrap">${peso(o.total)}${Number(o.due) && Number(o.due) !== Number(o.total) ? `<br><small style="color:var(--muted)">due ${peso(o.due)}</small>` : ""}</td>
       <td class="nowrap">${webBadge(o)}<br><small style="color:var(--muted)">${esc(o.payment || "")}</small></td><td class="nowrap">${esc(webStatusName(o.status))}${o.tracking ? `<br><small style="color:var(--muted)">${esc(o.tracking)}</small>` : ""}</td></tr>`).join("") || `<tr><td colspan="7"><div class="empty">No website orders here.</div></td></tr>`}
   </tbody></table></div>`;
@@ -2979,7 +2999,7 @@ function openWebOrder(ref) {
   const o = S.web.orders.find(x => x.ref === ref); if (!o) return;
   const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
   openSheet(`<h2 style="margin:0">#${esc(String(o.ref || "").replace(/^#/, ""))} ${webBadge(o)}</h2>
-    <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date))} · ${esc(o.payment || "")}${o.payRef && !/bdo\.com\.ph/i.test(o.payRef) ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
+    <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date, o))} · ${esc(o.payment || "")}${o.payRef && !/bdo\.com\.ph/i.test(o.payRef) ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
     <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
       <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
     </div>
