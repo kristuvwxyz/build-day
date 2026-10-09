@@ -8305,6 +8305,36 @@ async function shopHistoryBackfill(c) {
 // One-time copy of Shopify's "Cost per item" into listings (matched by the listing's website handle, which came from Shopify).
 // Runs once in the owner's app; fills only listings with no cost yet, so costs typed in RS OS are kept.
 const SHOP_COST_Q = `query RSCost($first: Int!, $after: String) { productVariants(first: $first, after: $after) { pageInfo { hasNextPage endCursor } nodes { product { handle } inventoryItem { unitCost { amount } } } } }`;
+/* One-time import of every Shopify listing that isn't in RS OS yet (K, Oct 9, 2026). The listings were prepared from a Shopify
+   bulk export into webmeta/_shopsrc_0.._N (rows), with webmeta/_shopimp { status: "ready", chunks, total }. The owner's device
+   adds them as Inactive (not on the website), skipping any website link that already exists. Ids are fixed (sh<product>-<n>), so a re-run adds nothing twice. */
+async function shopListingsImport() {
+  if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
+  const t0 = Date.now();
+  while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 60000) return; await new Promise(r => setTimeout(r, 1000)); }
+  const meta = S.webmeta.find(d => d.id === "_shopimp"); if (!meta || meta.status !== "ready") return;
+  if (meta.lock && meta.lock !== S.uid && Date.now() - (meta.lockAt || 0) < 10 * 60e3) return;
+  await save("webmeta", "_shopimp", { ...clean(meta), lock: S.uid || "owner", lockAt: Date.now() });
+  const have = new Set(S.products.map(p => p.id)), webIds = new Set(S.products.map(p => p.webId).filter(Boolean));
+  let n = 0, skip = 0;
+  toast(`Importing ${meta.total} listings from Shopify (as Inactive)… keep RS OS open.`);
+  try {
+    for (let c = 0; c < (meta.chunks || 0); c++) {
+      const ch = S.webmeta.find(d => d.id === "_shopsrc_" + c); if (!ch || !Array.isArray(ch.rows)) continue;
+      const todo = ch.rows.filter(r => r && r.id && !have.has(r.id) && !(r.webId && webIds.has(r.webId)));
+      skip += ch.rows.length - todo.length;
+      for (let i = 0; i < todo.length; i += 10) {
+        await Promise.all(todo.slice(i, i + 10).map(({ id, ...r }) => save("products", id, { ...r, createdAt: r.createdAt || Date.now(), log: [{ at: Date.now(), by: "Shopify import", msg: "imported from Shopify (Inactive)" }] }).then(() => { n++; have.add(id); }).catch(e => console.warn("shop import", e))));
+        UNDO.at = 0;
+        if (n && n % 200 < 10) toast(`Shopify import: ${n} of ${meta.total} added…`);
+      }
+      await save("webmeta", "_shopimp", { ...clean(S.webmeta.find(d => d.id === "_shopimp") || meta), progress: c + 1, added: n, lockAt: Date.now() });
+    }
+    await save("webmeta", "_shopimp", { ...clean(S.webmeta.find(d => d.id === "_shopimp") || meta), status: "done", added: n, skipped: skip, doneAt: Date.now(), by: actor() });
+    for (let c = 0; c < (meta.chunks || 0); c++) await remove("webmeta", "_shopsrc_" + c).catch(() => {});
+    toast(`Shopify import done: ${n} listings added as Inactive${skip ? ` (${skip} were already here)` : ""}. Find them under Listings → Inactive.`);
+  } catch (e) { console.warn("shop import", e); toast("Shopify import paused. It continues next time you open RS OS."); }
+}
 async function costImportOnce(c) {
   if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
   const t0 = Date.now();
@@ -8371,7 +8401,7 @@ async function dpFixOnce() {
   if (todo.length) toast(`${todo.length} pre-order order${todo.length === 1 ? "" : "s"} changed from Fully paid to Partially paid (50% DP).`);
 }
 async function startShopSync(c) {
-  costImportOnce(c);
+  costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)), 8000);
   dpFixOnce().catch(e => console.warn("dp fix", e));
   barcodeImportOnce().catch(e => console.warn("barcode import", e));
   setTimeout(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 20000); setInterval(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 5 * 60e3);
