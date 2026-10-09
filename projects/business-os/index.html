@@ -5102,36 +5102,63 @@ async function annCompose(blob) {
    accords (made again when they change; skipped when the 2nd photo already is a scent card). Runs in the browser:
    the owner's RS App works through all listings (website ones first), and whoever saves a listing does that one. */
 const SC_COL = { woody: "#774414", citrus: "#F9FF52", floral: "#FF5F8D", "white floral": "#EDF2FB", sweet: "#EE363B", vanilla: "#FFFEC0", fruity: "#FC4B29", amber: "#BC4D10", powdery: "#EEDDCC", fresh: "#9BE5ED", aromatic: "#37A089", "warm spicy": "#CC3300", "fresh spicy": "#83C928", spicy: "#CC3300", musky: "#E6CEE5", green: "#0E8C1D", rose: "#FE016B", leather: "#8B4513", oud: "#3D2B1F", aquatic: "#66CCFF", marine: "#66CCFF", earthy: "#544838", smoky: "#8D8D8D", balsamic: "#9C6A40", lavender: "#B07FCA", violet: "#991DCD", iris: "#C8C8F0", tuberose: "#F7E6EC", honey: "#FFBF00", tobacco: "#9E6A1F", caramel: "#C68E17", coffee: "#673B11", cacao: "#5C3317", chocolate: "#5C3317", lactonic: "#FDF4DC", coconut: "#F9F2E1", almond: "#F2D8B6", herbal: "#6CA06C", patchouli: "#6D6D2D", mossy: "#6E8E2C", animalic: "#8E5A2C", soapy: "#E0F7FA", ozonic: "#C9F3FF", metallic: "#B4B4B4", cherry: "#A50021", beeswax: "#E4B53A", tropical: "#FFB300", salty: "#D5E8F0", mineral: "#A9B4BE", nutty: "#B57A3E", rum: "#8E2E00", whiskey: "#B66E2B", wine: "#7A0B2B", conifer: "#2E6B3A", camphor: "#B8E0D2", "soft spicy": "#E2725B", gourmand: "#B5651D", sour: "#D7F000", bitter: "#6E7F2E", yellow_floral: "#FFE08A", "yellow floral": "#FFE08A" };
-const scKey = p => { const n = p.notes || {}, a = p.accords || []; if (!a.length && (n.top || []).length + (n.heart || []).length + (n.base || []).length < 3) return ""; return [p.brand, p.name, a.join(","), (n.top || []).join(","), (n.heart || []).join(","), (n.base || []).join(",")].join("|").toLowerCase(); };
-function scentCard(p) {
+const scKey = p => { const n = p.notes || {}, a = p.accords || []; if (!a.length && (n.top || []).length + (n.heart || []).length + (n.base || []).length < 3) return ""; return ["v2", p.brand, p.name, a.join(","), (n.top || []).join(","), (n.heart || []).join(","), (n.base || []).join(",")].join("|").toLowerCase(); };
+// A small picture per note (first keyword that matches), like Fragrantica's note photos.
+const SC_PIC = [["orange blossom|neroli|orange flower", "🌸"], ["rosemary", "🍃"], ["pear", "🍐"], ["pineapple", "🍍"], ["green apple|apple", "🍏"], ["cherry|cherries", "🍒"], ["strawberr", "🍓"], ["raspberr|blackberr|blueberr|cassis|black currant|blackcurrant|currant|berries|berry", "🫐"], ["peach|apricot|nectarine", "🍑"], ["plum|prune", "🟣"], ["grape(?!fruit)|wine|champagne|cognac", "🍇"], ["pineapple", "🍍"], ["mango|papaya|passion|guava|lychee|litchi|tropical", "🥭"], ["coconut", "🥥"], ["banana", "🍌"], ["melon|watermelon", "🍈"], ["fig", "🌳"], ["pomegranate", "🔴"], ["lime|yuzu|calabrian|bergamot|lemon|citron|citrus|verbena", "🍋"], ["grapefruit|orange|mandarin|tangerine|neroli|petitgrain|clementine|blood orange", "🍊"], ["rose(?!mary)", "🌹"], ["jasmine|sambac|gardenia|frangipani|ylang|orange blossom|tiare|tuberose|lily|magnolia|honeysuckle|white flower|white floral|lotus|freesia|lilac|mimosa|osmanthus|heliotrope|peony|carnation|geranium|marigold|chamomile|flower|floral|blossom|orchid|hyacinth|violet|iris|orris|narcissus|daffodil", "🌸"], ["lavender|lavandin", "💜"], ["vanilla|tonka|benzoin|coumarin", "🍦"], ["caramel|praline|toffee|candy|sugar|marshmallow|cotton candy|meringue|cream|milk|butter|cake|cookie|biscuit|gourmand|nougat|dulce", "🍬"], ["honey|beeswax", "🍯"], ["chocolate|cacao|cocoa", "🍫"], ["coffee|espresso", "☕"], ["tea\\b|mate\\b|matcha", "🍵"], ["almond|hazelnut|pistachio|nut\\b|chestnut|walnut", "🌰"], ["rum|whisk|bourbon|liquor|liqueur|brandy|gin\\b|vodka|absinthe", "🥃"], ["tobacco|cigar", "🍂"], ["leather|suede", "👜"], ["oud|agarwood|sandalwood|cedar|vetiver|guaiac|wood|birch|oak\\b|cashmeran|akigalawood|ebony|teak|papyrus|cypriol|hinoki", "🪵"], ["pine|fir|cypress|juniper|spruce|conifer", "🌲"], ["patchouli|moss|oakmoss|fern", "🌿"], ["mint|basil|sage|rosemary|thyme|tarragon|herb|artemisia|davana|clary|green|leaf|leaves|grass|galbanum|violet leaf|tomato|bamboo|ivy|shiso", "🍃"], ["pepper|pink pepper|black pepper", "🌶"], ["cinnamon|clove|nutmeg|cardamom|ginger|saffron|cumin|anise|star anise|spice|spicy|coriander|caraway|elemi", "✨"], ["sea|marine|aquatic|ocean|water|salt|ambergris|seaweed|algae|calone|ozonic|rain|dew", "🌊"], ["amber|labdanum|myrrh|incense|frankincense|olibanum|resin|balsam|tolu|opoponax|styrax|elemi", "🔥"], ["musk|ambrette|cashmere|aldehyde|powder|cotton|soap|clean|iso e", "🤍"], ["smoke|smoky|ash\\b|burnt", "💨"], ["metal|mineral|stone|flint", "🪨"], ["rice|wheat|cereal|oat|bread", "🌾"]].map(([k, e]) => [new RegExp("\\b(" + k + ")", "i"), e]);
+const scPic = t => { for (const [re, e] of SC_PIC) if (re.test(t)) return e; return "🌼"; };
+// No Fragrantica accords? A rough scent profile from the notes' families.
+const SC_FAM = [["citrus", /lemon|bergamot|orange|mandarin|grapefruit|lime|yuzu|citrus|neroli|tangerine/i], ["fruity", /pear|apple|berr|peach|plum|cherry|pineapple|mango|lychee|fig|melon|cassis|currant|apricot|fruit/i], ["floral", /rose|jasmine|tuberose|lily|flower|floral|iris|violet|peony|ylang|magnolia|orchid|freesia|gardenia|blossom|heliotrope|mimosa/i], ["sweet", /vanilla|caramel|praline|sugar|honey|tonka|candy|chocolate|cacao|marshmallow|benzoin/i], ["woody", /wood|cedar|sandal|vetiver|oud|guaiac|patchouli|birch|cypress|pine/i], ["warm spicy", /cinnamon|clove|nutmeg|saffron|cardamom|ginger|spice|cumin|pepper/i], ["fresh", /mint|sea|marine|aquatic|water|ozon|fresh|green|tea|lavender|aldehyde/i], ["amber", /amber|labdanum|incense|myrrh|resin|balsam|benzoin|olibanum/i], ["musky", /musk|ambrette|cashmere|powder/i], ["leather", /leather|suede|tobacco/i]];
+function scFromNotes(n) { const all = [...(n.top || []), ...(n.heart || []), ...(n.base || [])].join(" | "), c = {};
+  for (const [f, re] of SC_FAM) { const m = all.match(new RegExp(re.source, "gi")); if (m) c[f] = m.length; }
+  return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0]); }
+function scentCard(p, bottle) {
   const W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
-  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#FDFCF4"); bg.addColorStop(1, "#F5F1DF"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.strokeStyle = "#C9A55A"; g.lineWidth = 2; g.strokeRect(22, 22, W - 44, H - 44);
-  const fit = (t, max, size, font) => { let s = size; g.font = font(s); while (s > 14 && g.measureText(t).width > max) { s -= 2; g.font = font(s); } return s; };
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#FFFDF2"); bg.addColorStop(1, "#F8F1D8"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "#D9C48F"; g.lineWidth = 2; g.strokeRect(18, 18, W - 36, H - 36);
   const serif = s => `600 ${s}px "Cormorant Garamond", Georgia, serif`, sans = (s, w = 500) => `${w} ${s}px Jost, "Helvetica Neue", Arial, sans-serif`;
-  let y = 78; g.textAlign = "left"; g.fillStyle = "#A5823B"; g.font = sans(17, 600); const brand = String(p.brand || "").toUpperCase(); g.fillText(brand.split("").join(String.fromCharCode(8202)), 52, y);
-  y += 48; g.fillStyle = "#2B1B2E"; const nm = p.name || ""; fit(nm, W - 104, 44, serif); g.fillText(nm, 52, y);
-  y += 22; g.fillStyle = "#8A7F70"; g.font = sans(15); g.fillText(["Scent card", p.size].filter(Boolean).join(" · "), 52, y += 8);
-  const acc = (p.accords || []).slice(0, 7);
+  const emo = s => `${s}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+  const fit = (t, max, size, font, min = 12) => { let s = size; g.font = font(s); while (s > min && g.measureText(t).width > max) { s -= 1; g.font = font(s); } return s; };
+  const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
+  // Header: brand + name
+  g.textAlign = "center"; g.fillStyle = "#A5823B"; g.font = sans(16, 600); g.fillText(String(p.brand || "").toUpperCase().split("").join(String.fromCharCode(8202)), W / 2, 62);
+  g.fillStyle = "#2B1B2E"; const nm = p.name || ""; fit(nm, W - 100, 44, serif, 22); g.fillText(nm, W / 2, 106);
+  g.fillStyle = "#8A7F70"; g.font = sans(14); g.fillText([p.ptype, p.size].filter(Boolean).join(" · ") || "Scent card", W / 2, 132);
+  // Left: the bottle (listing photo 1). Right: main accords.
+  const n = p.notes || {}, real = (p.accords || []).length > 0, acc = (real ? p.accords : scFromNotes(n)).slice(0, 7);
+  const top = 156, abh = acc.length > 5 ? 28 : 34, boxH = bottle ? 270 : Math.max(60, 34 + acc.length * (abh + 6)); let ax = 52, aw = W - 104;
+  if (bottle) { const bw = 250, bh = boxH, s = Math.max(bw / bottle.width, bh / bottle.height), sw = bw / s, sh = bh / s;
+    g.save(); rr(52, top, bw, bh, 18); g.clip(); g.drawImage(bottle, (bottle.width - sw) / 2, (bottle.height - sh) / 2, sw, sh, 52, top, bw, bh); g.restore();
+    g.strokeStyle = "#E6D6AA"; g.lineWidth = 2; rr(52, top, bw, bh, 18); g.stroke(); ax = 52 + bw + 34; aw = W - 52 - ax; }
   if (acc.length) {
-    y += 44; g.fillStyle = "#2B1B2E"; g.font = sans(16, 700); g.fillText("MAIN ACCORDS", 52, y); y += 14;
-    const bh = acc.length > 5 ? 26 : 32, gap = 7, max = W - 104;
-    acc.forEach((a, i) => { const w = max * (1 - i * (0.5 / Math.max(1, acc.length - 1))), c = SC_COL[String(a).toLowerCase()] || "#C9A55A";
-      g.fillStyle = c; g.fillRect(52, y, w, bh); const [r, gg, b] = [1, 3, 5].map(k => parseInt(c.slice(k, k + 2), 16)); g.fillStyle = r * .3 + gg * .59 + b * .11 > 150 ? "#2B1B2E" : "#FFFFFF";
-      g.font = sans(Math.round(bh * .55), 600); g.fillText(String(a).toLowerCase(), 64, y + bh * .68); y += bh + gap; });
+    g.textAlign = "center"; g.fillStyle = "#2B1B2E"; g.font = sans(14, 700); g.fillText(real ? "MAIN ACCORDS" : "SCENT PROFILE", ax + aw / 2, top + 14);
+    const bh = abh, gap = 6, y0 = top + 30;
+    acc.forEach((a, i) => { const w = aw * (1 - i * (0.55 / Math.max(1, acc.length - 1))), c = SC_COL[String(a).toLowerCase()] || "#C9A55A", y = y0 + i * (bh + gap);
+      g.fillStyle = c; rr(ax, y, w, bh, 6); g.fill(); const [r, gg, b] = [1, 3, 5].map(k => parseInt(c.slice(k, k + 2), 16));
+      g.fillStyle = r * .3 + gg * .59 + b * .11 > 150 ? "#2B1B2E" : "#FFFFFF"; g.textAlign = "center"; fit(String(a).toLowerCase(), w - 12, Math.round(bh * .5), s => sans(s, 600), 10); g.fillText(String(a).toLowerCase(), ax + w / 2, y + bh * .66); });
   }
-  const n = p.notes || {}, rows = [["TOP NOTES", n.top], ["HEART NOTES", n.heart], ["BASE NOTES", n.base]].filter(r => (r[1] || []).length);
-  const left = H - 70 - y - 30, per = rows.length ? Math.max(70, left / rows.length) : 0;
-  for (const [lab, list] of rows) {
-    y += 40; g.fillStyle = "#2B1B2E"; g.font = sans(16, 700); g.fillText(lab, 52, y); y += 12;
-    let x = 52, line = 0; const ch = 32, end = y + per - 40; g.font = sans(16);
-    for (const t of list.slice(0, 14)) { const w = g.measureText(t).width + 28; if (x + w > W - 52) { x = 52; line++; } const cy = y + line * (ch + 8); if (cy + ch > end + 10 || cy + ch > H - 80) break;
-      g.fillStyle = "#FFFFFF"; g.strokeStyle = "#E3D6B5"; g.lineWidth = 1.5; g.beginPath(); g.roundRect ? g.roundRect(x, cy, w, ch, 16) : g.rect(x, cy, w, ch); g.fill(); g.stroke();
-      g.fillStyle = "#3A2B3C"; g.fillText(t, x + 14, cy + 22); x += w + 8; }
-    y += (line + 1) * (ch + 8);
+  // Bottom: perfume pyramid with a picture per note.
+  const rows = [["Top notes", n.top], ["Middle notes", n.heart], ["Base notes", n.base]].filter(r => (r[1] || []).length);
+  let y = top + boxH + 34;
+  if (rows.length) {
+    g.textAlign = "center"; g.fillStyle = "#2B1B2E"; g.font = serif(28); g.fillText("Perfume Pyramid", W / 2, y); y += 12;
+    const per = Math.min(118, (H - 64 - y) / rows.length);
+    for (const [lab, list] of rows) {
+      g.fillStyle = "#A5823B"; g.font = sans(13, 700); g.fillText(lab.toUpperCase(), W / 2, y + 18);
+      const items = list.slice(0, 9), cw = Math.min(96, (W - 80) / items.length), d = Math.min(52, per - 52), cy = y + 28 + d / 2;
+      let x = W / 2 - (cw * items.length) / 2 + cw / 2;
+      for (const t of items) {
+        g.fillStyle = "#FFFFFF"; g.strokeStyle = "#E3D3A8"; g.lineWidth = 1.5; g.beginPath(); g.arc(x, cy, d / 2, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.font = emo(Math.round(d * .56)); g.textBaseline = "middle"; g.fillText(scPic(t), x, cy + 1); g.textBaseline = "alphabetic";
+        g.fillStyle = "#3A2B3C"; const words = String(t).split(/\s+/), lines = []; let cur = "";
+        g.font = sans(12, 500); for (const w of words) { const tr = cur ? cur + " " + w : w; if (g.measureText(tr).width > cw - 6 && cur) { lines.push(cur); cur = w; } else cur = tr; } if (cur) lines.push(cur);
+        (per >= 100 ? lines.slice(0, 2) : [lines.join(" ")]).forEach((l, k) => { fit(l, cw - 4, 12, s => sans(s, 500), 9); g.fillText(l, x, cy + d / 2 + 15 + k * 13); });
+        x += cw;
+      }
+      y += per;
+    }
   }
-  g.fillStyle = "#A5823B"; g.font = sans(13, 600); g.textAlign = "left"; g.fillText("Notes & accords: Fragrantica", 52, H - 46);
-  g.textAlign = "right"; g.fillStyle = "#4A2C4D"; g.font = serif(22); g.fillText("Regal Spritz PH", W - 52, H - 44);
+  g.textAlign = "left"; g.fillStyle = "#A5823B"; g.font = sans(12, 600); g.fillText("Notes & accords: Fragrantica", 40, H - 32);
+  g.textAlign = "right"; g.fillStyle = "#4A2C4D"; g.font = serif(20); g.fillText("Regal Spritz PH", W - 40, H - 31);
   return cv.toDataURL("image/jpeg", .9);
 }
 // Is this photo a scent card (mostly light, flat background, not our template)? Then we keep it and don't add ours.
@@ -5139,14 +5166,16 @@ async function looksLikeCard(blob) {
   const im = await createImageBitmap(blob), W = 100, H = Math.max(1, Math.round(100 * im.height / im.width)), cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const g = cv.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data; let light = 0, sat = 0;
   for (let i = 0; i < d.length; i += 4) { const mn = Math.min(d[i], d[i + 1], d[i + 2]), mx = Math.max(d[i], d[i + 1], d[i + 2]); if (mn > 225 && mx - mn < 40) light++; if (mx - mn > 90 && mx > 150) sat++; }
-  const px = d.length / 4; return light / px > .55 && sat / px > .015 && !(await annOnTemplate(blob));
+  let white = 0; for (let i = 0; i < d.length; i += 4) if (Math.min(d[i], d[i + 1], d[i + 2]) > 242) white++;
+  // Fragrantica cards are cream with a yellow bar too, so "on our template" only rules a photo out when it has little pure white.
+  const px = d.length / 4; return light / px > .55 && sat / px > .015 && (white / px > .2 || !(await annOnTemplate(blob)));
 }
 const tplMemo = new Map(), cardMemo = new Map();   // original photo → template copy (this session; sizes of one perfume often share a photo)
 const tplImgs = p => galListingImgs(p).filter(u => !String(u).startsWith("data:"));
 const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
-  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && !p.card.chk); };
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2); };
 // A scent card the listing already had (e.g. from Fragrantica) wins over ours: it goes to 2nd place.
-async function oldCardOf(list, ours) { for (const u of list) { if (u === ours || u === list[0]) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
+async function oldCardOf(list, ours, skip = []) { for (const u of list) { if (u === ours || u === list[0] || skip.includes(u)) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
 async function tplOne(id) {
   let p = S.products.find(x => x.id === id); if (!p || !S.photos || !tplNeeds(p)) return false;
   if (p.tplBusy && Date.now() - p.tplBusy < 3 * 60e3) return false;
@@ -5160,20 +5189,21 @@ async function tplOne(id) {
           imgs = [url, ...imgs.filter(x => x !== url)]; u.tplOk = url; u.tplFrom = L[0]; if (!p.photoOrig) u.photoOrig = L; }
       } catch (e) { console.warn("template", id, e); u.tplFail = L[0]; }
     }
-    const key = scKey(p);
-    // Listings done before the fix: if they already had a scent card, drop ours and put theirs 2nd.
-    if (p.card && p.card.url && !p.card.chk) { const old = await oldCardOf(L, p.card.url);
-      if (old) { imgs = imgs.filter(x => x !== p.card.url && x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key: p.card.key, skip: old, chk: 1 }; }
-      else u.card = { ...p.card, chk: 1 }; }
+    const key = scKey(p), mine = [u.tplOk, p.tplOk, p.tplFrom, u.tplFrom].filter(Boolean);
+    // A scent card the listing already had (e.g. Fragrantica's) wins: drop ours and put theirs 2nd.
+    if (p.card && p.card.url && (p.card.chk !== 2 || p.card.key !== key)) { const old = await oldCardOf(L, p.card.url, mine);
+      if (old) { imgs = imgs.filter(x => x !== p.card.url && x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key, skip: old, chk: 2 }; }
+      else if (p.card.key === key) u.card = { ...p.card, chk: 2 }; }
+    if (key && !u.card && p.card && p.card.skip && imgs.includes(p.card.skip)) u.card = { ...p.card, key, chk: 2 };   // theirs is still there: keep it
     if (key && !u.card && (p.card || {}).key !== key) {
       const old = (p.card || {}).url; let at = old ? imgs.indexOf(old) : -1;
-      if (at < 0 && !(p.card || {}).skip) { const old = await oldCardOf(L, ""); if (old) { imgs = imgs.filter(x => x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key, skip: old, chk: 1 }; } }
-      if (!u.card) { let url = cardMemo.get(key);
-        if (!url) { await Promise.all(['600 44px "Cormorant Garamond"', "500 16px Jost", "700 16px Jost"].map(f => document.fonts.load(f).catch(() => {})));
-          const r = await S.photos.save({ data: scentCard(p) }); if (r && r.ok && r.url) { url = r.url; cardMemo.set(key, url); } }
-        if (url) { const r = { url };
-        if (at >= 0) imgs[at] = r.url; else imgs.splice(Math.min(1, imgs.length), 0, r.url);
-        u.card = { key, url: r.url, chk: 1 }; } }
+      if (at < 0 && !(p.card || {}).skip) { const old = await oldCardOf(L, "", mine); if (old) { imgs = imgs.filter(x => x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key, skip: old, chk: 2 }; } }
+      if (!u.card) { let url = cardMemo.get(key + "|" + imgs[0]);
+        if (!url) { await Promise.all(['600 44px "Cormorant Garamond"', "500 16px Jost", "600 16px Jost", "700 16px Jost", '40px "Noto Color Emoji"'].map(f => document.fonts.load(f).catch(() => {})));
+          let bottle = null; try { bottle = await createImageBitmap(await annBlob(imgs[0])); } catch (e) {}
+          const r = await S.photos.save({ data: scentCard(p, bottle) }); if (r && r.ok && r.url) { url = r.url; cardMemo.set(key + "|" + imgs[0], url); } }
+        if (url) { if (at >= 0) imgs[at] = url; else imgs.splice(Math.min(1, imgs.length), 0, url);
+          u.card = { key, url, chk: 2 }; } }
     }
   } finally {
     p = S.products.find(x => x.id === id); if (!p) return false;
