@@ -5104,13 +5104,15 @@ function scentCard(p) {
 async function looksLikeCard(blob) {
   const im = await createImageBitmap(blob), W = 100, H = Math.max(1, Math.round(100 * im.height / im.width)), cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const g = cv.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data; let light = 0, sat = 0;
-  for (let i = 0; i < d.length; i += 4) { const mn = Math.min(d[i], d[i + 1], d[i + 2]), mx = Math.max(d[i], d[i + 1], d[i + 2]); if (mn > 228) light++; if (mx - mn > 90 && mx > 150) sat++; }
-  const px = d.length / 4; return light / px > .55 && sat / px > .015;
+  for (let i = 0; i < d.length; i += 4) { const mn = Math.min(d[i], d[i + 1], d[i + 2]), mx = Math.max(d[i], d[i + 1], d[i + 2]); if (mn > 225 && mx - mn < 40) light++; if (mx - mn > 90 && mx > 150) sat++; }
+  const px = d.length / 4; return light / px > .55 && sat / px > .015 && !(await annOnTemplate(blob));
 }
 const tplMemo = new Map(), cardMemo = new Map();   // original photo → template copy (this session; sizes of one perfume often share a photo)
 const tplImgs = p => galListingImgs(p).filter(u => !String(u).startsWith("data:"));
 const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
-  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)); };
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && !p.card.chk); };
+// A scent card the listing already had (e.g. from Fragrantica) wins over ours: it goes to 2nd place.
+async function oldCardOf(list, ours) { for (const u of list) { if (u === ours || u === list[0]) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
 async function tplOne(id) {
   let p = S.products.find(x => x.id === id); if (!p || !S.photos || !tplNeeds(p)) return false;
   if (p.tplBusy && Date.now() - p.tplBusy < 3 * 60e3) return false;
@@ -5125,15 +5127,19 @@ async function tplOne(id) {
       } catch (e) { console.warn("template", id, e); u.tplFail = L[0]; }
     }
     const key = scKey(p);
-    if (key && (p.card || {}).key !== key) {
+    // Listings done before the fix: if they already had a scent card, drop ours and put theirs 2nd.
+    if (p.card && p.card.url && !p.card.chk) { const old = await oldCardOf(L, p.card.url);
+      if (old) { imgs = imgs.filter(x => x !== p.card.url && x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key: p.card.key, skip: old, chk: 1 }; }
+      else u.card = { ...p.card, chk: 1 }; }
+    if (key && !u.card && (p.card || {}).key !== key) {
       const old = (p.card || {}).url; let at = old ? imgs.indexOf(old) : -1;
-      if (at < 0 && !(p.card || {}).skip && imgs[1]) { try { if (await looksLikeCard(await annBlob(imgs[1]))) { u.card = { key, skip: imgs[1] }; } } catch (e) {} }
+      if (at < 0 && !(p.card || {}).skip) { const old = await oldCardOf(L, ""); if (old) { imgs = imgs.filter(x => x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key, skip: old, chk: 1 }; } }
       if (!u.card) { let url = cardMemo.get(key);
         if (!url) { await Promise.all(['600 44px "Cormorant Garamond"', "500 16px Jost", "700 16px Jost"].map(f => document.fonts.load(f).catch(() => {})));
           const r = await S.photos.save({ data: scentCard(p) }); if (r && r.ok && r.url) { url = r.url; cardMemo.set(key, url); } }
         if (url) { const r = { url };
         if (at >= 0) imgs[at] = r.url; else imgs.splice(Math.min(1, imgs.length), 0, r.url);
-        u.card = { key, url: r.url }; } }
+        u.card = { key, url: r.url, chk: 1 }; } }
     }
   } finally {
     p = S.products.find(x => x.id === id); if (!p) return false;
