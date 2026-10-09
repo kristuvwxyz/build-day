@@ -2393,7 +2393,7 @@ function myTaskBadge() {
   const ts = dueTasksOf(myMemberId()); if (!ts.length) return "";
   const over = ts.filter(isOverdue).length, now = ts.length - over;
   const tip = [over ? `${over} overdue` : "", now ? `${now} due today` : ""].filter(Boolean).join(", ");
-  return `<span class="nbadge${over ? "" : " amber"}" title="My tasks: ${tip}" aria-label="My tasks: ${tip}">${ts.length}</span>`;
+  return `<span class="nbadge" title="My tasks: ${tip}" aria-label="My tasks: ${tip}">${ts.length}</span>`;
 }
 
 // Tasks: CEO sees all, Admin all except CEO's, everyone else only their own department (plus tasks assigned to them).
@@ -3013,7 +3013,7 @@ const cxBadge = () => { const n = S.web.loaded ? (S.web.cancelRequests || cxPend
 // BDO link requests: website orders paying by BDO with no link yet, plus RS OS orders set to BDO BNPL with no link.
 const rsBdoNeeds = () => S.orders.filter(o => o.payVia === "bdo" && rrPayable(o) && !/bdo\.com\.ph/i.test(o.payLink || ""));
 const bdoCount = () => (S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0) + rsBdoNeeds().length;
-const bdoBadge = () => { const n = bdoCount(); return n ? `<span class="badge amber cx-n" title="${n} BDO link${n > 1 ? "s" : ""} needed">${n}</span>` : ""; };
+const bdoBadge = () => { const n = bdoCount(); return n ? `<span class="badge red cx-n" title="${n} BDO link${n > 1 ? "s" : ""} needed">${n}</span>` : ""; };
 function bdoPanel() {
   const web = S.web.loaded ? S.web.orders.filter(bdoNeeds).sort((a, b) => webOMs(a) - webOMs(b)) : [], rs = rsBdoNeeds();
   if (!S.web.loaded && !rs.length) return `<div class="panel"><div class="empty">Loading website orders…</div></div>`;
