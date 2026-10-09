@@ -3901,7 +3901,7 @@ function viewDisputes() {
   <div style="font-size:12.5px;color:var(--muted)">Orders tagged DISPUTE. Open one to check it, then press <b>Resolved</b> to remove the tag.</div>
   <div class="table-wrap"><table>
     <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Note</th><th></th></tr></thead>
-    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Cancelled</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td><td>${o.archived ? "–" : badge(pay(o.payment))}</td><td>${o.archived ? "–" : badge(ful(o.fulfillment))}${risky.includes(o) ? " ⚠️" : ""}</td><td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Cancelled</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td>${o.archived ? "<td>–</td>" : orderCell("payment", o)}${o.archived ? "<td>–</td>" : orderCell("fulfillment", o).replace(/<\/td>$/, risky.includes(o) ? " ⚠️</td>" : "</td>")}<td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
       <td class="nowrap">${canAll() || isUnlocked("ADMIN") ? `<button class="btn sm" type="button" data-act="disp-ok" data-id="${o.id}">Resolved</button>` : ""}</td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No disputes. Open an order and tap ⚠️ Mark as dispute to track it here.</div>`}</div>`;
 }
@@ -5643,6 +5643,7 @@ function openProductForm(id, preset = {}) {
     const PLAB = { name: "name", brand: "brand", size: "size", ptype: "type", sku: "SKU", barcode: "barcode", category: "collection", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", reorder: "low-stock alert", status: "status", kind: "availability", eta: "ETA", badges: "badges", notes: "notes", accords: "accords", fragrantica: "Fragrantica link", description: "description", url: "website link", batch: "batch no.", photo: "photo" };
     const changed = id ? Object.keys(PLAB).filter(k => JSON.stringify(p[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !p[k]) && !(k === "notes" && !Object.keys(data.notes).length && !p.notes)) : [];
     data.log = logAdd(p, [id ? (changed.length ? "changed " + changed.map(k => PLAB[k]).join(", ") : "saved with no changes") : "added this listing"]);
+    tidyListing(data);
     const pid = id || uid("p"); await save("products", pid, data);
     closeSheet(); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
     setTimeout(() => tplOne(pid).then(ch => { if (ch) { scheduleWebPush(true); toast("Template photo + scent card added to the listing."); } }).catch(e => console.warn("tpl", e)), 1500);
@@ -8449,6 +8450,39 @@ async function shopListingsImport() {
   } catch (e) { console.warn("shop import", e); toast("Shopify import paused. It continues next time you open RS OS."); }
 }
 // One-time brand fill for imported Shopify listings that had no brand (webmeta/_brandfix { map: { id: { brand, name } } }); owner's device.
+// One-time (Oct 9, 2026): tidy names: brand only in Brand, size in Size, type in Type, no ALL CAPS (webmeta/_namefix map id → fields).
+async function nameFixOnce() {
+  if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
+  const t0 = Date.now();
+  while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 60000) return; await new Promise(r => setTimeout(r, 1000)); }
+  const src = S.webmeta.find(d => d.id === "_namefix"); if (!src || !src.map || src.done) return;
+  let n = 0;
+  for (const [id, v] of Object.entries(src.map)) { const p = S.products.find(x => x.id === id); if (!p || !v) continue;
+    const u = {}; for (const k of ["brand", "name", "size", "ptype"]) if (v[k] != null && v[k] !== (p[k] || "")) u[k] = v[k];
+    if (!Object.keys(u).length) continue;
+    UNDO.at = 0; await patch("products", id, { ...u, webSync: "pending", editedAt: Date.now(), log: logAdd(p, ["tidied " + Object.keys(u).map(k => ({ ptype: "type" })[k] || k).join(", ") + (u.name ? ` (was “${p.name}”)` : "")]) }).then(() => n++).catch(() => {}); }
+  await save("webmeta", "_namefix", { done: true, count: n, at: Date.now(), by: actor() });
+  if (n) toast(`Tidied the names of ${n} listing${n === 1 ? "" : "s"} (brand, size and type in their own boxes, no ALL CAPS).`);
+}
+// New / edited listings: same rules, so names stay clean (brand not repeated, "| 90ML - TESTER" moved out, no ALL CAPS).
+const NAME_KEEP = new Set(["EDP", "EDT", "EDC", "II", "III", "IV", "XS", "XL", "ANC", "PH"]);
+function tidyListing(d) {
+  let n = String(d.name || "").replace(/⎪/g, "|").replace(/\s+/g, " ").trim(); const n0 = n;
+  const known = [...new Set(S.products.map(p => p.brand).filter(Boolean))], b = known.find(x => x.toLowerCase() === String(d.brand || "").trim().toLowerCase());
+  if (b) d.brand = b; else if (d.brand && d.brand === d.brand.toLowerCase()) d.brand = d.brand.replace(/(^|[\s\-&])([a-z])/g, (q, x, l) => x + l.toUpperCase());
+  if (/^ysl$/i.test(d.brand || "")) d.brand = "Yves Saint Laurent";
+  let tail = ""; const m = /\s*\|\s*(.+)$/.exec(n); if (m) { tail = m[1]; n = n.slice(0, m.index); }
+  const mt = /\s+-\s*(sealed|tester|unsealed|partial|decant)\s*$/i.exec(n); if (mt) { tail += " " + mt[1]; n = n.slice(0, mt.index); }
+  const ms = !/set/i.test(n) && /(?:\s+-)?\s+(\d+(?:\.\d+)?)\s?(ml|g)\s*$/i.exec(n); if (ms) { tail = ms[1] + ms[2] + " " + tail; n = n.slice(0, ms.index); }
+  if (tail) { const z = /(\d+(?:\.\d+)?)\s?(ml|g)\b/i.exec(tail); if (z && !d.size) d.size = z[1] + z[2].toLowerCase();
+    const ty = [["unsealed", "Unsealed, New"], ["sealed", "Sealed"], ["tester", "Tester"], ["partial", "Partial"], ["decant", "Decant"]].find(([k]) => new RegExp("\\b" + k + "\\b", "i").test(tail)); if (ty && !d.ptype) d.ptype = ty[1]; }
+  if (/^\d+(\.\d+)?$/.test(d.size || "")) d.size += "ml";
+  for (const pre of [d.brand, /yves saint laurent/i.test(d.brand || "") ? "YSL" : "", /van cleef/i.test(d.brand || "") ? "VCA" : ""]) if (pre && n.toLowerCase().startsWith(pre.toLowerCase() + " ") && n.length > pre.length + 2) { n = n.slice(pre.length + 1); break; }
+  const letters = n0.replace(/\b(EDP|EDT|EDC)\b|\d\s?x\s?\d/g, "").replace(/[^A-Za-z]/g, "");
+  if (letters.length >= 6 && letters === letters.toUpperCase()) n = n.split(" ").map(w => { const c = w.replace(/[^A-Za-z0-9]/g, ""); if (NAME_KEEP.has(c.toUpperCase()) || c.length === 1) return w.toUpperCase(); if (/\d/.test(c) && /[a-z]/i.test(c)) return w.replace(/(\d)(ML|G|OZ)\b/gi, (q, a, u) => a + u.toLowerCase()); return w.toLowerCase().replace(/(^|[\s\-(/&#'’])([a-zà-ÿ])/g, (q, a, l) => a + l.toUpperCase()).replace(/(['’])S\b/g, "$1s"); }).join(" ");
+  d.name = n.replace(/\s+/g, " ").replace(/^[-\s]+|[\s/|-]+$/g, "").trim() || n0;
+  return d;
+}
 async function brandFixOnce() {
   if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
   const t0 = Date.now();
@@ -8542,7 +8576,7 @@ async function poSoldOutOnce() {
   if (n) toast(`${n} pre-order listing${n === 1 ? "" : "s"} updated (Sold out${src.eta ? `, ETA ${src.eta}` : ""}). The website updates in a few seconds.`);
 }
 async function startShopSync(c) {
-  costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)).then(() => brandFixOnce()).catch(e => console.warn("brand fix", e)), 8000);
+  costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)).then(() => brandFixOnce()).catch(e => console.warn("brand fix", e)).then(() => nameFixOnce()).catch(e => console.warn("name fix", e)), 8000);
   dpFixOnce().catch(e => console.warn("dp fix", e));
   setTimeout(() => poSoldOutOnce().catch(e => console.warn("po sold out", e)), 5000);
   barcodeImportOnce().catch(e => console.warn("barcode import", e));
