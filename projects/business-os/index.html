@@ -3908,7 +3908,7 @@ const pickTd = (key, id) => pickOn() ? `<td class="cb"><input type="checkbox" cl
 // actions: [label, act, extra class]; each act reads the ticked ids with pickIds(key)
 function pickBar(key, actions, live) {
   const ids = [...pk(key)].filter(id => !live || live.includes(id)); if (!pickOn() || !ids.length) return "";
-  return `<div class="bulk"><strong>${ids.length} selected</strong>${actions.map(([l, a, c]) => `<button class="btn sm ${c || ""}" type="button" data-act="${a}" data-key="${key}">${l}</button>`).join("")}<button class="btn ghost sm" type="button" data-act="pick-clear" data-key="${key}">Clear selection</button></div>`;
+  return `<div class="bulk"><strong>${ids.length} selected</strong>${actions.map(([l, a, c, opts]) => l === "select" ? `<select data-pickact="${c}" data-key="${key}" aria-label="${esc(a)}"><option value="">${esc(a)}</option>${opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</select>` : `<button class="btn sm ${c || ""}" type="button" data-act="${a}" data-key="${key}">${l}</button>`).join("")}<button class="btn ghost sm" type="button" data-act="pick-clear" data-key="${key}">Clear selection</button></div>`;
 }
 const pickIds = key => [...pk(key)];
 document.addEventListener("click", e => { if (e.target.matches && e.target.matches("input.pick")) e.stopPropagation(); }, true);
@@ -3916,6 +3916,14 @@ document.addEventListener("change", e => { const t = e.target; if (!t.matches ||
   if (t.dataset.pickall) { const set = pk(t.dataset.pickall); t.dataset.ids.split(",").filter(Boolean).forEach(id => t.checked ? set.add(id) : set.delete(id)); }
   else { const set = pk(t.dataset.pick); t.checked ? set.add(t.dataset.id) : set.delete(t.dataset.id); }
   render(); }, true);
+// Dropdown bulk actions (pickBar ["select", placeholder, act, options]): act → (ids key, value)
+const PICK_SEL = {
+  "cust-assign": v => pickRun("cust", v ? "Assigned to " + memberName(v) : "Unassigned", async k => { const c = customerList().find(x => custKey(x) === k); if (!c) return false; const os = c.orderIds.map(id => S.orders.find(o => o.id === id)).filter(o => o && OPEN_FUL.has(o.fulfillment)); for (const o of os) await updateOrder(o, { assignee: v }); }),
+  "chk-status": v => pickRun("chk", "Checks → " + CHECK_STATUS[v].name, async id => { const c = S.checks.find(x => x.id === id); if (!c || (c.status || "pending") === v) return false; await patch("checks", id, { status: v, updatedAt: Date.now() }); }),
+  "login-status": v => pickRun("login", v === "inactive" ? "Set inactive" : "Set active", async id => { const l = S.logins.find(x => x.id === id); if (!l || (l.status === "inactive") === (v === "inactive")) return false; await patch("logins", id, { status: v === "inactive" ? "inactive" : "active", updatedAt: Date.now() }); }),
+  "att-status": v => pickRun("att", "Attendance → " + astat(v).name, async mid => { const date = S.att.date, r = attRec(date, mid); await save("attendance", attId(date, mid), { ...(r ? clean(r) : {}), date, memberId: mid, status: v, ...(v === "present" ? {} : { in: 0, out: 0 }), recordedByName: actor(), updatedAt: Date.now() }); }),
+};
+document.addEventListener("change", e => { const t = e.target; if (!t.dataset || !t.dataset.pickact || !t.value) return; e.stopPropagation(); const fn = PICK_SEL[t.dataset.pickact]; if (fn) fn(t.value); }, true);
 async function pickRun(key, label, fn) { const ids = pickIds(key); let n = 0; for (const id of ids) { try { if (await fn(id) !== false) n++; } catch (e) { console.warn(label, e); } } pk(key).clear(); toast(`${label}: ${n} done.`); render(); }
 function viewDisputes() {
   const rows = [...S.orders, ...S.archived].filter(isDispute).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -4363,9 +4371,10 @@ function viewCustomers() {
     <div class="kpi"><span class="label">Avg per customer</span><span class="value">${peso(all.length ? sum / all.length : 0)}</span></div>
   </div>
   <div class="toolbar"><input id="cq" type="search" placeholder="Search name, email, phone, city or tag" value="${esc(S.cq)}" aria-label="Search customers"></div>
+  ${canAll() ? pickBar("cust", [["select", "Assign to…", "cust-assign", [["", "Unassigned"], ...salesTeam().map(m => [m.id, m.nickname || m.name])]]], rows.map(custKey)) : ""}
   <div class="table-wrap"><table class="otable" data-own="1">
-    <thead><tr>${[["name", "Customer"], ["phone", "Phone"], ["loc", "Location"], ["assigned", "Assigned to"], ["channels", "Channels"], ["orders", "Orders", "r"], ["spent", "Amount spent", "r"], ["last", "Last order"], ["tags", "Tags"]].map(([k, l, c]) => sortTh(k, l, c || "", cs, "csort")).join("")}</tr></thead>
-    <tbody>${page.map(c => `<tr data-cust="${esc(custKey(c))}">
+    <thead><tr>${canAll() ? pickTh("cust", page.map(custKey)) : ""}${[["name", "Customer"], ["phone", "Phone"], ["loc", "Location"], ["assigned", "Assigned to"], ["channels", "Channels"], ["orders", "Orders", "r"], ["spent", "Amount spent", "r"], ["last", "Last order"], ["tags", "Tags"]].map(([k, l, c]) => sortTh(k, l, c || "", cs, "csort")).join("")}</tr></thead>
+    <tbody>${page.map(c => `<tr data-cust="${esc(custKey(c))}">${canAll() ? pickTd("cust", custKey(c)) : ""}
       <td><div style="font-weight:600">${esc(c.name)}${c.example ? ' <span class="chip ex">Example</span>' : ""}${c.orders > 1 ? ' <span class="chip good">Repeat</span>' : ""}</div><div class="s">${esc(c.email || "")}</div></td>
       <td class="nowrap">${esc(c.phone || "")}</td>
       <td>${esc(c.city || (c.address || "").split(",").slice(-3, -2)[0] || "")}</td>
@@ -6482,9 +6491,10 @@ function viewAttendance() {
     body = `${attSummary(A.date)}
     <div class="toolbar">${seg}${deptSel}<span style="flex:1"></span>
       <div class="pager"><button class="btn sm" type="button" data-aday="-1" aria-label="Previous day">‹</button><input id="a-date" type="date" value="${A.date}" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 8px"><button class="btn sm" type="button" data-aday="1" aria-label="Next day">›</button><button class="btn ghost sm" type="button" data-aday="0">Today</button></div></div>
+    ${pickBar("att", [["select", "Set status for " + fmtDate(A.date) + "…", "att-status", ATT_STATUS.filter(x => !["notin", "flex", "present", "late"].includes(x.id)).map(x => [x.id, x.name])]], team.map(m => m.id))}
     <div class="table-wrap"><table class="otable">
-      <thead><tr><th>Team member</th><th>Department</th><th>Status</th><th>Time in</th><th>Time out</th><th class="r">Break</th><th class="r">Hours</th><th>Note</th><th></th></tr></thead>
-      <tbody>${team.map(m => { const r = attRec(A.date, m.id), st = astat(attStatus(A.date, m.id)); return `<tr data-att="${m.id}">
+      <thead><tr>${pickTh("att", team.map(m => m.id))}<th>Team member</th><th>Department</th><th>Status</th><th>Time in</th><th>Time out</th><th class="r">Break</th><th class="r">Hours</th><th>Note</th><th></th></tr></thead>
+      <tbody>${team.map(m => { const r = attRec(A.date, m.id), st = astat(attStatus(A.date, m.id)); return `<tr data-att="${m.id}">${pickTd("att", m.id)}
         <td style="font-weight:600">${esc(m.name)}${m.id === myMemberId() ? ' <span class="chip">You</span>' : ""}</td>
         <td>${esc((dept(m.department) || { name: "–" }).name)}${schedOf(m) || isFlex(m.id) ? `<div style="font-size:11px;color:var(--muted)">${esc(isFlex(m.id) ? "Flexible hours" : shiftLabel(A.date, m.id))}</div>` : ""}</td>
         <td><span class="chip ${st.cls}">${st.name}</span>${onBreak(r) ? ' <span class="chip warn">On break</span>' : ""}</td>
@@ -6767,9 +6777,9 @@ function supplierNames() {
   const set = new Set(); for (const o of S.orders) for (const t of o.tags || []) if (/^S-/i.test(t)) set.add(t.toUpperCase());
   for (const x of S.invoices) if (x.supplier) set.add(x.supplier); return [...set].sort();
 }
-function invRow(x, finance) {
+function invRow(x, finance, pick) {
   const u = x.status === "paid" || x.budget === "declined" ? "" : urgOf(x.dueDate);
-  return `<tr data-act="view-invoice" data-id="${x.id}" class="${u ? "u-row u-" + u : ""}">
+  return `<tr data-act="view-invoice" data-id="${x.id}" class="${u ? "u-row u-" + u : ""}">${pick ? pickTd("inv", x.id) : ""}
     <td class="nowrap">${fmtDate(x.invDate || dstr(x.createdAt || Date.now()))}</td>
     <td style="font-weight:600">${esc(invTitle(x))}${x.file ? ' <span title="Has attachment">📎</span>' : ""}<div class="s">${esc(x.kind === "request" ? (x.purpose || "") : (x.orders || x.notes || ""))}</div></td>
     <td class="r num nowrap">${peso2(x.amount)}</td>
@@ -6797,7 +6807,8 @@ function viewInvoices() {
     <div class="toolbar"><input id="inv-q" type="search" placeholder="Search supplier, invoice # or order #" value="${esc(f.q)}" aria-label="Search invoices" autocomplete="off">
       <div class="seg" role="group" aria-label="Status">${[["topay", "To pay"], ["paid", "Paid"], ["all", "All"]].map(([k, l]) => `<button type="button" data-invst="${k}" aria-pressed="${f.st === k}">${l}</button>`).join("")}</div>
       <select id="inv-sup" aria-label="Supplier"><option value="all">All suppliers</option>${sups.map(x => `<option value="${esc(x)}" ${f.sup === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
-    <div class="table-wrap"><table class="otable">${invHead}<tbody>${rows.map(x => invRow(x, false)).join("")}</tbody></table>${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No invoices match." : "No supplier invoices yet. Click “Upload invoice” to add a PDF or photo."}</div>`}</div>
+    ${pickBar("inv", [["✓ Mark paid", "inv-sel-paid", "primary"], ["Mark to pay", "inv-sel-topay"]], rows.map(x => x.id))}
+    <div class="table-wrap"><table class="otable">${invHead.replace("<tr>", "<tr>" + pickTh("inv", rows.map(x => x.id)))}<tbody>${rows.map(x => invRow(x, false, true)).join("")}</tbody></table>${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No invoices match." : "No supplier invoices yet. Click “Upload invoice” to add a PDF or photo."}</div>`}</div>
     <div style="font-size:12px;color:var(--muted)">Every invoice marked “To pay” goes to Finance → Budget requests and shows on the Tasks calendar on its due date.</div>`;
 }
 function viewBudget() {
@@ -6962,7 +6973,7 @@ function viewDues() {
   const act = list.filter(d => d.active !== false);
   const tot = act.reduce((a, d) => a + (Number(d.amount) || 0), 0), paid = act.filter(d => (d.paid || []).includes(ym));
   const next = act.filter(d => !(d.paid || []).includes(ym) && dueDateIn(d, ym) >= mToday()).sort((a, b) => dueDateIn(a, ym).localeCompare(dueDateIn(b, ym)))[0];
-  const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="7">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">
+  const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="${can && pickOn() ? 8 : 7}">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">${can ? pickTd("due", d.id) : ""}
       <td style="font-weight:600">${esc(d.name)}</td><td class="nowrap">${ordinal(d.day)} of the month</td><td class="r num nowrap">${peso(d.amount)}</td><td>${esc(d.method || "")}</td><td class="nowrap num">${d.account ? "•••• " + esc(d.account) : ""}</td><td>${esc(d.holder || "")}</td>
       <td class="nowrap">${d.active === false ? "Stopped" : `<button class="btn sm ${isPaid ? "" : late ? "danger" : "primary"}" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${ym}">${isPaid ? "Paid ✓" : late ? "Overdue · Mark paid" : "Mark paid"}</button>`}</td></tr>`; }).join(""); };
   return `<div class="kpis">
@@ -6971,7 +6982,8 @@ function viewDues() {
       <div class="kpi"><span class="label">Next due</span><span class="value" style="font-size:18px">${next ? esc(next.name) : "–"}</span><span class="sub">${next ? fmtDate(dueDateIn(next, ym)) + " · " + peso(next.amount) : "All paid for this month"}</span></div>
       <div class="kpi"><span class="label">Calendar</span><span class="value" style="font-size:16px">On the Tasks calendar</span><span class="sub">Visible to people with Finance unlocked</span></div>
     </div>
-    <div class="table-wrap"><table class="otable"><thead><tr><th>Name</th><th>Due date</th><th class="r">Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th></tr></thead>
+    ${pickBar("due", [["✓ Mark paid (" + monthLabel(ym) + ")", "due-sel-paid", "primary"], ["Mark unpaid", "due-sel-unpaid"]], list.map(d => d.id))}
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th>Name</th><th>Due date</th><th class="r">Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th></tr></thead>
       <tbody>${DUE_KINDS.map(k => group(k[0])).join("")}</tbody></table>${list.length ? "" : `<div class="empty" style="padding:16px">No due dates yet.</div>`}</div>
     <div style="font-size:12px;color:var(--muted)">Only the last 4 digits of account and card numbers are kept here, for safety. A due date of the 30th falls on the last day in shorter months.</div>`;
 }
@@ -7018,8 +7030,9 @@ function viewChecks() {
       <div class="kpi"><span class="label">Cleared</span><span class="value">${list.filter(c => c.status === "cleared").length}</span></div>
       <div class="kpi"><span class="label">Bounced</span><span class="value" style="color:${list.some(c => c.status === "bounced") ? "var(--bad)" : "inherit"}">${list.filter(c => c.status === "bounced").length}</span></div>
     </div>
-    <div class="table-wrap"><table class="otable"><thead><tr><th>Check date</th><th>Check no.</th><th>Bank / account</th><th>Payee</th><th class="r">Amount</th><th>Purpose</th><th>Status</th></tr></thead>
-    <tbody>${list.map(c => { const st = CHECK_STATUS[c.status || "pending"], over = st === CHECK_STATUS.pending && c.checkDate && c.checkDate < t; return `<tr ${can ? `data-act="edit-check" data-id="${c.id}"` : 'style="cursor:default"'}>
+    ${pickBar("chk", [["select", "Set status…", "chk-status", Object.entries(CHECK_STATUS).map(([k, v]) => [k, v.name])]], list.map(c => c.id))}
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("chk", list.map(c => c.id)) : ""}<th>Check date</th><th>Check no.</th><th>Bank / account</th><th>Payee</th><th class="r">Amount</th><th>Purpose</th><th>Status</th></tr></thead>
+    <tbody>${list.map(c => { const st = CHECK_STATUS[c.status || "pending"], over = st === CHECK_STATUS.pending && c.checkDate && c.checkDate < t; return `<tr ${can ? `data-act="edit-check" data-id="${c.id}"` : 'style="cursor:default"'}>${can ? pickTd("chk", c.id) : ""}
       <td class="nowrap" style="color:${over ? "var(--bad)" : "inherit"}">${c.checkDate ? fmtLong(c.checkDate) : "–"}${over ? " · past date" : ""}</td><td class="num">${esc(c.checkNo || "")}</td><td>${esc(c.bank || "")}</td><td style="font-weight:600">${esc(c.payee || "")}</td>
       <td class="r num nowrap">${peso2(c.amount)}</td><td>${esc(c.purpose || "")}</td><td><span class="chip ${st.cls}">${st.name}</span></td></tr>`; }).join("")}</tbody></table>
     ${list.length ? "" : `<div class="empty" style="padding:16px">No checks yet. Click “Add check” each time you issue one. Pending checks show on the Tasks calendar on their date.</div>`}</div>`;
@@ -7251,11 +7264,12 @@ function viewLogins() {
   const can = !S.readOnly;
   const pwCell = l => !l.pw ? `<span style="color:var(--muted)">${esc(l.pwHint || "")}</span>` : `<span class="nowrap" style="display:inline-flex;gap:6px;align-items:center"><code class="pw">${S.pwShown[l.id] != null ? esc(S.pwShown[l.id]) : "••••••••"}</code>
     <button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="${S.pwShown[l.id] != null ? "hide" : "show"}">${S.pwShown[l.id] != null ? "Hide" : "Show"}</button><button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="copy">Copy</button></span>`;
-  const section = (title, rows) => `<tr class="grp"><td colspan="6">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>
+  const section = (title, rows) => `<tr class="grp"><td colspan="${can && pickOn() ? 7 : 6}">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>${can ? pickTd("login", l.id) : ""}
       <td style="font-weight:600">${esc(String(l.account || "").replace(/^["“”']+|["“”']+$/g, ""))}</td><td>${esc(l.accountName || "")}</td><td style="user-select:all">${esc(l.username || "")}</td>
       <td>${pwCell(l)}</td><td class="nowrap num">${esc(l.phone || "")}</td><td style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${esc(l.notes || "")}</td></tr>`).join("");
   return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins">${can ? `<span style="flex:1"></span><button class="btn" type="button" data-act="login-import">Import from spreadsheet</button>` : ""}</div>
-    <div class="table-wrap"><table class="otable logins"><thead><tr><th>Account</th><th>Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th>Notes</th></tr></thead>
+    ${pickBar("login", [["select", "Set status…", "login-status", [["active", "Active"], ["inactive", "Inactive"]]], ["Delete…", "login-sel-del", "danger"]], list.map(l => l.id))}
+    <div class="table-wrap"><table class="otable logins"><thead><tr>${can ? pickTh("login", list.map(l => l.id)) : ""}<th>Account</th><th>Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th>Notes</th></tr></thead>
     <tbody>${section("Active accounts", list.filter(l => l.status !== "inactive"))}${section("Inactive accounts", list.filter(l => l.status === "inactive"))}</tbody></table></div>
     ${S.canEdit ? `<details class="panel"><summary style="cursor:pointer;font-weight:600">Change vault passphrase</summary>
       <form id="vault-change" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;max-width:360px">
@@ -7868,6 +7882,9 @@ document.addEventListener("click", guard(async ev => {
       await patch("orders", o.id, on ? { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) } : { tags: [...(o.tags || []), "DISPUTE"], log: logAdd(o, ["marked the order as a dispute"]) });
       toast(on ? `${onum(o)}: dispute resolved.` : `${onum(o)} marked as a dispute (see Disputes).`); openOrderDetails(o.id); return; }
     case "pick-clear": pk(b.dataset.key).clear(); render(); return;
+    case "inv-sel-paid": case "inv-sel-topay": { const paid = b.dataset.act === "inv-sel-paid", me = member(myMemberId()) || {}; return pickRun("inv", paid ? "Invoices marked paid" : "Invoices marked to pay", async id => { const x = S.invoices.find(r => r.id === id); if (!x || (x.status === "paid") === paid) return false; await patch("invoices", id, paid ? { status: "paid", paidAt: Date.now(), paidBy: me.nickname || me.name || "", budget: x.budget === "declined" ? "declined" : "approved" } : { status: "topay", paidAt: 0, paidBy: "" }); }); }
+    case "due-sel-paid": case "due-sel-unpaid": { const paid = b.dataset.act === "due-sel-paid", ym = mToday().slice(0, 7); return pickRun("due", paid ? "Marked paid" : "Marked unpaid", async id => { const d = S.dues.find(r => r.id === id); if (!d) return false; const set = new Set(d.paid || []); if (set.has(ym) === paid) return false; paid ? set.add(ym) : set.delete(ym); await patch("dues", id, { paid: [...set].sort() }); }); }
+    case "login-sel-del": { if (!confirm(`Delete ${pickIds("login").length} login(s)? This can't be undone.`)) return; return pickRun("login", "Logins deleted", async id => { if (!S.logins.some(x => x.id === id)) return false; await remove("logins", id); }); }
     case "disp-ok-sel": return pickRun("disp", "Disputes resolved", async id => { const o = findOrder(id); if (!o) return false; await patch("orders", o.id, { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) }); });
     case "rv-sel-show": case "rv-sel-hide": { const show = b.dataset.act === "rv-sel-show"; const chunks = []; await pickRun("rv", show ? "Reviews shown" : "Reviews hidden", async id => { const r = S.reviews.find(x => x.id === id); if (!r) return false; await patch("reviews", id, { status: show ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); chunks.push(r.chunk); }); if (typeof rvQueue === "function") rvQueue(chunks); return; }
     case "rv-sel-del": { if (!confirm(`Delete ${pickIds("rv").length} review(s)? This can't be undone.`)) return; const chunks = []; await pickRun("rv", "Reviews deleted", async id => { const r = S.reviews.find(x => x.id === id); if (!r) return false; await remove("reviews", id); chunks.push(r.chunk); }); if (typeof rvQueue === "function") rvQueue(chunks); return; }
