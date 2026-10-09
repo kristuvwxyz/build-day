@@ -2043,12 +2043,12 @@ function headActions() {
     payrecords: ex("payrecords") + (can ? `<button class="btn primary" type="button" data-act="new-pr">Add record</button>` : ""),
     bir: ex("bir") + (can ? `<button class="btn primary" type="button" data-act="new-bir">Add sale</button>` : ""),
     investors: ex("investments") + (can ? `<button class="btn primary" type="button" data-act="new-inv">Add investment</button>` : ""),
-    orders: (ctxDept() === "PACKING" && canShip() ? `<button class="btn" type="button" data-act="jnt-file">J&T VIP booking file</button>` : "") + (SHOPIFY_ON && canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
+    orders: (canShip() ? `<label class="btn" for="wb-up" style="cursor:pointer" title="Upload the J&T waybill file (Excel, CSV or PDF): tracking numbers are matched to orders">📄 Upload J&T waybills</label><input id="wb-up" type="file" accept=".xls,.xlsx,.csv,.pdf" hidden>` : "") + (ctxDept() === "PACKING" && canShip() ? `<button class="btn" type="button" data-act="jnt-file">J&T VIP booking file</button>` : "") + (SHOPIFY_ON && canAll() ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("orders") + (canAll() ? `<button class="btn primary" type="button" data-act="new-order">Create order</button>` : ""),
     suppliers: S.sp && S.sp.mode === "invoices" && canInvoices() && can ? `<button class="btn primary" type="button" data-act="new-invoice">Upload invoice</button>` : "",
     budget: can && canInvoices() ? `<button class="btn" type="button" data-act="new-invoice">Upload supplier invoice</button><button class="btn primary" type="button" data-act="new-budget">New budget request</button>` : "",
     archived: "",
     gallery: can && S.mcp ? `<button class="btn" type="button" data-act="gal-load">${S.gallery.length ? "Refresh from Shopify" : "Load photos from Shopify"}</button>` : "",
-    packing: (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
+    packing: (canShip() ? `<label class="btn" for="wb-up" style="cursor:pointer">📄 Upload J&T waybills</label><input id="wb-up" type="file" accept=".xls,.xlsx,.csv,.pdf" hidden>` : "") + (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
     customers: (SHOPIFY_ON && can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
     channels: ex("customers"),
@@ -4534,7 +4534,7 @@ function openOrderForm() {
       <div class="field"><label for="o-dnote">Discount reason (optional)</label><input id="o-dnote" placeholder="e.g. loyal buyer, promo code" autocomplete="off"></div>
     </div>
     <div class="row">
-      <div class="field"><label for="o-sf">Shipping fee (buyer pays, ₱)</label><input inputmode="decimal" class="money" id="o-sf" placeholder="0"></div>
+      <div class="field"><label for="o-sf">Shipping fee (buyer pays, ₱)</label><input inputmode="decimal" class="money" id="o-sf" placeholder="0" data-auto="1"><div id="o-sf-hint" style="font-size:12px;color:var(--muted)">Fills in from the province (J&T: Luzon ₱130 · Visayas ₱160 · Mindanao ₱170).</div></div>
       <div class="field"><label for="o-ship">Shipping you paid (₱)</label><input inputmode="decimal" class="money" id="o-ship" placeholder="0"></div>
     </div>
     <div class="field"><label for="o-via">How will the buyer pay?</label><select id="o-via"><option value="">Choose later</option>${PAYVIA.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></div>
@@ -4633,10 +4633,12 @@ async function addrInit() {
   fill(C, cities, m.city || (P.value === m.prov ? "" : C.dataset.was), cities.length ? "Choose city…" : "Choose a province first");
   const bs = P.value && C.value && A[P.value] && A[P.value][C.value] ? A[P.value][C.value].slice().sort() : [];
   fill(B, bs, m.brgy || (C.value === m.city ? "" : B.dataset.was), bs.length ? "Choose barangay…" : "Choose a city first");
+  sfFill();
 }
 function addrCascade(t) {
   const A = JNT_ADDR; if (!A) return;
   const P = $("#o-prov"), C = $("#o-city"), B = $("#o-a2");
+  if (t.id === "o-prov") setTimeout(sfFill, 0);
   if (t.id === "o-prov") { const cs = A[P.value] ? Object.keys(A[P.value]).sort() : []; C.innerHTML = `<option value="">${cs.length ? "Choose city…" : "Choose a province first"}</option>${cs.map(x => `<option value="${esc(x)}">${esc(placeName(x))}</option>`).join("")}`; C.disabled = !cs.length; }
   if (t.id === "o-prov" || t.id === "o-city") { const bs = A[P.value] && A[P.value][C.value] ? A[P.value][C.value].slice().sort() : []; B.innerHTML = `<option value="">${bs.length ? "Choose barangay…" : "Choose a city first"}</option>${bs.map(x => `<option value="${esc(x)}">${esc(placeName(x))}</option>`).join("")}`; B.disabled = !bs.length; }
 }
@@ -4757,7 +4759,7 @@ function rrViaPanel(o) {
     <div class="bdo-paste"><input id="rr-bdo" type="url" placeholder="Paste the BDO link here (https://…bdo.com.ph/…)" value="${esc(/bdo\.com\.ph/i.test(o.payLink || "") ? o.payLink : "")}" autocomplete="off"><button type="button" class="btn sm primary" data-act="rr-bdo-save" data-id="${o.id}">Save${o.email ? " & email" : ""}</button></div>`; }
   else if (v === "manual") body = `<div style="font-size:13px">The receipt shows our QR codes and accounts (${payMethods().map(m => esc(m.title)).join(", ") || "none saved yet"}). The buyer replies with a screenshot; check it in the bank / GCash app, then set Payment Status → <b>Fully paid</b>.</div>`;
   else body = `<div style="font-size:13px;color:var(--warn, #8a5a00);font-weight:600">👆 Tap how the buyer pays. The receipt changes to match.</div>`;
-  const sf = `<div class="rr-sf"><label for="rr-sf">Shipping fee (buyer pays)</label><input id="rr-sf" inputmode="decimal" class="money" value="${moneyFmt(Number(o.shipFee) || "")}" placeholder="0"><label class="rr-free"><input type="checkbox" id="rr-free" ${o.shipFree ? "checked" : ""}> Free shipping</label><button class="btn sm" type="button" data-act="rr-sf-save" data-id="${o.id}">Save</button></div>`;
+  const sf = `<div class="rr-sf"><label for="rr-sf">Shipping fee (buyer pays)${o.sfAutoAt ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">· J&T rate</span>` : ""}</label><input id="rr-sf" inputmode="decimal" class="money" value="${moneyFmt(Number(o.shipFee) || "")}" placeholder="0"><label class="rr-free"><input type="checkbox" id="rr-free" ${o.shipFree ? "checked" : ""}> Free shipping</label><button class="btn sm" type="button" data-act="rr-sf-save" data-id="${o.id}">Save</button></div>`;
   return `<div class="panel bdo-box"><div class="bdo-h"><b>How the buyer pays</b></div>${seg}${body}${sf}</div>`;
 }
 const payBtns = o => o.payLink && rrPayable(o) && o.payVia !== "manual" ? `<a class="btn sm" href="${esc(o.payLink)}" target="_blank" rel="noopener">💳 Pay link</a><button class="btn sm" type="button" data-copy="${esc(o.payLink)}">Copy pay link</button>` : "";
@@ -4834,7 +4836,7 @@ const receiptSubject = o => `Your Royal Receipt · Regal Spritz PH order ${onum(
 async function receiptSend(o, quiet) {
   if (!o.email) { if (!quiet) toast("Add the customer's email first (Edit contact & shipping)."); return false; }
   if (!S.site || !S.site.email) { if (!quiet) toast("Emailing works in the RS App. Copy the receipt here instead."); return false; }
-  const r = await S.site.email({ to: o.email, subject: receiptSubject(o), html: receiptHTML(o, true), text: receiptText(o) }).catch(e => ({ ok: false, error: e && e.message }));
+  const r = await S.site.email({ to: o.email, subject: receiptSubject(o), html: receiptHTML(o, true), text: receiptText(o), kind: "receipt" }).catch(e => ({ ok: false, error: e && e.message }));
   if (!r || !r.ok) { toast(`Royal Receipt not sent: ${(r && r.error) || "the website didn't answer"}. Copy it from the order instead.`); return false; }
   const cur = S.orders.find(x => x.id === o.id) || o;
   await patch("orders", o.id, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
@@ -4845,6 +4847,7 @@ async function receiptSend(o, quiet) {
    Internal steps (FWD, Billed, DP, On hold…) are one "confirmed" email, so customers aren't flooded. */
 const MAIL_STEP = { fwd: "confirmed", billed: "confirmed", dp: "confirmed", on_hold: "confirmed", arrived: "arrived", sorted: "arrived", arrived_hold: "arrived", unfulfilled: "packing", fulfilled: "shipped", delivered: "shipped", cancelled: "cancelled" };
 const SITE_ORDERS = "https://www.regalspritz.com/account";
+const JNT_TRACK = "https://www.jtexpress.ph/";
 function custMailHTML(o, m) {
   const e = esc, c = RR;
   const items = (o.items || []).map(i => `<tr><td style="padding:3px 0;font-size:14px;color:${c.ink}">${Number(i.qty) > 1 ? i.qty + " × " : ""}${e(i.name || "")}</td></tr>`).join("");
@@ -4865,13 +4868,15 @@ function custMailHTML(o, m) {
 }
 function custMailMsg(o, step, x) {
   const n = esc((o.customer || "").split(" ")[0] || "there"), num = esc(onum(o)), pre = hasPreorder(o), part = o.payment === "partial";
+  const jnt = courierOf(o) === "J&T", trkBox = o.tracking ? `<div style="margin:14px 0;padding:16px;border:1px dashed ${RR.gold};border-radius:10px;text-align:center;background:#FFFBF2"><div style="font-size:11px;letter-spacing:2px;color:${RR.muted};font-weight:700">${jnt ? "J&T " : ""}TRACKING NUMBER</div><div style="font-family:'Courier New',monospace;font-size:24px;font-weight:700;letter-spacing:2px;color:${RR.ink};margin:6px 0;-webkit-user-select:all;user-select:all">${esc(o.tracking)}</div><div style="font-size:12.5px;color:${RR.muted}">Tap and hold (or double-click) the number to copy it${jnt ? ", then paste it on J&T's tracking page" : ""}.</div>${jnt ? `<div style="margin-top:12px"><a href="${JNT_TRACK}" target="_blank" style="display:inline-block;background:#E60012;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 24px;border-radius:8px">Track on J&T Express</a></div>` : ""}</div>` : "";
   const trk = o.tracking ? `Tracking number: <b>${esc(o.tracking)}</b>${o.courier || courierOf(o) ? ` (${esc(COURIER_LABEL[courierOf(o)] || courierOf(o))})` : ""}.` : "";
   const M = {
     paylink: { subject: `Your payment link is ready · order ${onum(o)}`, title: "Your payment link is ready", lines: [`Hi ${n}, your ${esc(x && x.method || "")} payment link for order <b>${num}</b> is ready.`, x && x.until ? `Please pay by <b>${esc(x.until)}</b> so we can keep your order.` : "Tap the button below to pay. Thank you!"], button: x && x.url ? { label: "Pay now", url: x.url } : null },
     confirmed: { subject: `Order ${onum(o)} confirmed`, title: "Your order is confirmed", lines: [`Hi ${n}, thank you! Order <b>${num}</b> is confirmed${pre ? " and your pre-order is now being processed with our supplier" : " and we're preparing it"}.`, pre ? "We'll email you again when it arrives in the Philippines." : "We'll email you when it ships."] },
     arrived: { subject: `Your pre-order has arrived · order ${onum(o)}`, title: "Your pre-order has arrived", lines: [`Hi ${n}, good news: your pre-order for order <b>${num}</b> has arrived in the Philippines.`, part ? "We'll send the remaining balance details, then ship it right away." : "We're getting it ready to ship."] },
     packing: { subject: `We're packing order ${onum(o)}`, title: "We're packing your order", lines: [`Hi ${n}, order <b>${num}</b> is being packed and will ship soon.`] },
-    shipped: { subject: `Order ${onum(o)} has shipped`, title: "Your order is on its way", lines: [`Hi ${n}, order <b>${num}</b> has shipped.`, trk || "We'll share the tracking number if you need it."] },
+    shipped: { subject: `Order ${onum(o)} has shipped`, title: "Your order is on its way", lines: [`Hi ${n}, order <b>${num}</b> has shipped.`, o.tracking ? "Here's your tracking number:" : "We'll email your tracking number as soon as it's ready."], block: trkBox },
+    tracking: { subject: `Your tracking number · order ${onum(o)}`, title: "Track your order", lines: [`Hi ${n}, order <b>${num}</b> is on its way! Here's your tracking number:`], block: trkBox },
     cancelled: { subject: `Order ${onum(o)} cancelled`, title: "Your order was cancelled", lines: [`Hi ${n}, order <b>${num}</b> has been cancelled${x && x.reason ? ": " + esc(x.reason) : "."}`, "If this is a mistake or you'd still like the items, just reply to this email and we'll help you place it again."] },
   };
   if (step === "review") { const its = reviewItems(o);
@@ -4889,12 +4894,13 @@ async function custMail(o, step, x) {
   const sentKey = step === "paylink" ? "paylink:" + ((x && x.url) || "") : step;
   const meta = o.web ? (S.webmeta.find(d => d.ref === o.ref) || {}) : (S.orders.find(r => r.id === o.id) || o);
   if ((meta.mailed || {})[sentKey]) return false;
+  if (step === "tracking" && (!o.tracking || ((meta.mailed || {}).tracking === o.tracking))) return false;
   const m = custMailMsg(o, step, x); if (!m) return false;
   const text = [m.title, ...m.lines.map(l => l.replace(/<[^>]+>/g, "")), ...(step === "review" ? reviewItems(o).map(i => `★ ${i.name}: ${i.url}`) : []), m.button ? m.button.label + ": " + m.button.url : ""].filter(Boolean).join("\n\n");
-  const r = await S.site.email({ to: o.email, subject: m.subject, html: custMailHTML(o, m), text }).catch(e => ({ ok: false, error: e && e.message }));
+  const r = await S.site.email({ to: o.email, subject: m.subject, html: custMailHTML(o, m), text, kind: step === "review" ? "review" : "update" }).catch(e => ({ ok: false, error: e && e.message }));
   if (!r || !r.ok) { if (!S.mailErrShown) { S.mailErrShown = true; toast(`Customer email not sent: ${(r && r.error) || "the website didn't answer"}.`); } return false; }
   if (typeof r.remaining === "number" && r.remaining < 5) { try { localStorage.setItem("rs-mail-pause", mToday()); } catch (e) {} toast("Gmail's daily email limit is almost used up. Customer update emails pause until tomorrow."); }
-  const mailed = { ...(meta.mailed || {}), [sentKey]: Date.now() }, msg = `emailed the customer: ${m.title}`;
+  const mailed = { ...(meta.mailed || {}), [sentKey]: step === "tracking" ? o.tracking : Date.now(), ...(step === "shipped" && o.tracking ? { tracking: o.tracking } : {}) }, msg = `emailed the customer: ${m.title}`;
   if (o.web) { const id = String(o.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {}; await save("webmeta", id, { ...clean(cur), ref: o.ref, mailed, log: [...(cur.log || []), { at: Date.now(), by: actor(), msg }].slice(-50), at: Date.now() }).catch(() => {}); }
   else { UNDO.at = 0; await patch("orders", o.id, { mailed, log: logAdd(meta, [msg]) }).catch(() => {}); }
   return true;
@@ -4907,6 +4913,17 @@ function custMailStep(o, ful) { const step = MAIL_STEP[ful]; if (!step || !o.ema
 const REVIEW_FROM = Date.parse("2026-10-08T00:00:00+08:00");
 const VISAYAS = /aklan|antique|capiz|guimaras|iloilo|negros|bohol|cebu|siquijor|biliran|samar|leyte/i;
 const MINDANAO = /zamboanga|bukidnon|camiguin|lanao|misamis|davao|compostela|cotabato|sarangani|sultan kudarat|agusan|dinagat|surigao|basilan|maguindanao|sulu|tawi|bangsamoro|barmm|soccsksargen|caraga|general santos|cagayan de oro|iligan|butuan/i;
+// J&T shipping fee the buyer pays, by area (K, Oct 9, 2026). Filled in automatically; staff can change it.
+const SF_RATE = { luzon: 130, visayas: 160, mindanao: 170 };
+const SF_AREA = { luzon: "Luzon / Metro Manila", visayas: "Visayas", mindanao: "Mindanao" };
+const sfAuto = prov => SF_RATE[shipRegion(prov)] || 0;
+function sfFill() {
+  const P = $("#o-prov"), F = $("#o-sf"), H = $("#o-sf-hint"); if (!P || !F) return;
+  if (F.value !== "" && F.dataset.auto !== "1") return;
+  const r = sfAuto(P.value); F.value = r ? moneyFmt(r) : ""; F.dataset.auto = "1";
+  if (H) H.textContent = r ? `J&T rate for ${SF_AREA[shipRegion(P.value)]}. You can change it.` : "Pick the province to fill the J&T rate.";
+  updateOrderTotal();
+}
 const shipRegion = prov => { const p = String(prov || "").trim(); return !p ? "" : MINDANAO.test(p) ? "mindanao" : VISAYAS.test(p) ? "visayas" : "luzon"; };
 const REVIEW_DAYS = { luzon: 3, visayas: 5, mindanao: 7, "": 7 };
 const provOf = o => (o.ship && o.ship.province) || o.province || (o.web ? ((S.web.orders.find(w => w.ref === o.ref) || {}).province || "") : "");
@@ -5108,7 +5125,7 @@ async function announceRun() {
     if (!todo.length) { await save("webmeta", "_announce", { ...clean(d), status: "done", doneAt: Date.now() }); toast("New website email: sent to everyone. 🎉"); return; }
     let k = 0;
     for (const x of todo) {
-      const r = await S.site.email({ to: x.email, subject: ANN_SUBJECT, html: annHTML(x.name), text: annText(x.name) }).catch(e => ({ ok: false, error: e && e.message }));
+      const r = await S.site.email({ to: x.email, subject: ANN_SUBJECT, html: annHTML(x.name), text: annText(x.name), kind: "announce" }).catch(e => ({ ok: false, error: e && e.message }));
       if (!r || !r.ok) { console.warn("announce", r && r.error); const cur = annDoc() || d; UNDO.at = 0; await save("webmeta", "_announce", { ...clean(cur), sent: [...sent], lastError: String((r && r.error) || "no answer from the website backend").slice(0, 200), lastTry: Date.now(), at: Date.now() }); return; }
       sent.add(emailHash(x.email)); k++;
       if (typeof r.remaining === "number" && r.remaining < 30) { try { localStorage.setItem("rs-ann-pause", mToday()); } catch (e) {} break; }
@@ -5124,6 +5141,12 @@ async function copyRich(html, text) {
 }
 function openReceipt(id) {
   const o = S.orders.find(x => x.id === id) || S.archived.find(x => x.id === id); if (!o) return;
+  // No shipping fee yet: fill the J&T rate for the buyer's province (once; staff can change it in the box below).
+  const sfR = sfAuto((o.ship || shipOf(o)).province);
+  if (sfR && !Number(o.shipFee) && !o.shipFree && !o.pickup && !Number(o.adjust) && !o.sfAutoAt && !S.readOnly && o.payment !== "paid") {
+    Object.assign(o, { shipFee: sfR, sfAutoAt: Date.now() });
+    patch("orders", o.id, { shipFee: sfR, sfAutoAt: Date.now(), log: logAdd(o, [`shipping fee set to the J&T rate ${peso2(sfR)} (${SF_AREA[shipRegion((o.ship || shipOf(o)).province)]})`]) }).catch(() => {});
+  }
   S.sheetReopen = () => openReceipt(id);
   const sent = o.receipt && o.receipt.at ? `Emailed to ${esc(o.receipt.to)} · ${relTime(o.receipt.at)}` : "Not emailed yet";
   openSheet(`<h3>Royal Receipt · ${esc(onum(o))}</h3>
@@ -5245,7 +5268,81 @@ function openItemsEdit(id) {
 }
 
 /* ---------- waybill scan → tracking # → Shopify fulfillment ---------- */
-async function saveWaybill(id, code) {
+/* ---------- J&T waybill upload: read the file J&T gives back (Excel / CSV / PDF), match each waybill to an order, save the tracking numbers ----------
+   Match by the order number in the row (our booking file puts #RS… in Remarks), else by the receiver's phone (open orders without tracking). */
+let PDF_LIB = null;
+function loadPDF() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (PDF_LIB) return PDF_LIB;
+  PDF_LIB = new Promise((ok, no) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"; sc.onload = () => { if (!window.pdfjsLib) return no(new Error("x")); window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; ok(window.pdfjsLib); }; sc.onerror = () => no(new Error("Couldn't load the PDF reader.")); document.head.appendChild(sc); }).catch(e => { PDF_LIB = null; throw e; });
+  return PDF_LIB;
+}
+const WB_RE = /\b(JT\d{10,16}|\d{12,15})\b/i, WB_REF = /#?\s*\b(RS-?\d{3,7})\b/i, wbPhone = v => { const d = String(v || "").replace(/\D/g, ""); return d.length >= 10 ? d.slice(-10) : ""; };
+// Each waybill → { wb, ref, phone, name }
+async function wbRead(file) {
+  const out = [], name = file.name.toLowerCase();
+  if (/\.pdf$/.test(name)) {
+    const lib = await loadPDF(), doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    for (let i = 1; i <= doc.numPages; i++) { const tc = await (await doc.getPage(i)).getTextContent(), t = tc.items.map(x => x.str).join(" ");
+      const wbs = [...new Set((t.match(new RegExp(WB_RE.source, "gi")) || []).map(x => x.toUpperCase()))].filter(x => !/^63\d{10}$|^09\d{9}$/.test(x)), ref = (WB_REF.exec(t) || [])[1] || "", ph = (t.match(/(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}/) || [])[0] || "";
+      if (wbs[0]) out.push({ wb: wbs[0], ref: ref.replace("-", "").toUpperCase(), phone: wbPhone(ph), name: "" }); }
+    return out;
+  }
+  const X = await loadXLSX(), wb = X.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
+  for (const sn of wb.SheetNames) {
+    const rows = X.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: "" }); let H = -1, cW = -1, cP = -1, cN = -1;
+    for (let r = 0; r < Math.min(rows.length, 30) && H < 0; r++) { const row = rows[r].map(x => String(x).toLowerCase()); const w = row.findIndex(x => /waybill|tracking|airway|awb|bill ?code|bill no/.test(x)); if (w >= 0) { H = r; cW = w; cP = row.findIndex(x => /receiver.*(phone|tel|mobile)|(phone|tel|mobile)/.test(x)); cN = row.findIndex(x => /^receiver( name)?(\(\*\))?$|receiver name|consignee/.test(x)); } }
+    for (let r = H + 1; r < rows.length; r++) { const row = rows[r].map(x => String(x).trim()); if (!row.join("")) continue;
+      let w = cW >= 0 ? row[cW].replace(/\s+/g, "").toUpperCase() : ""; if (!WB_RE.test(w)) { const hit = row.map(x => (WB_RE.exec(x.replace(/\s+/g, "")) || [])[1]).find(Boolean); w = hit ? hit.toUpperCase() : ""; }
+      if (!w || /^63\d{10}$|^09\d{9}$/.test(w)) continue;
+      const ref = (row.map(x => (WB_REF.exec(x) || [])[1]).find(Boolean) || "").replace("-", "").toUpperCase();
+      out.push({ wb: w, ref, phone: wbPhone(cP >= 0 ? row[cP] : row.find(x => /^(\+?63|0)9\d{9}$/.test(x.replace(/\D/g, "").replace(/^63/, "0")))), name: cN >= 0 ? row[cN] : "" }); }
+  }
+  return out;
+}
+function wbMatch(list) {
+  const rs = S.orders.filter(o => o.fulfillment !== "cancelled"), web = S.web.loaded ? webAsOrders().filter(o => o.fulfillment !== "cancelled") : [], all = [...rs, ...web];
+  const byNum = n => all.find(o => [o.num, o.web ? o.ref : "", ...(o.merged || [])].some(x => squash(x) === squash(n)));
+  const seen = new Set();
+  return list.filter(x => !seen.has(x.wb) && seen.add(x.wb)).map(x => {
+    let o = x.ref ? byNum(x.ref) : null, how = o ? "order number" : "";
+    if (!o && x.phone) { const c = all.filter(z => !z.tracking && OPEN_FUL.has(z.fulfillment) && wbPhone(z.phone || (z.ship || {}).phone) === x.phone); if (c.length === 1) { o = c[0]; how = "phone"; } }
+    const dupe = all.find(z => z.tracking && z.tracking.toUpperCase() === x.wb);
+    return { ...x, o: dupe || o, how: dupe ? "already saved" : how, done: !!dupe && (!o || dupe === o) };
+  });
+}
+async function wbUpload(file) {
+  if (!file || !canShip()) return;
+  toast("Reading the waybill file…");
+  let L; try { if (S.site && !S.web.loaded) await webLoad(true); L = wbMatch(await wbRead(file)); } catch (e) { console.warn("waybills", e); toast("Couldn't read that file. Upload the Excel / CSV / PDF from J&T."); return; }
+  if (!L.length) { toast("No J&T waybill numbers found in that file."); return; }
+  S.wbList = L;
+  const ok = L.filter(x => x.o && !x.done), row = (x, i) => `<tr><td>${x.o && !x.done ? `<input type="checkbox" class="wbu-pick" data-i="${i}" checked aria-label="Save ${esc(x.wb)}">` : ""}</td><td class="num"><b>${esc(x.wb)}</b></td>
+    <td>${x.o ? `${esc(onum(x.o))} · ${esc(x.o.customer || x.o.name || "")}${x.o.web ? ` <span class="badge grey">Website</span>` : ""}` : `<span style="color:var(--bad)">No match${x.ref ? " for " + esc(x.ref) : ""}</span>`}</td>
+    <td style="font-size:12.5px;color:var(--muted)">${x.done ? "✓ already saved" : x.o ? "by " + esc(x.how) + (x.o.tracking && x.o.tracking.toUpperCase() !== x.wb ? ` · replaces ${esc(x.o.tracking)}` : "") : x.phone ? "phone ends " + esc(x.phone.slice(-4)) : ""}</td></tr>`;
+  openSheet(`<h3>J&T waybills · ${L.length} found</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn primary" type="button" data-act="wbu-save" ${ok.length ? "" : "disabled"}>Save ${ok.length} tracking number${ok.length === 1 ? "" : "s"}</button><button class="btn ghost" type="button" data-act="close">Cancel</button>
+      <label style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="wbu-ship" checked> Mark as shipped + email the buyer their tracking number</label></div>
+    <div class="table-wrap"><table class="otable"><thead><tr><th></th><th>Waybill</th><th>Order</th><th>Matched</th></tr></thead><tbody>${L.map(row).join("")}</tbody></table></div>
+    <div style="font-size:12.5px;color:var(--muted)">Matched by the order number in the file (our booking file puts it in Remarks), else by the receiver's phone. Unmatched rows: type the waybill on the order instead.</div>`, null);
+}
+async function wbSaveAll(btn) {
+  const L = S.wbList || [], ship = !!($("#wbu-ship") || {}).checked, pick = [...document.querySelectorAll(".wbu-pick:checked")].map(x => L[Number(x.dataset.i)]).filter(x => x && x.o);
+  if (!pick.length) return; btn.disabled = true; let n = 0, fail = 0;
+  const was = S.wbShip; S.wbShip = ship;
+  for (const x of pick) {
+    btn.textContent = `Saving ${n + fail + 1} of ${pick.length}…`;
+    try {
+      if (x.o.web) { const r = await S.site.update(x.o.ref, { tracking: x.wb, ...(ship ? { status: "Shipped" } : {}) }); if (!r || !r.ok) throw new Error((r && r.error) || "website"); const i = S.web.orders.findIndex(w => w.ref === x.o.ref); if (i >= 0 && r.order) S.web.orders[i] = r.order; }
+      else await saveWaybill(x.o.id, x.wb, true);
+      if (ship) { const cur = x.o.web ? webAsOrders().find(w => w.ref === x.o.ref) : S.orders.find(o => o.id === x.o.id); if (cur) setTimeout(() => custMail({ ...cur, tracking: x.wb }, "tracking").catch(() => {}), 4000 + n * 1500); }
+      n++;
+    } catch (e) { console.warn("wb save", e); fail++; }
+  }
+  S.wbShip = was; S.web.dirty = true; closeSheet(); render();
+  toast(`${n} tracking number${n === 1 ? "" : "s"} saved${ship ? " · marked shipped" : ""}${fail ? ` · ${fail} couldn't be saved` : ""}.`);
+}
+async function saveWaybill(id, code, quiet) {
   const o = S.orders.find(x => x.id === id); if (!o || S.readOnly) return;
   const tracking = String(code).trim().replace(/\s+/g, ""), courier = courierOf(o);
   const dupe = S.orders.find(x => x.id !== id && x.tracking === tracking);
@@ -5254,8 +5351,9 @@ async function saveWaybill(id, code) {
   Object.assign(o, { tracking, courier });
   if (S.wbShip !== false) {
     if (o.fulfillment !== "fulfilled" && o.fulfillment !== "delivered") await updateOrder(o, { fulfillment: "fulfilled" });
-    toast(`#${o.num}: ${tracking} saved · shipped`);
-  } else toast(`#${o.num}: tracking ${tracking} saved`);
+    if (!quiet) toast(`#${o.num}: ${tracking} saved · shipped`);
+    if (!quiet && o.email) setTimeout(() => { const cur = S.orders.find(x => x.id === o.id); if (cur) custMail(cur, "tracking").catch(() => {}); }, 4000);
+  } else if (!quiet) toast(`#${o.num}: tracking ${tracking} saved`);
 }
 const SHIP_FO_Q = `query RSFO($id: ID!) { order(id: $id) { id displayFulfillmentStatus fulfillmentOrders(first: 10) { nodes { id status requestStatus } } } }`;
 const SHIP_RELEASE_M = `mutation RSRelease($id: ID!) { fulfillmentOrderReleaseHold(id: $id) { fulfillmentOrder { id status } userErrors { field message } } }`;
@@ -7455,7 +7553,7 @@ document.addEventListener("click", guard(async ev => {
     case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
     case "ann-preview": { if (S.photos && !S.webmeta.some(d => d.id === "_annpicks" && d.v === ANN_PICKS_V)) { b.disabled = true; await annPrepare(); b.disabled = false; } const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
-    case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; await annPrepare(); const r = await S.site.email({ to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
+    case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; await annPrepare(); const r = await S.site.email({ kind: "test", to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
     case "ann-start": { await annPrepare(); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
     case "ann-pause": { const d = annDoc(); if (d) await save("webmeta", "_announce", { ...clean(d), status: "paused", at: Date.now() }); toast("Paused. Tap Start sending to continue."); render(); return; }
     case "rr-sf-save": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const v = numv("rr-sf"), free = !!($("#rr-free") && $("#rr-free").checked);
@@ -7596,6 +7694,7 @@ document.addEventListener("click", guard(async ev => {
     case "sup-copy": try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
     case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${String(S.supLabel || S.of.sup || "all").toLowerCase().replace(/\s+/g, "-")}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
     case "jnt-export": return jntExport();
+    case "wbu-save": return wbSaveAll(b);
     case "jnt-file": return openJntFile();
     case "jnt-dl": return jntDownload();
     case "of-clear": Object.assign(S.of, { q: "", view: "all", ful: "all", pay: "all", sup: "all", month: "" }); S.page = 0; render(); return;
@@ -7802,6 +7901,7 @@ document.addEventListener("change", guard(async ev => {
   if ((t.id === "bulk-pay" || t.id === "bulk-ful") && t.value) return bulkAction((t.id === "bulk-pay" ? "pay:" : "ful:") + t.value);
   if (t.id === "pack-courier") { S.courier = t.value; try { localStorage.setItem("rs-courier", t.value); } catch (e) {} return; }
   if (t.id === "pack-ship") { S.wbShip = t.checked; try { localStorage.setItem("rs-wbship", t.checked ? "1" : "0"); } catch (e) {} return; }
+  if (t.id === "wb-up" && t.files[0]) { const f = t.files[0]; t.value = ""; return wbUpload(f); }
   if (t.dataset.wbcam && t.files[0]) { const f = t.files[0], id = t.dataset.wbcam; t.value = ""; toast("Reading waybill barcode…"); const c = await decodeBarcode(f); if (!c) { toast("No barcode found. Try again closer, flat, and in good light."); return; } return saveWaybill(id, c); }
   if (t.id === "pack-filter") { S.packF = t.value; render(); return; }
   if (t.id === "of-view") { S.of.view = t.value; S.page = 0; render(); }
@@ -7811,6 +7911,7 @@ document.addEventListener("change", guard(async ev => {
 
 document.addEventListener("input", ev => {
   const t = ev.target;
+  if (t.id === "o-sf") { t.dataset.auto = ""; const H = $("#o-sf-hint"); if (H) H.textContent = "Typed by you."; }
   if (t.matches(".it-q, .it-price, #o-disc, #o-sf")) return updateOrderTotal();
   if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-sf, #ei-disc")) return eiTotal();
   if (t.id === "p-frag-text") { if (t.value.trim()) fragFill(fragFromText(t.value), true); return; }

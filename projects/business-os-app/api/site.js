@@ -74,7 +74,9 @@ export default async function handler(req, res) {
     const subject = String(body.subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 200), html = String(body.html || ""), text = String(body.text || "").slice(0, 20000);
     if (!subject || !html || html.length > 150000) return res.status(400).json({ ok: false, error: "The receipt is empty or too big." });
     const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
-    call = { action: "opsEmail", key: KEY, to, subject, html, text, by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
+    // kind: receipt | update | review | announce | test (announce = marketing: the backend skips buyers marked "No Emails").
+    const kind = ["receipt", "update", "review", "announce", "test"].includes(body.kind) ? body.kind : "update";
+    call = { action: "opsEmail", key: KEY, to, subject, html, text, kind, by: String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60) };
   } else if (body.action === "returnSet") {
     // Return / refund request decision (website backend v31 opsReturnSet). The refund itself is done by the team.
     const ref = String(body.ref || "").trim().replace(/^#/, "");
