@@ -1062,6 +1062,10 @@ const FUL_PICK = FULFILLMENTS.filter(f => f.id !== "delivered");
 const ful = id => FULFILLMENTS.find(s => s.id === id) || FULFILLMENTS[0];
 const badge = s => `<span class="badge ${s.cls}">${esc(s.name)}</span>`;
 const fmtDate = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "";
+const fmtDateY = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "";
+// The store Gmail allows ~100 emails a day (shared with sign-in codes); the Mailer refuses RS OS emails when 15 or fewer are left.
+const MAIL_LIMIT_RE = /daily.*limit|limit reached|quota/i;
+const mailLimitHit = () => { try { localStorage.setItem("rs-mail-pause", mToday()); localStorage.setItem("rs-ann-pause", mToday()); } catch (e) {} };
 const exChip = r => r.example ? ' <span class="chip ex">Example</span>' : "";
 const isVoid = o => VOIDPAY.has(o.payment);
 const ICONS = {
@@ -1483,7 +1487,7 @@ function viewReviews() {
       <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : r.status === "pending" ? "rv-pend" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>
         <td data-sort="${Number(r.rating) || 0}">${starsHTML(r.rating)}</td><td style="font-weight:600">${esc(r.customer || "Anonymous")}</td><td>${esc(r.product || "")}</td>
         <td><div class="rv-text">${r.title ? `<b>${esc(r.title)}</b> · ` : ""}${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}${Array.isArray(r.pics) && r.pics.length ? `<div style="display:flex;gap:4px;margin-top:4px">${r.pics.slice(0, 3).filter(u => /^https:\/\//.test(u)).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img src="${esc(u)}" alt="Review photo" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--line)"></a>`).join("")}</div>` : ""}</td>
-        <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap">${r.date ? fmtDate(r.date) : ""}</td>
+        <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap" data-sort="${esc(r.date || "")}">${r.date ? fmtDateY(r.date) : ""}</td>
         <td><span class="chip ${r.status === "hidden" ? "" : r.status === "pending" ? "warn" : "good"}">${r.status === "hidden" ? "Hidden" : r.status === "pending" ? "To approve" : "Shown"}</span></td>
         ${can ? `<td class="r nowrap">${r.status === "pending" ? `<button class="btn sm primary" type="button" data-act="rv-approve" data-id="${r.id}">✓ Approve</button> <button class="btn sm ghost" type="button" data-act="rv-reject" data-id="${r.id}">Hide</button>` : `<button class="btn sm ghost" type="button" data-act="rv-toggle" data-id="${r.id}">${r.status === "hidden" ? "Show" : "Hide"}</button>`}</td>` : ""}</tr>`).join("")}</tbody></table>
       ${list.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No reviews match these filters." : "No reviews yet. Add one, or import them from a spreadsheet."}</div>`}</div>
@@ -4837,7 +4841,8 @@ async function receiptSend(o, quiet) {
   if (!o.email) { if (!quiet) toast("Add the customer's email first (Edit contact & shipping)."); return false; }
   if (!S.site || !S.site.email) { if (!quiet) toast("Emailing works in the RS App. Copy the receipt here instead."); return false; }
   const r = await S.site.email({ to: o.email, subject: receiptSubject(o), html: receiptHTML(o, true), text: receiptText(o), kind: "receipt" }).catch(e => ({ ok: false, error: e && e.message }));
-  if (!r || !r.ok) { toast(`Royal Receipt not sent: ${(r && r.error) || "the website didn't answer"}. Copy it from the order instead.`); return false; }
+  if (!r || !r.ok) { if (r && MAIL_LIMIT_RE.test(r.error || "")) { mailLimitHit(); toast("Royal Receipt not sent: Gmail's daily email limit is reached. Send it again tomorrow, or Copy text (for chat) now."); return false; }
+    toast(`Royal Receipt not sent: ${(r && r.error) || "the website didn't answer"}. Copy it from the order instead.`); return false; }
   const cur = S.orders.find(x => x.id === o.id) || o;
   await patch("orders", o.id, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
   toast(`Royal Receipt emailed to ${o.email}.`); return true;
@@ -4898,8 +4903,9 @@ async function custMail(o, step, x) {
   const m = custMailMsg(o, step, x); if (!m) return false;
   const text = [m.title, ...m.lines.map(l => l.replace(/<[^>]+>/g, "")), ...(step === "review" ? reviewItems(o).map(i => `★ ${i.name}: ${i.url}`) : []), m.button ? m.button.label + ": " + m.button.url : ""].filter(Boolean).join("\n\n");
   const r = await S.site.email({ to: o.email, subject: m.subject, html: custMailHTML(o, m), text, kind: step === "review" ? "review" : "update" }).catch(e => ({ ok: false, error: e && e.message }));
-  if (!r || !r.ok) { if (!S.mailErrShown) { S.mailErrShown = true; toast(`Customer email not sent: ${(r && r.error) || "the website didn't answer"}.`); } return false; }
-  if (typeof r.remaining === "number" && r.remaining < 5) { try { localStorage.setItem("rs-mail-pause", mToday()); } catch (e) {} toast("Gmail's daily email limit is almost used up. Customer update emails pause until tomorrow."); }
+  if (!r || !r.ok) { if (r && MAIL_LIMIT_RE.test(r.error || "")) { mailLimitHit(); if (!S.mailErrShown) { S.mailErrShown = true; toast("Gmail's daily email limit is reached. Customer emails continue tomorrow."); } return false; }
+    if (!S.mailErrShown) { S.mailErrShown = true; toast(`Customer email not sent: ${(r && r.error) || "the website didn't answer"}.`); } return false; }
+  if (typeof r.remaining === "number" && r.remaining <= 16) { try { localStorage.setItem("rs-mail-pause", mToday()); } catch (e) {} toast("Gmail's daily email limit is almost used up. Customer update emails pause until tomorrow."); }
   const mailed = { ...(meta.mailed || {}), [sentKey]: step === "tracking" ? o.tracking : Date.now(), ...(step === "shipped" && o.tracking ? { tracking: o.tracking } : {}) }, msg = `emailed the customer: ${m.title}`;
   if (o.web) { const id = String(o.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {}; await save("webmeta", id, { ...clean(cur), ref: o.ref, mailed, log: [...(cur.log || []), { at: Date.now(), by: actor(), msg }].slice(-50), at: Date.now() }).catch(() => {}); }
   else { UNDO.at = 0; await patch("orders", o.id, { mailed, log: logAdd(meta, [msg]) }).catch(() => {}); }
@@ -5126,6 +5132,7 @@ async function announceRun() {
     let k = 0;
     for (const x of todo) {
       const r = await S.site.email({ to: x.email, subject: ANN_SUBJECT, html: annHTML(x.name), text: annText(x.name), kind: "announce" }).catch(e => ({ ok: false, error: e && e.message }));
+      if (r && !r.ok && MAIL_LIMIT_RE.test(r.error || "")) { mailLimitHit(); break; }
       if (!r || !r.ok) { console.warn("announce", r && r.error); const cur = annDoc() || d; UNDO.at = 0; await save("webmeta", "_announce", { ...clean(cur), sent: [...sent], lastError: String((r && r.error) || "no answer from the website backend").slice(0, 200), lastTry: Date.now(), at: Date.now() }); return; }
       sent.add(emailHash(x.email)); k++;
       if (typeof r.remaining === "number" && r.remaining < 30) { try { localStorage.setItem("rs-ann-pause", mToday()); } catch (e) {} break; }
