@@ -8335,6 +8335,18 @@ async function shopListingsImport() {
     toast(`Shopify import done: ${n} listings added as Inactive${skip ? ` (${skip} were already here)` : ""}. Find them under Listings → Inactive.`);
   } catch (e) { console.warn("shop import", e); toast("Shopify import paused. It continues next time you open RS OS."); }
 }
+// One-time brand fill for imported Shopify listings that had no brand (webmeta/_brandfix { map: { id: { brand, name } } }); owner's device.
+async function brandFixOnce() {
+  if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
+  const t0 = Date.now();
+  while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 60000) return; await new Promise(r => setTimeout(r, 1000)); }
+  const src = S.webmeta.find(d => d.id === "_brandfix"); if (!src || !src.map || src.done) return;
+  let n = 0;
+  for (const [id, v] of Object.entries(src.map)) { const p = S.products.find(x => x.id === id); if (!p || p.brand || !v || !v.brand) continue;
+    UNDO.at = 0; await patch("products", id, { brand: v.brand, ...(v.name ? { name: v.name } : {}), log: logAdd(p, [`brand set to ${v.brand}`]) }).then(() => n++).catch(() => {}); }
+  await save("webmeta", "_brandfix", { done: true, count: n, at: Date.now(), by: actor() });
+  if (n) toast(`Filled the brand on ${n} imported listing${n === 1 ? "" : "s"}.`);
+}
 async function costImportOnce(c) {
   if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
   const t0 = Date.now();
@@ -8401,7 +8413,7 @@ async function dpFixOnce() {
   if (todo.length) toast(`${todo.length} pre-order order${todo.length === 1 ? "" : "s"} changed from Fully paid to Partially paid (50% DP).`);
 }
 async function startShopSync(c) {
-  costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)), 8000);
+  costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)).then(() => brandFixOnce()).catch(e => console.warn("brand fix", e)), 8000);
   dpFixOnce().catch(e => console.warn("dp fix", e));
   barcodeImportOnce().catch(e => console.warn("barcode import", e));
   setTimeout(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 20000); setInterval(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 5 * 60e3);
