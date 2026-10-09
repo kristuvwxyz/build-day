@@ -92,14 +92,17 @@ export default async function handler(req, res) {
     const name = s(body.name).slice(0, 80), email = s(body.email).slice(0, 120), phone = s(body.phone).slice(0, 20);
     const items = (Array.isArray(body.items) ? body.items : []).slice(0, 50).map(i => ({ name: s(i && i.name).slice(0, 120) || "Item", quantity: Math.max(1, Math.round(Number(i && i.qty) || 1)), totalAmount: { value: Math.round((Number(i && i.qty) || 1) * (Number(i && i.price) || 0) * 100) / 100 } }));
     const back = "https://www.regalspritz.com/account";
-    if (process.env.MAYA_PUBLIC_KEY) {
+    // Maya public key: Vercel MAYA_PUBLIC_KEY, else the one saved in Supabase (supabase/maya-key.sql).
+    let MAYA = process.env.MAYA_PUBLIC_KEY || "";
+    if (!MAYA) { const mk = await rpc("maya_key", { p_key: KEY }).then(r => r.ok ? r.json() : null).catch(() => null); if (typeof mk === "string" && /^pk-/.test(mk)) MAYA = mk; }
+    if (MAYA) {
       const [first, ...rest] = name.split(" ");
       const mb = { totalAmount: { value: amount, currency: "PHP" }, requestReferenceNumber: ref,
         buyer: { firstName: first || "Customer", lastName: rest.join(" ") || "-", contact: { ...(email ? { email } : {}), ...(phone ? { phone } : {}) } },
         items: items.length ? items : [{ name: "Order " + ref, quantity: 1, totalAmount: { value: amount } }],
         redirectUrl: { success: back + "?paid=" + ref, failure: back, cancel: back } };
       try {
-        const r = await fetch((process.env.MAYA_BASE_URL || "https://pg.maya.ph") + "/checkout/v1/checkouts", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Basic " + Buffer.from(process.env.MAYA_PUBLIC_KEY + ":").toString("base64") }, body: JSON.stringify(mb) });
+        const r = await fetch((process.env.MAYA_BASE_URL || "https://pg.maya.ph") + "/checkout/v1/checkouts", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Basic " + Buffer.from(MAYA + ":").toString("base64") }, body: JSON.stringify(mb) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.redirectUrl) return res.status(502).json({ ok: false, error: "Maya didn't make the link: " + String(j.message || j.error || r.status).slice(0, 160) });
         return res.status(200).json({ ok: true, url: j.redirectUrl, id: j.checkoutId || "" });

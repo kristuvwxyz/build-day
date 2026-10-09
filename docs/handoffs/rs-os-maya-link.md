@@ -3,7 +3,7 @@
 RS OS ("Create Maya link" on the Royal Receipt, or "Card · Maya Checkout" in Create order) makes a Maya Checkout link
 for the order's amount due, saves it as the order's pay link and emails the Royal Receipt with a Pay now button.
 
-## Easiest: add the Maya public key in Vercel (no website change)
+## Done (Oct 9, 2026): the public key is saved in Supabase app_settings.maya_public_key (supabase/maya-key.sql). Or: add it in Vercel (no website change)
 1. Open Maya Business Manager → **Developers / API keys** and copy the **Public key** (starts with `pk-`).
 2. Open https://vercel.com/kristuvwxyz/regal-spritz-os/settings/environment-variables
 3. Add **MAYA_PUBLIC_KEY** = the key → Save. Then **Deployments → ⋯ → Redeploy**.
