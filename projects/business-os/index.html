@@ -1114,7 +1114,7 @@ const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
   web: { orders: [], at: "", err: "", loading: false, loaded: false }, oSrc: "all", wf: { f: "all", q: "" }, site: null, cx: { show: false, f: "pending" },
-  webmeta: [], products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "high", source: "" }, rvq: "", eomMonth: "",
+  webmeta: [], products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "new", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
@@ -1488,7 +1488,7 @@ function viewReviews() {
     <div class="toolbar"><input id="rvq" type="search" placeholder="Search customer, product, review" value="${esc(S.rvq)}" aria-label="Search reviews">
       ${sel("rv-stars", "Rating", [["", "All ratings"], ...[5, 4, 3, 2, 1].map(n => [n, n + " star" + (n === 1 ? "" : "s")])], R.stars)}
       ${sel("rv-source", "Source", [["", "All sources"], ...RV_SOURCES.map(x => [x, x])], R.source)}
-      ${sel("rv-sort", "Sort", [["high", "Highest rating first"], ["low", "Lowest rating first"], ["new", "Newest first"], ["old", "Oldest first"]], R.sort)}
+      ${sel("rv-sort", "Sort", [["new", "Newest first"], ["old", "Oldest first"], ["high", "Highest rating first"], ["low", "Lowest rating first"]], R.sort)}
       ${active ? `<button class="btn ghost sm" type="button" data-act="rv-clear">✕ Clear filters</button>` : ""}</div>
     <div class="table-wrap"><table class="otable"><thead><tr><th>Rating</th><th>Customer</th><th>Product</th><th>Review</th><th>Source</th><th>Date</th><th>Status</th>${can ? "<th></th>" : ""}</tr></thead>
       <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : r.status === "pending" ? "rv-pend" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>
@@ -5652,14 +5652,14 @@ function openProductForm(id, preset = {}) {
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, compare: p => Number(p.compareAt) || 0, cost: p => Number(p.cost) || 0, stock: p => Number(p.stock) || 0, committed: p => committedOf(p), status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
-  const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
+  const q = (S.liq || "").trim().toLowerCase(), qWords = q.split(/\s+/).filter(Boolean), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products, lb = S.lbrand || "", lc = S.lcat || "", lbd = S.lbadge || "";
   const brands = [...new Set(all.map(p => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(isOut).length, pending: all.filter(p => p.webSync === "pending").length };
   const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
   const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? isOut(p) : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
     && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
-    && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta].join(" ").toLowerCase().includes(q)))
+    && (!q || qWords.every(w => [p.brand, p.name, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta, p.kind === "preorder" ? "pre-order preorder" : "on hand"].join(" ").toLowerCase().includes(w))))
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
   const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
   const page = rows.slice(S.lpage * PAGE, S.lpage * PAGE + PAGE);
@@ -5704,7 +5704,7 @@ function viewListings() {
         price: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="price" data-id="${p.id}" value="${moneyFmt(p.price)}" placeholder="SRP" aria-label="SRP"></span>` : peso(p.price)}</td>`,
         compare: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="compareAt" data-id="${p.id}" value="${Number(p.compareAt) ? moneyFmt(p.compareAt) : ""}" placeholder="Compare" aria-label="Compare-at price"></span>` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
         cost: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="cost" data-id="${p.id}" value="${Number(p.cost) ? moneyFmt(p.cost) : ""}" placeholder="Cost" aria-label="Cost"></span>` : p.cost ? peso(p.cost) : "–"}</td>`,
-        stock: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>`,
+        stock: () => `<td class="r num nowrap">${can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>`,
         committed: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : (() => { const c = committedOf(p); return c ? `<button type="button" class="linkish num" data-commit="${p.id}" title="See the orders holding these" style="font-weight:700">${c}</button>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
         web: () => `<td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : onSite(p) ? `<a class="site-link" href="${esc(webUrl(p))}" target="_blank" rel="noopener" title="Open this product on regalspritz.com">View on site ↗</a>` : `<span style="color:var(--muted);font-size:12px">Not on site</span>`}</td>`
