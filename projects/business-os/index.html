@@ -4956,7 +4956,7 @@ let annPickMemo = { at: 0, list: [] };
 // 4 on-hand pieces with photos for the "Fresh picks" grid (new arrivals first), linked to their own page on the website.
 function annPicks() {
   const prep = S.webmeta.find(d => d.id === "_annpicks");
-  if (prep && Array.isArray(prep.picks) && prep.picks.length >= 2) {
+  if (prep && prep.v === ANN_PICKS_V && Array.isArray(prep.picks) && prep.picks.length >= 2) {
     let W = []; try { W = webProducts(); } catch (e) {}
     const L = prep.picks.map(x => { const p = W.find(w => w.id === x.id); return p ? { ...p, imgs: [x.img || p.imgs[0]], cut: !!x.img } : null; }).filter(Boolean);
     if (L.length >= 2) return L.slice(0, L.length >= 4 ? 4 : 2);
@@ -4966,41 +4966,66 @@ function annPicks() {
   L.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
   annPickMemo = { at: Date.now(), list: L.slice(0, L.length >= 4 ? 4 : 2) }; return annPickMemo.list;
 }
-// Email photos: cut the bottle out of each picked listing photo (in the owner's browser) and place it on our
-// ivory / lilac template backdrop with a thin gold frame. Saved to photo storage; picks + URLs in webmeta/_annpicks.
+// Email photos use the website's listing template (cream backdrop, white marble stand, gold bar; like regalspritz.com).
+// Listing photos already on the template are used as they are. Other photos: the bottle is cut out (owner's browser)
+// and placed on a drawn copy of the template. Saved to photo storage; picks + URLs in webmeta/_annpicks (v2).
 const BGR_LIB = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm";
+const ANN_PICKS_V = 2;
 let annPrepBusy = null;
-async function annCutout(src) {
-  const blob = await fetch(src, { mode: "cors" }).then(r => { if (!r.ok) throw new Error("photo " + r.status); return r.blob(); });
+const annBlob = src => fetch(src, { mode: "cors" }).then(r => { if (!r.ok) throw new Error("photo " + r.status); return r.blob(); });
+// Is this photo already on the website template? (light cream corners + a gold bar in the lower part)
+async function annOnTemplate(blob) {
+  const im = await createImageBitmap(blob), W = 160, H = Math.round(160 * im.height / im.width), cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data, at = (x, y) => { const i = (y * W + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
+  const cream = ([r, gg, b]) => r > 205 && gg > 195 && b > 175 && r - b >= -4 && r - b < 45;
+  const corners = [[4, 4], [W - 5, 4], [4, Math.round(H * .3)], [W - 5, Math.round(H * .3)]].filter(([x, y]) => cream(at(x, y))).length;
+  const gold = ([r, gg, b]) => r > 140 && gg > 95 && r > gg && gg > b && r - b > 55;
+  let bar = false;
+  for (let y = Math.round(H * .55); y < Math.round(H * .98) && !bar; y++) { let n = 0; for (let x = Math.round(W * .25); x < Math.round(W * .75); x++) if (gold(at(x, y))) n++; if (n > W * .4) bar = true; }
+  return corners >= 3 && bar;
+}
+// A drawn copy of the website template with the cut-out bottle standing on the marble.
+async function annCompose(blob) {
   let cut = null;
-  try { const m = await import(BGR_LIB).catch(() => import("https://esm.sh/@imgly/background-removal@1.4.5")); const rb = m.removeBackground || m.default; cut = await rb(blob, { model: "small", output: { format: "image/png" } }); }
+  try { const m = await import(BGR_LIB).catch(() => import("https://esm.sh/@imgly/background-removal@1.4.5")); const rb = m.removeBackground || m.default; cut = await rb(blob, { model: "medium", output: { format: "image/png" } }); }
   catch (e) { console.warn("cutout", e); throw new Error("couldn't cut out the photo"); }
   const im = await createImageBitmap(cut), W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
-  const bg = g.createRadialGradient(W / 2, H * .42, 40, W / 2, H / 2, W * .75); bg.addColorStop(0, "#FDFBF7"); bg.addColorStop(.6, "#F7F1F6"); bg.addColorStop(1, "#E9DFEC");
+  const bg = g.createRadialGradient(W / 2, H * .38, 30, W / 2, H * .45, W * .8); bg.addColorStop(0, "#FCFAF5"); bg.addColorStop(.55, "#F4EFE6"); bg.addColorStop(1, "#E6DED1");
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.strokeStyle = "rgba(168,134,76,.55)"; g.lineWidth = 2; g.strokeRect(22, 22, W - 44, H - 44);
-  // trim transparent edges so every bottle is sized the same
+  // marble stand + gold bar
+  const sx = W * .14, sw = W * .72, sy = H * .70, shh = H * .115, by = sy + shh, bh = H * .026;
+  const mg = g.createLinearGradient(0, sy, 0, by); mg.addColorStop(0, "#FFFFFF"); mg.addColorStop(.12, "#F3F2F0"); mg.addColorStop(1, "#E4E2DF"); g.fillStyle = mg; g.fillRect(sx, sy, sw, shh);
+  g.save(); g.beginPath(); g.rect(sx, sy, sw, shh); g.clip(); g.filter = "blur(1.2px)"; let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  for (let i = 0; i < 7; i++) { g.strokeStyle = `rgba(120,118,115,${.08 + rnd() * .14})`; g.lineWidth = .8 + rnd() * 1.8; g.beginPath(); const x0 = sx + rnd() * sw; g.moveTo(x0, sy); g.bezierCurveTo(x0 + (rnd() - .5) * 140, sy + shh * .35, x0 + (rnd() - .5) * 160, sy + shh * .7, x0 + (rnd() - .5) * 200, by); g.stroke(); }
+  g.restore();
+  const gb = g.createLinearGradient(0, by, 0, by + bh); gb.addColorStop(0, "#D9B86A"); gb.addColorStop(.5, "#B8913F"); gb.addColorStop(1, "#8C6A2C"); g.fillStyle = gb; g.fillRect(sx - W * .03, by, sw + W * .06, bh);
+  const fl = g.createLinearGradient(0, by + bh, 0, by + bh + 22); fl.addColorStop(0, "rgba(60,45,20,.18)"); fl.addColorStop(1, "rgba(60,45,20,0)"); g.fillStyle = fl; g.fillRect(sx - W * .03, by + bh, sw + W * .06, 22);
+  // trim transparent edges so every bottle is sized the same, then stand it on the marble
   const t = document.createElement("canvas"); t.width = im.width; t.height = im.height; const tg = t.getContext("2d"); tg.drawImage(im, 0, 0);
   const px = tg.getImageData(0, 0, t.width, t.height).data; let x0 = t.width, y0 = t.height, x1 = 0, y1 = 0;
   for (let y = 0; y < t.height; y += 2) for (let x = 0; x < t.width; x += 2) if (px[(y * t.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   if (x1 <= x0 || y1 <= y0) throw new Error("nothing found in the photo");
-  const bw = x1 - x0, bh = y1 - y0, sc = Math.min((W * .72) / bw, (H * .72) / bh), dw = bw * sc, dh = bh * sc, dx = (W - dw) / 2, dy = H * .86 - dh;
-  const sh = g.createRadialGradient(W / 2, H * .87, 4, W / 2, H * .87, dw * .6); sh.addColorStop(0, "rgba(42,18,64,.22)"); sh.addColorStop(1, "rgba(42,18,64,0)");
-  g.save(); g.translate(W / 2, H * .87); g.scale(1, .14); g.translate(-W / 2, -H * .87); g.fillStyle = sh; g.beginPath(); g.arc(W / 2, H * .87, dw * .6, 0, Math.PI * 2); g.fill(); g.restore();
-  g.drawImage(t, x0, y0, bw, bh, dx, dy, dw, dh);
+  const bw = x1 - x0, bh2 = y1 - y0, sc = Math.min((sw * .9) / bw, (H * .5) / bh2), dw = bw * sc, dh = bh2 * sc, dx = (W - dw) / 2, dy = sy + 4 - dh;
+  const sh = g.createRadialGradient(W / 2, sy + 4, 4, W / 2, sy + 4, dw * .55); sh.addColorStop(0, "rgba(60,45,30,.22)"); sh.addColorStop(1, "rgba(60,45,30,0)");
+  g.save(); g.translate(W / 2, sy + 4); g.scale(1, .08); g.translate(-W / 2, -(sy + 4)); g.fillStyle = sh; g.beginPath(); g.arc(W / 2, sy + 4, dw * .55, 0, Math.PI * 2); g.fill(); g.restore();
+  g.drawImage(t, x0, y0, bw, bh2, dx, dy, dw, dh);
   return cv.toDataURL("image/jpeg", .9);
 }
 async function annPrepare() {
   if (annPrepBusy) return annPrepBusy;
-  const have = S.webmeta.find(d => d.id === "_annpicks"); if (have && (have.picks || []).filter(x => x.img).length >= 2) return true;
+  const have = S.webmeta.find(d => d.id === "_annpicks"); if (have && have.v === ANN_PICKS_V && (have.picks || []).filter(x => x.img).length >= 2) return true;
   if (!S.photos || S.readOnly || S.viewAs) return false;
   annPrepBusy = (async () => {
-    annPickMemo.at = 0; const raw = annPicks().map(p => ({ id: p.id, src: p.imgs[0] })); if (raw.length < 2) return false;
-    toast("Preparing the email photos (cutting out the bottles)… about a minute.");
-    const picks = [];
-    for (const x of raw) { try { const data = await annCutout(x.src); const r = await S.photos.save({ data }); picks.push({ id: x.id, img: r && r.ok && r.url ? r.url : "" }); } catch (e) { console.warn("ann photo", e); picks.push({ id: x.id, img: "" }); } }
-    if (picks.filter(x => x.img).length < 2) { toast("Couldn't prepare the email photos, so the original photos are used."); return false; }
-    UNDO.at = 0; await save("webmeta", "_annpicks", { picks, at: Date.now(), by: actor() }); toast("Email photos ready."); return true;
+    let C = []; try { C = webProducts().filter(p => p.kind === "onhand" && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
+    C.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0)); C = C.slice(0, 16); if (C.length < 2) return false;
+    toast("Preparing the email photos (website template)…");
+    // 1. Prefer listings whose photo is already on the website template (used as is).
+    const picks = [], rest = [];
+    for (const p of C) { if (picks.length >= 4) break; try { const bl = await annBlob(p.imgs[0]); if (await annOnTemplate(bl)) picks.push({ id: p.id, img: p.imgs[0], kind: "template" }); else rest.push({ p, bl }); } catch (e) { console.warn("ann photo", e); } }
+    // 2. Not enough? Put cut-outs of the next ones on a drawn copy of the template.
+    for (const { p, bl } of rest) { if (picks.length >= 4) break; try { const data = await annCompose(bl); const r = await S.photos.save({ data }); if (r && r.ok && r.url) picks.push({ id: p.id, img: r.url, kind: "cutout" }); } catch (e) { console.warn("ann cutout", e); } }
+    if (picks.length < 2) { toast("Couldn't prepare the email photos, so the original photos are used."); return false; }
+    UNDO.at = 0; await save("webmeta", "_annpicks", { v: ANN_PICKS_V, picks: picks.slice(0, picks.length >= 4 ? 4 : 2), at: Date.now(), by: actor() }); annPickMemo.at = 0; toast("Email photos ready."); render(); return true;
   })().finally(() => { annPrepBusy = null; });
   return annPrepBusy;
 }
@@ -7415,7 +7440,7 @@ document.addEventListener("click", guard(async ev => {
     case "edit-contact": return openContactEdit(b.dataset.id);
     case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
-    case "ann-preview": { if (S.photos && !S.webmeta.some(d => d.id === "_annpicks")) { b.disabled = true; await annPrepare(); b.disabled = false; } const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
+    case "ann-preview": { if (S.photos && !S.webmeta.some(d => d.id === "_annpicks" && d.v === ANN_PICKS_V)) { b.disabled = true; await annPrepare(); b.disabled = false; } const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
     case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; await annPrepare(); const r = await S.site.email({ to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
     case "ann-start": { await annPrepare(); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
     case "ann-pause": { const d = annDoc(); if (d) await save("webmeta", "_announce", { ...clean(d), status: "paused", at: Date.now() }); toast("Paused. Tap Start sending to continue."); render(); return; }
