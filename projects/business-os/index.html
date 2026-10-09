@@ -8539,12 +8539,13 @@ async function noteFixOnce() {
   if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
   const t0 = Date.now();
   while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 60000) return; await new Promise(r => setTimeout(r, 1000)); }
-  const src = S.webmeta.find(d => d.id === "_notefix"); if (!src || !src.map || src.done) return;
   let n = 0;
+  // _notefix, _notefix2, … (later batches of notes found online)
+  for (const src of S.webmeta.filter(d => /^_notefix/.test(d.id) && d.map && !d.done)) {
   for (const [id, v] of Object.entries(src.map)) { const p = S.products.find(x => x.id === id); if (!p || !v || (p.notes && Object.keys(p.notes).some(k => (p.notes[k] || []).length))) continue;
     const notes = Object.fromEntries(["top", "heart", "base"].filter(k => (v[k] || []).length).map(k => [k, v[k]]));
-    UNDO.at = 0; await patch("products", id, { notes, webSync: "pending", log: logAdd(p, ["notes added from the old Shopify description"]) }).then(() => n++).catch(() => {}); }
-  await save("webmeta", "_notefix", { done: true, count: n, at: Date.now(), by: actor() });
+    UNDO.at = 0; await patch("products", id, { notes, webSync: "pending", log: logAdd(p, [src.id === "_notefix" ? "notes added from the old Shopify description" : "notes added (looked up online)"]) }).then(() => n++).catch(() => {}); }
+  await save("webmeta", src.id, { done: true, count: n, at: Date.now(), by: actor() }); }
   if (n) toast(`Added scent notes to ${n} listing${n === 1 ? "" : "s"}. Their scent cards follow automatically.`);
 }
 async function brandFixOnce() {
@@ -8641,6 +8642,7 @@ async function poSoldOutOnce() {
 }
 async function startShopSync(c) {
   costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)).then(() => brandFixOnce()).catch(e => console.warn("brand fix", e)).then(() => nameFixOnce()).catch(e => console.warn("name fix", e)).then(() => noteFixOnce()).catch(e => console.warn("note fix", e)), 8000);
+  setInterval(() => noteFixOnce().catch(() => {}), 10 * 60e3);
   dpFixOnce().catch(e => console.warn("dp fix", e));
   setTimeout(() => poSoldOutOnce().catch(e => console.warn("po sold out", e)), 5000);
   barcodeImportOnce().catch(e => console.warn("barcode import", e));
