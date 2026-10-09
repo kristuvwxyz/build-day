@@ -5494,7 +5494,7 @@ function openProductForm(id, preset = {}) {
     </div>
     <div id="sheet-err" class="confirm" hidden></div>
     ${id && ((p.log || []).length || p.editedBy) ? `<div class="olog"><div class="olog-h">Team activity</div>${(p.log || []).length ? [...p.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("") : `<div><b>${esc(p.editedBy)}</b> last edited this <span>· ${relTime(p.editedAt)}</span></div>`}</div>` : ""}
-    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-product" data-id="${id}">Delete listing</button></div>` : ""}
+    ${id ? `<div id="del-slot" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="l-dup-one" data-id="${id}">⧉ Duplicate listing</button><button class="btn danger sm" type="button" data-act="ask-del-product" data-id="${id}">Delete listing</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save listing</button></div>`,
   async () => {
     if (!val("p-name")) return sheetError("Give the product a name.");
@@ -5549,6 +5549,7 @@ function viewListings() {
       <select data-lbulk="status" aria-label="Set status"><option value="">Set status…</option>${Object.entries(LIST_STATUS).map(([k, st]) => o(k, k === "hidden" ? "Inactive" : st.name)).join("")}</select>
       <input inputmode="decimal" class="money lb-num" id="lb-price" placeholder="SRP" aria-label="New SRP"><input inputmode="decimal" class="money lb-num" id="lb-compare" placeholder="Compare" aria-label="New compare-at price"><input inputmode="decimal" class="money lb-num" id="lb-cost" placeholder="Cost" aria-label="New cost">
       <button class="btn sm" type="button" data-act="lb-prices">Apply prices</button>
+      <button class="btn sm" type="button" data-act="l-dup">⧉ Duplicate</button>
       <span id="lb-del-slot"><button class="btn sm danger" type="button" data-act="lb-ask-del">Delete…</button></span>
       <button class="btn ghost sm" type="button" data-act="lb-clear">Clear selection</button></div>`; })() : ""}
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
@@ -5575,6 +5576,20 @@ function viewListings() {
     <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${rows.length ? `${S.lpage * PAGE + 1}–${Math.min(rows.length, S.lpage * PAGE + PAGE)} of ${rows.length}` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
 }
 
+// Duplicate listings: same details + photos, name ends with " (COPY)", saved as Draft (not on the website until set Active).
+// Barcode, stock and website link are left out so the copy doesn't clash with the original.
+async function listingsDup(ids) {
+  const by = (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", made = [];
+  for (const id of ids) {
+    const pr = S.products.find(x => x.id === id); if (!pr) continue;
+    const { barcode, webId, webSync, webSyncAt, webErr, log, editedAt, editedBy, stock, ...rest } = clean(pr);
+    const nid = uid("p");
+    await save("products", nid, { ...rest, name: String(pr.name || "").replace(/\s*\(COPY\)\s*$/i, "") + " (COPY)", stock: 0, status: "draft", createdAt: Date.now(), dupOf: id, editedAt: Date.now(), editedBy: by, log: [{ at: Date.now(), by, msg: `duplicated from ${[pr.brand, pr.name, pr.size, pr.ptype].filter(Boolean).join(" ")}` }] });
+    made.push(nid);
+  }
+  toast(made.length ? `${made.length} listing${made.length === 1 ? "" : "s"} duplicated as Draft (COPY).` : "Nothing to duplicate.");
+  return made;
+}
 // Bulk edit on Listings: same fields as the table, each listing logs the change and goes to the website as usual.
 async function listingsBulk(upd, label) {
   const ids = [...(S.lsel || [])], by = (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "";
@@ -7771,6 +7786,8 @@ document.addEventListener("click", guard(async ev => {
     }
     case "del-order": await remove("orders", id); closeSheet(); toast("Order deleted."); return;
     case "del-product": await remove("products", id); closeSheet(); toast("Product deleted."); return;
+    case "l-dup-one": { const [nid] = await listingsDup([id]); if (nid) { closeSheet(); setTimeout(() => openProductForm(nid), 300); } return; }
+    case "l-dup": { const ids = [...(S.lsel || [])]; if (ids.length > 50 && !confirm(`Duplicate ${ids.length} listings?`)) return; const made = await listingsDup(ids); if (made.length === 1) setTimeout(() => openProductForm(made[0]), 300); if (S.lsel) S.lsel.clear(); render(); return; }
     case "del-expense": { const x = S.expenses.find(r => r.id === id); await remove("expenses", id); if (x && x.file) removeFile(x.file); closeSheet(); toast("Deleted."); return; }
   }
 }));
