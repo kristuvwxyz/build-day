@@ -5102,7 +5102,7 @@ async function annCompose(blob) {
    accords (made again when they change; skipped when the 2nd photo already is a scent card). Runs in the browser:
    the owner's RS App works through all listings (website ones first), and whoever saves a listing does that one. */
 const SC_COL = { woody: "#774414", citrus: "#F9FF52", floral: "#FF5F8D", "white floral": "#EDF2FB", sweet: "#EE363B", vanilla: "#FFFEC0", fruity: "#FC4B29", amber: "#BC4D10", powdery: "#EEDDCC", fresh: "#9BE5ED", aromatic: "#37A089", "warm spicy": "#CC3300", "fresh spicy": "#83C928", spicy: "#CC3300", musky: "#E6CEE5", green: "#0E8C1D", rose: "#FE016B", leather: "#8B4513", oud: "#3D2B1F", aquatic: "#66CCFF", marine: "#66CCFF", earthy: "#544838", smoky: "#8D8D8D", balsamic: "#9C6A40", lavender: "#B07FCA", violet: "#991DCD", iris: "#C8C8F0", tuberose: "#F7E6EC", honey: "#FFBF00", tobacco: "#9E6A1F", caramel: "#C68E17", coffee: "#673B11", cacao: "#5C3317", chocolate: "#5C3317", lactonic: "#FDF4DC", coconut: "#F9F2E1", almond: "#F2D8B6", herbal: "#6CA06C", patchouli: "#6D6D2D", mossy: "#6E8E2C", animalic: "#8E5A2C", soapy: "#E0F7FA", ozonic: "#C9F3FF", metallic: "#B4B4B4", cherry: "#A50021", beeswax: "#E4B53A", tropical: "#FFB300", salty: "#D5E8F0", mineral: "#A9B4BE", nutty: "#B57A3E", rum: "#8E2E00", whiskey: "#B66E2B", wine: "#7A0B2B", conifer: "#2E6B3A", camphor: "#B8E0D2", "soft spicy": "#E2725B", gourmand: "#B5651D", sour: "#D7F000", bitter: "#6E7F2E", yellow_floral: "#FFE08A", "yellow floral": "#FFE08A" };
-const scKey = p => { const n = p.notes || {}, a = p.accords || []; if (!a.length && (n.top || []).length + (n.heart || []).length + (n.base || []).length < 3) return ""; return ["v2", p.brand, p.name, a.join(","), (n.top || []).join(","), (n.heart || []).join(","), (n.base || []).join(",")].join("|").toLowerCase(); };
+const scKey = p => { const n = p.notes || {}, a = p.accords || []; if (!a.length && (n.top || []).length + (n.heart || []).length + (n.base || []).length < 3) return ""; return ["v3", p.brand, p.name, a.join(","), (n.top || []).join(","), (n.heart || []).join(","), (n.base || []).join(",")].join("|").toLowerCase(); };
 // A small picture per note (first keyword that matches), like Fragrantica's note photos.
 const SC_PIC = [["orange blossom|neroli|orange flower", "🌸"], ["rosemary", "🍃"], ["pear", "🍐"], ["pineapple", "🍍"], ["green apple|apple", "🍏"], ["cherry|cherries", "🍒"], ["strawberr", "🍓"], ["raspberr|blackberr|blueberr|cassis|black currant|blackcurrant|currant|berries|berry", "🫐"], ["peach|apricot|nectarine", "🍑"], ["plum|prune", "🟣"], ["grape(?!fruit)|wine|champagne|cognac", "🍇"], ["pineapple", "🍍"], ["mango|papaya|passion|guava|lychee|litchi|tropical", "🥭"], ["coconut", "🥥"], ["banana", "🍌"], ["melon|watermelon", "🍈"], ["fig", "🌳"], ["pomegranate", "🔴"], ["lime|yuzu|calabrian|bergamot|lemon|citron|citrus|verbena", "🍋"], ["grapefruit|orange|mandarin|tangerine|neroli|petitgrain|clementine|blood orange", "🍊"], ["rose(?!mary)", "🌹"], ["jasmine|sambac|gardenia|frangipani|ylang|orange blossom|tiare|tuberose|lily|magnolia|honeysuckle|white flower|white floral|lotus|freesia|lilac|mimosa|osmanthus|heliotrope|peony|carnation|geranium|marigold|chamomile|flower|floral|blossom|orchid|hyacinth|violet|iris|orris|narcissus|daffodil", "🌸"], ["lavender|lavandin", "💜"], ["vanilla|tonka|benzoin|coumarin", "🍦"], ["caramel|praline|toffee|candy|sugar|marshmallow|cotton candy|meringue|cream|milk|butter|cake|cookie|biscuit|gourmand|nougat|dulce", "🍬"], ["honey|beeswax", "🍯"], ["chocolate|cacao|cocoa", "🍫"], ["coffee|espresso", "☕"], ["tea\\b|mate\\b|matcha", "🍵"], ["almond|hazelnut|pistachio|nut\\b|chestnut|walnut", "🌰"], ["rum|whisk|bourbon|liquor|liqueur|brandy|gin\\b|vodka|absinthe", "🥃"], ["tobacco|cigar", "🍂"], ["leather|suede", "👜"], ["oud|agarwood|sandalwood|cedar|vetiver|guaiac|wood|birch|oak\\b|cashmeran|akigalawood|ebony|teak|papyrus|cypriol|hinoki", "🪵"], ["pine|fir|cypress|juniper|spruce|conifer", "🌲"], ["patchouli|moss|oakmoss|fern", "🌿"], ["mint|basil|sage|rosemary|thyme|tarragon|herb|artemisia|davana|clary|green|leaf|leaves|grass|galbanum|violet leaf|tomato|bamboo|ivy|shiso", "🍃"], ["pepper|pink pepper|black pepper", "🌶"], ["cinnamon|clove|nutmeg|cardamom|ginger|saffron|cumin|anise|star anise|spice|spicy|coriander|caraway|elemi", "✨"], ["sea|marine|aquatic|ocean|water|salt|ambergris|seaweed|algae|calone|ozonic|rain|dew", "🌊"], ["amber|labdanum|myrrh|incense|frankincense|olibanum|resin|balsam|tolu|opoponax|styrax|elemi", "🔥"], ["musk|ambrette|cashmere|aldehyde|powder|cotton|soap|clean|iso e", "🤍"], ["smoke|smoky|ash\\b|burnt", "💨"], ["metal|mineral|stone|flint", "🪨"], ["rice|wheat|cereal|oat|bread", "🌾"]].map(([k, e]) => [new RegExp("\\b(" + k + ")", "i"), e]);
 const scPic = t => { for (const [re, e] of SC_PIC) if (re.test(t)) return e; return "🌼"; };
@@ -5111,6 +5111,8 @@ const SC_FAM = [["citrus", /lemon|bergamot|orange|mandarin|grapefruit|lime|yuzu|
 function scFromNotes(n) { const all = [...(n.top || []), ...(n.heart || []), ...(n.base || [])].join(" | "), c = {};
   for (const [f, re] of SC_FAM) { const m = all.match(new RegExp(re.source, "gi")); if (m) c[f] = m.length; }
   return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0]); }
+// Our own softer take on the family colours (blended toward cream), so the card is ours, not a copy.
+const scSoft = c => "#" + [1, 3, 5].map(k => Math.round(parseInt(c.slice(k, k + 2), 16) * .72 + [253, 246, 228][(k - 1) / 2] * .28).toString(16).padStart(2, "0")).join("");
 function scentCard(p, bottle) {
   const W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
   const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#FFFDF2"); bg.addColorStop(1, "#F8F1D8"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
@@ -5130,17 +5132,17 @@ function scentCard(p, bottle) {
     g.save(); rr(52, top, bw, bh, 18); g.clip(); g.drawImage(bottle, (bottle.width - sw) / 2, (bottle.height - sh) / 2, sw, sh, 52, top, bw, bh); g.restore();
     g.strokeStyle = "#E6D6AA"; g.lineWidth = 2; rr(52, top, bw, bh, 18); g.stroke(); ax = 52 + bw + 34; aw = W - 52 - ax; }
   if (acc.length) {
-    g.textAlign = "center"; g.fillStyle = "#2B1B2E"; g.font = sans(14, 700); g.fillText(real ? "MAIN ACCORDS" : "SCENT PROFILE", ax + aw / 2, top + 14);
+    g.textAlign = "center"; g.fillStyle = "#2B1B2E"; g.font = sans(14, 700); g.fillText("SCENT FAMILY", ax + aw / 2, top + 14);
     const bh = abh, gap = 6, y0 = top + 30;
-    acc.forEach((a, i) => { const w = aw * (1 - i * (0.55 / Math.max(1, acc.length - 1))), c = SC_COL[String(a).toLowerCase()] || "#C9A55A", y = y0 + i * (bh + gap);
-      g.fillStyle = c; rr(ax, y, w, bh, 6); g.fill(); const [r, gg, b] = [1, 3, 5].map(k => parseInt(c.slice(k, k + 2), 16));
+    acc.forEach((a, i) => { const w = aw * (1 - i * (0.55 / Math.max(1, acc.length - 1))), c = scSoft(SC_COL[String(a).toLowerCase()] || "#C9A55A"), y = y0 + i * (bh + gap);
+      g.fillStyle = c; rr(ax, y, w, bh, bh / 2); g.fill(); const [r, gg, b] = [1, 3, 5].map(k => parseInt(c.slice(k, k + 2), 16));
       g.fillStyle = r * .3 + gg * .59 + b * .11 > 150 ? "#2B1B2E" : "#FFFFFF"; g.textAlign = "center"; fit(String(a).toLowerCase(), w - 12, Math.round(bh * .5), s => sans(s, 600), 10); g.fillText(String(a).toLowerCase(), ax + w / 2, y + bh * .66); });
   }
   // Bottom: perfume pyramid with a picture per note.
-  const rows = [["Top notes", n.top], ["Middle notes", n.heart], ["Base notes", n.base]].filter(r => (r[1] || []).length);
+  const rows = [["Opening", n.top], ["Heart", n.heart], ["Dry down", n.base]].filter(r => (r[1] || []).length);
   let y = top + boxH + 34;
   if (rows.length) {
-    g.textAlign = "center"; g.fillStyle = "#2B1B2E"; g.font = serif(28); g.fillText("Perfume Pyramid", W / 2, y); y += 12;
+    g.textAlign = "center"; g.fillStyle = "#2B1B2E"; g.font = serif(28); g.fillText("The Notes", W / 2, y); y += 12;
     const per = Math.min(118, (H - 64 - y) / rows.length);
     for (const [lab, list] of rows) {
       g.fillStyle = "#A5823B"; g.font = sans(13, 700); g.fillText(lab.toUpperCase(), W / 2, y + 18);
@@ -5157,7 +5159,7 @@ function scentCard(p, bottle) {
       y += per;
     }
   }
-  g.textAlign = "left"; g.fillStyle = "#A5823B"; g.font = sans(12, 600); g.fillText("Notes & accords: Fragrantica", 40, H - 32);
+  g.textAlign = "left"; g.fillStyle = "#A5823B"; g.font = sans(12, 600); g.fillText("Notes: Fragrantica", 40, H - 32);
   g.textAlign = "right"; g.fillStyle = "#4A2C4D"; g.font = serif(20); g.fillText("Regal Spritz PH", W - 40, H - 31);
   return cv.toDataURL("image/jpeg", .9);
 }
