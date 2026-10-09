@@ -5428,6 +5428,9 @@ const SITE = "https://www.regalspritz.com/";
 // The product's own page on regalspritz.com (#/p/<id>, same id the website gets from RS OS).
 const webIdOf = p => p.webId || slug([p.kind === "preorder" ? "preorder" : "", p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" "));
 const onSite = p => (p.status || "active") === "active" && !(p.kind !== "preorder" && (Number(p.stock) || 0) <= 0);
+// Sold out: on-hand at 0 stock (off the website), or a pre-order marked sold out (stays on the website as "Sold out", can't be ordered).
+const poOut = p => p.kind === "preorder" && !!p.soldOut;
+const isOut = p => poOut(p) || (p.kind !== "preorder" && (Number(p.stock) || 0) <= 0);
 const webProdUrl = p => SITE + "#/p/" + encodeURIComponent(webIdOf(p));
 const webUrl0 = p => { const u = String((p && p.url) || "").trim(), m = /^(?:https?:\/\/)?(?:www\.)?regal\.famcoventures\.com\/?(.*)$/i.exec(u); return m ? SITE + m[1] : u; };
 const webUrl = p => { const u = webUrl0(p); return !u || u.replace(/\/+$/, "") === SITE.replace(/\/+$/, "") || /^https?:\/\/(www\.)?regalspritz\.com\/?(#\/?)?$/i.test(u) ? webProdUrl(p) : u; };
@@ -5548,9 +5551,9 @@ function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products, lb = S.lbrand || "", lc = S.lcat || "", lbd = S.lbadge || "";
   const brands = [...new Set(all.map(p => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(p => p.kind !== "preorder" && (Number(p.stock) || 0) <= 0).length, pending: all.filter(p => p.webSync === "pending").length };
+  const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(isOut).length, pending: all.filter(p => p.webSync === "pending").length };
   const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
-  const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? p.kind !== "preorder" && (Number(p.stock) || 0) <= 0 : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
+  const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? isOut(p) : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
     && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
     && (!q || [p.name, p.brand, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta].join(" ").toLowerCase().includes(q)))
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
@@ -5572,7 +5575,7 @@ function viewListings() {
     ${can && S.lsel.size ? (() => { const o = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`; return `<div class="bulk"><strong>${S.lsel.size} selected</strong>
       <select data-lbulk="ptype" aria-label="Set type"><option value="">Set type…</option>${LIST_TYPES.map(t => o(t, t)).join("")}</select>
       <select data-lbulk="category" aria-label="Set collection"><option value="">Set collection…</option>${WEB_CATS.map(([k, l]) => o(k, l)).join("")}</select>
-      <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}</select>
+      <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}${o("preorder-out", "Pre-order · Sold out")}</select>
       <select data-lbulk="eta" aria-label="Set ETA"><option value="">Set ETA (pre-orders)…</option>${MONTHS.map(m => o(m, m)).join("")}</select>
       <select data-lbadge="add" aria-label="Add badge"><option value="">Add badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
       <select data-lbadge="remove" aria-label="Remove badge"><option value="">Remove badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
@@ -5592,7 +5595,7 @@ function viewListings() {
         type: () => `<td class="nowrap">${can ? `<select class="lcell" data-lset="ptype" data-id="${p.id}" aria-label="Type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : esc(p.ptype || "")}</td>`,
         cat: () => `<td class="nowrap">${(() => { const c = p.category || "unisex", opts = [...WEB_CATS, ...(WEB_CATS.some(x => x[0] === c) ? [] : [[c, c]])]; return can ? `<select class="lcell" data-lset="category" data-id="${p.id}" aria-label="Collection">${opts.map(([k, l]) => `<option value="${esc(k)}" ${c === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : esc((opts.find(x => x[0] === c) || [c, c])[1]); })()}</td>`,
         barcode: () => `<td class="nowrap">${can ? `<span class="bc-cell"><input class="lcell num" data-lset="barcode" data-id="${p.id}" value="${esc(p.barcode || "")}" placeholder="–" inputmode="numeric" aria-label="Barcode" style="width:128px"><button type="button" class="btn ghost sm" data-act="l-bc-scan" data-id="${p.id}" title="Scan this item's barcode" aria-label="Scan barcode">📷</button></span>` : esc(p.barcode || "–")}</td>`,
-        kind: () => `<td class="nowrap">${can ? `<select class="status ${p.kind === "preorder" ? "st-blue" : "st-grey"}" data-lset="kind" data-id="${p.id}" aria-label="On hand or pre-order"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select>` : p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>`,
+        kind: () => `<td class="nowrap">${can ? `<select class="status ${poOut(p) ? "st-red" : p.kind === "preorder" ? "st-blue" : "st-grey"}" data-lset="kind" data-id="${p.id}" aria-label="On hand or pre-order"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand</option><option value="preorder" ${p.kind === "preorder" && !p.soldOut ? "selected" : ""}>Pre-order</option><option value="preorder-out" ${poOut(p) ? "selected" : ""}>Sold out (pre-order)</option></select>` : poOut(p) ? `<span class="chip bad">Sold out (pre-order)</span>` : p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>`,
         eta: () => `<td>${p.kind === "preorder" ? (can ? `<select class="status st-blue" data-lset="eta" data-id="${p.id}" aria-label="ETA">${etaOpts(p)}</select>` : esc(p.eta || "–")) : `<span style="color:var(--muted)">–</span>`}</td>`,
         price: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="price" data-id="${p.id}" value="${moneyFmt(p.price)}" placeholder="SRP" aria-label="SRP"></span>` : peso(p.price)}</td>`,
         compare: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="compareAt" data-id="${p.id}" value="${Number(p.compareAt) ? moneyFmt(p.compareAt) : ""}" placeholder="Compare" aria-label="Compare-at price"></span>` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
@@ -5676,9 +5679,9 @@ async function readListingFile(file) {
 const slug = s => String(s || "").toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 90);
 function webProducts() {
   const live = S.products.filter(p => (p.status || "active") === "active" && p.name && (p.kind === "preorder" || (Number(p.stock) || 0) > 0 || p.webId));
-  return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
+  return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || poOut(a) - poOut(b) || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
     .filter(p => p.kind === "preorder" || (Number(p.stock) || 0) > 0)
-    .map(p => ({ id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [], isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", vac: !!p.vac, created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
+    .map(p => ({ id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [], isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", ...(poOut(p) ? { soldOut: true } : {}), vac: !!p.vac, created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
 }
 const webCodeText = () => "<script>\nwindow.PRODUCTS=" + JSON.stringify(webProducts()).replace(/<\//g, "<\\/") + ";\n</" + "script>";
 function openWebCode() {
@@ -7824,11 +7827,16 @@ document.addEventListener("click", guard(async ev => {
   }
 }));
 
+const KIND_LAB = { onhand: "On hand", preorder: "Pre-order", "preorder-out": "Pre-order · Sold out" };
+const kindUpd = v => v === "preorder-out" ? { kind: "preorder", soldOut: true } : { kind: v === "preorder" ? "preorder" : "onhand", soldOut: false };
 async function listSet(t, quiet) {
   const pr = S.products.find(x => x.id === t.dataset.id); if (!pr) return false; const f = t.dataset.lset;
   let v = t.value.trim(); if (t.classList.contains("money")) v = v.replace(/,/g, "");
   if (f === "price" || f === "stock") { if (v === "" || isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return false; } v = f === "stock" ? Math.round(Number(v)) : Number(v); }
   if (f === "compareAt" || f === "cost") { if (v !== "" && isNaN(Number(v))) { t.value = pr[f] ?? ""; toast("Enter a number."); return false; } v = v === "" ? null : Number(v); }
+  if (f === "kind") { const u = kindUpd(v); if (u.kind === (pr.kind === "preorder" ? "preorder" : "onhand") && !!u.soldOut === !!pr.soldOut) return false;
+    await patch("products", pr.id, { ...u, webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(pr, [`changed availability to ${KIND_LAB[v]}`]) });
+    if (!quiet) toast(`${pr.name}: availability → ${KIND_LAB[v]}`); if (!S.db && !quiet) render(); return true; }
   if (String(pr[f] ?? "") === String(v ?? "")) return false;
   if (f === "barcode" && v) { const dup = S.products.find(x => x.id !== pr.id && String(x.barcode || "").trim() === v); if (dup) { t.value = pr.barcode || ""; toast(`That barcode is already on ${dup.brand ? dup.brand + " " : ""}${dup.name}.`); return false; } }
   const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", category: "collection" }[f] || f;
@@ -7895,8 +7903,8 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "l-selall") { const ids = S.lrowIds || []; ids.forEach(id => t.checked ? S.lsel.add(id) : S.lsel.delete(id)); render(); return; }
   if (t.dataset.lsel) { t.checked ? S.lsel.add(t.dataset.lsel) : S.lsel.delete(t.dataset.lsel); render(); return; }
   if (t.dataset.lbulk) { const f = t.dataset.lbulk, v = t.value; if (!v) return;
-    const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "status" ? "status → " + (v === "hidden" ? "Inactive" : (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
-    await listingsBulk({ [f]: v }, lab); return; }
+    const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? KIND_LAB[v] : f === "status" ? "status → " + (v === "hidden" ? "Inactive" : (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
+    await listingsBulk(f === "kind" ? kindUpd(v) : { [f]: v }, lab); return; }
   if (t.id === "l-badge") { S.lbadge = t.value; S.lpage = 0; render(); return; }
   if (t.dataset.lbadge) { const v = t.value, add = t.dataset.lbadge === "add"; if (!v) return;
     await listingsBulk(pr => { const b = add ? [...new Set([...badgesOf(pr), v])] : badgesOf(pr).filter(x => x !== v); return { badges: b, isNew: b.includes("New arrival") }; }, (add ? "added badge " : "removed badge ") + v); return; }
@@ -8412,9 +8420,23 @@ async function dpFixOnce() {
   for (const o of todo) { UNDO.at = 0; await patch("orders", o.id, { payment: "partial", log: logAdd(o, ["changed Payment Status → Partially paid (pre-order, 50% DP)"], "Auto · pre-order DP") }); }
   if (todo.length) toast(`${todo.length} pre-order order${todo.length === 1 ? "" : "s"} changed from Fully paid to Partially paid (50% DP).`);
 }
+// One-time (Oct 9, 2026): pre-order listings listed in webmeta/_posold (all active pre-orders except To Summer) → Sold out, ETA as given.
+async function poSoldOutOnce() {
+  if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
+  const t0 = Date.now();
+  while (!S.loaded.products || !S.loaded.webmeta) { if (Date.now() - t0 > 60000) return; await new Promise(r => setTimeout(r, 1000)); }
+  const src = S.webmeta.find(d => d.id === "_posold"); if (!src || !src.ids || src.done) return;
+  let n = 0;
+  for (const id of src.ids) { const p = S.products.find(x => x.id === id); if (!p || p.kind !== "preorder" || /^to summer/i.test(p.brand || "")) continue;
+    const u = { ...(p.soldOut ? {} : { soldOut: true }), ...(src.eta && p.eta !== src.eta ? { eta: src.eta } : {}) }; if (!Object.keys(u).length) continue;
+    UNDO.at = 0; await patch("products", id, { ...u, webSync: "pending", editedAt: Date.now(), log: logAdd(p, [`set to Sold out${u.eta ? `, ETA ${u.eta}` : ""}`]) }).then(() => n++).catch(() => {}); }
+  await save("webmeta", "_posold", { done: true, count: n, eta: src.eta || "", at: Date.now(), by: actor() });
+  if (n) toast(`${n} pre-order listing${n === 1 ? "" : "s"} set to Sold out${src.eta ? ` (ETA ${src.eta})` : ""}. The website updates in a few seconds.`);
+}
 async function startShopSync(c) {
   costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)).then(() => brandFixOnce()).catch(e => console.warn("brand fix", e)), 8000);
   dpFixOnce().catch(e => console.warn("dp fix", e));
+  setTimeout(() => poSoldOutOnce().catch(e => console.warn("po sold out", e)), 5000);
   barcodeImportOnce().catch(e => console.warn("barcode import", e));
   setTimeout(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 20000); setInterval(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 5 * 60e3);
   reconcileStages();

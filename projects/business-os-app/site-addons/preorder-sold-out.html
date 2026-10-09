@@ -1,0 +1,86 @@
+<!--
+  Regal Spritz PH: sold-out pre-orders (2026-10-09).
+  RS OS can mark a pre-order listing "Pre-order · Sold out". It stays on the website (with its ETA) and RS OS sends
+  soldOut: true on it in the product list (window.RS_PRODUCTS). This add-on shows a "Sold out" tag on its cards and
+  product page (#/p/<id>) and turns its Add to cart / Pre-order buttons into a disabled "Sold out" button.
+  The website chat can build this in properly (docs/handoffs/website-preorder-sold-out.md); this is the stopgap.
+-->
+<style>
+.rs-so-tag{display:inline-block;background:#7a1f2b;color:#fff;font:600 11px/1 Jost,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:6px 9px;margin:4px 0}
+.rs-so-btn{opacity:.55!important;cursor:not-allowed!important;pointer-events:none!important}
+</style>
+<script>
+(function () {
+  var BTN = /add to (cart|bag)|pre-?order|buy now|reserve/i;
+  function soldIds() {
+    var list = window.RS_PRODUCTS || window.PRODUCTS, out = {};
+    if (!list || !list.length) return null;
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].soldOut) out[list[i].id] = list[i];
+    return out;
+  }
+  function idFromHref(h) { var m = /#\/p\/([^?&#\/]+)/.exec(h || ''); return m ? decodeURIComponent(m[1]) : ''; }
+  // Links that go somewhere (menu "Pre-order", product links) are never touched; only real buttons.
+  function goes(b) { var h = b.tagName === 'A' ? (b.getAttribute('href') || '').trim() : ''; return !!h && h !== '#' && !/^javascript:/i.test(h); }
+  // On a product page, skip buttons that belong to another product's card ("You may also like").
+  function otherCard(b, root, id) {
+    for (var el = b, up = 0; el && el !== root && up < 6; el = el.parentElement, up++) {
+      var ls = el.querySelectorAll('a[href*="#/p/"]');
+      for (var k = 0; k < ls.length; k++) if (idFromHref(ls[k].getAttribute('href')) !== id) return true;
+    }
+    return false;
+  }
+  function block(root, id) {
+    var bs = root.querySelectorAll('button, a, [role="button"], input[type="submit"], input[type="button"]');
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i], t = (b.value || b.textContent || '').replace(/\s+/g, ' ').trim();
+      if (b.classList.contains('rs-so-btn') || t.length > 40 || !BTN.test(t) || goes(b) || (id && otherCard(b, root, id))) continue;
+      b.classList.add('rs-so-btn'); b.setAttribute('aria-disabled', 'true'); b.disabled = true;
+      if (b.tagName === 'INPUT') b.value = 'Sold out'; else if (!b.children.length) b.textContent = 'Sold out';
+    }
+  }
+  function tag(el) {
+    if (!el || el.querySelector('.rs-so-tag')) return;
+    var s = document.createElement('span'); s.className = 'rs-so-tag'; s.textContent = 'Sold out';
+    el.insertBefore(s, el.firstChild);
+  }
+  // The smallest box around a product link that holds only that product (the card).
+  function cardOf(a, id) {
+    var el = a, best = a;
+    for (var up = 0; up < 6 && el.parentElement && el.parentElement !== document.body; up++) {
+      el = el.parentElement;
+      var ls = el.querySelectorAll('a[href*="#/p/"]'), other = false;
+      for (var k = 0; k < ls.length; k++) if (idFromHref(ls[k].getAttribute('href')) !== id) { other = true; break; }
+      if (other) break;
+      best = el;
+    }
+    return best;
+  }
+  function fix() {
+    var ids = soldIds(); if (!ids) return;
+    var links = document.querySelectorAll('a[href*="#/p/"]');
+    for (var i = 0; i < links.length; i++) {
+      var id = idFromHref(links[i].getAttribute('href'));
+      if (!ids[id]) continue;
+      var card = cardOf(links[i], id);
+      if (card.getAttribute('data-rs-so') !== '1') { card.setAttribute('data-rs-so', '1'); tag(card); }
+      block(card);
+    }
+    var cur = idFromHref(location.hash);
+    if (cur && ids[cur]) {
+      var main = document.querySelector('main') || document.body, h = main.querySelector('h1');
+      if (h && h.parentElement) tag(h.parentElement);
+      block(main, cur);
+    }
+  }
+  // Belt and braces: a click on a sold-out product's button never reaches the cart.
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('.rs-so-btn');
+    if (b) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+  var t = 0;
+  function soon() { clearTimeout(t); t = setTimeout(fix, 200); }
+  new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('hashchange', soon);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', soon); else soon();
+})();
+</script>
