@@ -20,4 +20,4 @@ Please build it in:
 
 Until then, a small RS App add-on (`site-addons/preorder-sold-out.html`) shows the tag and disables the buttons. Tell me when yours is live and I'll remove it.
 
-On Oct 9, 2026 all active pre-orders except the brand **To Summer** were set to Sold out with ETA November (340 listings).
+On Oct 9, 2026 all active pre-orders except the brand **To Summer** were set to Sold out with ETA November (340 listings). The 31 To Summer pre-orders stay orderable; their ETA is November too.

@@ -8420,7 +8420,7 @@ async function dpFixOnce() {
   for (const o of todo) { UNDO.at = 0; await patch("orders", o.id, { payment: "partial", log: logAdd(o, ["changed Payment Status → Partially paid (pre-order, 50% DP)"], "Auto · pre-order DP") }); }
   if (todo.length) toast(`${todo.length} pre-order order${todo.length === 1 ? "" : "s"} changed from Fully paid to Partially paid (50% DP).`);
 }
-// One-time (Oct 9, 2026): pre-order listings listed in webmeta/_posold (all active pre-orders except To Summer) → Sold out, ETA as given.
+// One-time (Oct 9, 2026): pre-order listings listed in webmeta/_posold (all active pre-orders except To Summer) → Sold out, ETA as given; etaIds (To Summer) get the ETA only.
 async function poSoldOutOnce() {
   if (!S.realOwner || S.readOnly || !S.db || S.viewAs) return;
   const t0 = Date.now();
@@ -8430,8 +8430,11 @@ async function poSoldOutOnce() {
   for (const id of src.ids) { const p = S.products.find(x => x.id === id); if (!p || p.kind !== "preorder" || /^to summer/i.test(p.brand || "")) continue;
     const u = { ...(p.soldOut ? {} : { soldOut: true }), ...(src.eta && p.eta !== src.eta ? { eta: src.eta } : {}) }; if (!Object.keys(u).length) continue;
     UNDO.at = 0; await patch("products", id, { ...u, webSync: "pending", editedAt: Date.now(), log: logAdd(p, [`set to Sold out${u.eta ? `, ETA ${u.eta}` : ""}`]) }).then(() => n++).catch(() => {}); }
+  // etaIds (To Summer): only the ETA changes, they stay orderable.
+  for (const id of src.etaIds || []) { const p = S.products.find(x => x.id === id); if (!p || p.kind !== "preorder" || !src.eta || p.eta === src.eta) continue;
+    UNDO.at = 0; await patch("products", id, { eta: src.eta, webSync: "pending", editedAt: Date.now(), log: logAdd(p, [`changed ETA to ${src.eta}`]) }).then(() => n++).catch(() => {}); }
   await save("webmeta", "_posold", { done: true, count: n, eta: src.eta || "", at: Date.now(), by: actor() });
-  if (n) toast(`${n} pre-order listing${n === 1 ? "" : "s"} set to Sold out${src.eta ? ` (ETA ${src.eta})` : ""}. The website updates in a few seconds.`);
+  if (n) toast(`${n} pre-order listing${n === 1 ? "" : "s"} updated (Sold out${src.eta ? `, ETA ${src.eta}` : ""}). The website updates in a few seconds.`);
 }
 async function startShopSync(c) {
   costImportOnce(c); setTimeout(() => shopListingsImport().catch(e => console.warn("shop import", e)).then(() => brandFixOnce()).catch(e => console.warn("brand fix", e)), 8000);
