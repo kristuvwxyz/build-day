@@ -63,7 +63,11 @@
       var line = info && info.parentElement, box = null;
       for (var up = 0; line && up < 3 && !box; up++, line = line.parentElement) {
         var kids = line.children;
-        for (var k = 0; k < kids.length; k++) if (!kids[k].contains(d) && kids[k].offsetWidth && kids[k].offsetWidth < 160 && kids[k].offsetHeight < 160) { box = kids[k]; break; }
+        for (var k = 0; k < kids.length; k++) { var kk = kids[k]; if (kk.contains(d) || !kk.offsetWidth || kk.offsetWidth >= 160 || kk.offsetHeight >= 160) continue;
+          // never another add-on's tag (e.g. the Sold out tag) or a box that already shows a real photo
+          if (kk.getAttribute('data-rs-op') || kk.querySelector('.rs-op-img')) { box = kk; break; }  // already done
+          if (kk.classList.contains('rs-so-tag') || kk.closest('.rs-so-tag') || (kk.querySelector('img') && !isPlaceholder(kk))) continue;
+          box = kk; break; }
       }
       if (!box || box.getAttribute('data-rs-op') === title || !isPlaceholder(box)) continue;
       var src = photoFor(title, txt(d));

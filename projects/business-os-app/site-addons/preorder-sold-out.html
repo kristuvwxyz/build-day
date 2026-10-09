@@ -12,6 +12,7 @@
 <script>
 (function () {
   var BTN = /add to (cart|bag)|pre-?order|buy now|reserve/i;
+  var SKIP = '.o2-it, .ord-it, [class*="cart"], [class*="Cart"], [class*="checkout"], [class*="drawer"], [id*="cart"], [id*="account"]';
   function soldIds() {
     var list = window.RS_PRODUCTS || window.PRODUCTS, out = {};
     if (!list || !list.length) return null;
@@ -45,22 +46,24 @@
   }
   // The smallest box around a product link that holds only that product (the card).
   function cardOf(a, id) {
-    var el = a, best = a;
+    // Climb from the link to its card: stop before a box that also holds another product (a sibling card).
+    var el = a;
     for (var up = 0; up < 6 && el.parentElement && el.parentElement !== document.body; up++) {
-      el = el.parentElement;
-      var ls = el.querySelectorAll('a[href*="#/p/"]'), other = false;
-      for (var k = 0; k < ls.length; k++) if (idFromHref(ls[k].getAttribute('href')) !== id) { other = true; break; }
-      if (other) break;
-      best = el;
+      var par = el.parentElement, other = false;
+      for (var k = 0; k < par.children.length; k++) { var c = par.children[k]; if (c !== el && c.querySelector && (c.matches('a[href*="#/p/"]') || c.querySelector('a[href*="#/p/"]'))) { other = true; break; } }
+      if (other || par.matches('main, section, [class*="grid"], [class*="list"]')) break;
+      el = par;
     }
-    return best;
+    return el;
   }
   function fix() {
     var ids = soldIds(); if (!ids) return;
+    // Never in My Account (order history), cart or checkout: only product lists and product pages.
+    if (/^#\/(account|cart|checkout|orders?)\b/i.test(location.hash)) return;
     var links = document.querySelectorAll('a[href*="#/p/"]');
     for (var i = 0; i < links.length; i++) {
       var id = idFromHref(links[i].getAttribute('href'));
-      if (!ids[id]) continue;
+      if (!ids[id] || links[i].closest(SKIP)) continue;
       var card = cardOf(links[i], id);
       if (card.getAttribute('data-rs-so') !== '1') { card.setAttribute('data-rs-so', '1'); tag(card); }
       block(card);
