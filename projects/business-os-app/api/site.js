@@ -121,7 +121,7 @@ export default async function handler(req, res) {
     if (!j) return res.status(502).json({ ok: false, error: "The website backend didn't answer (" + r.status + ")." });
     if (!j.ok && call.action === "opsSetProducts" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website can't receive listings yet. Update the website backend to v15 (see the setup guide)." });
     if (!j.ok && call.action === "opsMayaCheckout" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "Maya links aren't set up yet (add MAYA_PUBLIC_KEY in Vercel)." });
-    if (!j.ok && call.action === "opsEmail" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "the website backend can't send emails yet (needs the opsEmail update)" });
+    if (!j.ok && call.action === "opsEmail" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "the website backend can't send emails yet (needs the opsEmail update). Backend said: " + String(j.error || "").slice(0, 120) });
     if (!j.ok && call.action === "opsReturnSet" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website backend can't take return decisions yet (needs v31)." });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });
     // Keep the shared counter above every website order number seen (covers numbers the website made on its own).
