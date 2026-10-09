@@ -4970,7 +4970,7 @@ function annPicks() {
 // Listing photos already on the template are used as they are. Other photos: the bottle is cut out (owner's browser)
 // and placed on a drawn copy of the template. Saved to photo storage; picks + URLs in webmeta/_annpicks (v2).
 const BGR_LIB = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm";
-const ANN_PICKS_V = 2;
+const ANN_PICKS_V = 3;
 let annPrepBusy = null;
 const annBlob = src => fetch(src, { mode: "cors" }).then(r => { if (!r.ok) throw new Error("photo " + r.status); return r.blob(); });
 // Is this photo already on the website template? (light cream corners + a gold bar in the lower part)
@@ -4980,8 +4980,10 @@ async function annOnTemplate(blob) {
   const cream = ([r, gg, b]) => r > 205 && gg > 195 && b > 175 && r - b >= -4 && r - b < 45;
   const corners = [[4, 4], [W - 5, 4], [4, Math.round(H * .3)], [W - 5, Math.round(H * .3)]].filter(([x, y]) => cream(at(x, y))).length;
   const gold = ([r, gg, b]) => r > 140 && gg > 95 && r > gg && gg > b && r - b > 55;
+  // The gold bar is a thin band: a little below it is no longer gold (a wooden table stays brown all the way down).
+  const goldRow = y => { let n = 0; for (let x = Math.round(W * .25); x < Math.round(W * .75); x++) if (gold(at(x, y))) n++; return n; };
   let bar = false;
-  for (let y = Math.round(H * .55); y < Math.round(H * .98) && !bar; y++) { let n = 0; for (let x = Math.round(W * .25); x < Math.round(W * .75); x++) if (gold(at(x, y))) n++; if (n > W * .4) bar = true; }
+  for (let y = Math.round(H * .55); y < Math.round(H * .98) && !bar; y++) if (goldRow(y) > W * .4) { const below = Math.min(H - 1, y + Math.max(4, Math.round(H * .07))); if (goldRow(below) < W * .1) bar = true; }
   return corners >= 3 && bar;
 }
 // A drawn copy of the website template with the cut-out bottle standing on the marble.
@@ -5017,7 +5019,15 @@ async function annPrepare() {
   if (!S.photos || S.readOnly || S.viewAs) return false;
   annPrepBusy = (async () => {
     let C = []; try { C = webProducts().filter(p => p.kind === "onhand" && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
-    C.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0)); C = C.slice(0, 16); if (C.length < 2) return false;
+    C.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+    // Picks made before stay the same perfumes; only their photos are redone.
+    const keep = have && Array.isArray(have.picks) ? have.picks.map(x => C.find(p => p.id === x.id)).filter(Boolean) : [];
+    if (keep.length >= 2) {
+      toast("Fixing the email photos (website template)…"); const picks = [];
+      for (const p of keep) { try { const bl = await annBlob(p.imgs[0]); if (await annOnTemplate(bl)) picks.push({ id: p.id, img: p.imgs[0], kind: "template" }); else { const r = await S.photos.save({ data: await annCompose(bl) }); picks.push({ id: p.id, img: r && r.ok && r.url ? r.url : "", kind: "cutout" }); } } catch (e) { console.warn("ann photo", e); picks.push({ id: p.id, img: "", kind: "" }); } }
+      UNDO.at = 0; await save("webmeta", "_annpicks", { v: ANN_PICKS_V, picks, at: Date.now(), by: actor() }); annPickMemo.at = 0; toast("Email photos ready."); render(); return true;
+    }
+    C = C.slice(0, 16); if (C.length < 2) return false;
     toast("Preparing the email photos (website template)…");
     // 1. Prefer listings whose photo is already on the website template (used as is).
     const picks = [], rest = [];
