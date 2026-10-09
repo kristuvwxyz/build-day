@@ -4973,6 +4973,24 @@ function annList() {
   return [...by.values()].sort((a, b) => b.t - a.t);
 }
 const ANN_HERO = "https://regal-spritz-os.vercel.app/email/new-home.gif";
+// Bulk send through Brevo (free plan, 300 a day): the owner downloads the buyer list (CSV) + the email (HTML) and uploads both to Brevo.
+// The list is made in the owner's browser and never stored anywhere else. Brevo fills {{ contact.FIRSTNAME }} and its own unsubscribe link.
+const BREVO_NAME = "{{ contact.FIRSTNAME | default : 'there' }}";
+async function dlText(filename, text, type) {
+  if (S.dl) { try { await S.dl.save({ filename, data: text }); return true; } catch (e) { if (e && e.code === "declined") return false; } }
+  try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); return true; } catch (e) { toast("Download didn't work."); return false; }
+}
+async function brevoList() {
+  const q = v => /[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
+  const rows = annList().map(x => [x.email, (x.name || "").replace(/[^\p{L} .'-]/gu, "").trim()]);
+  const ok = await dlText(`regal-spritz-buyers-${mToday()}.csv`, ["EMAIL,FIRSTNAME", ...rows.map(r => r.map(q).join(","))].join("\n"), "text/csv");
+  if (ok) toast(`Buyer list ready: ${rows.length.toLocaleString("en-PH")} emails. Upload it in Brevo → Contacts → Import.`);
+}
+async function brevoHTML() {
+  await annPrepare();
+  const ok = await dlText("regal-spritz-new-website-email.html", annHTML(BREVO_NAME), "text/html");
+  if (ok) toast("Email file ready. In Brevo: Campaigns → Create → Code your own → paste or upload it.");
+}
 // Welcome code (website checkout honors it: docs/handoffs/website-welcome-code.md).
 const ANN_CODE = { code: "NEWHOME100", off: 100, min: 3000, until: "Dec 31, 2026" };
 let annPickMemo = { at: 0, list: [] };
@@ -5083,7 +5101,7 @@ function annHTML(name) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${c.line};border-radius:4px;overflow:hidden">
 <tr><td style="background:${c.brand};padding:0;line-height:0"><a href="${SITE_URL}" target="_blank"><img src="${ANN_HERO}" width="560" alt="Regal Spritz PH · Our new home is live · regalspritz.com" style="display:block;width:100%;height:auto;border:0;color:#ffffff;font-family:Georgia,serif;font-size:24px;line-height:1.4;text-align:center;background:${c.brand}"></a></td></tr>
 <tr><td class="rs-pad" style="padding:26px 28px 4px">
-  <p style="margin:0 0 12px;font-size:17px;line-height:1.5">Hi ${e(name || "there")} <span class="rs-float">&#10024;</span></p>
+  <p style="margin:0 0 12px;font-size:17px;line-height:1.5">Hi ${name === BREVO_NAME ? name : e(name || "there")} <span class="rs-float">&#10024;</span></p>
   <p style="margin:0 0 6px;font-size:15px;line-height:1.65">Thank you for shopping with Regal Spritz PH! We've moved into our very own home, <b>regalspritz.com</b>. Same 100% authentic perfumes, now easier to browse, order and track.</p>
   <div style="text-align:center;margin:22px 0 18px">${btn(SITE_URL, "Shop the new website")}</div>
 </td></tr>
@@ -5103,7 +5121,7 @@ ${grid}
   <div style="font-family:${SERIF};font-weight:500;font-size:24px;color:${c.ink};margin:6px 0 4px">Create your account with this email</div>
   <div style="font-size:13px;line-height:1.55;color:#5b4a2a">Your past orders show up right away, and you start collecting Royal Points from your very first order.</div>
   <div style="margin-top:14px">${btnGold(SITE_URL, "Create my account")}</div></div></td></tr>
-<tr><td style="padding:20px 28px 26px;text-align:center;font-size:12px;color:${c.muted};line-height:1.7"><div style="font-family:${SERIF};font-weight:500;font-size:20px;color:${P};margin-bottom:4px">Regal Spritz PH</div>Questions? Just reply to this email or message us on Facebook / Instagram <b>@regalspritzph</b>.<br>You're getting this one-time email because you ordered from Regal Spritz PH. Don't want emails from us? Reply "unsubscribe".</td></tr>
+<tr><td style="padding:20px 28px 26px;text-align:center;font-size:12px;color:${c.muted};line-height:1.7"><div style="font-family:${SERIF};font-weight:500;font-size:20px;color:${P};margin-bottom:4px">Regal Spritz PH</div>Questions? Just reply to this email or message us on Facebook / Instagram <b>@regalspritzph</b>.<br>You're getting this one-time email because you ordered from Regal Spritz PH. ${name === BREVO_NAME ? `<a href="{{ unsubscribe }}" style="color:${c.muted}">Unsubscribe</a>` : `Don't want emails from us? Reply "unsubscribe".`}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 const annText = name => `Hi ${name || "there"},\n\nThank you for shopping with Regal Spritz PH! We've moved to our very own home: regalspritz.com.\n\n• On-hand and pre-order perfumes in one place\n• Track your orders in My Account\n• Pay with card / Maya, BDO installment, GCash or bank transfer\n• Earn Royal Points on every order\n\nWELCOME GIFT: ₱${ANN_CODE.off} off your website order of ₱${NF0.format(ANN_CODE.min)} and up. Code: ${ANN_CODE.code} (enter at checkout, one use per account, valid until ${ANN_CODE.until}).\n\nVisit https://www.regalspritz.com/\n\nUse the same email you ordered with to create your account, so your past orders show up.\n\nDon't want emails from us? Reply "unsubscribe".`;
@@ -5119,7 +5137,8 @@ function announceCard() {
       else if (d.lastError) wait = "Last try didn't send: " + d.lastError + ". It tries again every 5 minutes.";
       return wait ? `<div class="notice" style="font-size:13px">${esc(wait)}</div>` : ""; })() : ""}
     <div style="font-size:13px;color:var(--muted)">${d && d.status === "sending" ? "Goes out in batches while your RS App is open, keeping 30 of Gmail's daily emails for order emails. It picks up again tomorrow when the limit is reached." : `Preview it and send yourself a test. It carries the welcome code <b>${ANN_CODE.code}</b> (₱${ANN_CODE.off} off ₱${NF0.format(ANN_CODE.min)}+): tap Start sending once the website's checkout accepts it.`}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="ann-preview">Preview</button>${S.me && S.me.email ? `<button class="btn sm" type="button" data-act="ann-test">Send a test to me</button>` : ""}${d && d.status === "sending" ? `<button class="btn sm ghost" type="button" data-act="ann-pause">Pause</button>` : `<button class="btn sm primary" type="button" data-act="ann-start">Start sending</button>`}</div></section>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="ann-preview">Preview</button>${S.me && S.me.email ? `<button class="btn sm" type="button" data-act="ann-test">Send a test to me</button>` : ""}${d && d.status === "sending" ? `<button class="btn sm ghost" type="button" data-act="ann-pause">Pause</button>` : ""}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:8px"><span style="font-size:12.5px;color:var(--muted)">Send to all ${n.toLocaleString("en-PH")} buyers with Brevo (free, 300 a day):</span><button class="btn sm" type="button" data-act="ann-brevo-list">⬇ Buyer list (CSV)</button><button class="btn sm" type="button" data-act="ann-brevo-html">⬇ Email (HTML)</button></div></section>`;
 }
 let annBusy = false;
 async function announceRun() {
@@ -7577,6 +7596,8 @@ document.addEventListener("click", guard(async ev => {
     case "ann-preview": { if (S.photos && !S.webmeta.some(d => d.id === "_annpicks" && d.v === ANN_PICKS_V)) { b.disabled = true; await annPrepare(); b.disabled = false; } const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
     case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; await annPrepare(); const r = await S.site.email({ kind: "test", to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
     case "ann-start": { await annPrepare(); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
+    case "ann-brevo-list": return brevoList();
+    case "ann-brevo-html": return brevoHTML();
     case "ann-pause": { const d = annDoc(); if (d) await save("webmeta", "_announce", { ...clean(d), status: "paused", at: Date.now() }); toast("Paused. Tap Start sending to continue."); render(); return; }
     case "rr-sf-save": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const v = numv("rr-sf"), free = !!($("#rr-free") && $("#rr-free").checked);
       if (v === (Number(o.shipFee) || 0) && free === !!o.shipFree) { toast("No change."); return; }
