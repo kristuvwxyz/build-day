@@ -1086,6 +1086,7 @@ const ICONS = {
   depts: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/>',
   account: '<path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   award: '<circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.2"/>',
@@ -1095,10 +1096,10 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "reviews", "logins", "homecontent", "expenses", "dtasks"], blurb: "Directory, logins, Home page, expenses & cash" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "logins", "homecontent", "expenses", "dtasks"], blurb: "Directory, logins, Home page, expenses & cash" },
   { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["suppliers", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
-  { id: "MARKETING", name: "Marketing", tabs: ["channels", "reviews", "customers", "dtasks"], blurb: "Channels, listings, audience" },
+  { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "dtasks"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
 const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
@@ -1130,7 +1131,7 @@ const S = {
   unlocked: new Set(),
   accessreq: [], db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
 };
-try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom", "listings", "gallery"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab, oSrc: v.oSrc === "web" ? "web" : "all" }); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom", "listings", "gallery", "reviews"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab, oSrc: v.oSrc === "web" ? "web" : "all" }); } catch (e) {}
 try { const y = Number(sessionStorage.getItem("rs-refresh-y")); sessionStorage.removeItem("rs-refresh-y"); if (y > 0) [700, 1600].forEach(ms => setTimeout(() => window.scrollTo(0, y), ms)); } catch (e) {}
 try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
 const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account", "eom"].includes(hv)) S.view = hv;
@@ -1490,8 +1491,9 @@ function viewReviews() {
       ${sel("rv-source", "Source", [["", "All sources"], ...RV_SOURCES.map(x => [x, x])], R.source)}
       ${sel("rv-sort", "Sort", [["new", "Newest first"], ["old", "Oldest first"], ["high", "Highest rating first"], ["low", "Lowest rating first"]], R.sort)}
       ${active ? `<button class="btn ghost sm" type="button" data-act="rv-clear">✕ Clear filters</button>` : ""}</div>
-    <div class="table-wrap"><table class="otable"><thead><tr><th>Rating</th><th>Customer</th><th>Product</th><th>Review</th><th>Source</th><th>Date</th><th>Status</th>${can ? "<th></th>" : ""}</tr></thead>
-      <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : r.status === "pending" ? "rv-pend" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>
+    ${pickBar("rv", [["✓ Approve / Show", "rv-sel-show", "primary"], ["Hide", "rv-sel-hide"], ["Delete…", "rv-sel-del", "danger"]], list.map(r => r.id))}
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("rv", list.map(r => r.id)) : ""}<th>Rating</th><th>Customer</th><th>Product</th><th>Review</th><th>Source</th><th>Date</th><th>Status</th>${can ? "<th></th>" : ""}</tr></thead>
+      <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : r.status === "pending" ? "rv-pend" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>${can ? pickTd("rv", r.id) : ""}
         <td data-sort="${Number(r.rating) || 0}">${starsHTML(r.rating)}</td><td style="font-weight:600">${esc(r.customer || "Anonymous")}</td><td>${esc(r.product || "")}</td>
         <td><div class="rv-text">${r.title ? `<b>${esc(r.title)}</b> · ` : ""}${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}${Array.isArray(r.pics) && r.pics.length ? `<div style="display:flex;gap:4px;margin-top:4px">${r.pics.slice(0, 3).filter(u => /^https:\/\//.test(u)).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img src="${esc(u)}" alt="Review photo" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--line)"></a>`).join("")}</div>` : ""}</td>
         <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap" data-sort="${esc(r.date || "")}">${r.date ? fmtDateY(r.date) : ""}</td>
@@ -2021,11 +2023,12 @@ function renderNav() {
     (canOrders() ? item('data-nav="orders"', "orders", "Orders", S.view === "orders", cxBadge() + retBadge()) : "") +
     (canListings() ? item('data-nav="listings"', "tag", "Listings", S.view === "listings", "", "desktop-only") : "") +
     (canListings() ? item('data-nav="gallery"', "image", "Gallery", S.view === "gallery", "", "desktop-only") : "") +
+    (rvSees() ? item('data-nav="reviews"', "star", "Reviews", S.view === "reviews", rvBadge(), "desktop-only") : "") +
     (canAttendance() ? item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', "award", "Awards", S.view === "eom") : "") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
     `<div class="nav-label desktop-only">Departments</div>` +
-    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : d.id === "ADMIN" || d.id === "MARKETING" ? rvBadge() : ""), "desktop-only dept-item")).join("") +
+    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, "depts", d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : ""), "desktop-only dept-item")).join("") +
     item('data-nav="account"', "account", "My Account", S.view === "account", "", "account-item mobile-only") +
     (() => { const m = member(myMemberId()) || {}; return `<button type="button" class="me-chip desktop-only" data-nav="account" ${S.view === "account" ? 'aria-current="page"' : ""}>${m.id ? avatar(m, 32, false) : svg("account")}<span class="me-t"><b>${esc(m.nickname || m.name || "My Account")}</b><small>${esc(m.role || (dept(m.department) || {}).name || "My Account")}</small></span><span class="me-go">›</span></button>`; })();
 }
@@ -2140,7 +2143,7 @@ function bounceHome(v) {
 function renderInner() {
   renderNav();
   const d = dept(S.dept);
-  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My Account", depts: "Departments", orders: "Orders", listings: "Listings", gallery: "Photo gallery", eom: "Employee of the Month" }[S.view] || d.name;
+  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My Account", depts: "Departments", orders: "Orders", listings: "Listings", gallery: "Photo gallery", reviews: "Reviews", eom: "Employee of the Month" }[S.view] || d.name;
   $("#view-title").textContent = title;
   const dc = S.view === "dept" ? DEPT_COLORS[S.dept] : "";
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
@@ -2164,6 +2167,7 @@ function renderInner() {
   if (S.view === "depts") { v.innerHTML = viewDeptPicker(); return; }
   if (S.view === "orders") { if (!canOrders()) return bounceHome(v); v.innerHTML = viewOrders(); return; }
   if (S.view === "gallery") { if (!canListings()) return bounceHome(v); v.innerHTML = viewGallery(); return; }
+  if (S.view === "reviews") { if (!rvSees()) return bounceHome(v); v.innerHTML = viewReviews(); return; }
   if (S.view === "listings") {
     if (!canListings()) return bounceHome(v);
     const ld = LISTING_DEPTS.find(x => canSee(x) && isUnlocked(x));
@@ -2444,9 +2448,10 @@ function taskPill(t) {
   const a = t.assigneeId ? member(t.assigneeId) : null, o = t.orderId ? findOrder(t.orderId) : null;
   return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}${taskUrg(t) ? " u-" + taskUrg(t) : ""}" ${o ? `data-open="${o.id}"` : `data-task="${t.id}"`} title="${o ? esc(onum(o)) + " · " : ""}${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${o ? `<span class="ini">📦</span>` : a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${o ? "#" + esc(o.num) + " " : ""}${esc(t.title)}</span></button>`;
 }
-function taskRow(t) {
+const TASK_BULK = [["✓ Mark done", "task-sel-done", "primary"], ["Delete…", "task-sel-del", "danger"]];
+function taskRow(t, pick) {
   const ed = !S.readOnly, pr = t.status === "done" ? 100 : Number(t.progress) || 0;
-  return `<tr data-task="${t.id}" style="cursor:pointer">
+  return `<tr data-task="${t.id}" style="cursor:pointer">${pick === true ? pickTd("task", t.id) : ""}
     <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}${t.orderId && findOrder(t.orderId) ? ` <button type="button" class="chip" data-open="${t.orderId}">📦 #${esc(findOrder(t.orderId).num)}</button>` : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
     <td class="nowrap">${isAllTask(t) && !t.assigneeId ? `<span style="color:var(--muted)">By</span> ${esc(t.createdByName || memberName(t.createdById) || "–")}` : esc(memberName(t.assigneeId))}</td>
     <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc(taskDeptName(t.department))}</span>` : "–"}</td>
@@ -2504,9 +2509,9 @@ function viewTasks(forceDept) {
       main = groupBy ? `<div class="tboard">${groups.map(r => `<div class="tcol"><div class="tcol-h">${esc(r.name)}<span>${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? ` · ${r.ts.length - openCount(r.ts)} done` : ""}</span></div>${r.ts.length ? r.ts.map(taskPill).join("") : `<div style="font-size:12px;color:var(--muted)">Nothing today</div>`}</div>`).join("")}</div>`
         : `<div class="tboard"><div class="tcol">${todayTasks.length ? groups[0].ts.map(taskPill).join("") : `<div style="font-size:12px;color:var(--muted)">Nothing today</div>`}</div></div>`;
     } else {
-      const rows = groupBy ? groups.filter(r => r.ts.length).map(r => `<tr class="tgrp"><td colspan="6">${esc(r.name)} · ${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? `, ${r.ts.length - openCount(r.ts)} done` : ""}${r.ts.filter(isOverdue).length ? `<span class="nbadge" title="Overdue">${r.ts.filter(isOverdue).length} overdue</span>` : ""}</td></tr>${r.ts.map(taskRow).join("")}`).join("") : (groups[0] ? groups[0].ts.map(taskRow).join("") : "");
-      main = `<div class="table-wrap"><table>
-      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
+      const rows = groupBy ? groups.filter(r => r.ts.length).map(r => `<tr class="tgrp"><td colspan="${pickOn() ? 7 : 6}">${esc(r.name)} · ${openCount(r.ts)} open${r.ts.length - openCount(r.ts) ? `, ${r.ts.length - openCount(r.ts)} done` : ""}${r.ts.filter(isOverdue).length ? `<span class="nbadge" title="Overdue">${r.ts.filter(isOverdue).length} overdue</span>` : ""}</td></tr>${r.ts.map(t => taskRow(t, true)).join("")}`).join("") : (groups[0] ? groups[0].ts.map(t => taskRow(t, true)).join("") : "");
+      main = `${pickBar("task", TASK_BULK)}<div class="table-wrap"><table>
+      <thead><tr>${pickTh("task", todayTasks.map(t => t.id))}<th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
       <tbody>${rows}</tbody></table>${todayTasks.length ? "" : `<div class="empty" style="padding:16px">No tasks for today.</div>`}</div>`;
     }
     main = note + main;
@@ -2539,9 +2544,9 @@ function viewTasks(forceDept) {
     ${showMoney ? "" : canSee("FINANCE") ? `<div style="font-size:12px;color:var(--muted)">Unlock Finance to see investor, credit card and check due dates on this calendar.</div>` : ""}`;
   } else {
     const sorted = [...monthTasks].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
-    main = `<div class="table-wrap"><table>
-      <thead><tr><th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
-      <tbody>${sorted.map(taskRow).join("")}</tbody></table>${sorted.length ? "" : `<div class="empty" style="padding:16px">No tasks due in ${monthLabel(ym)}.</div>`}</div>`;
+    main = `${pickBar("task", TASK_BULK)}<div class="table-wrap"><table>
+      <thead><tr>${pickTh("task", sorted.map(t => t.id))}<th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
+      <tbody>${sorted.map(t => taskRow(t, true)).join("")}</tbody></table>${sorted.length ? "" : `<div class="empty" style="padding:16px">No tasks due in ${monthLabel(ym)}.</div>`}</div>`;
   }
   const extra = isToday ? "" : forceDept ? workload(monthTasks, "person")
     : S.t.scope === "team" ? workload(monthTasks, "person")
@@ -3894,14 +3899,33 @@ function viewLoggedOut() {
     <div class="empty">All departments are locked on this device. Log back in to continue, or sign out of Claude completely to switch accounts.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn primary" type="button" data-act="log-in">Log back in</button><a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign out of Claude</a></div></div>`;
 }
+/* ---------- Tick boxes on tables (select rows, then act on them together) ---------- */
+S.pick = {};
+const pk = key => S.pick[key] || (S.pick[key] = new Set());
+const pickOn = () => !S.readOnly;
+const pickTh = (key, ids) => pickOn() ? `<th class="cb"><input type="checkbox" class="pick" data-pickall="${key}" data-ids="${esc(ids.join(","))}" aria-label="Select all" ${ids.length && ids.every(id => pk(key).has(id)) ? "checked" : ""}></th>` : "";
+const pickTd = (key, id) => pickOn() ? `<td class="cb"><input type="checkbox" class="pick" data-pick="${key}" data-id="${esc(id)}" aria-label="Select row" ${pk(key).has(id) ? "checked" : ""}></td>` : "";
+// actions: [label, act, extra class]; each act reads the ticked ids with pickIds(key)
+function pickBar(key, actions, live) {
+  const ids = [...pk(key)].filter(id => !live || live.includes(id)); if (!pickOn() || !ids.length) return "";
+  return `<div class="bulk"><strong>${ids.length} selected</strong>${actions.map(([l, a, c]) => `<button class="btn sm ${c || ""}" type="button" data-act="${a}" data-key="${key}">${l}</button>`).join("")}<button class="btn ghost sm" type="button" data-act="pick-clear" data-key="${key}">Clear selection</button></div>`;
+}
+const pickIds = key => [...pk(key)];
+document.addEventListener("click", e => { if (e.target.matches && e.target.matches("input.pick")) e.stopPropagation(); }, true);
+document.addEventListener("change", e => { const t = e.target; if (!t.matches || !t.matches("input.pick")) return; e.stopPropagation();
+  if (t.dataset.pickall) { const set = pk(t.dataset.pickall); t.dataset.ids.split(",").filter(Boolean).forEach(id => t.checked ? set.add(id) : set.delete(id)); }
+  else { const set = pk(t.dataset.pick); t.checked ? set.add(t.dataset.id) : set.delete(t.dataset.id); }
+  render(); }, true);
+async function pickRun(key, label, fn) { const ids = pickIds(key); let n = 0; for (const id of ids) { try { if (await fn(id) !== false) n++; } catch (e) { console.warn(label, e); } } pk(key).clear(); toast(`${label}: ${n} done.`); render(); }
 function viewDisputes() {
   const rows = [...S.orders, ...S.archived].filter(isDispute).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const risky = rows.filter(o => !o.archived && ["unfulfilled", "fulfilled"].includes(o.fulfillment));
   return `<div class="kpis"><div class="kpi"><span class="label">Open disputes</span><span class="value">${rows.filter(o => !o.archived).length}</span></div><div class="kpi"><span class="label">In To ship / Shipped</span><span class="value" style="color:${risky.length ? "var(--bad)" : "inherit"}">${risky.length}</span><span class="sub">check before dispatch</span></div></div>
   <div style="font-size:12.5px;color:var(--muted)">Orders tagged DISPUTE. Open one to check it, then press <b>Resolved</b> to remove the tag.</div>
+  ${pickBar("disp", [["✓ Resolved", "disp-ok-sel"]], rows.map(o => o.id))}
   <div class="table-wrap"><table>
-    <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Note</th><th></th></tr></thead>
-    <tbody>${rows.map(o => `<tr data-row="${o.id}"><td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Cancelled</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td>${o.archived ? "<td>–</td>" : orderCell("payment", o)}${o.archived ? "<td>–</td>" : orderCell("fulfillment", o).replace(/<\/td>$/, risky.includes(o) ? " ⚠️</td>" : "</td>")}<td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
+    <thead><tr>${pickTh("disp", rows.map(o => o.id))}<th>Order</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Payment</th><th>Fulfillment</th><th>Note</th><th></th></tr></thead>
+    <tbody>${rows.map(o => `<tr data-row="${o.id}">${pickTd("disp", o.id)}<td class="nowrap"><button type="button" class="linkish" data-open="${o.id}">${esc(onum(o))}</button>${o.archived ? ' <span class="chip">Cancelled</span>' : ""}</td><td class="nowrap" data-sort="${o.createdAt || 0}">${relTime(o.createdAt)}</td><td>${custLink(o)}</td><td class="r num nowrap">${peso2(total(o))}</td>${o.archived ? "<td>–</td>" : orderCell("payment", o)}${o.archived ? "<td>–</td>" : orderCell("fulfillment", o).replace(/<\/td>$/, risky.includes(o) ? " ⚠️</td>" : "</td>")}<td style="font-size:12.5px;max-width:260px">${esc((o.note || "").slice(0, 120))}</td>
       <td class="nowrap">${canAll() || isUnlocked("ADMIN") ? `<button class="btn sm" type="button" data-act="disp-ok" data-id="${o.id}">Resolved</button>` : ""}</td></tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">No disputes. Open an order and tap ⚠️ Mark as dispute to track it here.</div>`}</div>`;
 }
@@ -4401,9 +4425,10 @@ function viewExpenses() {
     <section class="panel"><h2>Total ${periodLabel()}</h2><div class="kpi" style="border:0;padding:0"><span class="value">${peso(tot)}</span><span class="sub">${rows.length} expense${rows.length === 1 ? "" : "s"}</span></div></section>
     <section class="panel"><h2>By category</h2><div class="bars">${byCat.map(x => `<div class="bar-row"><span>${esc(x.c)}</span><div class="bar-track"><div class="bar-fill" style="width:${(x.v / max * 100).toFixed(1)}%;background:var(--gold)"></div></div><span class="num">${peso(x.v)}</span></div>`).join("") || `<div class="empty">No expenses ${periodLabel()}.</div>`}</div></section>
   </div>
+  ${pickBar("exp", [["Delete…", "exp-sel-del", "danger"]], all.map(e => e.id))}
   <div class="table-wrap"><table>
-    <thead><tr><th>Date</th><th>Category</th><th>Note</th><th>Paid with</th><th>OR / receipt</th><th>By</th><th class="r">Amount</th><th></th></tr></thead>
-    <tbody>${all.map(e => `<tr><td class="num">${fmtDate(e.date)}</td><td>${isCashIn(e) ? `<span class="chip good">Cash in</span>` : esc(e.category)}${exChip(e)}</td><td>${esc(e.note || "")}</td><td>${isCashIn(e) ? "" : esc(e.paidWith || "")}</td><td>${e.file ? `<button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">📎 View</button>` : isCashIn(e) ? "" : `<span style="color:var(--muted)">–</span>`}</td><td style="font-size:12.5px">${esc(e.by || "")}</td><td class="r num" style="font-weight:700;${isCashIn(e) ? "color:var(--good)" : ""}">${isCashIn(e) ? "+" : ""}${peso(e.amount)}</td><td class="r">${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">Edit</button>`}</td></tr>`).join("")}</tbody>
+    <thead><tr>${pickTh("exp", all.map(e => e.id))}<th>Date</th><th>Category</th><th>Note</th><th>Paid with</th><th>OR / receipt</th><th>By</th><th class="r">Amount</th><th></th></tr></thead>
+    <tbody>${all.map(e => `<tr>${pickTd("exp", e.id)}<td class="num">${fmtDate(e.date)}</td><td>${isCashIn(e) ? `<span class="chip good">Cash in</span>` : esc(e.category)}${exChip(e)}</td><td>${esc(e.note || "")}</td><td>${isCashIn(e) ? "" : esc(e.paidWith || "")}</td><td>${e.file ? `<button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">📎 View</button>` : isCashIn(e) ? "" : `<span style="color:var(--muted)">–</span>`}</td><td style="font-size:12.5px">${esc(e.by || "")}</td><td class="r num" style="font-weight:700;${isCashIn(e) ? "color:var(--good)" : ""}">${isCashIn(e) ? "+" : ""}${peso(e.amount)}</td><td class="r">${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">Edit</button>`}</td></tr>`).join("")}</tbody>
   </table>${all.length ? "" : `<div class="empty" style="padding:16px">No expenses ${periodLabel()}. Log ingredients, packaging, ads and other costs so net profit stays accurate.</div>`}</div>`;
 }
 
@@ -7487,10 +7512,11 @@ function openDrawer() {
     (canOrders() ? item('data-nav="orders"', ic("orders"), "Orders", S.view === "orders", cxBadge() + retBadge()) : "") +
     (canListings() ? item('data-nav="listings"', ic("tag"), "Listings", S.view === "listings") : "") +
     (canListings() ? item('data-nav="gallery"', ic("image"), "Gallery", S.view === "gallery") : "") +
+    (rvSees() ? item('data-nav="reviews"', ic("star"), "Reviews", S.view === "reviews", rvBadge()) : "") +
     (canAttendance() ? item('data-nav="attendance"', ic("clock"), "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', ic("award"), "Awards", S.view === "eom") : "") +
     `<div class="drawer-l">Departments</div>` +
-    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, `<i class="dc"></i>`, d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : d.id === "ADMIN" || d.id === "MARKETING" ? rvBadge() : ""))).join("") +
+    visDepts().map(d => item(`data-dept="${d.id}" style="--dc:${DEPT_COLORS[d.id]}"`, `<i class="dc"></i>`, d.name, S.view === "dept" && S.dept === d.id, (S.isOwner || isUnlocked(d.id) ? "" : svg("lock", "lock-ico")) + (d.id === "FINANCE" ? urgentBadge() : ""))).join("") +
     `<div class="drawer-l">Me</div>` +
     item('data-nav="account"', ic("account"), esc(m.nickname || m.name || "My Account"), S.view === "account") +
     `<div class="drawer-sync">${esc(($("#sync") || {}).textContent || "")}</div>`;
@@ -7739,7 +7765,7 @@ document.addEventListener("click", guard(async ev => {
     case "rv-approve": case "rv-reject": { const r = S.reviews.find(x => x.id === id); if (!r) return; const ok = b.dataset.act === "rv-approve"; await patch("reviews", id, { status: ok ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); toast(ok ? "Approved. It shows on the website in a few seconds." : "Hidden. It stays here for your records."); return; }
     case "rv-pend": S.rv.status = "pending"; render(); return;
     case "ret-go": if (!$("#scrim").hidden) closeSheet(); S.view = "orders"; S.cx.show = "ret"; S.cx.rf = "pending"; S.sel.clear(); saveNav(); if (!S.web.loaded) webLoad(); render(); window.scrollTo(0, 0); return;
-    case "rv-go": S.view = "dept"; S.dept = id; S.tab = "reviews"; S.rv.status = "pending"; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); navRefresh(); return;
+    case "rv-go": S.view = "reviews"; S.rv.status = "pending"; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); navRefresh(); return;
     case "rv-web": return openRvWebsite();
     case "rv-copy": return rvCopyCode();
     case "rv-clear": S.rv = { stars: "", status: S.rv.status, sort: S.rv.sort, source: "" }; S.rvq = ""; render(); return;
@@ -7841,6 +7867,13 @@ document.addEventListener("click", guard(async ev => {
     case "dispute-toggle": { const o = findOrder(id); if (!o) return; const on = isDispute(o);
       await patch("orders", o.id, on ? { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) } : { tags: [...(o.tags || []), "DISPUTE"], log: logAdd(o, ["marked the order as a dispute"]) });
       toast(on ? `${onum(o)}: dispute resolved.` : `${onum(o)} marked as a dispute (see Disputes).`); openOrderDetails(o.id); return; }
+    case "pick-clear": pk(b.dataset.key).clear(); render(); return;
+    case "disp-ok-sel": return pickRun("disp", "Disputes resolved", async id => { const o = findOrder(id); if (!o) return false; await patch("orders", o.id, { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) }); });
+    case "rv-sel-show": case "rv-sel-hide": { const show = b.dataset.act === "rv-sel-show"; const chunks = []; await pickRun("rv", show ? "Reviews shown" : "Reviews hidden", async id => { const r = S.reviews.find(x => x.id === id); if (!r) return false; await patch("reviews", id, { status: show ? "shown" : "hidden", updatedAt: Date.now(), updatedBy: actor() }); chunks.push(r.chunk); }); if (typeof rvQueue === "function") rvQueue(chunks); return; }
+    case "rv-sel-del": { if (!confirm(`Delete ${pickIds("rv").length} review(s)? This can't be undone.`)) return; const chunks = []; await pickRun("rv", "Reviews deleted", async id => { const r = S.reviews.find(x => x.id === id); if (!r) return false; await remove("reviews", id); chunks.push(r.chunk); }); if (typeof rvQueue === "function") rvQueue(chunks); return; }
+    case "task-sel-done": return pickRun("task", "Tasks marked done", async id => { const t = S.tasks.find(x => x.id === id); if (!t || t.status === "done") return false; await save("tasks", id, { ...clean(t), status: "done", progress: 100, updatedAt: Date.now() }); });
+    case "task-sel-del": { if (!confirm(`Delete ${pickIds("task").length} task(s)?`)) return; return pickRun("task", "Tasks deleted", async id => { if (!S.tasks.some(x => x.id === id)) return false; await remove("tasks", id); }); }
+    case "exp-sel-del": { if (!confirm(`Delete ${pickIds("exp").length} expense(s)?`)) return; return pickRun("exp", "Expenses deleted", async id => { const x = S.expenses.find(r => r.id === id); if (!x) return false; await remove("expenses", id); if (x.file) removeFile(x.file); }); }
     case "disp-ok": { const o = findOrder(id); if (!o) return; await patch("orders", o.id, { tags: (o.tags || []).filter(t => normTag(t) !== "DISPUTE"), disputeResolvedAt: Date.now(), log: logAdd(o, ["marked the dispute as resolved"]) }); toast(`${onum(o)}: dispute resolved.`); if (!S.db) render(); return; }
     case "a-clear": S.asel.clear(); render(); return;
     case "a-unarch": { const os = S.archived.filter(o => S.asel.has(o.id)); for (const o of os) await restoreOrder(o); S.asel.clear(); render(); toast(`Restored ${os.length} order${os.length === 1 ? "" : "s"} with their last statuses.`); return; }
