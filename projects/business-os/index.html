@@ -306,7 +306,10 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .nav button .cx-n { margin-left: auto; }
 .cx-seg { margin: 0 0 12px; } .cx-seg button[aria-pressed="false"] .cx-n { animation: cxpulse 1.6s ease-in-out infinite; }
 @keyframes cxpulse { 50% { opacity: .55; } } @media (prefers-reduced-motion: reduce) { .cx-seg .cx-n { animation: none; } }
-.pgal { display: flex; flex-wrap: wrap; gap: 8px; } .pgal-empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
+.pgal { display: flex; flex-wrap: wrap; gap: 8px; }
+.pgal-add { width: 96px; height: 96px; border-radius: 10px; border: 2px dashed var(--line); background: var(--surface); color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; transition: border-color .15s, color .15s; }
+.pgal-add span { font-size: 34px; line-height: 1; font-weight: 300; } .pgal-add small { font-size: 11.5px; font-weight: 600; }
+.pgal-add:hover, .pgal-add:focus-within { border-color: var(--gold); color: var(--gold); } .pgal-empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
 .pgal-it { position: relative; width: 96px; height: 96px; border-radius: 10px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
 .pgal-it.main { border: 2px solid var(--gold); } .pgal-it img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .pgal-main { position: absolute; top: 4px; left: 4px; background: var(--gold); color: #fff; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; }
@@ -5461,9 +5464,10 @@ async function fragGet(btn) {
 }
 // Listing photos in the editor: see all, remove, reorder (first = main photo, the one the website and Gallery show first).
 function pgalHtml(list) {
-  if (!list.length) return `<div class="pgal-empty">No photos yet.</div>`;
+  const add = `<label class="pgal-add" for="p-photo-file" title="Add photos"><span>+</span><small>Add photo</small></label>`;
+  if (!list.length) return add;
   return list.map((u, i) => `<div class="pgal-it${i ? "" : " main"}"><img src="${esc(u)}" alt="" referrerpolicy="no-referrer" loading="lazy">${i ? "" : `<span class="pgal-main">Main</span>`}
-    <div class="pgal-bar"><button type="button" data-act="pg" data-op="left" data-i="${i}" aria-label="Move earlier" ${i ? "" : "disabled"}>‹</button>${i ? `<button type="button" data-act="pg" data-op="main" data-i="${i}" title="Make main photo">★</button>` : ""}<button type="button" data-act="pg" data-op="right" data-i="${i}" aria-label="Move later" ${i < list.length - 1 ? "" : "disabled"}>›</button><button type="button" data-act="pg" data-op="del" data-i="${i}" aria-label="Remove photo" class="pgal-del">×</button></div></div>`).join("");
+    <div class="pgal-bar"><button type="button" data-act="pg" data-op="left" data-i="${i}" aria-label="Move earlier" ${i ? "" : "disabled"}>‹</button>${i ? `<button type="button" data-act="pg" data-op="main" data-i="${i}" title="Make main photo">★</button>` : ""}<button type="button" data-act="pg" data-op="right" data-i="${i}" aria-label="Move later" ${i < list.length - 1 ? "" : "disabled"}>›</button><button type="button" data-act="pg" data-op="del" data-i="${i}" aria-label="Remove photo" class="pgal-del">×</button></div></div>`).join("") + add;
 }
 const pgalGet = () => { try { return JSON.parse(($("#p-imgs") || {}).value || "[]"); } catch (e) { return []; } };
 const pgalSet = list => { $("#p-imgs").value = JSON.stringify(list); $("#p-photos").innerHTML = pgalHtml(list); };
@@ -5475,7 +5479,7 @@ function openProductForm(id, preset = {}) {
     <h3>${id ? "Edit listing" : "Add listing"}</h3>
     <div class="field"><label>Photos <span style="font-weight:400;color:var(--muted)">· the first one is the main photo. Use the arrows to change the order.</span></label>
       <div id="p-photos" class="pgal">${pgalHtml(galListingImgs(p))}</div>
-      <div><label class="btn sm" for="p-photo-file" style="cursor:pointer">+ Add photos</label><input id="p-photo-file" type="file" accept="image/*" multiple hidden></div>
+      <input id="p-photo-file" type="file" accept="image/*" multiple hidden>
       <input type="hidden" id="p-imgs" value="${esc(JSON.stringify(galListingImgs(p)))}"></div>
     <div class="field"><label for="p-brand">Brand</label><input id="p-brand" list="p-brand-list" value="${esc(p.brand || "")}" placeholder="Pick or type a brand" autocomplete="off"><datalist id="p-brand-list">${listOptions("brand").sort((a, b) => a.localeCompare(b)).map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
     <div class="field"><label for="p-name">Product name</label><input id="p-name" value="${esc(p.name || "")}" placeholder="e.g. Carolina Herrera Good Girl EDP 80ml"></div>
