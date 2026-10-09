@@ -7946,6 +7946,7 @@ document.addEventListener("change", guard(async ev => {
   if ((t.id === "bulk-pay" || t.id === "bulk-ful") && t.value) return bulkAction((t.id === "bulk-pay" ? "pay:" : "ful:") + t.value);
   if (t.id === "pack-courier") { S.courier = t.value; try { localStorage.setItem("rs-courier", t.value); } catch (e) {} return; }
   if (t.id === "pack-ship") { S.wbShip = t.checked; try { localStorage.setItem("rs-wbship", t.checked ? "1" : "0"); } catch (e) {} return; }
+  if (t.classList && t.classList.contains("wbu-pick")) { const n = document.querySelectorAll(".wbu-pick:checked").length, b = document.querySelector('[data-act="wbu-save"]'); if (b) { b.textContent = `Save ${n} tracking number${n === 1 ? "" : "s"}`; b.disabled = !n; } return; }
   if (t.id === "wb-up" && t.files[0]) { const f = t.files[0]; t.value = ""; return wbUpload(f); }
   if (t.dataset.wbcam && t.files[0]) { const f = t.files[0], id = t.dataset.wbcam; t.value = ""; toast("Reading waybill barcode…"); const c = await decodeBarcode(f); if (!c) { toast("No barcode found. Try again closer, flat, and in good light."); return; } return saveWaybill(id, c); }
   if (t.id === "pack-filter") { S.packF = t.value; render(); return; }
