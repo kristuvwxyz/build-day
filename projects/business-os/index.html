@@ -1,6 +1,6 @@
 <title>Regal Spritz PH OS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Manrope:wght@400;500;600;700&family=Cormorant+Garamond:wght@600&family=Jost:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: left rail nav (bottom tab bar on phones) + one working pane; summary first, detail below. */
 /* BRAND TOKENS: swap these for Regal Spritz's exact colors and fonts. */
@@ -304,6 +304,8 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .badge.red { background: var(--bad-bg); color: var(--bad); }
 .badge.cx-n, .badge.red.cx-n { margin-left: 6px; padding: 1px 7px; background: var(--bad); color: #fff; font-weight: 700; } .badge.cx-n::before { display: none; }
 .nav button .cx-n { margin-left: auto; }
+/* Every count badge (menu, tabs) looks the same: round pill, same number font and size. */
+.nbadge, .badge.cx-n, .badge.red.cx-n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font: 800 11px/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: 0; display: inline-grid; place-items: center; gap: 0; }
 .cx-seg { margin: 0 0 12px; } .cx-seg button[aria-pressed="false"] .cx-n { animation: cxpulse 1.6s ease-in-out infinite; }
 @keyframes cxpulse { 50% { opacity: .55; } } @media (prefers-reduced-motion: reduce) { .cx-seg .cx-n { animation: none; } }
 .pgal { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1450,6 +1452,7 @@ const headIdx = (H, test) => H.findIndex(test);
 const RV_SOURCES = ["Website", "Shopee", "Facebook", "Instagram", "TikTok", "Lazada", "Viber / Messenger", "Other"];
 const rvPending = () => S.reviews.filter(r => r.status === "pending");
 const rvSees = () => canSee("ADMIN") || canSee("MARKETING");
+const rvTabBadge = () => { const n = rvPending().length; return n ? `<span class="badge red cx-n" title="${n} review${n > 1 ? "s" : ""} to approve">${n}</span>` : ""; };
 const rvBadge = () => { const n = rvPending().length; return n ? `<span class="nbadge" title="${n} review${n > 1 ? "s" : ""} to approve">${n}</span>` : ""; };
 function rvApproveAlert() {
   const n = rvPending().length; if (!n || !rvSees() || S.viewAs) return "";
@@ -1459,8 +1462,9 @@ function rvApproveAlert() {
 const starsHTML = n => { n = Math.max(0, Math.min(5, Math.round(Number(n) || 0))); return `<span class="stars" role="img" aria-label="${n} out of 5 stars">${"★".repeat(n)}<span class="off">${"★".repeat(5 - n)}</span></span>`; };
 function rvFiltered() {
   const R = S.rv, q = (S.rvq || "").toLowerCase().trim();
+  const st = R.status || "shown";   // tabs: Reviews (shown) · To approve · Hidden
   const list = S.reviews.filter(r => (!R.stars || Math.round(Number(r.rating) || 0) === Number(R.stars))
-    && (!R.status || (R.status === "hidden" || R.status === "pending" ? r.status === R.status : r.status !== "hidden" && r.status !== "pending"))
+    && (st === "hidden" || st === "pending" ? r.status === st : r.status !== "hidden" && r.status !== "pending")
     && (!R.source || r.source === R.source)
     && (!q || [r.customer, r.product, r.text, r.reply].join(" ").toLowerCase().includes(q)));
   const dt = r => r.date || "";
@@ -1473,16 +1477,16 @@ function viewReviews() {
   const dist = [5, 4, 3, 2, 1].map(n => [n, all.filter(r => Math.round(Number(r.rating) || 0) === n).length]);
   const max = Math.max(1, ...dist.map(d => d[1]));
   const list = rvFiltered();
-  const active = R.stars || R.status || R.source || S.rvq;
+  const active = R.stars || R.source || S.rvq, st = R.status || "shown";
+  const rvTabs = `<div class="seg cx-seg" role="group" aria-label="Reviews, reviews to approve or hidden reviews">${[["shown", "Reviews", ""], ["pending", "To approve", rvTabBadge()], ["hidden", "Hidden", ` <span style="color:var(--muted)">${S.reviews.filter(r => r.status === "hidden").length}</span>`]].map(([k, l, x]) => `<button type="button" data-rvtab="${k}" aria-pressed="${st === k}">${l}${x}</button>`).join("")}</div>`;
   const sel = (id, label, opts, cur) => `<select id="${id}" aria-label="${label}">${opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
   if (S.loaded.reviews && S.canEdit && !S.readOnly && !S.rvImporting && !rvCfg().imported && !S.reviews.some(r => r.jmId) && S.rvCfgLoaded) setTimeout(importWebsiteReviews, 50);
-  return `${rvSyncLine()}<section class="panel"><div class="rv-sum">
-      <div class="rv-avg"><b class="num">${all.length ? avg.toFixed(1) : "–"}</b>${starsHTML(avg)}<span style="font-size:12px;color:var(--muted)">${all.length} review${all.length === 1 ? "" : "s"} · ${all.filter(r => r.status === "hidden").length} hidden</span>${pend ? `<button class="btn sm primary" type="button" data-act="rv-pend" style="margin-top:6px">⭐ ${pend} to approve</button>` : ""}</div>
+  return `${rvSyncLine()}${rvTabs}<section class="panel"><div class="rv-sum">
+      <div class="rv-avg"><b class="num">${all.length ? avg.toFixed(1) : "–"}</b>${starsHTML(avg)}<span style="font-size:12px;color:var(--muted)">${all.length} review${all.length === 1 ? "" : "s"} · ${all.filter(r => r.status === "hidden").length} hidden</span>${pend && st !== "pending" ? `<button class="btn sm primary" type="button" data-act="rv-pend" style="margin-top:6px">⭐ ${pend} to approve</button>` : ""}</div>
       <div class="rv-dist">${dist.map(([n, c]) => `<button type="button" data-rvstars="${n}" aria-pressed="${String(R.stars) === String(n)}"><span>${n} ★</span><i><s style="width:${c / max * 100}%"></s></i><span class="num">${c}</span></button>`).join("")}</div>
     </div></section>
     <div class="toolbar"><input id="rvq" type="search" placeholder="Search customer, product, review" value="${esc(S.rvq)}" aria-label="Search reviews">
       ${sel("rv-stars", "Rating", [["", "All ratings"], ...[5, 4, 3, 2, 1].map(n => [n, n + " star" + (n === 1 ? "" : "s")])], R.stars)}
-      ${sel("rv-status", "Status", [["", "All statuses"], ["pending", "To approve"], ["shown", "Shown"], ["hidden", "Hidden"]], R.status)}
       ${sel("rv-source", "Source", [["", "All sources"], ...RV_SOURCES.map(x => [x, x])], R.source)}
       ${sel("rv-sort", "Sort", [["high", "Highest rating first"], ["low", "Lowest rating first"], ["new", "Newest first"], ["old", "Oldest first"]], R.sort)}
       ${active ? `<button class="btn ghost sm" type="button" data-act="rv-clear">✕ Clear filters</button>` : ""}</div>
@@ -1493,7 +1497,7 @@ function viewReviews() {
         <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap" data-sort="${esc(r.date || "")}">${r.date ? fmtDateY(r.date) : ""}</td>
         <td><span class="chip ${r.status === "hidden" ? "" : r.status === "pending" ? "warn" : "good"}">${r.status === "hidden" ? "Hidden" : r.status === "pending" ? "To approve" : "Shown"}</span></td>
         ${can ? `<td class="r nowrap">${r.status === "pending" ? `<button class="btn sm primary" type="button" data-act="rv-approve" data-id="${r.id}">✓ Approve</button> <button class="btn sm ghost" type="button" data-act="rv-reject" data-id="${r.id}">Hide</button>` : `<button class="btn sm ghost" type="button" data-act="rv-toggle" data-id="${r.id}">${r.status === "hidden" ? "Show" : "Hide"}</button>`}</td>` : ""}</tr>`).join("")}</tbody></table>
-      ${list.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No reviews match these filters." : "No reviews yet. Add one, or import them from a spreadsheet."}</div>`}</div>
+      ${list.length ? "" : `<div class="empty" style="padding:16px">${st === "pending" && !active ? "No reviews waiting for approval. 🎉" : st === "hidden" && !active ? "No hidden reviews." : all.length ? "No reviews match these filters." : "No reviews yet. Add one, or import them from a spreadsheet."}</div>`}</div>
     <div style="font-size:12px;color:var(--muted)">Reviews written on regalspritz.com arrive here as <b>To approve</b>. Approve to show them; hidden reviews stay here for your records but are off the website. Click a review to edit or delete it. The website updates within seconds.</div>`;
 }
 function openReviewForm(id) {
@@ -5057,6 +5061,99 @@ async function annCompose(blob) {
   g.drawImage(t, x0, y0, bw, bh2, dx, dy, dw, dh);
   return cv.toDataURL("image/jpeg", .9);
 }
+/* ---------- Listing photos: website template first, Scent card second (automatic, Oct 9, 2026) ----------
+   Every listing's 1st photo is on our listing template (cream backdrop, white marble stand, gold bar). A photo already on
+   the template is kept as is; otherwise the bottle is cut out and placed on the drawn template (same as the email photos),
+   and the original photos stay after it. The 2nd photo is the Scent card, drawn from the listing's Fragrantica notes and
+   accords (made again when they change; skipped when the 2nd photo already is a scent card). Runs in the browser:
+   the owner's RS App works through all listings (website ones first), and whoever saves a listing does that one. */
+const SC_COL = { woody: "#774414", citrus: "#F9FF52", floral: "#FF5F8D", "white floral": "#EDF2FB", sweet: "#EE363B", vanilla: "#FFFEC0", fruity: "#FC4B29", amber: "#BC4D10", powdery: "#EEDDCC", fresh: "#9BE5ED", aromatic: "#37A089", "warm spicy": "#CC3300", "fresh spicy": "#83C928", spicy: "#CC3300", musky: "#E6CEE5", green: "#0E8C1D", rose: "#FE016B", leather: "#8B4513", oud: "#3D2B1F", aquatic: "#66CCFF", marine: "#66CCFF", earthy: "#544838", smoky: "#8D8D8D", balsamic: "#9C6A40", lavender: "#B07FCA", violet: "#991DCD", iris: "#C8C8F0", tuberose: "#F7E6EC", honey: "#FFBF00", tobacco: "#9E6A1F", caramel: "#C68E17", coffee: "#673B11", cacao: "#5C3317", chocolate: "#5C3317", lactonic: "#FDF4DC", coconut: "#F9F2E1", almond: "#F2D8B6", herbal: "#6CA06C", patchouli: "#6D6D2D", mossy: "#6E8E2C", animalic: "#8E5A2C", soapy: "#E0F7FA", ozonic: "#C9F3FF", metallic: "#B4B4B4", cherry: "#A50021", beeswax: "#E4B53A", tropical: "#FFB300", salty: "#D5E8F0", mineral: "#A9B4BE", nutty: "#B57A3E", rum: "#8E2E00", whiskey: "#B66E2B", wine: "#7A0B2B", conifer: "#2E6B3A", camphor: "#B8E0D2", "soft spicy": "#E2725B", gourmand: "#B5651D", sour: "#D7F000", bitter: "#6E7F2E", yellow_floral: "#FFE08A", "yellow floral": "#FFE08A" };
+const scKey = p => { const n = p.notes || {}, a = p.accords || []; if (!a.length && (n.top || []).length + (n.heart || []).length + (n.base || []).length < 3) return ""; return [p.brand, p.name, a.join(","), (n.top || []).join(","), (n.heart || []).join(","), (n.base || []).join(",")].join("|").toLowerCase(); };
+function scentCard(p) {
+  const W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#FDFCF4"); bg.addColorStop(1, "#F5F1DF"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "#C9A55A"; g.lineWidth = 2; g.strokeRect(22, 22, W - 44, H - 44);
+  const fit = (t, max, size, font) => { let s = size; g.font = font(s); while (s > 14 && g.measureText(t).width > max) { s -= 2; g.font = font(s); } return s; };
+  const serif = s => `600 ${s}px "Cormorant Garamond", Georgia, serif`, sans = (s, w = 500) => `${w} ${s}px Jost, "Helvetica Neue", Arial, sans-serif`;
+  let y = 78; g.textAlign = "left"; g.fillStyle = "#A5823B"; g.font = sans(17, 600); const brand = String(p.brand || "").toUpperCase(); g.fillText(brand.split("").join(String.fromCharCode(8202)), 52, y);
+  y += 48; g.fillStyle = "#2B1B2E"; const nm = p.name || ""; fit(nm, W - 104, 44, serif); g.fillText(nm, 52, y);
+  y += 22; g.fillStyle = "#8A7F70"; g.font = sans(15); g.fillText(["Scent card", p.size].filter(Boolean).join(" · "), 52, y += 8);
+  const acc = (p.accords || []).slice(0, 7);
+  if (acc.length) {
+    y += 44; g.fillStyle = "#2B1B2E"; g.font = sans(16, 700); g.fillText("MAIN ACCORDS", 52, y); y += 14;
+    const bh = acc.length > 5 ? 26 : 32, gap = 7, max = W - 104;
+    acc.forEach((a, i) => { const w = max * (1 - i * (0.5 / Math.max(1, acc.length - 1))), c = SC_COL[String(a).toLowerCase()] || "#C9A55A";
+      g.fillStyle = c; g.fillRect(52, y, w, bh); const [r, gg, b] = [1, 3, 5].map(k => parseInt(c.slice(k, k + 2), 16)); g.fillStyle = r * .3 + gg * .59 + b * .11 > 150 ? "#2B1B2E" : "#FFFFFF";
+      g.font = sans(Math.round(bh * .55), 600); g.fillText(String(a).toLowerCase(), 64, y + bh * .68); y += bh + gap; });
+  }
+  const n = p.notes || {}, rows = [["TOP NOTES", n.top], ["HEART NOTES", n.heart], ["BASE NOTES", n.base]].filter(r => (r[1] || []).length);
+  const left = H - 70 - y - 30, per = rows.length ? Math.max(70, left / rows.length) : 0;
+  for (const [lab, list] of rows) {
+    y += 40; g.fillStyle = "#2B1B2E"; g.font = sans(16, 700); g.fillText(lab, 52, y); y += 12;
+    let x = 52, line = 0; const ch = 32, end = y + per - 40; g.font = sans(16);
+    for (const t of list.slice(0, 14)) { const w = g.measureText(t).width + 28; if (x + w > W - 52) { x = 52; line++; } const cy = y + line * (ch + 8); if (cy + ch > end + 10 || cy + ch > H - 80) break;
+      g.fillStyle = "#FFFFFF"; g.strokeStyle = "#E3D6B5"; g.lineWidth = 1.5; g.beginPath(); g.roundRect ? g.roundRect(x, cy, w, ch, 16) : g.rect(x, cy, w, ch); g.fill(); g.stroke();
+      g.fillStyle = "#3A2B3C"; g.fillText(t, x + 14, cy + 22); x += w + 8; }
+    y += (line + 1) * (ch + 8);
+  }
+  g.fillStyle = "#A5823B"; g.font = sans(13, 600); g.textAlign = "left"; g.fillText("Notes & accords: Fragrantica", 52, H - 46);
+  g.textAlign = "right"; g.fillStyle = "#4A2C4D"; g.font = serif(22); g.fillText("Regal Spritz PH", W - 52, H - 44);
+  return cv.toDataURL("image/jpeg", .9);
+}
+// Is this photo a scent card (mostly light, flat background, not our template)? Then we keep it and don't add ours.
+async function looksLikeCard(blob) {
+  const im = await createImageBitmap(blob), W = 100, H = Math.max(1, Math.round(100 * im.height / im.width)), cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data; let light = 0, sat = 0;
+  for (let i = 0; i < d.length; i += 4) { const mn = Math.min(d[i], d[i + 1], d[i + 2]), mx = Math.max(d[i], d[i + 1], d[i + 2]); if (mn > 228) light++; if (mx - mn > 90 && mx > 150) sat++; }
+  const px = d.length / 4; return light / px > .55 && sat / px > .015;
+}
+const tplMemo = new Map(), cardMemo = new Map();   // original photo → template copy (this session; sizes of one perfume often share a photo)
+const tplImgs = p => galListingImgs(p).filter(u => !String(u).startsWith("data:"));
+const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)); };
+async function tplOne(id) {
+  let p = S.products.find(x => x.id === id); if (!p || !S.photos || !tplNeeds(p)) return false;
+  if (p.tplBusy && Date.now() - p.tplBusy < 3 * 60e3) return false;
+  UNDO.at = 0; await patch("products", id, { tplBusy: Date.now() }).catch(() => {});
+  const L = tplImgs(p); let imgs = [...L]; const u = { tplBusy: 0 };
+  try {
+    if (p.tplOk !== L[0] && p.tplFail !== L[0]) {
+      try { const bl = await annBlob(L[0]);
+        if (await annOnTemplate(bl)) u.tplOk = L[0];
+        else { let url = tplMemo.get(L[0]); if (!url) { const r = await S.photos.save({ data: await annCompose(bl) }); if (!r || !r.ok || !r.url) throw new Error((r && r.error) || "photo save failed"); url = r.url; tplMemo.set(L[0], url); }
+          imgs = [url, ...imgs.filter(x => x !== url)]; u.tplOk = url; u.tplFrom = L[0]; if (!p.photoOrig) u.photoOrig = L; }
+      } catch (e) { console.warn("template", id, e); u.tplFail = L[0]; }
+    }
+    const key = scKey(p);
+    if (key && (p.card || {}).key !== key) {
+      const old = (p.card || {}).url; let at = old ? imgs.indexOf(old) : -1;
+      if (at < 0 && !(p.card || {}).skip && imgs[1]) { try { if (await looksLikeCard(await annBlob(imgs[1]))) { u.card = { key, skip: imgs[1] }; } } catch (e) {} }
+      if (!u.card) { let url = cardMemo.get(key);
+        if (!url) { await Promise.all(['600 44px "Cormorant Garamond"', "500 16px Jost", "700 16px Jost"].map(f => document.fonts.load(f).catch(() => {})));
+          const r = await S.photos.save({ data: scentCard(p) }); if (r && r.ok && r.url) { url = r.url; cardMemo.set(key, url); } }
+        if (url) { const r = { url };
+        if (at >= 0) imgs[at] = r.url; else imgs.splice(Math.min(1, imgs.length), 0, r.url);
+        u.card = { key, url: r.url }; } }
+    }
+  } finally {
+    p = S.products.find(x => x.id === id); if (!p) return false;
+    const changed = JSON.stringify(imgs) !== JSON.stringify(L);
+    UNDO.at = 0; await patch("products", id, { ...u, ...(changed ? { photo: imgs[0], imgs, log: logAdd(p, ["photos: template first" + (u.card && u.card.url ? " + scent card" : "")], "Auto · photos") } : {}) }).catch(() => {});
+    return changed;
+  }
+}
+let tplBusyRun = false;
+async function tplRun() {
+  if (tplBusyRun || !S.realOwner || !S.photos || !S.db || S.readOnly || S.viewAs || !S.loaded.products) return;
+  const live = p => (p.status || "active") === "active";
+  const todo = S.products.filter(tplNeeds).sort((a, b) => live(b) - live(a));
+  if (!todo.length) return;
+  tplBusyRun = true; let n = 0, k = 0;
+  try { for (const p of todo) { if (await tplOne(p.id).catch(e => (console.warn("tpl", e), false))) { n++; if (live(p)) k++; }
+      if (k && k % 15 === 0) scheduleWebPush(true);
+      if (n && n % 25 === 0) toast(`Listing photos on the template: ${n} of ${todo.length} done…`); }
+  } finally { tplBusyRun = false; if (k) scheduleWebPush(true); if (n) toast(`${n} listing${n === 1 ? "" : "s"} now have the template photo first${k ? ". The website updates in a few seconds." : "."}`); }
+}
 async function annPrepare() {
   if (annPrepBusy) return annPrepBusy;
   const have = S.webmeta.find(d => d.id === "_annpicks"); if (have && have.v === ANN_PICKS_V && (have.picks || []).filter(x => x.img).length >= 2) return true;
@@ -5540,8 +5637,9 @@ function openProductForm(id, preset = {}) {
     const PLAB = { name: "name", brand: "brand", size: "size", ptype: "type", sku: "SKU", barcode: "barcode", category: "collection", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", reorder: "low-stock alert", status: "status", kind: "availability", eta: "ETA", badges: "badges", notes: "notes", accords: "accords", fragrantica: "Fragrantica link", description: "description", url: "website link", batch: "batch no.", photo: "photo" };
     const changed = id ? Object.keys(PLAB).filter(k => JSON.stringify(p[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !p[k]) && !(k === "notes" && !Object.keys(data.notes).length && !p.notes)) : [];
     data.log = logAdd(p, [id ? (changed.length ? "changed " + changed.map(k => PLAB[k]).join(", ") : "saved with no changes") : "added this listing"]);
-    await save("products", id || uid("p"), data);
+    const pid = id || uid("p"); await save("products", pid, data);
     closeSheet(); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
+    setTimeout(() => tplOne(pid).then(ch => { if (ch) { scheduleWebPush(true); toast("Template photo + scent card added to the listing."); } }).catch(e => console.warn("tpl", e)), 1500);
   });
 }
 
@@ -7495,6 +7593,7 @@ document.addEventListener("click", guard(async ev => {
   const js = ev.target.closest("[data-jntsave]"); if (js && S.jnt) { js.disabled = true; await jntSaveBack(Number(js.dataset.jntsave)); js.disabled = false; return; }
   const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
   const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
+  const rvt = ev.target.closest("[data-rvtab]"); if (rvt) { S.rv.status = rvt.dataset.rvtab; render(); return; }
   const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "ret" ? "ret" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
   const rtf = ev.target.closest("[data-retf]"); if (rtf) { S.cx.rf = rtf.dataset.retf; render(); return; }
   const rtd = ev.target.closest("[data-retdec]"); if (rtd) { await returnDecide(rtd.dataset.ref, rtd.dataset.retdec, rtd); return; }
@@ -7636,7 +7735,7 @@ document.addEventListener("click", guard(async ev => {
     case "rv-go": S.view = "dept"; S.dept = id; S.tab = "reviews"; S.rv.status = "pending"; S.sel.clear(); saveNav(); render(); window.scrollTo(0, 0); navRefresh(); return;
     case "rv-web": return openRvWebsite();
     case "rv-copy": return rvCopyCode();
-    case "rv-clear": S.rv = { stars: "", status: "", sort: S.rv.sort, source: "" }; S.rvq = ""; render(); return;
+    case "rv-clear": S.rv = { stars: "", status: S.rv.status, sort: S.rv.sort, source: "" }; S.rvq = ""; render(); return;
     case "rv-import": return openReviewImport();
     case "login-import": return openLoginImport();
     case "eom-vote": return eomVote();
@@ -7931,7 +8030,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "t-person") { S.t.person = t.value; render(); return; }
   if (t.id === "t-dept") { S.t.dept = t.value; render(); return; }
   if (t.id === "k-status" && t.value === "done") { $("#k-prog").value = 100; $("#k-prog-val").textContent = "100%"; return; }
-  if (t.id === "rv-stars" || t.id === "rv-status" || t.id === "rv-sort" || t.id === "rv-source") { S.rv[t.id.slice(3)] = t.value; render(); return; }
+  if (t.id === "rv-stars" || t.id === "rv-sort" || t.id === "rv-source") { S.rv[t.id.slice(3)] = t.value; render(); return; }
   if (t.dataset.eomrate) return eomRate(t.dataset.eomrate, Number(t.value));
   if (t.matches(".ws-num")) return setWorkStyle({ [t.dataset.k]: Math.max(1, Math.round(Number(t.value) || 1)) });
   if (t.id === "k-dept") { const all = t.value === "all", a = $("#k-who-f"), c = $("#k-by-f"); if (a) a.hidden = all; if (c) c.hidden = !all; }
@@ -8444,7 +8543,7 @@ async function startShopSync(c) {
   setTimeout(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 20000); setInterval(() => { reviewInvites().catch(() => {}); announceRun().catch(() => {}); }, 5 * 60e3);
   reconcileStages();
   shopHistoryBackfill(c);
-  if (c?.use) Promise.resolve().then(() => c.use("photos")).then(ph => { if (!ph || !ph.save) return; S.photos = ph; const go = () => { if (S.loaded.products) photoCopyRun(); else setTimeout(go, 2000); if (S.loaded.webmeta) payQrUpload(); }; setTimeout(go, 8000); setInterval(() => { photoCopyRun(); payQrUpload(); }, 30 * 60e3); }).catch(() => {});
+  if (c?.use) Promise.resolve().then(() => c.use("photos")).then(ph => { if (!ph || !ph.save) return; S.photos = ph; const go = () => { if (S.loaded.products) photoCopyRun(); else setTimeout(go, 2000); if (S.loaded.webmeta) payQrUpload(); }; setTimeout(go, 8000); setInterval(() => { photoCopyRun(); payQrUpload(); }, 30 * 60e3); setTimeout(() => tplRun().catch(() => {}), 45000); setInterval(() => tplRun().catch(() => {}), 2 * 60e3); }).catch(() => {});
   if (!SHOPIFY_ON) return;
   S.mcp = c?.use ? await c.use("mcp").catch(() => null) : null;
   if (!S.mcp) { paintShop(); return; }
