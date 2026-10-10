@@ -2064,7 +2064,7 @@ function headActions() {
     gallery: can && S.mcp ? `<button class="btn" type="button" data-act="gal-load">${S.gallery.length ? "Refresh from Shopify" : "Load photos from Shopify"}</button>` : "",
     packing: (canShip() ? `<label class="btn" for="wb-up" style="cursor:pointer">📄 Upload J&T waybills</label><input id="wb-up" type="file" accept=".xls,.xlsx,.csv,.pdf" hidden>` : "") + (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
     inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
-    customers: (SHOPIFY_ON && can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + ex("customers"),
+    customers: (SHOPIFY_ON && can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + (S.realOwner && !S.viewAs ? `<button class="btn" type="button" data-act="ann-brevo-list" title="Buyers' emails + first names for Brevo (made in your browser, not saved)">⬇ Buyer list (CSV)</button>` : "") + ex("customers"),
     channels: ex("customers"),
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
