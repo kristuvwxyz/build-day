@@ -5023,9 +5023,10 @@ async function dlText(filename, text, type) {
 }
 async function brevoList() {
   const q = v => /[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
-  const rows = annList().map(x => [x.email, (x.name || "").replace(/[^\p{L} .'-]/gu, "").trim()]);
+  const done = new Set((annDoc() || {}).sent || []);   // already got it via Gmail: left out so nobody gets it twice
+  const all = annList(), rows = all.filter(x => !done.has(emailHash(x.email))).map(x => [x.email, (x.name || "").replace(/[^\p{L} .'-]/gu, "").trim()]);
   const ok = await dlText(`regal-spritz-buyers-${mToday()}.csv`, ["EMAIL,FIRSTNAME", ...rows.map(r => r.map(q).join(","))].join("\n"), "text/csv");
-  if (ok) toast(`Buyer list ready: ${rows.length.toLocaleString("en-PH")} emails. Upload it in Brevo → Contacts → Import.`);
+  if (ok) toast(`Buyer list ready: ${rows.length.toLocaleString("en-PH")} emails${all.length > rows.length ? ` (${all.length - rows.length} who already got it left out)` : ""}. Upload it in Brevo → Contacts → Import.`);
 }
 async function brevoHTML() {
   await annPrepare();
