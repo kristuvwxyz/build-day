@@ -2063,13 +2063,13 @@ function headActions() {
     archived: "",
     gallery: can && S.mcp ? `<button class="btn" type="button" data-act="gal-load">${S.gallery.length ? "Refresh from Shopify" : "Load photos from Shopify"}</button>` : "",
     packing: (canShip() ? `<label class="btn" for="wb-up" style="cursor:pointer">📄 Upload J&T waybills</label><input id="wb-up" type="file" accept=".xls,.xlsx,.csv,.pdf" hidden>` : "") + (S.dl ? `<button class="btn" type="button" data-act="jnt-export">J&T VIP booking file</button>` : "") + `<button class="btn" type="button" data-act="jnt-copy">Copy for J&T</button>`,
-    inventory: ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
+    inventory: ex("products") + (can ? `<button class="btn" type="button" data-act="shopee-file" title="Excel for Shopee Mass Upload: in-stock on-hand listings, photos with our logo">🛍 Shopee file</button>` : "") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
     customers: (SHOPIFY_ON && can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + (S.realOwner && !S.viewAs ? `<button class="btn" type="button" data-act="ann-brevo-list" title="Buyers' emails + first names for Brevo (made in your browser, not saved)">⬇ Buyer list (CSV)</button>` : "") + ex("customers"),
     channels: ex("customers"),
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
     logins: S.vaultKey && can ? `<button class="btn ghost" type="button" data-act="vault-lock">${svg("lock", "btn-ico")} Lock logins</button><button class="btn primary" type="button" data-act="new-login">Add login</button>` : "",
-    listings: (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
+    listings: (can ? `<button class="btn" type="button" data-act="import-listings">Import CSV</button>` : "") + (can && S.mcp ? `<button class="btn" type="button" data-act="import-committed" title="Bring in items customers already checked out in Shopify">Import reserved from Shopify</button>` : "") + ex("products") + (can ? `<button class="btn" type="button" data-act="shopee-file" title="Excel for Shopee Mass Upload: in-stock on-hand listings, photos with our logo">🛍 Shopee file</button>` : "") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add listing</button>` : ""),
     passwords: "", homecontent: "", account: "", depts: "",
   };
   return lockBtn + (map[moduleKey()] || "");
@@ -5033,6 +5033,90 @@ async function brevoHTML() {
   const ok = await dlText("regal-spritz-new-website-email.html", annHTML(BREVO_NAME), "text/html");
   if (ok) toast("Email file ready. In Brevo: Campaigns → Create → Code your own → paste or upload it.");
 }
+/* ---------- Shopee file: on-hand listings → Shopee mass-upload sheet + photos with our logo ---------- */
+// Only what Shopee allows: no other brands' names ("alternative / inspired by"), no links, contacts or off-Shopee mentions, Fragrantica's own card photos left out,
+// one listing per perfume (sizes as variations), decants / partials / testers said plainly. Photos get our logo (corner + faint centre), memo in webmeta/_shopee.
+const SHP_BAD = /\b(alternative|inspired|dupe|clone|replica|smells? (just )?like|twin|version of|impression of|type of|copy of)\b/i;
+function shopeeDesc(p) {
+  const strip = t => String(t || "").replace(/https?:\/\/\S+|www\.\S+|\S+@\S+\.\S+|@\w+|(\+?63|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}/g, "").replace(/\b(shopify|regalspritz(\.com)?|website|facebook|instagram|tiktok|viber|messenger|lazada|dm us|pm us|message us)\b/gi, "");
+  const lines = String(p.description || "").split(/\n|(?<=[.!?])\s+/).map(s => strip(s).replace(/\s{2,}/g, " ").trim()).filter(s => s.length > 2 && !SHP_BAD.test(s));
+  const n = p.notes || {}, row = (k, a) => (a || []).length ? `${k}: ${a.join(", ")}` : "";
+  const notes = [row("Top notes", n.top), row("Heart notes", n.heart), row("Base notes", n.base)].filter(Boolean);
+  const t = String(p.ptype || "");
+  const what = /decant|vial/i.test(t) ? "Decant: perfume transferred from an authentic full bottle into our clean glass atomizer. It does not come in the original bottle or box."
+    : /partial/i.test(t) ? "Partial bottle: pre-owned, with the level shown in the photos."
+    : /tester/i.test(t) ? "Tester: authentic tester bottle. It may come without the retail box or cap."
+    : /unsealed/i.test(t) ? "Brand new, box opened (unsealed)."
+    : /sealed|boxed/i.test(t) ? "Brand new, sealed in the original box." : "";
+  const out = [[p.brand, p.name].filter(Boolean).join(" ") + (p.size ? ` · ${p.size}` : "") + (t ? ` · ${t}` : ""), "", ...lines, ...(notes.length ? ["", ...notes] : []), ...(what ? ["", what] : []),
+    "", "Packed with bubble wrap and shipped within 1–2 days.", "Scent experience varies per skin. Photos are of the actual item or the same product."].join("\n").replace(/\n{3,}/g, "\n\n");
+  return out.slice(0, 2900);
+}
+const shopeeTitle = (p, solo) => { const base = [p.brand, p.name].filter(Boolean).join(" ").replace(SHP_BAD, "").replace(/\s{2,}/g, " ").trim();
+  const t = /perfume|parfum|cologne|toilette|edp|edt|mist|oil/i.test(base) || p.category === "beauty" ? base : base + " Perfume";
+  return (solo ? [t, p.size, p.ptype].filter(Boolean).join(" ") : t).slice(0, 120); };
+const shopeeKg = p => { const ml = parseFloat(String(p.size || "").replace(",", "")) || 0, t = String(p.ptype || "");
+  return /decant|vial/i.test(t) ? 0.1 : Math.round((Math.max(0.2, ml * 0.004 + (/sealed|boxed/i.test(t) ? 0.25 : 0.15))) * 100) / 100; };
+async function shopeeMark(src) {
+  const im = await createImageBitmap(await annBlob(src)), s = Math.min(1, 1200 / Math.max(im.width, im.height)), W = Math.round(im.width * s), H = Math.round(im.height * s);
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.drawImage(im, 0, 0, W, H);
+  const u = Math.min(W, H) / 800;
+  g.save(); g.globalAlpha = .08; g.translate(W / 2, H / 2); g.rotate(-Math.PI / 9); g.fillStyle = "#4A2A5E"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = `600 ${Math.round(70 * u)}px "Cormorant Garamond", Georgia, serif`; g.fillText("♛ REGAL SPRITZ PH", 0, 0); g.restore();
+  const txt = "♛ REGAL SPRITZ PH"; g.font = `600 ${Math.round(24 * u)}px "Cormorant Garamond", Georgia, serif`;
+  const tw = g.measureText(txt).width, ph = Math.round(40 * u), pw = tw + 28 * u, x = W - pw - 18 * u, y = H - ph - 18 * u;
+  g.globalAlpha = .82; g.fillStyle = "#4A2A5E"; g.beginPath(); (g.roundRect ? g.roundRect(x, y, pw, ph, ph / 2) : g.rect(x, y, pw, ph)); g.fill();
+  g.globalAlpha = 1; g.fillStyle = "#F3E3B5"; g.textBaseline = "middle"; g.textAlign = "left"; g.fillText(txt, x + 14 * u, y + ph / 2 + 1);
+  return cv.toDataURL("image/jpeg", .88);
+}
+let shopeeBusy = false;
+async function shopeeFile() {
+  if (shopeeBusy) return toast("The Shopee file is still being made…");
+  const L = S.products.filter(p => p.kind === "onhand" && p.status === "active" && Number(p.stock) > 0 && Number(p.price) > 0 && (p.imgs || []).length);
+  if (!L.length) return toast("No on-hand listings in stock to put on Shopee.");
+  if (!S.photos) return toast("Photo saving isn't available here. Open the RS App.");
+  let X; try { X = await loadXLSX(); } catch (e) { return toast(e.message); }
+  shopeeBusy = true;
+  try {
+    await Promise.all(['600 24px "Cormorant Garamond"'].map(f => document.fonts.load(f).catch(() => {})));
+    const memo = { ...(((S.webmeta.find(d => d.id === "_shopee") || {}).imgs) || {}) }, k = u => emailHash(u);
+    const photosOf = p => (p.imgs || []).filter(u => !(p.card && p.card.skip === u)).slice(0, 9);   // Fragrantica's own card photo never goes to Shopee
+    const need = [...new Set(L.flatMap(photosOf))].filter(u => !memo[k(u)]);
+    let done = 0, fail = 0;
+    for (const u of need) {
+      try { const r = await S.photos.save({ data: await shopeeMark(u) }); if (r && r.ok && r.url) memo[k(u)] = r.url; else fail++; } catch (e) { fail++; console.warn("shopee photo", e); }
+      if (++done % 10 === 0) { toast(`Putting our logo on Shopee photos… ${done}/${need.length}`); if (done % 50 === 0) { UNDO.at = 0; await save("webmeta", "_shopee", { imgs: memo, at: Date.now() }); } }
+    }
+    if (need.length) { UNDO.at = 0; await save("webmeta", "_shopee", { imgs: memo, at: Date.now() }); }
+    // one listing per perfume; used partials get their own (condition is per listing on Shopee)
+    const groups = new Map(); for (const p of L) { const g = (p.brand + "|" + p.name).toLowerCase().replace(/[^a-z0-9|]/g, "") + (/partial/i.test(p.ptype || "") ? "|used" : ""); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p); }
+    const head = ["Category", "Product Name", "Product Description", "Parent SKU", "Variation Integration No.", "Variation Name1", "Option for Variation 1", "Image per Variation", "Price", "Stock", "SKU", "Cover image", ...Array.from({ length: 8 }, (_, i) => `Item image ${i + 1}`), "Weight (kg)", "Length (cm)", "Width (cm)", "Height (cm)", "Condition", "Brand", "Check"];
+    const rows = []; let gi = 0;
+    for (const ps of groups.values()) {
+      gi++; const solo = ps.length === 1, p0 = ps[0], pics = photosOf(p0).map(u => memo[k(u)]).filter(Boolean);
+      const seen = new Map();
+      for (const p of ps) {
+        const opt = [p.size, p.ptype].filter(Boolean).join(" ") || "Standard";
+        if (seen.has(opt)) { const r = seen.get(opt); r[9] += Number(p.stock); r[10] += " + " + p.id; continue; }   // same size twice in RS OS = one Shopee option, stock added
+        const own = photosOf(p).map(u => memo[k(u)]).filter(Boolean), d = Number(p.size && parseFloat(p.size)) || 0;
+        const chk = [Number(p.price) < 100 ? "price under ₱100?" : "", !own.length ? "photo failed, add one" : "", !p.brand ? "no brand" : ""].filter(Boolean).join("; ");
+        rows.push([p.category === "beauty" ? "Beauty > Makeup / Skincare" : "Beauty > Fragrances", shopeeTitle(p0, solo), shopeeDesc(p0), solo ? "" : `RSG${gi}`, solo ? "" : `RSG${gi}`,
+          solo ? "" : "Size / Type", solo ? "" : opt, solo ? "" : (own[0] || ""), Number(p.price), Number(p.stock), p.id,
+          ...(solo ? own : pics).concat(Array(9).fill("")).slice(0, 9), shopeeKg(p), /decant|vial/i.test(p.ptype || "") ? 5 : 10, /decant|vial/i.test(p.ptype || "") ? 5 : 8, /decant|vial/i.test(p.ptype || "") ? 13 : (d > 75 ? 16 : 13),
+          /partial/i.test(p.ptype || "") ? "Used" : "New", p.brand || "", chk]); seen.set(opt, rows[rows.length - 1]);
+      }
+    }
+    const rules = [["How to use"], ["1. Shopee Seller Centre → Products → Mass Upload → download the 'Basic info' template for Fragrances."], ["2. Copy each column from the 'Shopee upload' sheet into the same column in Shopee's template (paste values only)."], ["3. Upload the template back in Mass Upload. Fix any red rows Shopee shows."], [""], ["Rules this file already follows (so listings don't get taken down)"],
+      ["• No other brands' names in titles or descriptions (no 'alternative', 'inspired by', 'dupe')."], ["• No links, phone numbers, social media or other shops in text or photos."], ["• One listing per perfume; sizes / types are variations (Shopee deletes duplicate listings)."],
+      ["• Decants, testers and partial bottles say so plainly; partials are 'Used'."], ["• Fragrantica's own scent card photos are left out (their copyright)."], ["• Every photo has our Regal Spritz PH logo."], [""], ["Prices = website prices. SKU = RS OS listing id (match stock later)."]];
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([head, ...rows]), "Shopee upload"); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rules), "Read me");
+    const filename = `SHOPEE_UPLOAD_${mToday()}.xlsx`, data = new Uint8Array(X.write(wb, { bookType: "xlsx", type: "array" }));
+    let ok = false;
+    if (S.dl) { try { await S.dl.save({ filename, data }); ok = true; } catch (e) { if (e && e.code === "declined") return; } }
+    if (!ok) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+    toast(`${filename} ready: ${groups.size} Shopee listings (${L.length} sizes)${fail ? ` · ${fail} photos failed, see Check column` : ""}.`);
+  } finally { shopeeBusy = false; }
+}
 // Welcome code (website checkout honors it: docs/handoffs/website-welcome-code.md).
 const ANN_CODE = { code: "NEWHOME100", off: 100, min: 3000, until: "Dec 31, 2026" };
 let annPickMemo = { at: 0, list: [] };
@@ -7783,6 +7867,7 @@ document.addEventListener("click", guard(async ev => {
     case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; await annPrepare(); const r = await S.site.email({ kind: "test", to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
     case "ann-start": { await annPrepare(); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
     case "ann-brevo-list": return brevoList();
+    case "shopee-file": return shopeeFile();
     case "ann-brevo-html": return brevoHTML();
     case "ann-pause": { const d = annDoc(); if (d) await save("webmeta", "_announce", { ...clean(d), status: "paused", at: Date.now() }); toast("Paused. Tap Start sending to continue."); render(); return; }
     case "rr-sf-save": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const v = numv("rr-sf"), free = !!($("#rr-free") && $("#rr-free").checked);
