@@ -5073,7 +5073,7 @@ const shopeePrice = v => Math.ceil(Number(v) * 1.2 / 10) * 10;   // K: Shopee pr
 let shopeeBusy = false;
 async function shopeeFile() {
   if (shopeeBusy) return toast("The Shopee file is still being made…");
-  const L = S.products.filter(p => p.kind === "onhand" && p.status === "active" && Number(p.stock) > 0 && Number(p.price) > 0 && (p.imgs || []).length);
+  const L = S.products.filter(p => p.kind === "onhand" && p.status === "active" && Number(p.stock) > 0 && Number(p.price) > 0 && (p.imgs || []).length && !/decant|vial/i.test(p.ptype || ""));   // K: no decants / vials on Shopee (repacked = riskier)
   if (!L.length) return toast("No on-hand listings in stock to put on Shopee.");
   if (!S.photos) return toast("Photo saving isn't available here. Open the RS App.");
   let X; try { X = await loadXLSX(); } catch (e) { return toast(e.message); }
@@ -5109,7 +5109,7 @@ async function shopeeFile() {
     }
     const rules = [["How to use"], ["1. Shopee Seller Centre → Products → Mass Upload → download the 'Basic info' template for Fragrances."], ["2. Copy each column from the 'Shopee upload' sheet into the same column in Shopee's template (paste values only)."], ["3. Upload the template back in Mass Upload. Fix any red rows Shopee shows."], [""], ["Rules this file already follows (so listings don't get taken down)"],
       ["• No other brands' names in titles or descriptions (no 'alternative', 'inspired by', 'dupe')."], ["• No links, phone numbers, social media or other shops in text or photos."], ["• One listing per perfume; sizes / types are variations (Shopee deletes duplicate listings)."],
-      ["• Decants, testers and partial bottles say so plainly; partials are 'Used'."], ["• Fragrantica's own scent card photos are left out (their copyright)."], ["• Every photo has our Regal Spritz PH logo."], [""], ["Prices = website price + 20% (Shopee fees), rounded up to ₱10. SKU = RS OS listing id (match stock later)."]];
+      ["• No decants or vials (repacked perfume gets taken down more). Testers and partial bottles say so plainly; partials are 'Used'."], ["• Fragrantica's own scent card photos are left out (their copyright)."], ["• Every photo has our Regal Spritz PH logo."], [""], ["Prices = website price + 20% (Shopee fees), rounded up to ₱10. SKU = RS OS listing id (match stock later)."]];
     const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([head, ...rows]), "Shopee upload"); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rules), "Read me");
     const filename = `SHOPEE_UPLOAD_${mToday()}.xlsx`, data = new Uint8Array(X.write(wb, { bookType: "xlsx", type: "array" }));
     let ok = false;
