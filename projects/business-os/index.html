@@ -5069,6 +5069,7 @@ async function shopeeMark(src) {
   g.globalAlpha = 1; g.fillStyle = "#F3E3B5"; g.textBaseline = "middle"; g.textAlign = "left"; g.fillText(txt, x + 14 * u, y + ph / 2 + 1);
   return cv.toDataURL("image/jpeg", .88);
 }
+const shopeePrice = v => Math.ceil(Number(v) * 1.2 / 10) * 10;   // K: Shopee price = website price + 20% (covers Shopee fees), rounded up to ₱10
 let shopeeBusy = false;
 async function shopeeFile() {
   if (shopeeBusy) return toast("The Shopee file is still being made…");
@@ -5101,14 +5102,14 @@ async function shopeeFile() {
         const own = photosOf(p).map(u => memo[k(u)]).filter(Boolean), d = Number(p.size && parseFloat(p.size)) || 0;
         const chk = [Number(p.price) < 100 ? "price under ₱100?" : "", !own.length ? "photo failed, add one" : "", !p.brand ? "no brand" : ""].filter(Boolean).join("; ");
         rows.push([p.category === "beauty" ? "Beauty > Makeup / Skincare" : "Beauty > Fragrances", shopeeTitle(p0, solo), shopeeDesc(p0), solo ? "" : `RSG${gi}`, solo ? "" : `RSG${gi}`,
-          solo ? "" : "Size / Type", solo ? "" : opt, solo ? "" : (own[0] || ""), Number(p.price), Number(p.stock), p.id,
+          solo ? "" : "Size / Type", solo ? "" : opt, solo ? "" : (own[0] || ""), shopeePrice(p.price), Number(p.stock), p.id,
           ...(solo ? own : pics).concat(Array(9).fill("")).slice(0, 9), shopeeKg(p), /decant|vial/i.test(p.ptype || "") ? 5 : 10, /decant|vial/i.test(p.ptype || "") ? 5 : 8, /decant|vial/i.test(p.ptype || "") ? 13 : (d > 75 ? 16 : 13),
           /partial/i.test(p.ptype || "") ? "Used" : "New", p.brand || "", chk]); seen.set(opt, rows[rows.length - 1]);
       }
     }
     const rules = [["How to use"], ["1. Shopee Seller Centre → Products → Mass Upload → download the 'Basic info' template for Fragrances."], ["2. Copy each column from the 'Shopee upload' sheet into the same column in Shopee's template (paste values only)."], ["3. Upload the template back in Mass Upload. Fix any red rows Shopee shows."], [""], ["Rules this file already follows (so listings don't get taken down)"],
       ["• No other brands' names in titles or descriptions (no 'alternative', 'inspired by', 'dupe')."], ["• No links, phone numbers, social media or other shops in text or photos."], ["• One listing per perfume; sizes / types are variations (Shopee deletes duplicate listings)."],
-      ["• Decants, testers and partial bottles say so plainly; partials are 'Used'."], ["• Fragrantica's own scent card photos are left out (their copyright)."], ["• Every photo has our Regal Spritz PH logo."], [""], ["Prices = website prices. SKU = RS OS listing id (match stock later)."]];
+      ["• Decants, testers and partial bottles say so plainly; partials are 'Used'."], ["• Fragrantica's own scent card photos are left out (their copyright)."], ["• Every photo has our Regal Spritz PH logo."], [""], ["Prices = website price + 20% (Shopee fees), rounded up to ₱10. SKU = RS OS listing id (match stock later)."]];
     const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([head, ...rows]), "Shopee upload"); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rules), "Read me");
     const filename = `SHOPEE_UPLOAD_${mToday()}.xlsx`, data = new Uint8Array(X.write(wb, { bookType: "xlsx", type: "array" }));
     let ok = false;
