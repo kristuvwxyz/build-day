@@ -5386,19 +5386,38 @@ ${grid}
 }
 const annText = name => `Hi ${name || "there"},\n\nThank you for shopping with Regal Spritz PH! We've moved to our very own home: regalspritz.com.\n\n• On-hand and pre-order perfumes in one place\n• Track your orders in My Account\n• Pay with card / Maya, BDO installment, GCash or bank transfer\n• Earn Royal Points on every order\n\nWELCOME GIFT: ₱${ANN_CODE.off} off your website order of ₱${NF0.format(ANN_CODE.min)} and up. Code: ${ANN_CODE.code} (enter at checkout, one use per account, valid until ${ANN_CODE.until}).\n\nVisit https://www.regalspritz.com/\n\nUse the same email you ordered with to create your account, so your past orders show up.\n\nDon't want emails from us? Reply "unsubscribe".`;
 const annDoc = () => S.webmeta.find(d => d.id === "_announce") || null;
+// Home card: the new-website email goes out with Brevo (12 daily campaigns "New Website Launch…"); live numbers come from /api/brevo (RS App).
+let brevoMemo = { at: 0, busy: false, data: null };
+function brevoLoad() {
+  if (!S.site || !S.site.brevo || brevoMemo.busy || Date.now() - brevoMemo.at < 10 * 60e3) return;
+  brevoMemo.busy = true;
+  S.site.brevo().then(j => { brevoMemo.data = j; }).catch(e => { brevoMemo.data = { ok: false, error: (e && e.message) || "Couldn't reach Brevo." }; }).finally(() => { brevoMemo.busy = false; brevoMemo.at = Date.now(); render(); });
+}
+const mnlWhen = x => { const t = Date.parse(String(x || "").replace(" ", "T")); return isNaN(t) ? "" : new Date(t).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); };
 function announceCard() {
   if (!S.realOwner || S.viewAs || !S.loaded.orders) return "";
-  const d = annDoc(); if (d && d.status === "done") return "";
-  const n = annList().length, sent = d ? (d.sent || []).length : 0;
+  brevoLoad();
+  const j = brevoMemo.data, n = annList().length, pct = (a, b) => b ? (a / b * 100).toFixed(1).replace(/\.0$/, "") + "%" : "0%";
+  const camps = j && j.ok ? j.camps : [], done = camps.filter(c => c.status === "sent"), next = camps.find(c => c.status !== "sent" && c.scheduledAt);
+  const last = done.length ? Math.max(...done.map(c => Date.parse(String(c.sentDate).replace(" ", "T")) || 0)) : 0;
+  if (camps.length && !next && done.length === camps.length && Date.now() - last > 7 * 864e5) return "";   // all sent a week ago: card goes away
+  const sum = k => done.reduce((a, c) => a + (Number(c[k]) || 0), 0), got = sum("delivered") || sum("sent");
+  let body;
+  if (!S.site || !S.site.brevo) body = `<div style="font-size:13px;color:var(--muted)">Live Brevo numbers show in the RS App (regal-spritz-os.vercel.app).</div>`;
+  else if (!j) body = `<div style="font-size:13px;color:var(--muted)">Loading Brevo numbers…</div>`;
+  else if (!j.ok && j.error === "no-key") body = `<div class="notice" style="font-size:13px">To see Brevo's numbers here, add your Brevo API key once: <a href="https://app.brevo.com/settings/keys/api" target="_blank" rel="noopener">Brevo → API keys</a> → Generate a new API key → copy it. Then <a href="https://vercel.com/kristuvwxyz/regal-spritz-os/settings/environment-variables" target="_blank" rel="noopener">Vercel → Environment Variables</a> → Key <b>BREVO_API_KEY</b>, paste, Sensitive, Production → Save → Redeploy.</div>`;
+  else if (!j.ok) body = `<div class="notice" style="font-size:13px">${esc(j.error || "Couldn't load Brevo.")}</div>`;
+  else body = `<div class="ann-stats" style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
+      <span><b class="num" style="font-size:18px">${got.toLocaleString("en-PH")}</b> got it</span>
+      <span><b class="num" style="font-size:18px">${sum("opened").toLocaleString("en-PH")}</b> opened · ${pct(sum("opened"), got)}</span>
+      <span><b class="num" style="font-size:18px">${sum("clicked").toLocaleString("en-PH")}</b> clicked · ${pct(sum("clicked"), got)}</span>
+      <span><b class="num" style="font-size:18px">${sum("unsub")}</b> unsubscribed</span></div>
+    <div style="font-size:13px;color:var(--muted)">${next ? `Next: #${camps.indexOf(next) + 1} on ${esc(mnlWhen(next.scheduledAt))} (Manila). ` : "All sent. "}About ${got.toLocaleString("en-PH")} of ${n.toLocaleString("en-PH")} past buyers reached. Welcome code <b>${ANN_CODE.code}</b> (₱${ANN_CODE.off} off ₱${NF0.format(ANN_CODE.min)}+).</div>`;
+  const badge = j && j.ok && camps.length ? `<span class="badge ${next ? "amber" : "green"}">${next ? `Sending with Brevo · ${done.length} of ${camps.length} sent` : `Sent · all ${camps.length}`}</span>` : `<span class="badge grey">Sending with Brevo</span>`;
   return `<section class="panel ann-card" style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--gold)">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>📣 New website email</b>${d && d.status === "sending" ? `<span class="badge amber">Sending · ${sent} of ${n}</span>` : `<span class="badge grey">Not sent yet · ${n} past buyers</span>`}</div>
-    ${d && d.status === "sending" ? (() => { let wait = ""; try { wait = mailPaused() || localStorage.getItem("rs-ann-pause") === mToday() ? "Gmail's daily email limit is reached for today, so sending continues tomorrow (keep the RS App open)." : ""; } catch (e) {}
-      if (!S.site || !S.site.email) wait = "Emails only go out from the RS App (regal-spritz-os.vercel.app). Open it and keep this page open.";
-      else if (d.lastError) wait = "Last try didn't send: " + d.lastError + ". It tries again every 5 minutes.";
-      return wait ? `<div class="notice" style="font-size:13px">${esc(wait)}</div>` : ""; })() : ""}
-    <div style="font-size:13px;color:var(--muted)">${d && d.status === "sending" ? "Goes out in batches while your RS App is open, keeping 30 of Gmail's daily emails for order emails. It picks up again tomorrow when the limit is reached." : `Preview it and send yourself a test. It carries the welcome code <b>${ANN_CODE.code}</b> (₱${ANN_CODE.off} off ₱${NF0.format(ANN_CODE.min)}+): tap Start sending once the website's checkout accepts it.`}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="ann-preview">Preview</button>${S.me && S.me.email ? `<button class="btn sm" type="button" data-act="ann-test">Send a test to me</button>` : ""}${d && d.status === "sending" ? `<button class="btn sm ghost" type="button" data-act="ann-pause">Pause</button>` : ""}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:8px"><span style="font-size:12.5px;color:var(--muted)">Send to all ${n.toLocaleString("en-PH")} buyers with Brevo (free, 300 a day):</span><button class="btn sm" type="button" data-act="ann-brevo-list">⬇ Buyer list (CSV)</button><button class="btn sm" type="button" data-act="ann-brevo-html">⬇ Email (HTML)</button></div></section>`;
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>📣 New website email</b>${badge}<span style="flex:1"></span><a class="btn sm ghost" href="https://app.brevo.com/campaigns/listing/email" target="_blank" rel="noopener">Open Brevo ↗</a></div>
+    ${body}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:8px"><span style="font-size:12.5px;color:var(--muted)">Files for Brevo:</span><button class="btn sm" type="button" data-act="ann-brevo-list">⬇ Buyer list (CSV)</button><button class="btn sm" type="button" data-act="ann-brevo-html">⬇ Email (HTML)</button><button class="btn sm ghost" type="button" data-act="ann-preview">Preview</button></div></section>`;
 }
 let annBusy = false;
 async function announceRun() {
