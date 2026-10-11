@@ -27,7 +27,9 @@ export default async function handler(req, res) {
     const m = map && map.size > 50 && /RS_PRODUCTS\s*=\s*\[/.exec(out);
     if (m) {
       const start = m.index + m[0].length - 1, { list, end } = readArray(out, start);
-      if (list) out = out.slice(0, start) + JSON.stringify(applyStock(list, map)) + out.slice(end);
+      const kept = list && applyStock(list, map), oh = l => l.filter(p => p.kind !== "preorder").length;
+      // Safety: if the check would hide more than a third of the on-hand pieces, something is off; send the backend copy.
+      if (kept && oh(kept) >= oh(list) * 2 / 3) out = out.slice(0, start) + JSON.stringify(kept) + out.slice(end);
     }
   } catch (e) { /* stock check failed: send the backend copy as is */ }
   res.setHeader("Content-Type", (/json/.test(last.type) ? "application/json" : "application/javascript") + "; charset=utf-8");
