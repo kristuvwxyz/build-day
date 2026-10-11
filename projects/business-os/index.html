@@ -2962,9 +2962,14 @@ async function webStockSync() {
       if (!cancel) {
         const map = {}, miss = [];
         for (const i of o.items || []) { const p = webItemProduct(i); if (p && p.kind !== "preorder") map[p.id] = (map[p.id] || 0) + (Number(i.qty) || 1); else if (!p) miss.push(i.title || i.name || "item"); }
+        // Oversold check: a piece with less stock than ordered (or a sold-out pre-order) is flagged for the team.
+        const short = [];
+        for (const [pid, q] of Object.entries(map)) { const p = S.products.find(x => x.id === pid); if (p && (Number(p.stock) || 0) < q) short.push(q + "× " + (p.name || "item") + " (had " + (Number(p.stock) || 0) + ")"); }
+        for (const i of o.items || []) { const p = webItemProduct(i); if (p && p.kind === "preorder" && p.soldOut) short.push((p.name || "item") + " (pre-order sold out)"); }
         await applyStockMap(map, -1);
         upd.stock = "taken"; upd.stockMap = map; upd.stockMiss = miss;
-        msg = "stock taken off for " + (Object.keys(map).length ? Object.entries(map).map(([pid, q]) => q + "× " + ((S.products.find(x => x.id === pid) || {}).name || "item")).join(", ") : "nothing on hand") + (miss.length ? " · not found in Listings: " + miss.join(", ") : "");
+        if (short.length) { upd.oversold = short; toast("⚠️ " + o.ref + " has sold-out items: " + short.join(", ")); }
+        msg = "stock taken off for " + (Object.keys(map).length ? Object.entries(map).map(([pid, q]) => q + "× " + ((S.products.find(x => x.id === pid) || {}).name || "item")).join(", ") : (o.items || []).length && !miss.length ? "no on-hand items (pre-order only)" : "nothing on hand") + (miss.length ? " · not found in Listings: " + miss.join(", ") : "") + (short.length ? " · ⚠️ OVERSOLD: " + short.join(", ") : "");
       } else {
         await applyStockMap(m.stockMap || {}, 1);
         upd.stock = "returned"; msg = "order cancelled · stock returned";
