@@ -1126,7 +1126,7 @@ const S = {
   of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
   page: 0, sel: new Set(),
   pq: "", cq: "", cpage: 0,
-  t: { scope: "team", person: "", dept: "", mode: "calendar", range: "month", month: today().slice(0, 7), day: today() },
+  t: { scope: "me", person: "", dept: "", mode: "calendar", range: "month", month: today().slice(0, 7), day: today() },
   slide: 0, slidePaused: false,
   unlocked: new Set(),
   accessreq: [], db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
@@ -2412,6 +2412,7 @@ function scopeTasks(forceDept) {
   return visTasks().filter(t => {
     if (isAllTask(t)) return true;
     if (forceDept) return t.department === forceDept;
+    if (S.t.scope === "me" && myMemberId()) return t.assigneeId === myMemberId();   // My tasks: assigned to me (+ "All (everyone)" tasks above)
     if (S.t.scope === "person" && S.t.person) return t.assigneeId === S.t.person;
     if (S.t.scope === "dept" && S.t.dept) return t.department === S.t.dept;
     return true;
@@ -2472,13 +2473,14 @@ async function taskQuick(el) {
 }
 
 function viewTasks(forceDept) {
+  if (S.t.scope === "me" && !myMemberId()) S.t.scope = "team";   // no team profile (e.g. view-as): fall back to the whole list
   const scoped = scopeTasks(forceDept);
   const ym = S.t.month;
   const monthTasks = scoped.filter(t => inMonth(t, ym));
   const undated = scoped.filter(t => !t.due && t.status !== "done" && t.status !== "cancelled");
-  const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name;
+  const scopeName = forceDept ? dept(forceDept).name : S.t.scope === "me" && myMemberId() ? "My tasks" : S.t.scope === "person" ? (S.t.person ? memberName(S.t.person) : "Pick a person") : S.t.scope === "dept" ? (S.t.dept ? dept(S.t.dept).name : "All departments") : fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name;
   const controls = `<div class="toolbar">
-    ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[["team", fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name], ["person", "Per person"], ...(taskDepts().length > 1 ? [["dept", "Per department"]] : [])].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
+    ${forceDept ? "" : `<div class="seg" role="group" aria-label="View">${[...(myMemberId() ? [["me", "My tasks"]] : []), ["team", fullTaskView() ? "Whole team" : taskDepts().length > 1 ? "All I can see" : (dept(taskDepts()[0]) || { name: "My team" }).name], ["person", "Per person"], ...(taskDepts().length > 1 ? [["dept", "Per department"]] : [])].map(([k, l]) => `<button type="button" data-tscope="${k}" aria-pressed="${S.t.scope === k}">${l}</button>`).join("")}</div>
     ${S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${taskTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}${(() => { const ts = dueTasksOf(m.id), o = ts.filter(isOverdue).length; return ts.length ? ` · ${o ? o + " overdue" : ""}${o && ts.length - o ? ", " : ""}${ts.length - o ? ts.length - o + " due today" : ""}` : ""; })()}</option>`).join("")}</select>` : ""}
     ${S.t.scope === "dept" ? `<select id="t-dept" aria-label="Department"><option value="">${fullTaskView() ? "All departments" : "All my departments"}</option>${DEPTS.filter(d => taskDepts().includes(d.id)).map(d => `<option value="${d.id}" ${S.t.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>` : ""}`}
     <span style="flex:1"></span>
@@ -2489,7 +2491,7 @@ function viewTasks(forceDept) {
   const monthNav = `<div class="head">${isToday ? `<strong>${longDate(today())}</strong>` : `<div class="pager"><button class="btn sm" type="button" data-tmonth="-1" aria-label="Previous month">‹</button><strong style="min-width:150px;text-align:center">${monthLabel(ym)}</strong><button class="btn sm" type="button" data-tmonth="1" aria-label="Next month">›</button><button class="btn ghost sm" type="button" data-tmonth="0">This month</button></div>`}${rangeSeg}</div>`;
   // Today view: tasks due today (or spanning today) plus overdue ones not yet done, grouped by person or department.
   const todayTasks = isToday ? scoped.filter(t => (onDay(t, today()) || isOverdue(t)) && t.status !== "cancelled") : [];
-  const groupBy = forceDept ? "person" : S.t.scope === "person" && S.t.person ? "" : S.t.scope === "dept" && !S.t.dept ? "dept" : "person";
+  const groupBy = forceDept ? "person" : (S.t.scope === "person" && S.t.person) || (S.t.scope === "me" && myMemberId()) ? "" : S.t.scope === "dept" && !S.t.dept ? "dept" : "person";
   const todayGroups = () => {
     const g = new Map();
     if (groupBy === "person") for (const m of (forceDept ? activeTeam().filter(m => m.department === forceDept) : S.t.scope === "dept" && S.t.dept ? activeTeam().filter(m => m.department === S.t.dept) : taskTeam())) g.set(m.id, []);
@@ -2522,7 +2524,7 @@ function viewTasks(forceDept) {
     const cells = [];
     for (let i = 0; i < weeks * 7; i++) { const d = new Date(y, m - 1, 1 - first.getDay() + i, 12); cells.push(dstr(d.getTime())); }
     const dayTasks = scoped.filter(t => onDay(t, S.t.day));
-    const pPerson = !forceDept && S.t.scope === "person" ? S.t.person : "";
+    const pPerson = !forceDept && S.t.scope === "person" ? S.t.person : !forceDept && S.t.scope === "me" ? myMemberId() : "";
     const showMoney = (finOpen() || DUE_PEOPLE.includes(myMemberId())) && (!forceDept || forceDept === "FINANCE");
     const showInv = canInvoices() && (!forceDept || forceDept === "FINANCE" || forceDept === "SALES");
     const money = [...(showMoney ? moneyEvents(cells[0], cells[cells.length - 1]) : []), ...(showInv ? invoiceEvents(cells[0], cells[cells.length - 1]) : [])].filter(e => !pPerson || e.who.includes(pPerson));
