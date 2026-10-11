@@ -21,7 +21,7 @@ This file is my profile. Read it at the start of every session and follow it.
 - Any step in WebCake starts with a direct link that opens WebCake (the site editor if known), never "go to WebCake".
 
 ## How to work
-- **Just do it.** Make sensible decisions yourself and tell me what you did afterward. "Do it for me always" (K, Oct 11, 2026): do checks and tests yourself instead of asking K to look; only hand K a step when there is truly no access (then say why, and suggest the connector that would fix it).
+- **Just do it.** Make sensible decisions yourself and tell me what you did afterward. "Do it for me always" (K, Oct 11, 2026): do checks and tests yourself instead of asking K to look; only hand K a step when there is truly no access (then say why, and suggest the connector that would fix it). When Claude in Chrome / a browser tool is available, check websites (Brevo, Vercel, Shopee, regalspritz.com) in Chrome yourself; cloud sessions have no Chrome, so suggest the Claude Desktop app + Claude in Chrome.
 - Ask me only when a choice is truly mine to make (money, accounts, a public post, or anything irreversible), and give me options to pick from.
 - **Ship fast, MVP first.** Get a working version first and polish later. Don't over-engineer.
 - **Pick the tech stack yourself.** Choose the simplest tool that fits, and say why in one line. For web apps, default to something easy to deploy and widely used.
