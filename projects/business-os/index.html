@@ -592,7 +592,7 @@ code.pw { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; backgr
 html, body { overflow-x: clip; }
 .av .bottle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .av .bottle svg { padding: 12%; }
-.org-scent img { border-radius: 50%; object-fit: cover !important; width: 16px !important; height: 16px !important; }
+.org-scent img { border-radius: 50%; object-fit: contain !important; width: 22px !important; height: 22px !important; background: #fff; box-shadow: 0 0 0 1px var(--line); }
 .crop-wrap { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; }
 .crop-box { background: var(--bg); color: var(--fg); border-radius: 16px; padding: 18px; width: min(340px, 100%); display: grid; gap: 14px; }
 .crop-box h3 { margin: 0; }
@@ -2249,7 +2249,17 @@ const scentOf = id => ((S.scents.find(s => s.id === id) || {}).scent || "");
 const BOTTLE = '<svg viewBox="0 0 16 20" aria-hidden="true"><rect x="6" y="1" width="4" height="3" rx="1" fill="var(--gold)"/><rect x="5" y="4" width="6" height="2" fill="currentColor" opacity=".55"/><rect x="2.5" y="6" width="11" height="12.5" rx="3" fill="var(--gold)"/><rect x="4.5" y="9.5" width="7" height="4.5" rx="1" fill="#fff" opacity=".75"/></svg>';
 const extraOf = id => S.scents.find(s => s.id === id) || {};
 const photoOf = m => extraOf(m.id).photo || m.photo || "";
-const productForScent = sc => { const k = String(sc || "").toLowerCase().trim(); if (!k) return null; return S.products.find(p => p.photo && [p.brand, p.name, p.size].filter(Boolean).join(" ").toLowerCase() === k) || S.products.find(p => p.photo && k.includes(String(p.name || "").toLowerCase()) && (!p.brand || k.includes(String(p.brand).toLowerCase()))); };
+// Signature scent → a listing photo. Every typed word must be in the listing's brand + name (one typo allowed in longer names), so "Lanvin Eclat" finds Lanvin Eclat D'arpege (K, Oct 12, 2026). Live listings on the template win.
+const scentNorm = x => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean);
+const scentMemo = new Map();
+const productForScent = sc => { const mk = String(sc || "") + "|" + S.products.length; if (scentMemo.has(mk)) return scentMemo.get(mk); const r = productForScent1(sc); if (scentMemo.size > 200) scentMemo.clear(); scentMemo.set(mk, r); return r; };
+const productForScent1 = sc => { const ws = scentNorm(sc); if (!ws.length) return null; let best = null, bs = -1;
+  for (const p of S.products) { const ph = p.photo || (p.imgs || [])[0]; if (!ph || String(ph).startsWith("data:")) continue;
+    const pw = scentNorm([p.brand, p.name, p.size].join(" ")), hit = ws.filter(w => pw.some(x => x === w || (w.length > 3 && x.startsWith(w)))).length;
+    if (hit < ws.length && !(ws.length >= 3 && hit >= ws.length - 1)) continue;
+    const sc2 = hit * 10 + ((p.status || "active") === "active" ? 4 : 0) + (p.tplOk ? 2 : 0) + (p.kind !== "preorder" ? 1 : 0) - pw.length * .1;
+    if (sc2 > bs) { bs = sc2; best = p; } }
+  return best ? { ...best, photo: best.photo || best.imgs[0] } : null; };
 const scentImgOf = id => { const x = extraOf(id); if (x.scentImg) return x.scentImg; const same = x.scent && S.scents.find(s => s.scentImg && (s.scent || "").toLowerCase() === x.scent.toLowerCase()); if (same) return same.scentImg; const p = productForScent(x.scent); return p ? p.photo : ""; };
 function resizeImage(file, max = 256, square = true) {
   return new Promise((ok, bad) => {
@@ -2262,7 +2272,7 @@ function resizeImage(file, max = 256, square = true) {
       const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url); ok(c.toDataURL("image/jpeg", 0.82));
     };
-    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error("That file isn't a picture we can read.")); };
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error("That picture type can't be opened here. Save it as JPG or PNG (or take a screenshot of it) and try again.")); };
     img.src = url;
   });
 }
@@ -2306,7 +2316,7 @@ function perfumeCatalog() {
 function avatar(m, size = 40, bottle = true) {
   const sc = scentOf(m.id), canSet = !S.readOnly, simg = scentImgOf(m.id), ph = photoOf(m);
   const face = ph ? `<img src="${esc(ph)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : m.photo ? `<img src="${esc(m.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span>${esc(initials(m.nickname || m.name))}</span>`;
-  const b = bottle ? `<button type="button" class="bottle${sc ? "" : " empty"}" ${canSet ? `data-scent="${m.id}"` : "disabled"} title="${sc ? "Favorite scent: " + esc(sc) : "Add favorite scent"}" aria-label="${esc(memberName(m.id))}'s favorite scent${sc ? ": " + esc(sc) : ""}">${simg ? `<img src="${esc(simg)}" alt="">` : BOTTLE}</button>` : "";
+  const b = bottle ? `<button type="button" class="bottle${sc || simg ? "" : " empty"}" ${canSet ? `data-scent="${m.id}"` : "disabled"} title="${sc ? "Favorite scent: " + esc(sc) : "Add favorite scent"}" aria-label="${esc(memberName(m.id))}'s favorite scent${sc ? ": " + esc(sc) : ""}">${simg ? `<img src="${esc(simg)}" alt="">` : BOTTLE}</button>` : "";
   return `<span class="av" style="--sz:${size}px;--avc:${DEPT_COLORS[m.department] || "var(--brand)"}">${face}${b}</span>`;
 }
 const isBirthday = (m, d = mToday()) => m.birthday && m.birthday.slice(5) === d.slice(5);
@@ -2346,8 +2356,27 @@ function openScentForm(mid) {
   });
   S.scentFor = mid;
 }
+// Signature scent pictures (K, Oct 12, 2026): iPhone HEIC photos are converted first, and the plain border around the bottle
+// is trimmed so the bottle fills the little circle on the team chart.
+let heicLib = null;
+const heicToJpeg = async file => {
+  if (!heicLib) heicLib = new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"; sc.onload = () => ok(window.heic2any); sc.onerror = () => { heicLib = null; bad(new Error("Couldn't open the iPhone photo. Take a screenshot of it and upload that instead.")); }; document.head.appendChild(sc); });
+  const conv = await heicLib, out = await conv({ blob: file, toType: "image/jpeg", quality: .9 }); return Array.isArray(out) ? out[0] : out;
+};
+function trimScentPic(src, max = 200) {
+  return new Promise(ok => { const img = new Image();
+    img.onload = () => { const W = img.width, H = img.height, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, W, H).data, bg = [d[0], d[1], d[2]]; let x0 = W, y0 = H, x1 = -1, y1 = -1;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]) > 45) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+      if (x1 < 0) return ok(src);
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1, side = Math.round(Math.max(bw, bh) * 1.06), o = document.createElement("canvas"); o.width = o.height = Math.min(max, side);
+      const k = o.width / side, og = o.getContext("2d"); og.fillStyle = `rgb(${bg.join(",")})`; og.fillRect(0, 0, o.width, o.height);
+      og.drawImage(c, x0, y0, bw, bh, (side - bw) / 2 * k, (side - bh) / 2 * k, bw * k, bh * k); ok(o.toDataURL("image/jpeg", .86)); };
+    img.onerror = () => ok(src); img.src = src; });
+}
 async function setScentDraft(file) {
-  try { scentDraftImg = await resizeImage(file, 200, false); const p = $("#sc-prev"); if (p) p.innerHTML = `<img src="${scentDraftImg}" alt="">`; }
+  try { let f = file; if (/hei[cf]/i.test(f.type || "") || /\.hei[cf]$/i.test(f.name || "")) f = await heicToJpeg(f);
+    scentDraftImg = await trimScentPic(await resizeImage(f, 600, false)); const p = $("#sc-prev"); if (p) p.innerHTML = `<img src="${scentDraftImg}" alt="">`; }
   catch (e) { sheetError(e.message); }
 }
 async function myPhoto(file) {
@@ -2740,7 +2769,7 @@ function orgChart(full) {
   const team = teamByRank(); if (!team.length) return full ? `<div class="empty">Add team members in Directory to build the chart.</div>` : "";
   const own = ownerMember();
   const top = team.filter(m => m.department === "CEO" || (own && m.id === own.id));
-  const node = (m, lead) => `<${full && S.canEdit ? `button type="button" data-act="edit-member" data-id="${m.id}"` : "div"} class="org-node${lead ? " lead" : ""}">${avatar(m, lead ? 40 : 30, false)}<span><b>${esc(m.nickname || m.name)}</b><small>${esc(m.role || (dept(m.department) || {}).name || "")}</small>${(() => { const sc = scentOf(m.id), si = scentImgOf(m.id); return sc ? `<small class="org-scent" title="Signature scent: ${esc(sc)}">${si ? `<img src="${esc(si)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : BOTTLE}<em>${esc(sc)}</em></small>` : ""; })()}${full && m.nickname && m.nickname !== m.name ? `<small class="org-full">${esc(m.name)}</small>` : ""}</span></${full && S.canEdit ? "button" : "div"}>`;
+  const node = (m, lead) => `<${full && S.canEdit ? `button type="button" data-act="edit-member" data-id="${m.id}"` : "div"} class="org-node${lead ? " lead" : ""}">${avatar(m, lead ? 40 : 30, false)}<span><b>${esc(m.nickname || m.name)}</b><small>${esc(m.role || (dept(m.department) || {}).name || "")}</small>${(() => { const sc = scentOf(m.id), si = scentImgOf(m.id); return sc || si ? `<small class="org-scent" title="Signature scent${sc ? ": " + esc(sc) : ""}">${si ? `<img src="${esc(si)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : BOTTLE}<em>${esc(sc || "Signature scent")}</em></small>` : ""; })()}${full && m.nickname && m.nickname !== m.name ? `<small class="org-full">${esc(m.name)}</small>` : ""}</span></${full && S.canEdit ? "button" : "div"}>`;
   const cols = DEPTS.filter(d => d.id !== "CEO").map(d => {
     const ms = team.filter(m => m.department === d.id && !top.includes(m)); if (!ms.length) return "";
     const head = roleRank(ms[0].role) <= 2 ? ms[0] : null;
@@ -4921,7 +4950,7 @@ function custMailHTML(o, m) {
 }
 function custMailMsg(o, step, x) {
   const n = esc((o.customer || "").split(" ")[0] || "there"), num = esc(onum(o)), pre = hasPreorder(o), part = o.payment === "partial";
-  const jnt = courierOf(o) === "J&T", trkBox = o.tracking ? `<div style="margin:14px 0;padding:16px;border:1px dashed ${RR.gold};border-radius:10px;text-align:center;background:#FFFBF2"><div style="font-size:11px;letter-spacing:2px;color:${RR.muted};font-weight:700">${jnt ? "J&T " : ""}TRACKING NUMBER</div><div style="font-family:'Courier New',monospace;font-size:24px;font-weight:700;letter-spacing:2px;color:${RR.ink};margin:6px 0;-webkit-user-select:all;user-select:all">${esc(o.tracking)}</div><div style="font-size:12.5px;color:${RR.muted}">Tap and hold (or double-click) the number to copy it${jnt ? ", then paste it on J&T's tracking page" : ""}.</div>${jnt ? `<div style="margin-top:12px"><a href="${JNT_TRACK}" target="_blank" style="display:inline-block;background:#E60012;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 24px;border-radius:8px">Track on J&T Express</a></div>` : ""}</div>` : "";
+  const jnt = courierOf(o) === "J&T" || /^JT\d/i.test(String(o.tracking || "").trim()), trkBox = o.tracking ? `<div style="margin:14px 0;padding:16px;border:1px dashed ${RR.gold};border-radius:10px;text-align:center;background:#FFFBF2"><div style="font-size:11px;letter-spacing:2px;color:${RR.muted};font-weight:700">${jnt ? "J&T " : ""}TRACKING NUMBER</div><div style="font-family:'Courier New',monospace;font-size:24px;font-weight:700;letter-spacing:2px;color:${RR.ink};margin:6px 0;-webkit-user-select:all;user-select:all">${esc(o.tracking)}</div><div style="font-size:12.5px;color:${RR.muted}">Tap and hold (or double-click) the number to copy it${jnt ? ", then paste it on J&T's tracking page" : ""}.</div>${jnt ? `<div style="margin-top:12px"><a href="${JNT_TRACK}" target="_blank" style="display:inline-block;background:#E60012;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 24px;border-radius:8px">Track on J&T Express</a></div>` : ""}</div>` : "";
   const trk = o.tracking ? `Tracking number: <b>${esc(o.tracking)}</b>${o.courier || courierOf(o) ? ` (${esc(COURIER_LABEL[courierOf(o)] || courierOf(o))})` : ""}.` : "";
   const M = {
     paylink: { subject: `Your payment link is ready · order ${onum(o)}`, title: "Your payment link is ready", lines: [`Hi ${n}, your ${esc(x && x.method || "")} payment link for order <b>${num}</b> is ready.`, x && x.until ? `Please pay by <b>${esc(x.until)}</b> so we can keep your order.` : "Tap the button below to pay. Thank you!"], button: x && x.url ? { label: "Pay now", url: x.url } : null },
@@ -4949,7 +4978,7 @@ async function custMail(o, step, x) {
   if ((meta.mailed || {})[sentKey]) return false;
   if (step === "tracking" && (!o.tracking || ((meta.mailed || {}).tracking === o.tracking))) return false;
   const m = custMailMsg(o, step, x); if (!m) return false;
-  const text = [m.title, ...m.lines.map(l => l.replace(/<[^>]+>/g, "")), ...(step === "review" ? reviewItems(o).map(i => `★ ${i.name}: ${i.url}`) : []), m.button ? m.button.label + ": " + m.button.url : ""].filter(Boolean).join("\n\n");
+  const text = [m.title, ...m.lines.map(l => l.replace(/<[^>]+>/g, "")), ...(step === "review" ? reviewItems(o).map(i => `★ ${i.name}: ${i.url}`) : []), (step === "tracking" || step === "shipped") && o.tracking ? "Tracking number: " + o.tracking : "", m.block && m.block.includes(JNT_TRACK) ? "Track on J&T Express: " + JNT_TRACK : "", m.button ? m.button.label + ": " + m.button.url : ""].filter(Boolean).join("\n\n");
   const r = await S.site.email({ to: o.email, subject: m.subject, html: custMailHTML(o, m), text, kind: step === "review" ? "review" : "update" }).catch(e => ({ ok: false, error: e && e.message }));
   if (!r || !r.ok) { if (r && MAIL_LIMIT_RE.test(r.error || "")) { mailLimitHit(); if (!S.mailErrShown) { S.mailErrShown = true; toast("Gmail's daily email limit is reached. Customer emails continue tomorrow."); } return false; }
     if (!S.mailErrShown) { S.mailErrShown = true; toast(`Customer email not sent: ${(r && r.error) || "the website didn't answer"}.`); } return false; }
@@ -5152,7 +5181,7 @@ const annBlob = src => fetch(src, { mode: "cors" }).then(r => { if (!r.ok) throw
 async function annOnTemplate(blob) {
   const im = await createImageBitmap(blob), W = 160, H = Math.round(160 * im.height / im.width), cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const g = cv.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data, at = (x, y) => { const i = (y * W + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
-  const cream = ([r, gg, b]) => r > 205 && gg > 195 && b > 175 && r - b >= -4 && r - b < 45;
+  const cream = ([r, gg, b]) => r > 205 && gg > 195 && b > 175 && r - b >= -4 && r - b < 45 && !(r > 248 && gg > 248 && b > 248);   // pure white is a plain product photo, not our cream (Oct 12, 2026: gold Lancôme jar on white was taken as "on template")
   const corners = [[4, 4], [W - 5, 4], [4, Math.round(H * .3)], [W - 5, Math.round(H * .3)]].filter(([x, y]) => cream(at(x, y))).length;
   const gold = ([r, gg, b]) => r > 140 && gg > 95 && r > gg && gg > b && r - b > 55;
   // The gold bar is a thin band: a little below it is no longer gold (a wooden table stays brown all the way down).
@@ -5832,12 +5861,12 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, compare: p => Number(p.compareAt) || 0, cost: p => Number(p.cost) || 0, stock: p => Number(p.stock) || 0, committed: p => committedOf(p), status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), qWords = q.split(/\s+/).filter(Boolean), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
-  const all = S.products, lb = S.lbrand || "", lc = S.lcat || "", lbd = S.lbadge || "";
+  const all = S.products, lb = S.lbrand || "", lc = S.lcat || "", lbd = S.lbadge || "", lst = S.lstat || "";
   const brands = [...new Set(all.map(p => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(isOut).length, pending: all.filter(p => p.webSync === "pending").length };
   const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
   const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? isOut(p) : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
-    && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
+    && (!lst || (p.status || "active") === lst) && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
     && (!q || qWords.every(w => [p.brand, p.name, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta, p.kind === "preorder" ? "pre-order preorder" : "on hand"].join(" ").toLowerCase().includes(w))))
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
   const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
@@ -5853,7 +5882,8 @@ function viewListings() {
       <select id="l-brand" aria-label="Filter by brand"><option value="">All brands</option>${brands.map(b => `<option ${b === lb ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
       <select id="l-cat" aria-label="Filter by collection"><option value="">All collections</option>${WEB_CATS.map(([k, l]) => `<option value="${k}" ${k === lc ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select id="l-badge" aria-label="Filter by badge"><option value="">All badges</option><option value="_any" ${lbd === "_any" ? "selected" : ""}>Any badge</option>${BADGES.map(b => `<option ${b === lbd ? "selected" : ""}>${esc(b)}</option>`).join("")}<option value="_none" ${lbd === "_none" ? "selected" : ""}>No badge</option></select>
-      ${f !== "all" || q || lb || lc || lbd ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
+      <select id="l-stat" aria-label="Filter by status"><option value="">All statuses</option>${[["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"]].map(([v, n]) => `<option value="${v}" ${v === lst ? "selected" : ""}>${n}</option>`).join("")}</select>
+      ${f !== "all" || q || lb || lc || lbd || lst ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
       <button class="btn" type="button" data-act="columns" data-table="listings">⚙︎ Columns</button></div>
     ${can && S.lsel.size ? (() => { const o = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`; return `<div class="bulk"><strong>${S.lsel.size} selected</strong>
       <select data-lbulk="ptype" aria-label="Set type"><option value="">Set type…</option>${LIST_TYPES.map(t => o(t, t)).join("")}</select>
@@ -8068,7 +8098,7 @@ document.addEventListener("click", guard(async ev => {
     case "lb-clear-del": render(); return;
     case "lb-del": { const ids = [...S.lsel]; for (const id of ids) await remove("products", id); S.lsel.clear(); toast(`Deleted ${ids.length} listing${ids.length === 1 ? "" : "s"}.`); render(); return; }
     case "cal-more": { const d = b.dataset.date, o = S.calOpen || (S.calOpen = new Set()); o.has(d) ? o.delete(d) : o.add(d); render(); return; }
-    case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lbadge = ""; S.lpage = 0; render(); return;
+    case "l-clear": S.lfilter = "all"; S.liq = ""; S.lbrand = ""; S.lcat = ""; S.lbadge = ""; S.lstat = ""; S.lpage = 0; render(); return;
     case "web-refresh": webLoad(); return;
     case "web-paid": return webUpdate(b.dataset.ref, { paid: b.dataset.paid === "1" }, b);
     case "bdo-save": { const inp = (b.closest(".bdo-box") || document).querySelector(".bdo-link, #bdo-link"), v = ((inp && inp.value) || "").trim(); if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\//i.test(v)) return !$("#scrim").hidden ? sheetError("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).") : toast("Paste the link from BDO Checkout (it starts with https:// and has bdo.com.ph).");
@@ -8142,8 +8172,11 @@ async function listSet(t, quiet) {
   if (f === "barcode" && v) { const dup = S.products.find(x => x.id !== pr.id && String(x.barcode || "").trim() === v); if (dup) { t.value = pr.barcode || ""; toast(`That barcode is already on ${dup.brand ? dup.brand + " " : ""}${dup.name}.`); return false; } }
   const lab = { eta: "ETA", status: "status", size: "size", ptype: "type", kind: "availability", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", category: "collection" }[f] || f;
   const shown = f === "status" ? (v === "hidden" ? "Inactive" : LIST_STATUS[v].name) : f === "kind" ? (v === "preorder" ? "Pre-order" : "On hand") : f === "price" || f === "compareAt" || f === "cost" ? (v == null ? "none" : peso(v)) : f === "category" ? (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : (v === "" ? "none" : v);
-  await patch("products", pr.id, { [f]: v, ...(f === "cost" || f === "barcode" ? {} : { webSync: "pending" }), editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(pr, [`changed ${lab} to ${shown}`]) });
-  if (!quiet) toast(`${pr.name}: ${lab} → ${shown}`); if (!S.db && !quiet) render(); return true;
+  // K (Oct 12, 2026): a pre-order's qty is what the supplier has: 0 = Sold out (pre-order), more than 0 = orderable again.
+  const po = f === "stock" && pr.kind === "preorder" ? (v <= 0 ? (pr.soldOut ? {} : { soldOut: true }) : (pr.soldOut ? { soldOut: false } : {})) : {};
+  const poMsg = "soldOut" in po ? (po.soldOut ? " (now Sold out)" : " (orderable again)") : "";
+  await patch("products", pr.id, { [f]: v, ...po, ...(f === "cost" || f === "barcode" ? {} : { webSync: "pending" }), editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(pr, [`changed ${lab} to ${shown}${poMsg}`]) });
+  if (!quiet) toast(`${pr.name}: ${lab} → ${shown}${poMsg}`); if (!S.db && !quiet) render(); return true;
 }
 
 /* ---------- Listings: drag the corner of a cell (like Excel / Google Sheets) to copy its value down or up ---------- */
@@ -8207,6 +8240,7 @@ document.addEventListener("change", guard(async ev => {
     const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? KIND_LAB[v] : f === "status" ? "status → " + (v === "hidden" ? "Inactive" : (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
     await listingsBulk(f === "kind" ? kindUpd(v) : { [f]: v }, lab); return; }
   if (t.id === "l-badge") { S.lbadge = t.value; S.lpage = 0; render(); return; }
+  if (t.id === "l-stat") { S.lstat = t.value; S.lpage = 0; render(); return; }
   if (t.dataset.lbadge) { const v = t.value, add = t.dataset.lbadge === "add"; if (!v) return;
     await listingsBulk(pr => { const b = add ? [...new Set([...badgesOf(pr), v])] : badgesOf(pr).filter(x => x !== v); return { badges: b, isNew: b.includes("New arrival") }; }, (add ? "added badge " : "removed badge ") + v); return; }
   if (t.id === "l-brand" || t.id === "l-cat") { S[t.id === "l-brand" ? "lbrand" : "lcat"] = t.value; S.lpage = 0; render(); return; }
@@ -8548,6 +8582,12 @@ const SHOP_HIST_FILL_Q = `query RSHistFill($ids: [ID!]!) { nodes(ids: $ids) { ..
    Runs quietly in the background for an owner/admin, a few photos at a time, and picks up where it left off. */
 const OWN_PHOTO = /\/storage\/v1\/object\/public\/listing-photos\//;
 let photoCopyBusy = false;
+async function photoViaBrowser(u) {
+  const b = await fetch(u, { mode: "cors" }).then(r => { if (!r.ok) throw new Error("photo " + r.status); return r.blob(); });
+  const im = await createImageBitmap(b), k = Math.min(1, 1600 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
+  cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k); const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(im, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/jpeg", .9);
+}
 async function photoCopyRun() {
   if (photoCopyBusy || !S.photos || !S.db || S.readOnly || S.viewAs || !canAll() || !S.loaded.products) return;
   const todo = S.products.filter(p => galListingImgs(p).some(u => !OWN_PHOTO.test(u) && !(p.photoGone || []).includes(u)));
@@ -8561,7 +8601,9 @@ async function photoCopyRun() {
       const list = galListingImgs(p), out = [], gone = [...(p.photoGone || [])]; let changed = false;
       for (const u of list) {
         if (OWN_PHOTO.test(u) || gone.includes(u)) { out.push(u); continue; }
-        const r = await S.photos.save(String(u).startsWith("data:") ? { data: u } : { url: u }).catch(() => null);
+        let r = await S.photos.save(String(u).startsWith("data:") ? { data: u } : { url: u }).catch(() => null);
+        // The server can't fetch some old shop photos (Oct 12, 2026: "empty or bigger than 8 MB"): the browser fetches it and sends a JPEG copy.
+        if (!(r && r.ok && r.url) && !String(u).startsWith("data:")) r = await photoViaBrowser(u).then(data => S.photos.save({ data })).catch(() => r);
         if (r && r.ok && r.url) { out.push(r.url); changed = true; n++; }
         else { out.push(u); failed++; lastError = String((r && r.error) || "no answer from /api/photo").slice(0, 200); if (r && r.gone) { gone.push(u); changed = true; }
           if (failed === 1 && !n) toast("Photo copy problem: " + lastError); }
