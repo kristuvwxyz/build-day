@@ -2912,7 +2912,7 @@ function webAsOrders() {
     const fulfillment = ["fulfilled", "delivered", "cancelled"].includes(siteFul) || !m.fulfillment ? siteFul : m.fulfillment;
     return { receivedAt: o.receivedAt ? webMs(o.receivedAt) : 0, shippedAt: m.shippedAt || (o.shippedAt ? webMs(o.shippedAt) : 0) || (((m.log || []).find(l => /Fulfillment Status → Shipped/.test(l.msg || "")) || {}).at || 0), id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
-      items: (o.items || []).map(i => ({ name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0, kind: i.kind === "preorder" || i.preorder === true ? "preorder" : i.kind === "onhand" ? "onhand" : "" })),
+      supOrdered: m.supOrdered, items: (o.items || []).map(i => ({ productId: (webItemProduct(i) || {}).id || "", name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0, kind: i.kind === "preorder" || i.preorder === true ? "preorder" : i.kind === "onhand" ? "onhand" : "" })),
       shipFee: Number(o.shipping) || 0, adjust: (Number(o.total) || 0) - (Number(o.shipping) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
       payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
       tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", cancel: o.cancel || null, shipPref: o.shipPref || "",
@@ -3853,11 +3853,54 @@ function viewOrders() {
   </div><span style="font-size:12px;color:var(--muted)">${orderRole() === "status" ? "Finance can change payment and fulfillment status." : orderRole() === "pack" ? "Packing can change fulfillment, courier and tracking." : orderRole() === "view" ? "View only." : ""}</span></div>`;
 }
 
+/* Supplier "To order" lists (K, Oct 13, 2026): paid / downpaid orders for a supplier's pre-orders that haven't been placed with
+   the supplier yet, added up per item. "Mark as ordered" stamps the orders (supOrdered[code]), so the next list only has new orders.
+   A listing's supplier = its Supplier field, else S-JEFF for the S-JEFF file imports, else S-SUMMER for the To Summer brand. */
+const SUP_NAMES = { "S-JEFF": "S-JEFF", "S-SUMMER": "To Summer Boutique (Hong Kong)" };
+const supOfProduct = p => !p ? "" : String(p.supplier || "").trim().toUpperCase() || (/^S-JEFF/i.test(p.importedFrom || "") ? "S-JEFF" : /to\s*summer/i.test(p.brand || "") ? "S-SUMMER" : "");
+const SUP_OPEN = new Set(["to_confirm", "billed", "dp", "unfulfilled", "on_hold"]);
+function supToOrder(code) {
+  const byId = new Map(S.products.map(p => [p.id, p]));
+  const os = allOrderRows().filter(o => !o.archived && !VOIDPAY.has(o.payment) && (o.payment === "paid" || o.payment === "partial") && SUP_OPEN.has(o.fulfillment) && !((o.supOrdered || {})[code]) && (o.items || []).some(i => supOfProduct(byId.get(i.productId)) === code));
+  const agg = new Map();
+  for (const o of os) for (const i of o.items || []) { const p = byId.get(i.productId); if (supOfProduct(p) !== code) continue;
+    const k = p.id; const a = agg.get(k) || { name: [p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" · "), cost: Number(p.cost) || Number(i.cost) || 0, qty: 0, orders: [] };
+    a.qty += Number(i.qty) || 0; a.orders.push(o.num); agg.set(k, a); }
+  return { os, rows: [...agg.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+}
+function viewSupToOrder() {
+  const codes = [...new Set(["S-JEFF", "S-SUMMER", ...S.products.map(supOfProduct).filter(Boolean)])];
+  const sp = S.sp; if (!codes.includes(sp.tsup)) sp.tsup = codes[0];
+  const code = sp.tsup, { os, rows } = supToOrder(code), pcs = rows.reduce((a, r) => a + r.qty, 0), cost = rows.reduce((a, r) => a + r.qty * r.cost, 0);
+  const nm = SUP_NAMES[code] || code;
+  S.supText = `ORDER LIST · ${nm} · ${mToday()}\n` + rows.map(r => `${r.qty}x ${r.name}`).join("\n") + `\n\nTotal pcs: ${pcs}`;
+  S.supRows = [["Qty", "Item", "Unit cost", "Total cost", "Orders"], ...rows.map(r => [r.qty, r.name, r.cost, r.qty * r.cost, [...new Set(r.orders)].map(n => "#" + n).join(" ")])];
+  S.supLabel = code;
+  const done = new Map(); for (const o of allOrderRows()) { const s = (o.supOrdered || {})[code]; if (s && s.at) { const d = mDate(s.at); const b = done.get(d) || { orders: 0 }; b.orders++; done.set(d, b); } }
+  const hist = [...done].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
+  return `<div class="supbar"><span class="lab">Supplier</span>${codes.map(c => `<button type="button" data-tsup="${esc(c)}" aria-pressed="${c === code}">${esc(SUP_NAMES[c] || c)} <span>${supToOrder(c).rows.reduce((a, r) => a + r.qty, 0)}</span></button>`).join("")}</div>
+  <section class="panel"><div class="head"><h2>To order · ${esc(nm)} · ${pcs} pcs from ${os.length} order${os.length === 1 ? "" : "s"}${cost ? ` · cost ${peso(cost)}` : ""}</h2><div style="display:flex;gap:6px;flex-wrap:wrap">${S.dl ? `<button class="btn sm" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn sm" type="button" data-act="sup-copy">Copy list</button>${os.length ? `<button class="btn sm primary" type="button" data-act="sup-mark" data-sup="${esc(code)}">Mark as ordered</button>` : ""}</div></div>
+    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th class="r">Qty</th><th>Item</th><th class="r">Unit cost</th><th class="r">Total</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr><td class="r"><b>${r.qty}</b></td><td>${esc(r.name)}</td><td class="r">${r.cost ? peso(r.cost) : "–"}</td><td class="r">${r.cost ? peso(r.qty * r.cost) : "–"}</td><td style="font-size:12px;color:var(--muted)">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Nothing to order from ${esc(nm)} right now. New paid or downpaid orders show up here by themselves.</div>`}
+    <div style="font-size:12px;color:var(--muted)">Counts paid and downpaid orders that are still To Confirm, Billed, Partially paid, To ship or On hold. After you place the order with the supplier, tap <b>Mark as ordered</b>: those orders leave this list, so the next list only has new orders.</div></section>
+  ${hist.length ? `<section class="panel"><div class="head"><h2>Already ordered from ${esc(nm)}</h2></div><div class="table-wrap"><table><thead><tr><th>Marked on</th><th class="r">Orders</th></tr></thead><tbody>${hist.map(([d, b]) => `<tr><td>${esc(d)}</td><td class="r">${b.orders}</td></tr>`).join("")}</tbody></table></div></section>` : ""}`;
+}
+async function supMark(code) {
+  const { os } = supToOrder(code); if (!os.length) return;
+  if (!confirm(`Mark ${os.length} order${os.length === 1 ? "" : "s"} as ordered from ${SUP_NAMES[code] || code}?`)) return;
+  const at = Date.now(), by = actor(); let n = 0;
+  const meta = new Map(S.webmeta.map(d => [d.ref, d]));
+  for (const o of os) { const supOrdered = { ...(o.supOrdered || {}), [code]: { at, by } }, line = `ordered from ${SUP_NAMES[code] || code} (supplier list)`;
+    if (o.web) { const m = meta.get(o.ref) || {}; await save("webmeta", webMetaId(o.ref), { ...clean(m), ref: o.ref, supOrdered, log: [...(m.log || []), { at, by, msg: line }].slice(-80) }).then(() => n++).catch(() => {}); }
+    else await patch("orders", o.id, { supOrdered, log: logAdd(o, [line], by) }).then(() => n++).catch(() => {}); }
+  if (os.some(o => o.web)) S.web.dirty = true;
+  toast(`${n} order${n === 1 ? "" : "s"} marked as ordered.`); render();
+}
 function viewSuppliers() {
   if (!canSuppliers()) return `<div class="panel"><div class="empty">Suppliers is only for the CEO and Senior Sales.</div></div>`;
-  const sp = S.sp || (S.sp = { sup: "all", ful: "all", pay: "all", q: "", mode: "orders" });
-  const modeBar = canInvoices() ? `<div class="seg sp-mode" role="group" aria-label="Suppliers section">${[["orders", "Order list"], ["invoices", "Supplier invoices"]].map(([k, l]) => `<button type="button" data-spmode="${k}" aria-pressed="${(sp.mode || "orders") === k}">${l}${k === "invoices" && S.invoices.filter(x => x.kind !== "request" && x.status !== "paid").length ? ` <span class="nbadge">${S.invoices.filter(x => x.kind !== "request" && x.status !== "paid").length}</span>` : ""}</button>`).join("")}</div>` : "";
+  const sp = S.sp || (S.sp = { sup: "all", ful: "all", pay: "all", q: "", mode: "toorder" });
+  const modeBar = `<div class="seg sp-mode" role="group" aria-label="Suppliers section">${[["toorder", "To order"], ["orders", "Order list"], ...(canInvoices() ? [["invoices", "Supplier invoices"]] : [])].map(([k, l]) => `<button type="button" data-spmode="${k}" aria-pressed="${(sp.mode || "toorder") === k}">${l}${k === "invoices" && S.invoices.filter(x => x.kind !== "request" && x.status !== "paid").length ? ` <span class="nbadge">${S.invoices.filter(x => x.kind !== "request" && x.status !== "paid").length}</span>` : ""}</button>`).join("")}</div>`;
   if (sp.mode === "invoices" && canInvoices()) return modeBar + viewInvoices();
+  if ((sp.mode || "toorder") === "toorder") return modeBar + viewSupToOrder();
   const m = new Map(); for (const o of S.orders) for (const t of o.tags || []) if (/^S-/i.test(t)) m.set(t.toUpperCase(), (m.get(t.toUpperCase()) || 0) + 1);
   const q = sp.q.trim().toLowerCase();
   const os = S.orders.filter(o => (o.tags || []).some(t => /^S-/i.test(t)) && (sp.sup === "all" || (o.tags || []).some(t => t.toUpperCase() === sp.sup)) && (sp.ful === "all" || o.fulfillment === sp.ful)
@@ -5881,6 +5924,7 @@ function openProductForm(id, preset = {}) {
     <div class="row">
       <div class="field"><label for="p-url">Website link${id ? ` · <a href="${esc(webUrl(p))}" target="_blank" rel="noopener">Open on site ↗</a>${onSite(p) ? "" : ` <span style="font-weight:400;color:var(--muted)">(not showing on the site: ${(p.status || "active") !== "active" ? "inactive" : "sold out"})</span>`}` : ""}</label><input id="p-url" value="${esc(id ? webUrl(p) : "")}" placeholder="Filled in after saving"></div>
       <div class="field"><label for="p-batch">Batch / lot no.</label><input id="p-batch" value="${esc(p.batch || "")}"></div>
+      <div class="field"><label for="p-supplier">Supplier code</label><input id="p-supplier" list="p-sup-list" placeholder="e.g. S-JEFF" value="${esc(p.supplier || supOfProduct(p) || "")}"><datalist id="p-sup-list">${[...new Set(["S-JEFF", "S-SUMMER", ...S.products.map(x => x.supplier).filter(Boolean)])].map(c => `<option value="${esc(c)}">`).join("")}</datalist></div>
     </div>
     <div id="sheet-err" class="confirm" hidden></div>
     ${id && ((p.log || []).length || p.editedBy) ? `<div class="olog"><div class="olog-h">Team activity</div>${(p.log || []).length ? [...p.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("") : `<div><b>${esc(p.editedBy)}</b> last edited this <span>· ${relTime(p.editedAt)}</span></div>`}</div>` : ""}
@@ -5890,7 +5934,7 @@ function openProductForm(id, preset = {}) {
     if (!val("p-name")) return sheetError("Give the product a name.");
     const bc = val("p-barcode");
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
-    const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : val("p-status"), kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : val("p-status"), kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), supplier: val("p-supplier").toUpperCase().replace(/\s+/g, ""), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     // Fields that are edited in the Listings table aren't in Edit listing: keep them as they are.
     if (id) for (const k of ["size", "price", "compareAt", "cost", "stock"]) { if (k in p) data[k] = p[k]; else delete data[k]; }
     if (!id) data.createdAt = Date.now();
@@ -7852,6 +7896,7 @@ document.addEventListener("click", guard(async ev => {
   if (ip) { await setInvPaid(ip.dataset.invpay, ip.dataset.ym, ip.dataset.paid === "1"); if (ip.dataset.insheet) openInvForm(ip.dataset.invpay); else toast(ip.dataset.paid === "1" ? "Marked paid." : "Marked unpaid."); return; }
   if (ev.target.closest("[data-orgchart]")) { S.view = "dept"; S.dept = "ADMIN"; S.tab = "orgchart"; saveNav(); render(); window.scrollTo(0, 0); return; }
   const spm = ev.target.closest("[data-spmode]"); if (spm) { S.sp.mode = spm.dataset.spmode; S.sel.clear(); render(); return; }
+  const tsp = ev.target.closest("[data-tsup]"); if (tsp) { S.sp.tsup = tsp.dataset.tsup; render(); return; }
   const ivs = ev.target.closest("[data-invst]"); if (ivs) { S.invF.st = ivs.dataset.invst; render(); return; }
   const ivst = ev.target.closest("[data-ivst]"); if (ivst) { $("#iv-st").value = ivst.dataset.ivst; ivst.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === ivst)); return; }
   const go = ev.target.closest("[data-goorders]");
@@ -8119,6 +8164,7 @@ document.addEventListener("click", guard(async ev => {
     case "a-del": { const os = S.archived.filter(o => S.asel.has(o.id)); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to delete ${os.length} forever`; b.classList.add("danger"); return; } for (const o of os) await remove("orders", o.id); if (!S.db) S.archived = S.archived.filter(x => !S.asel.has(x.id)); S.asel.clear(); render(); toast(`Deleted ${os.length} order${os.length === 1 ? "" : "s"} for good.`); return; }
     case "ask-del-forever": { const o = findOrder(id); if (!o) return; if (b.dataset.sure) { await remove("orders", id); if (!S.db) { S.archived = S.archived.filter(x => x.id !== id); render(); } toast(`${onum(o)} deleted for good.`); } else { b.dataset.sure = "1"; b.textContent = "Tap again to delete forever"; b.classList.add("danger"); } return; }
     case "sup-list": return openSupplierList();
+    case "sup-mark": await supMark(b.dataset.sup); return;
     case "sup-copy": try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
     case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${String(S.supLabel || S.of.sup || "all").toLowerCase().replace(/\s+/g, "-")}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
     case "jnt-export": return jntExport();
