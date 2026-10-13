@@ -2965,9 +2965,13 @@ const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirm
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
   const site = {}, keep = {}, msgs = [];
+  let mailStep = "";
   if ("payment" in ch && ch.payment !== o.payment) {
     keep.payment = ch.payment; msgs.push("Payment Status → " + pay(ch.payment).name);
     if (VOIDPAY.has(ch.payment)) site.status = "Cancelled"; else if (paidish(ch.payment) !== !!src.paid) site.paid = paidish(ch.payment);
+    // Paid now, but the website had already auto-cancelled it (unpaid after 24 h): bring it back and tell the buyer.
+    if (paidish(ch.payment) && !VOIDPAY.has(ch.payment) && /cancel/i.test(String(src.status || ""))) { site.status = WEB_STATUS_OF[o.fulfillment] || "Placed"; mailStep = "reinstated"; }
+    else if (paidish(ch.payment) && !src.paid) mailStep = "paid";
   }
   if ("fulfillment" in ch && ch.fulfillment !== o.fulfillment) {
     keep.fulfillment = ch.fulfillment; msgs.push("Fulfillment Status → " + ful(ch.fulfillment).name); if (ch.fulfillment === "fulfilled") keep.shippedAt = Date.now();
@@ -2988,6 +2992,7 @@ async function webOrderUpdate(o, ch) {
   S.web.dirty = true; bgRender();
   if ("fulfillment" in keep && keep.fulfillment !== o.fulfillment) custMailStep(o, keep.fulfillment);
   else if (site.status === "Cancelled") custMailStep(o, "cancelled");
+  if (mailStep) setTimeout(() => { const cur = webAsOrders().find(x => x.ref === o.ref); custMail(cur || o, mailStep).catch(() => {}); }, 2000);
 }
 const allOrderRows = () => [...S.orders, ...webAsOrders()];
 
@@ -5125,6 +5130,8 @@ function custMailMsg(o, step, x) {
     packing: { subject: `We're packing order ${onum(o)}`, title: "We're packing your order", lines: [`Hi ${n}, order <b>${num}</b> is being packed and will ship soon.`] },
     shipped: { subject: `Order ${onum(o)} has shipped`, title: "Your order is on its way", lines: [`Hi ${n}, order <b>${num}</b> has shipped.`, o.tracking ? "Here's your tracking number:" : "We'll email your tracking number as soon as it's ready."], block: trkBox },
     tracking: { subject: `Your tracking number · order ${onum(o)}`, title: "Track your order", lines: [`Hi ${n}, order <b>${num}</b> is on its way! Here's your tracking number:`], block: trkBox },
+    paid: { subject: `Payment received · order ${onum(o)}`, title: "We received your payment", lines: [`Hi ${n}, thank you! We received your payment for order <b>${num}</b>.`, "We'll keep you updated as your order is prepared."] },
+    reinstated: { subject: `Your order ${onum(o)} is back on`, title: "Your order is confirmed again", lines: [`Hi ${n}, sorry for the mix-up. Order <b>${num}</b> was cancelled automatically because your payment had not reached us yet. We have now received your payment, so your order is confirmed again.", "Thank you for your patience. We'll email you when it ships."] },
     cancelled: { subject: `Order ${onum(o)} cancelled`, title: "Your order was cancelled", lines: [`Hi ${n}, order <b>${num}</b> has been cancelled${x && x.reason ? ": " + esc(x.reason) : "."}`, "If this is a mistake or you'd still like the items, just reply to this email and we'll help you place it again."] },
   };
   if (step === "review") { const its = reviewItems(o);
