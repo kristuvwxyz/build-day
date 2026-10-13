@@ -3084,20 +3084,21 @@ function viewWebOrders() {
 const cxPending = () => S.web.orders.filter(o => o.cancel && o.cancel.status === "Pending").length;
 const cxBadge = () => { const n = S.web.loaded ? (S.web.cancelRequests || cxPending()) : 0; return n ? `<span class="badge red cx-n" title="${n} cancellation request${n > 1 ? "s" : ""} waiting">${n}</span>` : ""; };
 // Manual Processing (website checkout option, Oct 13, 2026): the buyer places the order unpaid and staff send the Royal Receipt
-// with the pay options (BDO BNPL / Maya / e-wallet or bank). Pay within 24 hours (the website backend cancels unpaid ones).
+// with the pay options (BDO BNPL / Maya / e-wallet or bank). Pay within 24 hours of the receipt being sent (the website backend cancels unpaid ones).
 const isManualWeb = o => /manual/i.test(o.payMethod || "");
 const manualNeeds = () => S.web.loaded ? webAsOrders().filter(o => isManualWeb(o) && o.payment === "pending" && o.fulfillment !== "cancelled" && !(o.receipt && o.receipt.at)) : [];
 const manualBadge = () => { const n = manualNeeds().length; return n ? `<span class="badge red cx-n" title="${n} Royal Receipt${n > 1 ? "s" : ""} to send">${n}</span>` : ""; };
 function manualAlert() {
   const n = manualNeeds().length; if (!n || !S.site || !canPay() || S.viewAs) return "";
-  return `<section class="panel" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--bad)"><b>👑 ${n} Royal Receipt${n > 1 ? "s" : ""} to send</b><span style="font-size:13px;color:var(--muted);flex:1">Manual Processing orders from regalspritz.com. The buyer has 24 hours to pay.</span><button class="btn sm primary" type="button" data-act="go-manual">Open</button></section>`;
+  return `<section class="panel" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--bad)"><b>👑 ${n} Royal Receipt${n > 1 ? "s" : ""} to send</b><span style="font-size:13px;color:var(--muted);flex:1">Manual Processing orders from regalspritz.com. The buyer has 24 hours to pay once it's sent.</span><button class="btn sm primary" type="button" data-act="go-manual">Open</button></section>`;
 }
 function manualPanel() {
   if (!S.web.loaded) return `<div class="panel"><div class="empty">Loading website orders…</div></div>`;
   const all = webAsOrders().filter(o => isManualWeb(o) && o.fulfillment !== "cancelled" && o.payment === "pending").sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   if (!all.length) return `<div class="panel"><div class="empty">No Manual Processing orders waiting. 🎉</div></div>`;
-  const left = o => { const h = 24 - (Date.now() - (o.createdAt || Date.now())) / 36e5; return h <= 0 ? `<span class="badge red">Over 24 h</span>` : `<span class="badge ${h < 6 ? "amber" : "grey"}">${Math.floor(h)} h left to pay</span>`; };
-  return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Website orders placed with <b>Manual Processing</b>. Step 1: tap <b>👑 Send Royal Receipt</b>, pick how the buyer pays (BDO BNPL, Maya, or e-wallet / bank QR) and email it. Step 2: when the payment comes in, set Payment to Fully paid in Orders. Unpaid after 24 hours = cancelled. Oldest first.</div>
+  // The 24 h starts when the Royal Receipt is sent; before that the order waits (it never auto-cancels unsent).
+  const left = o => { const at = o.receipt && o.receipt.at; if (!at) return `<span class="badge grey">24 h starts when sent</span>`; const h = 24 - (Date.now() - at) / 36e5; return h <= 0 ? `<span class="badge red">Over 24 h</span>` : `<span class="badge ${h < 6 ? "amber" : "grey"}">${Math.floor(h)} h left to pay</span>`; };
+  return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Website orders placed with <b>Manual Processing</b>. Step 1: tap <b>👑 Send Royal Receipt</b>, pick how the buyer pays (BDO BNPL, Maya, or e-wallet / bank QR) and email it. Step 2: when the payment comes in, set Payment to Fully paid in Orders. The buyer has 24 hours to pay from when the receipt is sent, then the order cancels by itself. Oldest first.</div>
   <div class="cx-list">${all.map(o => { const sent = o.receipt && o.receipt.at;
     return `<div class="panel cx-card${sent ? "" : " pend"}"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(o.num)}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${esc(relTime(o.createdAt))} · ${peso(total(o))}</span>${left(o)}</div>
       <div class="cx-foot">${sent ? `<span class="badge green">Receipt sent ${esc(relTime(o.receipt.at))}${o.payVia ? " · " + esc((PAYVIA.find(x => x[0] === o.payVia) || [, o.payVia])[1]) : ""}</span>` : `<span class="badge amber">Royal Receipt not sent</span>`}${o.email ? "" : ` <span class="badge red">No email: copy the receipt for chat</span>`}
@@ -5084,6 +5085,8 @@ async function receiptSend(o, quiet) {
     toast(`Royal Receipt not sent: ${(r && r.error) || "the website didn't answer"}. Copy it from the order instead.`); return false; }
   const cur = rrFind(o.id) || o;
   await rrPatch(cur, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
+  // Manual Processing: the website's 24 h pay timer starts when the first receipt is sent (backend keeps the first time, so a resend won't restart it).
+  if (o.web && isManualWeb(o) && S.site.update) { const x = await S.site.update(o.ref, { receiptSent: true }).catch(() => null); const i = S.web.orders.findIndex(w => w.ref === o.ref); if (x && x.ok && x.order && i >= 0) { S.web.orders[i] = x.order; S.web.dirty = true; } }
   toast(`Royal Receipt emailed to ${o.email}.`); return true;
 }
 /* ---------- customer update emails (store Gmail via the website backend opsEmail) ----------
