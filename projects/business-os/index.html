@@ -5499,8 +5499,8 @@ function shadeCardImg(p, s, hex) {
   return cv.toDataURL("image/jpeg", .9);
 }
 const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
-  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || shadeNeeds(p); };
-// A scent card the listing already had (e.g. from Fragrantica) wins over ours: it goes to 2nd place.
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p); };
+// Finds a scent card photo the listing already had (e.g. Fragrantica's), so it can be replaced by ours.
 async function oldCardOf(list, ours, skip = []) { for (const u of list) { if (u === ours || u === list[0] || skip.includes(u)) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
 async function tplOne(id) {
   let p = S.products.find(x => x.id === id); if (!p || !S.photos || !tplNeeds(p)) return false;
@@ -5516,15 +5516,13 @@ async function tplOne(id) {
       } catch (e) { console.warn("template", id, e); u.tplFail = L[0]; }
     }
     const key = scKey(p), mine = [u.tplOk, p.tplOk, p.tplFrom, u.tplFrom].filter(Boolean);
-    // A scent card the listing already had (e.g. Fragrantica's) wins: drop ours and put theirs 2nd.
-    if (p.card && p.card.url && (p.card.chk !== 2 || p.card.key !== key)) { const old = await oldCardOf(L, p.card.url, mine);
-      if (old) { imgs = imgs.filter(x => x !== p.card.url && x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key, skip: old, chk: 2 }; }
-      else if (p.card.key === key) u.card = { ...p.card, chk: 2 }; }
-    if (key && !u.card && p.card && p.card.skip && imgs.includes(p.card.skip)) u.card = { ...p.card, key, chk: 2 };   // theirs is still there: keep it
-    if (key && !u.card && (p.card || {}).key !== key) {
-      const old = (p.card || {}).url; let at = old ? imgs.indexOf(old) : -1;
-      if (at < 0 && !(p.card || {}).skip) { const old = await oldCardOf(L, "", mine); if (old) { imgs = imgs.filter(x => x !== old); imgs.splice(Math.min(1, imgs.length), 0, old); u.card = { key, skip: old, chk: 2 }; } }
-      if (!u.card) { let url = cardMemo.get(key + "|" + imgs[0]);
+    // K, Oct 13, 2026: Fragrantica's own scent cards are replaced by ours (our template), never kept. Without notes we can't make ours, so theirs stays.
+    if (key) {
+      const cur = p.card && p.card.url && imgs.includes(p.card.url) ? p.card : null;
+      const theirs = typeof (p.card || {}).skip === "string" && imgs.includes(p.card.skip) ? p.card.skip : cur && cur.chk === 2 && cur.key === key ? "" : await oldCardOf(L, cur ? cur.url : "", mine);
+      if (theirs) { imgs = imgs.filter(x => x !== theirs); u.fragCardGone = theirs; }
+      if (cur && cur.key === key) { if (cur.chk !== 2 || theirs) u.card = { key, url: cur.url, chk: 2 }; }
+      else { const at = cur ? imgs.indexOf(cur.url) : -1; let url = cardMemo.get(key + "|" + imgs[0]);
         if (!url) { await Promise.all(['600 44px "Cormorant Garamond"', "500 16px Jost", "600 16px Jost", "700 16px Jost", '40px "Noto Color Emoji"'].map(f => document.fonts.load(f).catch(() => {})));
           let bottle = null; try { bottle = await createImageBitmap(await annBlob(imgs[0])); } catch (e) {}
           const r = await S.photos.save({ data: scentCard(p, bottle) }); if (r && r.ok && r.url) { url = r.url; cardMemo.set(key + "|" + imgs[0], url); } }
