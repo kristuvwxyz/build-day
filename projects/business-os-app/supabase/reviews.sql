@@ -35,6 +35,8 @@ begin
     'pics', coalesce((select jsonb_agg(u) from (select u from jsonb_array_elements_text(case when jsonb_typeof(p->'pics') = 'array' then p->'pics' else '[]'::jsonb end) with ordinality x(u, n)
       where u ~ '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/review-photos/web/[0-9a-f]{32}\.jpg$' order by n limit 3) z), '[]'::jsonb),
     'date', to_char(clock_timestamp() at time zone 'Asia/Manila', 'YYYY-MM-DD'),
+    -- Written from a completed order in My Orders: the order number (no email is kept).
+    'orderRef', case when coalesce(p->>'orderRef', '') ~ '^[A-Za-z0-9#-]{1,30}$' then p->>'orderRef' else '' end,
     'source', 'Website', 'status', 'pending', 'chunk', 'web', 'createdAt', v_now, 'updatedAt', v_now, 'updatedBy', 'Website'));
   return v_id;
 end $$;

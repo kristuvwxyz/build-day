@@ -1494,7 +1494,7 @@ function viewReviews() {
     ${pickBar("rv", [["✓ Approve / Show", "rv-sel-show", "primary"], ["Hide", "rv-sel-hide"], ["Delete…", "rv-sel-del", "danger"]], list.map(r => r.id))}
     <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("rv", list.map(r => r.id)) : ""}<th>Rating</th><th>Customer</th><th>Product</th><th>Review</th><th>Source</th><th>Date</th><th>Status</th>${can ? "<th></th>" : ""}</tr></thead>
       <tbody>${list.map(r => `<tr class="${r.status === "hidden" ? "dim" : r.status === "pending" ? "rv-pend" : ""}" ${can ? `data-act="edit-review" data-id="${r.id}"` : 'style="cursor:default"'}>${can ? pickTd("rv", r.id) : ""}
-        <td data-sort="${Number(r.rating) || 0}">${starsHTML(r.rating)}</td><td style="font-weight:600">${esc(r.customer || "Anonymous")}</td><td>${esc(r.product || "")}</td>
+        <td data-sort="${Number(r.rating) || 0}">${starsHTML(r.rating)}</td><td style="font-weight:600">${esc(r.customer || "Anonymous")}</td><td>${esc(r.product || "")}${r.orderRef ? `<div class="s"><span class="badge grey">From order ${esc(r.orderRef)}</span></div>` : ""}</td>
         <td><div class="rv-text">${r.title ? `<b>${esc(r.title)}</b> · ` : ""}${esc(r.text || "")}</div>${r.reply ? `<div class="s">↳ ${esc(r.reply)}</div>` : ""}${Array.isArray(r.pics) && r.pics.length ? `<div style="display:flex;gap:4px;margin-top:4px">${r.pics.slice(0, 3).filter(u => /^https:\/\//.test(u)).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img src="${esc(u)}" alt="Review photo" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--line)"></a>`).join("")}</div>` : ""}</td>
         <td class="nowrap">${esc(r.source || "")}</td><td class="nowrap" data-sort="${esc(r.date || "")}">${r.date ? fmtDateY(r.date) : ""}</td>
         <td><span class="chip ${r.status === "hidden" ? "" : r.status === "pending" ? "warn" : "good"}">${r.status === "hidden" ? "Hidden" : r.status === "pending" ? "To approve" : "Shown"}</span></td>
@@ -5996,7 +5996,7 @@ function pgalHtml(list) {
 const pgalGet = () => { try { return JSON.parse(($("#p-imgs") || {}).value || "[]"); } catch (e) { return []; } };
 const pgalSet = list => { $("#p-imgs").value = JSON.stringify(list); $("#p-photos").innerHTML = pgalHtml(list); };
 // Short forms in listing names: Eau de Parfum → EDP, Eau de Toilette → EDT.
-const shortConc = n => String(n || "").replace(/\beau\s+de\s+parfum\b/gi, "EDP").replace(/\beau\s+de\s+toilette\b/gi, "EDT");
+const shortConc = n => String(n || "").replace(/\beau\s+de\s+parfum\b/gi, "EDP").replace(/\beau\s+de\s+toilette\b/gi, "EDT").replace(/\b(men|women)\b/gi, m => m[0].toUpperCase() + m.slice(1).toLowerCase());   // "Men" / "Women", always capitalised
 function openProductForm(id, preset = {}) {
   const p = id ? S.products.find(x => x.id === id) : { status: "active", reorder: 1, stock: 0, ...preset };
   openSheet(`

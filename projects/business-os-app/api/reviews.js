@@ -2,7 +2,7 @@
 // GET  /api/reviews        → {total, avg, list, by, at}   (list item: [id, handle, product, rating, date, author, title, body, pics, reply])
 // GET  /api/reviews?js=1   → window.RS_REVIEWS = {...}    (drop-in for the website's old embedded reviews)
 // POST /api/reviews {handle, product, customer, rating, title, text, anon, photos} → saved as "To approve" in RS OS.
-//   photos: up to 3 {type:'image/jpeg', data:<base64>} → Supabase Storage bucket review-photos (supabase/review-photos.sql). email is ignored.
+//   photos: up to 3 {type:'image/jpeg', data:<base64>} → Supabase Storage bucket review-photos (supabase/review-photos.sql). email is ignored; orderRef (e.g. RS10023, from a completed order) is kept so RS OS shows "From order RS10023".
 // CDN-cached ~10 s, so a review approved or hidden in RS OS shows on the website within seconds. No emails are kept.
 const SITES = /^https:\/\/([a-z0-9-]+\.)*regalspritz\.com$/i;
 import { createHash } from "crypto";
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
           if (up.ok || up.status === 409 || /exists|duplicate/i.test(await up.text().catch(() => ""))) pics.push(`${SB}/storage/v1/object/public/review-photos/${path}`);
         } catch (e) { /* skip a bad photo, keep the review */ }
       }
-      const p = { handle: String(b.handle || ""), product: String(b.product || ""), customer: String(b.customer || b.name || ""), rating: Math.round(Number(b.rating) || 5), title: String(b.title || ""), text: String(b.text || b.body || ""), anon: !!b.anon, pics };
+      const p = { handle: String(b.handle || ""), product: String(b.product || ""), customer: String(b.customer || b.name || ""), rating: Math.round(Number(b.rating) || 5), title: String(b.title || ""), text: String(b.text || b.body || ""), anon: !!b.anon, pics, orderRef: /^[A-Za-z0-9#-]{1,30}$/.test(String(b.orderRef || "")) ? String(b.orderRef) : "" };
       const r = await rpc("review_submit", { p });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) return res.status(400).json({ ok: false, error: (d && d.message) || "Couldn't save the review." });
