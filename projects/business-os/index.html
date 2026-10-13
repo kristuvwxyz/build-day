@@ -4988,9 +4988,10 @@ async function payViaStart(o) {
   if (o.payVia === "bdo") setTimeout(() => openReceipt(o.id), 400);
 }
 function rrViaPanel(o) {
-  const v = o.payVia || "", pay = rrPayable(o);
+  // Manual Processing orders never pay through Maya or BDO (owner rule, Oct 13): only the e-wallet / bank QR option.
+  const onlyQR = o.web && isManualWeb(o), v = onlyQR ? "manual" : (o.payVia || ""), pay = rrPayable(o);
   const PV_INFO = { bdo: ["🏦", "BDO BNPL", "BDO installment link"], maya: ["💳", "Card · Maya", "Card or Maya wallet link"], manual: ["📱", "E-wallet / Bank", "GCash, BDO, BPI QR codes"] };
-  const seg = `<div class="pv-cards" role="radiogroup" aria-label="How the buyer pays">${PAYVIA.map(([k]) => { const [ic, t, d] = PV_INFO[k]; return `<button type="button" class="pv-card${v === k ? " on" : ""}" role="radio" aria-checked="${v === k}" data-act="rr-via" data-id="${o.id}" data-v="${k}"><span class="pv-ic">${ic}</span><b>${t}</b><small>${d}</small>${v === k ? '<span class="pv-ok">✓ Selected</span>' : ""}</button>`; }).join("")}</div>`;
+  const seg = `<div class="pv-cards" role="radiogroup" aria-label="How the buyer pays">${PAYVIA.filter(([k]) => !onlyQR || k === "manual").map(([k]) => { const [ic, t, d] = PV_INFO[k]; return `<button type="button" class="pv-card${v === k ? " on" : ""}" role="radio" aria-checked="${v === k}" data-act="rr-via" data-id="${o.id}" data-v="${k}"><span class="pv-ic">${ic}</span><b>${t}</b><small>${d}</small>${v === k ? '<span class="pv-ok">✓ Selected</span>' : ""}</button>`; }).join("")}</div>`;
   if (!pay) return "";
   let body = "";
   if (v === "maya") body = o.payLink ? `<div style="font-size:13px;word-break:break-all">Maya link: <a href="${esc(o.payLink)}" target="_blank" rel="noopener">${esc(o.payLink)}</a></div><div class="bdo-act"><button class="btn sm" type="button" data-copy="${esc(o.payLink)}">Copy link</button><button class="btn sm ghost" type="button" data-act="rr-maya" data-id="${o.id}">Make a new link</button></div>`
@@ -5013,7 +5014,7 @@ const rrState = o => o.payment === "paid" ? "PAID" : o.payment === "partial" ? "
 const rrPayable = o => !["paid", "refunded", "voided", "to_refund"].includes(o.payment) && !o.archived;
 const rrDate = o => new Date(o.createdAt || Date.now()).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" });
 function receiptHTML(o, forEmail) {
-  const e = esc, sh = shipOf(o), c = RR, manual = rrPayable(o) && o.payVia === "manual", link = rrPayable(o) && !manual && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
+  const e = esc, sh = shipOf(o), c = RR, manual = rrPayable(o) && (o.payVia === "manual" || (o.web && isManualWeb(o))), link = rrPayable(o) && !manual && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
   const addr = addrLine(sh);
   const row = (l, v, b) => `<tr><td style="padding:4px 0;color:${b ? c.ink : c.muted};font-size:14px;${b ? "font-weight:700" : ""}">${l}</td><td align="right" style="padding:4px 0;color:${c.ink};font-size:14px;${b ? "font-weight:700" : ""}">${v}</td></tr>`;
   const st = rrState(o), stCol = st === "PAID" ? "#2e7d4f" : st === "UNPAID" ? "#b4541a" : c.brand;
@@ -5060,7 +5061,7 @@ ${link ? `<tr><td align="center" style="padding:18px 28px 6px">
 </table></td></tr></table></body></html>`;
 }
 function receiptText(o) {
-  const sh = shipOf(o), manual = rrPayable(o) && o.payVia === "manual", link = rrPayable(o) && !manual && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
+  const sh = shipOf(o), manual = rrPayable(o) && (o.payVia === "manual" || (o.web && isManualWeb(o))), link = rrPayable(o) && !manual && PAYLINK_RE.test(o.payLink || "") ? o.payLink : "";
   const addr = addrLine(sh);
   return [`👑 REGAL SPRITZ PH · ROYAL RECEIPT`, `Order ${onum(o)} · ${rrDate(o)} · ${rrState(o)}`, "",
     `Hi ${(o.customer || "").split(" ")[0] || "there"}, thank you for your order!`, "",
@@ -8144,7 +8145,7 @@ document.addEventListener("click", guard(async ev => {
       if (v === (Number(o.shipFee) || 0) && free === !!o.shipFree) { toast("No change."); return; }
       await patch("orders", o.id, { shipFee: v, shipFree: free && !v, log: logAdd(o, [`set Shipping fee → ${v ? peso2(v) : free ? "Free" : "none"}`]) });
       toast(`Shipping fee saved · total ${peso2(total({ ...o, shipFee: v }))}. Tap Email to send the updated receipt.`); openReceipt(o.id); return; }
-    case "rr-via": { const o = rrFind(b.dataset.id); if (!o) return; const v = b.dataset.v;
+    case "rr-via": { const o = rrFind(b.dataset.id); if (!o) return; const v = (o.web && isManualWeb(o)) ? "manual" : b.dataset.v;
       await rrPatch(o, { payVia: v, ...(v === "maya" ? { mop: "Maya" } : v === "bdo" ? { mop: "BDO" } : {}), log: logAdd(o, [`set how the buyer pays → ${(PAYVIA.find(x => x[0] === v) || [, v])[1]}`]) });
       openReceipt(o.id); return; }
     case "rr-maya": { const o = rrFind(b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Making link…"; await mayaLink(o); openReceipt(o.id); return; }
