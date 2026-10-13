@@ -1097,12 +1097,12 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
   { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "logins", "homecontent", "expenses", "dtasks"], blurb: "Directory, logins, Home page, expenses & cash" },
-  { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
+  { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "salesreport", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["suppliers", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "dtasks"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -2181,7 +2181,7 @@ function renderInner() {
   const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}${t === "reviews" ? rvBadge() : ""}</button>`).join("")}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), budget: viewBudget, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
-    dashboard: viewDashboard, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
+    dashboard: viewDashboard, salesreport: viewSalesReport, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
   v.innerHTML = (S.dept === "FINANCE" && S.tab !== "budget" ? duesAlert() : "") + tabs + body;
@@ -2726,6 +2726,42 @@ function quoteOfDay() {
   const d = mToday(), n = Math.floor((new Date(d + "T00:00:00Z") - new Date(d.slice(0, 4) + "-01-01T00:00:00Z")) / 864e5) + Number(d.slice(0, 4));
   return all[n % all.length];
 }
+/* VAT limit tracker (K, Oct 13, 2026): gross sales since Oct 1, 2026 (rolling 12 months) from every channel vs the ₱3,000,000 non-VAT limit.
+   RS OS + website orders that are paid / partly paid (cancelled and refunded left out), plus Shopee / TikTok / other monthly totals typed in
+   (webmeta/_vatother months {"2026-10": {shopee, tiktok, other}}). Alerts at 80% and 95%. Owner + Finance only. */
+const VAT_LIMIT = 3e6, VAT_START = "2026-10-01";
+function vatData() {
+  const back = new Date(mToday() + "T12:00:00+08:00"); back.setFullYear(back.getFullYear() - 1);
+  const from = [VAT_START, mDate(back.getTime() + 864e5)].sort()[1], to = mToday(), months = new Map();
+  const add = (ym, k, v) => { const m = months.get(ym) || { site: 0, shopee: 0, tiktok: 0, other: 0 }; m[k] += v; months.set(ym, m); };
+  for (const o of allOrderRows()) { if (o.archived || !paidish(o.payment) || o.fulfillment === "cancelled") continue; const d = srDay(o); if (d < from || d > to) continue; add(d.slice(0, 7), "site", total(o)); }
+  const oth = (S.webmeta.find(d => d.id === "_vatother") || {}).months || {};
+  for (const [ym, v] of Object.entries(oth)) if (ym >= from.slice(0, 7) && ym <= to.slice(0, 7)) for (const k of ["shopee", "tiktok", "other"]) add(ym, k, Number(v[k]) || 0);
+  const list = [...months].sort((a, b) => a[0].localeCompare(b[0])).map(([ym, m]) => ({ ym, ...m, sum: m.site + m.shopee + m.tiktok + m.other }));
+  const sum = list.reduce((a, m) => a + m.sum, 0);
+  return { from, to, list, sum, pct: sum / VAT_LIMIT * 100 };
+}
+function vatCard() {
+  if (!(S.isOwner || canSee("FINANCE"))) return "";
+  const v = vatData(), lvl = v.pct >= 95 ? "bad" : v.pct >= 80 ? "warn" : "";
+  const col = lvl === "bad" ? "var(--bad)" : lvl === "warn" ? "#D97706" : "var(--gold, #B8975A)";
+  const ymName = ym => new Date(ym + "-15T12:00:00+08:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" });
+  const msg = lvl === "bad" ? "⚠️ 95% of the non-VAT limit is used. Talk to your accountant about VAT registration now." : lvl === "warn" ? "⚠️ 80% of the non-VAT limit is used. Plan VAT registration with your accountant." : "";
+  return `<section class="panel" aria-label="VAT limit tracker"><div class="head"><h2>VAT limit · ₱3M a year</h2><button class="btn ghost sm" type="button" data-act="vat-other">+ Shopee / TikTok sales</button></div>
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><b style="font-size:22px">${peso(v.sum)}</b><span style="color:var(--muted);font-size:13px">of ${peso(VAT_LIMIT)} · ${v.pct.toFixed(1)}% used · ${peso(Math.max(0, VAT_LIMIT - v.sum))} left · since ${esc(v.from)}</span></div>
+    <div style="height:10px;border-radius:6px;background:var(--line);overflow:hidden;margin:8px 0"><div style="height:100%;width:${Math.min(100, v.pct).toFixed(1)}%;background:${col}"></div></div>
+    ${msg ? `<div style="color:${col};font-weight:600;font-size:13px;margin-bottom:6px">${msg}</div>` : ""}
+    ${v.list.length ? `<div class="table-wrap"><table><thead><tr><th>Month</th><th class="r">RS OS + website</th><th class="r">Shopee</th><th class="r">TikTok</th><th class="r">Other</th><th class="r">Total</th></tr></thead><tbody>${v.list.map(m => `<tr><td>${esc(ymName(m.ym))}</td><td class="r">${peso(m.site)}</td><td class="r">${m.shopee ? peso(m.shopee) : "–"}</td><td class="r">${m.tiktok ? peso(m.tiktok) : "–"}</td><td class="r">${m.other ? peso(m.other) : "–"}</td><td class="r"><b>${peso(m.sum)}</b></td></tr>`).join("")}</tbody></table></div>` : ""}
+    <div style="font-size:12px;color:var(--muted)">Paid and partly paid orders (Maya, BDO, Manual Processing, staff orders), cancellations and refunds left out. Shopee and TikTok aren't in RS OS, so add their monthly sales with the button above (gross sales before platform fees).</div></section>`;
+}
+async function vatOther() {
+  const ym = prompt("Which month? (YYYY-MM)", mToday().slice(0, 7)); if (!ym || !/^\d{4}-\d\d$/.test(ym.trim())) return;
+  const d = S.webmeta.find(x => x.id === "_vatother") || {}, months = { ...(d.months || {}) }, cur = months[ym.trim()] || {};
+  const ask = (k, l) => { const a = prompt(`${l} gross sales for ${ym.trim()} (₱, before fees)`, cur[k] || ""); return a == null ? null : Number(String(a).replace(/[₱,\s]/g, "")) || 0; };
+  const shopee = ask("shopee", "Shopee"); if (shopee == null) return; const tiktok = ask("tiktok", "TikTok"); if (tiktok == null) return; const other = ask("other", "Other channels (not in RS OS)"); if (other == null) return;
+  months[ym.trim()] = { shopee, tiktok, other, by: actor(), at: Date.now() };
+  await save("webmeta", "_vatother", { ...clean(d), ref: "_vatother", months }); toast("VAT tracker updated."); render();
+}
 function viewHome() {
   const fn = firstName(), h = S.home || {}, mid = myMemberId();
   const [q, who] = quoteOfDay();
@@ -2739,7 +2775,7 @@ function viewHome() {
   const overdue = mine.filter(t => t.due && t.due < today()).length;
   const web = S.site && S.web.loaded && canOrders();
   const side = (isCEO() ? eomHomeCard() : "") + (goals.length ? `<section class="panel quiet goals-card"><h2>Our goals</h2><ul>${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ul></section>` : "");
-  return `${birthdayBanner()}${rvApproveAlert()}${retAlert()}${announceCard()}
+  return `${birthdayBanner()}${rvApproveAlert()}${retAlert()}${manualAlert()}${announceCard()}
   <section class="hero" aria-label="Welcome">
     <div class="hero-l"><h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}</h2><span class="hero-date">${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span></div>
     <figure class="hero-q" title="${esc(q)}${who ? " — " + esc(who) : ""}"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure>
@@ -2755,6 +2791,7 @@ function viewHome() {
   ${APP_BUILD && !isStandalone() && !installHidden() ? `<div class="panel install-card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px"><span style="font-size:22px">📲</span><span style="flex:1;min-width:180px;font-size:14px"><b>Add RS OS to your Home Screen</b><br><span style="color:var(--muted);font-size:12.5px">Open it like an app, in one tap.</span></span><button type="button" class="btn sm primary" data-act="install-open">Show me how</button><button type="button" class="btn ghost sm" data-act="install-hide" aria-label="Hide this">✕</button></div>` : ""}
   <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>
   ${duesAlert()}
+  ${vatCard()}
   <div class="home-grid${side ? " has-side" : ""}">
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
     ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>${mine.length > 6 ? `<button type="button" class="linkish" data-nav="tasks" style="font-size:12.5px">+${mine.length - 6} more in Tasks</button>` : ""}` : `<div class="empty">You're all caught up.</div>`)
@@ -2915,7 +2952,7 @@ function webAsOrders() {
       supOrdered: m.supOrdered, items: (o.items || []).map(i => ({ productId: (webItemProduct(i) || {}).id || "", name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0, kind: i.kind === "preorder" || i.preorder === true ? "preorder" : i.kind === "onhand" ? "onhand" : "" })),
       shipFee: Number(o.shipping) || 0, adjust: (Number(o.total) || 0) - (Number(o.shipping) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
       payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
-      tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", cancel: o.cancel || null, shipPref: o.shipPref || "",
+      tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", payVia: m.payVia || (/manual/i.test(o.payment || "") ? "" : undefined), payLink: m.payLink || "", mayaId: m.mayaId || "", receipt: m.receipt || null, cancel: o.cancel || null, shipPref: o.shipPref || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
   });
   webRowsMemo = { at: S.web.at, n: S.web.orders.length, m: S.webmeta, rows }; return rows;
@@ -3046,6 +3083,26 @@ function viewWebOrders() {
 // Customer cancellation requests from regalspritz.com (website backend v16). Pending ones are urgent: red count on Orders.
 const cxPending = () => S.web.orders.filter(o => o.cancel && o.cancel.status === "Pending").length;
 const cxBadge = () => { const n = S.web.loaded ? (S.web.cancelRequests || cxPending()) : 0; return n ? `<span class="badge red cx-n" title="${n} cancellation request${n > 1 ? "s" : ""} waiting">${n}</span>` : ""; };
+// Manual Processing (website checkout option, Oct 13, 2026): the buyer places the order unpaid and staff send the Royal Receipt
+// with the pay options (BDO BNPL / Maya / e-wallet or bank). Pay within 24 hours (the website backend cancels unpaid ones).
+const isManualWeb = o => /manual/i.test(o.payMethod || "");
+const manualNeeds = () => S.web.loaded ? webAsOrders().filter(o => isManualWeb(o) && o.payment === "pending" && o.fulfillment !== "cancelled" && !(o.receipt && o.receipt.at)) : [];
+const manualBadge = () => { const n = manualNeeds().length; return n ? `<span class="badge red cx-n" title="${n} Royal Receipt${n > 1 ? "s" : ""} to send">${n}</span>` : ""; };
+function manualAlert() {
+  const n = manualNeeds().length; if (!n || !S.site || !canPay() || S.viewAs) return "";
+  return `<section class="panel" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--bad)"><b>👑 ${n} Royal Receipt${n > 1 ? "s" : ""} to send</b><span style="font-size:13px;color:var(--muted);flex:1">Manual Processing orders from regalspritz.com. The buyer has 24 hours to pay.</span><button class="btn sm primary" type="button" data-act="go-manual">Open</button></section>`;
+}
+function manualPanel() {
+  if (!S.web.loaded) return `<div class="panel"><div class="empty">Loading website orders…</div></div>`;
+  const all = webAsOrders().filter(o => isManualWeb(o) && o.fulfillment !== "cancelled" && o.payment === "pending").sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  if (!all.length) return `<div class="panel"><div class="empty">No Manual Processing orders waiting. 🎉</div></div>`;
+  const left = o => { const h = 24 - (Date.now() - (o.createdAt || Date.now())) / 36e5; return h <= 0 ? `<span class="badge red">Over 24 h</span>` : `<span class="badge ${h < 6 ? "amber" : "grey"}">${Math.floor(h)} h left to pay</span>`; };
+  return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Website orders placed with <b>Manual Processing</b>. Step 1: tap <b>👑 Send Royal Receipt</b>, pick how the buyer pays (BDO BNPL, Maya, or e-wallet / bank QR) and email it. Step 2: when the payment comes in, set Payment to Fully paid in Orders. Unpaid after 24 hours = cancelled. Oldest first.</div>
+  <div class="cx-list">${all.map(o => { const sent = o.receipt && o.receipt.at;
+    return `<div class="panel cx-card${sent ? "" : " pend"}"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(o.num)}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${esc(relTime(o.createdAt))} · ${peso(total(o))}</span>${left(o)}</div>
+      <div class="cx-foot">${sent ? `<span class="badge green">Receipt sent ${esc(relTime(o.receipt.at))}${o.payVia ? " · " + esc((PAYVIA.find(x => x[0] === o.payVia) || [, o.payVia])[1]) : ""}</span>` : `<span class="badge amber">Royal Receipt not sent</span>`}${o.email ? "" : ` <span class="badge red">No email: copy the receipt for chat</span>`}
+      <span style="flex:1"></span><button class="btn ${sent ? "" : "primary "}sm" type="button" data-act="receipt" data-id="${esc(o.id)}">👑 ${sent ? "Open Royal Receipt" : "Send Royal Receipt"}</button></div></div>`; }).join("")}</div>`;
+}
 // BDO link requests: website orders paying by BDO with no link yet, plus RS OS orders set to BDO BNPL with no link.
 const rsBdoNeeds = () => S.orders.filter(o => o.payVia === "bdo" && rrPayable(o) && !/bdo\.com\.ph/i.test(o.payLink || ""));
 const bdoCount = () => (S.web.loaded ? S.web.orders.filter(bdoNeeds).length : 0) + rsBdoNeeds().length;
@@ -3411,6 +3468,55 @@ function viewCEO() {
   return viewDashboard() + `<section class="panel"><h2>Tasks this month by department</h2>${taskSummary(S.tasks.filter(t => inMonth(t, today().slice(0, 7))), "Whole team · " + monthLabel(today().slice(0, 7)))}</section>` + workload(S.tasks.filter(t => inMonth(t, today().slice(0, 7))), "dept");
 }
 
+/* Finance → Sales report (K, Oct 13, 2026), Shopify-style: every paid / partly paid / refunded order (RS OS + website) in the date range.
+   Gross sales = item prices × qty · Discounts = discount + negative adjustments · Returns = refunded orders · Net sales = gross − discounts − returns
+   · Shipping = buyer-paid shipping · Total sales = net + shipping + other charges · Cost = item cost (else the listing's cost) · Gross profit = net − cost. */
+const SR_PAID = new Set(["paid", "partial", "refunded"]);
+const srDay = o => !o.web && /^\d{4}-\d\d-\d\d$/.test(o.date || "") ? o.date : o.createdAt ? mDate(o.createdAt) : "";
+function srRange() { const sr = S.sr || (S.sr = { from: mToday().slice(0, 8) + "01", to: mToday(), group: "day", by: "product" }); return sr; }
+function srRows() {
+  const sr = srRange(), byId = new Map(S.products.map(p => [p.id, p]));
+  const os = allOrderRows().filter(o => !o.archived && SR_PAID.has(o.payment) && o.fulfillment !== "cancelled" || (!o.archived && o.payment === "refunded"))
+    .filter(o => { const d = srDay(o); return d >= sr.from && d <= sr.to; });
+  return os.map(o => {
+    const ret = o.payment === "refunded", adj = Number(o.adjust) || 0, gross = itemsTotal(o), disc = (Number(o.discount) || 0) + Math.max(0, -adj);
+    const lines = (o.items || []).map(i => { const p = byId.get(i.productId), q = Number(i.qty) || 0, pr = Number(i.price) || 0;
+      return { p, name: p ? [p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" · ") : String(i.name || "?").replace(/\s*\|.*$/, ""), brand: p ? p.brand || "–" : "–", q, sales: q * pr, cost: q * (Number(i.cost) || (p ? Number(p.cost) || 0 : 0)) }; });
+    const cost = ret ? 0 : lines.reduce((a, l) => a + l.cost, 0);
+    return { o, day: srDay(o), gross, disc, ret: ret ? gross - disc : 0, ship: Number(o.shipFee) || 0, extra: Math.max(0, adj), cost, lines, refunded: ret,
+      pay: mopOf(o) || "Not set", src: orderSource(o) };
+  });
+}
+const srSum = rs => { const t = { orders: rs.length, gross: 0, disc: 0, ret: 0, ship: 0, extra: 0, cost: 0 }; rs.forEach(r => { t.gross += r.gross; t.disc += r.disc; t.ret += r.ret; t.ship += r.ship; t.extra += r.extra; t.cost += r.cost; });
+  t.net = t.gross - t.disc - t.ret; t.total = t.net + t.ship + t.extra; t.profit = t.net - t.cost; return t; };
+function viewSalesReport() {
+  const sr = srRange(), rs = srRows(), T = srSum(rs);
+  const key = r => sr.group === "month" ? r.day.slice(0, 7) : r.day;
+  const grp = new Map(); rs.forEach(r => { const k = key(r); (grp.get(k) || grp.set(k, []).get(k)).push(r); });
+  const time = [...grp].sort((a, b) => b[0].localeCompare(a[0])).map(([k, v]) => [k, srSum(v)]);
+  const agg = new Map(), addA = (k, sales, cost, q) => { const a = agg.get(k) || { k, q: 0, sales: 0, cost: 0, orders: 0 }; a.q += q; a.sales += sales; a.cost += cost; agg.set(k, a); return a; };
+  rs.filter(r => !r.refunded).forEach(r => { if (sr.by === "product" || sr.by === "brand") r.lines.forEach(l => addA(sr.by === "product" ? l.name : l.brand, l.sales, l.cost, l.q));
+    else { const a = addA(sr.by === "pay" ? r.pay : r.src, r.gross - r.disc, r.cost, r.lines.reduce((x, l) => x + l.q, 0)); a.orders++; } });
+  const top = [...agg.values()].sort((a, b) => b.sales - a.sales);
+  const BY = [["product", "Product"], ["brand", "Brand"], ["pay", "Payment method"], ["src", "Source"]];
+  S.srCsv = [["Date", "Orders", "Gross sales", "Discounts", "Returns", "Net sales", "Shipping", "Total sales", "Cost", "Gross profit"], ...time.map(([k, t]) => [k, t.orders, t.gross, t.disc, t.ret, t.net, t.ship, t.total, t.cost, t.profit]),
+    [], [BY.find(b => b[0] === sr.by)[1], "Qty", "Net sales", "Cost", "Gross profit"], ...top.map(a => [a.k, a.q, a.sales, a.cost, a.sales - a.cost])];
+  const kpi = (l, v, s) => `<div class="kpi"><span class="label">${l}</span><span class="value">${v}</span>${s ? `<span class="sub">${s}</span>` : ""}</div>`;
+  const quick = [["This month", mToday().slice(0, 8) + "01", mToday()], ["Last 30 days", mDate(Date.now() - 29 * 864e5), mToday()], ["Last month", (() => { const d = new Date(mToday().slice(0, 8) + "01T00:00:00"); d.setMonth(d.getMonth() - 1); return mDate(d.getTime() + 12 * 36e5); })(), mDate(new Date(mToday().slice(0, 8) + "01T00:00:00").getTime() - 12 * 36e5)], ["This year", mToday().slice(0, 4) + "-01-01", mToday()]];
+  return `<div class="head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div class="seg" role="group" aria-label="Quick range">${quick.map(([l, f, t]) => `<button type="button" data-srq="${f}|${t}" aria-pressed="${sr.from === f && sr.to === t}">${l}</button>`).join("")}</div>
+    <label style="font-size:12px">From <input type="date" id="sr-from" value="${sr.from}"></label><label style="font-size:12px">To <input type="date" id="sr-to" value="${sr.to}"></label>
+    ${S.dl ? `<button class="btn sm" type="button" data-act="sr-dl">Download CSV</button>` : ""}</div>
+  <div class="kpis">${kpi("Gross sales", peso(T.gross), `${T.orders} order${T.orders === 1 ? "" : "s"}`)}${kpi("Net sales", peso(T.net), `after ${peso(T.disc)} discounts and ${peso(T.ret)} returns`)}${kpi("Total sales", peso(T.total), `incl. ${peso(T.ship)} shipping`)}${kpi("Gross profit", peso(T.profit), `cost ${peso(T.cost)}${T.net ? ` · margin ${Math.round(T.profit / T.net * 100)}%` : ""}`)}${kpi("Average order", peso(T.orders ? T.net / T.orders : 0), "net sales ÷ orders")}</div>
+  <section class="panel"><div class="head"><h2>Sales over time</h2><div class="seg" role="group" aria-label="Group by">${[["day", "By day"], ["month", "By month"]].map(([k, l]) => `<button type="button" data-srg="${k}" aria-pressed="${sr.group === k}">${l}</button>`).join("")}</div></div>
+    ${time.length ? `<div class="table-wrap"><table><thead><tr><th>${sr.group === "month" ? "Month" : "Day"}</th><th class="r">Orders</th><th class="r">Gross sales</th><th class="r">Discounts</th><th class="r">Returns</th><th class="r">Net sales</th><th class="r">Shipping</th><th class="r">Total sales</th><th class="r">Gross profit</th></tr></thead><tbody>
+    ${time.map(([k, t]) => `<tr><td>${esc(k)}</td><td class="r">${t.orders}</td><td class="r">${peso(t.gross)}</td><td class="r">${t.disc ? "−" + peso(t.disc) : "–"}</td><td class="r">${t.ret ? "−" + peso(t.ret) : "–"}</td><td class="r"><b>${peso(t.net)}</b></td><td class="r">${peso(t.ship)}</td><td class="r">${peso(t.total)}</td><td class="r">${peso(t.profit)}</td></tr>`).join("")}
+    <tr style="font-weight:600"><td>Total</td><td class="r">${T.orders}</td><td class="r">${peso(T.gross)}</td><td class="r">${T.disc ? "−" + peso(T.disc) : "–"}</td><td class="r">${T.ret ? "−" + peso(T.ret) : "–"}</td><td class="r">${peso(T.net)}</td><td class="r">${peso(T.ship)}</td><td class="r">${peso(T.total)}</td><td class="r">${peso(T.profit)}</td></tr></tbody></table></div>` : `<div class="empty">No paid orders in this range.</div>`}</section>
+  <section class="panel"><div class="head"><h2>Sales by ${esc(BY.find(b => b[0] === sr.by)[1].toLowerCase())}</h2><div class="seg" role="group" aria-label="Break down by">${BY.map(([k, l]) => `<button type="button" data-srby="${k}" aria-pressed="${sr.by === k}">${l}</button>`).join("")}</div></div>
+    ${top.length ? `<div class="table-wrap"><table><thead><tr><th>${esc(BY.find(b => b[0] === sr.by)[1])}</th>${sr.by === "pay" || sr.by === "src" ? `<th class="r">Orders</th>` : ""}<th class="r">Qty</th><th class="r">Net sales</th><th class="r">Share</th><th class="r">Cost</th><th class="r">Gross profit</th></tr></thead><tbody>
+    ${top.slice(0, 100).map(a => `<tr><td>${esc(a.k)}</td>${sr.by === "pay" || sr.by === "src" ? `<td class="r">${a.orders}</td>` : ""}<td class="r">${a.q}</td><td class="r">${peso(a.sales)}</td><td class="r">${T.gross - T.disc ? Math.round(a.sales / (T.gross - T.disc) * 100) : 0}%</td><td class="r">${a.cost ? peso(a.cost) : "–"}</td><td class="r">${peso(a.sales - a.cost)}</td></tr>`).join("")}</tbody></table></div>${top.length > 100 ? `<div style="font-size:12px;color:var(--muted)">Top 100 shown. Download CSV for all.</div>` : ""}` : `<div class="empty">Nothing to show.</div>`}
+    <div style="font-size:12px;color:var(--muted)">Counts paid and partly paid orders from RS OS and the website (cancelled ones left out; refunded ones count as returns). Shopee and TikTok sales show here once they're entered as RS OS orders. Cost comes from the order line, else the listing's Cost.</div></section>`;
+}
 function viewDashboard() {
   const orders = S.orders.filter(o => inPeriod(o.date));
   const live = orders.filter(o => !isVoid(o));
@@ -3821,12 +3927,13 @@ function viewOrders() {
       ${canFul() || canAll() ? `<button class="btn sm cancel-btn" type="button" data-bulk="cancel">✕ Cancel order${S.sel.size === 1 ? "" : "s"}</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
-  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT, bdOn = S.cx.show === "bdo" && S.site && canPay(), rtOn = S.cx.show === "ret" && S.site;
-  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn && !bdOn && !rtOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button><button type="button" data-cx="ret" aria-pressed="${!!rtOn}">Returns${retBadge()}</button>` : ""}${S.site && canPay() ? `<button type="button" data-cx="bdo" aria-pressed="${!!bdOn}">BDO link requests${bdoBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
+  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT, bdOn = S.cx.show === "bdo" && S.site && canPay(), rtOn = S.cx.show === "ret" && S.site, mpOn = S.cx.show === "manual" && S.site && canPay();
+  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn && !bdOn && !rtOn && !mpOn}">Orders</button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button><button type="button" data-cx="ret" aria-pressed="${!!rtOn}">Returns${retBadge()}</button>` : ""}${S.site && canPay() ? `<button type="button" data-cx="manual" aria-pressed="${!!mpOn}">Manual Processing${manualBadge()}</button><button type="button" data-cx="bdo" aria-pressed="${!!bdOn}">BDO link requests${bdoBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
   if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
   if (rtOn) return `${webErrNotice()}${cxTabs}${returnsPanel()}`;
   if (arOn) return `${cxTabs}${viewArchived()}`;
   if (bdOn) return `${webErrNotice()}${cxTabs}${bdoPanel()}`;
+  if (mpOn) return `${webErrNotice()}${cxTabs}${manualPanel()}`;
   return `${webErrNotice()}${cxTabs}
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${S.site && canOrders() ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 4px">Website orders: <span id="web-state">${S.web.loading || !S.web.loaded ? "Loading…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" }) + (S.web.ms ? ` · ${(S.web.ms / 1e3).toFixed(1)}s` : "") : ""}</span></div>` : ""}
@@ -4825,6 +4932,18 @@ function openContactEdit(id) {
 // How the buyer pays an RS OS order (picked in Create order or on the Royal Receipt):
 // BDO BNPL = staff make a BDO Checkout link and paste it; Maya = RS OS makes a Maya Checkout link (cards / Maya wallet);
 // E-wallet / Bank transfer = the receipt shows our QR codes + accounts, the buyer replies with a screenshot, staff mark it paid.
+// Website orders (e.g. Manual Processing) use the same Royal Receipt; their team fields (payVia, payLink, receipt, log) live in webmeta.
+const rrFind = id => S.orders.find(x => x.id === id) || S.archived.find(x => x.id === id) || (String(id).startsWith("web:") ? webAsOrders().find(x => x.id === id) : undefined);
+async function rrPatch(o, data) {
+  if (!o.web) return patch("orders", o.id, data);
+  const m = S.webmeta.find(d => d.ref === o.ref) || {}, keep = {};
+  for (const k of ["payVia", "payLink", "mop", "mayaId", "receipt"]) if (k in data) keep[k] = data[k];
+  if (data.log) keep.log = data.log.filter(l => l.by !== "Website").slice(-80);
+  if (data.payLink && /bdo\.com\.ph/i.test(data.payLink) && S.site) await S.site.update(o.ref, { bdoLink: data.payLink }).catch(() => null);
+  const row = { ...clean(m), ref: o.ref, ...keep }; await save("webmeta", webMetaId(o.ref), row);
+  const i = S.webmeta.findIndex(d => d.ref === o.ref); if (i >= 0) S.webmeta[i] = { id: webMetaId(o.ref), ...row }; else S.webmeta = [...S.webmeta, { id: webMetaId(o.ref), ...row }];
+  S.web.dirty = true;
+}
 const PAYVIA = [["bdo", "BDO BNPL"], ["maya", "Card · Maya Checkout"], ["manual", "E-wallet / Bank transfer (QR)"]];
 // Our receiving accounts live in the database (webmeta/_paymethods), not in the code: { methods: [{ key, title, name, num, img, url }] }.
 const payMethods = () => ((S.webmeta.find(d => d.id === "_paymethods") || {}).methods || []);
@@ -4856,9 +4975,9 @@ async function mayaLink(o, quiet) {
   const amount = rrDue(o); if (!(amount > 0)) { if (!quiet) toast("Nothing to pay on this order."); return false; }
   const r = await S.site.maya({ ref: o.num, amount, name: o.customer || "", email: o.email || "", phone: o.phone || "", items: (o.items || []).map(i => ({ name: i.name, qty: i.qty, price: i.price })) }).catch(e => ({ ok: false, error: e && e.message }));
   if (!r || !r.ok || !PAYLINK_RE.test(r.url || "")) { toast(`Maya link not made: ${(r && r.error) || "no answer"}.`); return false; }
-  const cur = S.orders.find(x => x.id === o.id) || o;
-  await patch("orders", o.id, { payLink: r.url, payVia: "maya", mop: "Maya", mayaId: r.id || "", log: logAdd(cur, [`made a Maya Checkout link (${peso2(amount)})`]) });
-  const nw = S.orders.find(x => x.id === o.id); if (nw && nw.email) await receiptSend(nw, true); else toast("Maya link ready. Copy it for the buyer.");
+  const cur = rrFind(o.id) || o;
+  await rrPatch(cur, { payLink: r.url, payVia: "maya", mop: "Maya", mayaId: r.id || "", log: logAdd(cur, [`made a Maya Checkout link (${peso2(amount)})`]) });
+  const nw = rrFind(o.id); if (nw && nw.email) await receiptSend(nw, true); else toast("Maya link ready. Copy it for the buyer.");
   return true;
 }
 // After Create order: Maya makes the link then emails; BDO emails now and opens the BDO steps; QR / not chosen emails the receipt.
@@ -4884,7 +5003,7 @@ function rrViaPanel(o) {
   else if (v === "manual") body = `<div style="font-size:13px">The receipt shows our QR codes and accounts (${payMethods().map(m => esc(m.title)).join(", ") || "none saved yet"}). The buyer replies with a screenshot; check it in the bank / GCash app, then set Payment Status → <b>Fully paid</b>.</div>`;
   else body = `<div style="font-size:13px;color:var(--warn, #8a5a00);font-weight:600">👆 Tap how the buyer pays. The receipt changes to match.</div>`;
   const sf = `<div class="rr-sf"><label for="rr-sf">Shipping fee (buyer pays)${o.sfAutoAt ? ` <span style="font-weight:400;font-size:12px;color:var(--muted)">· J&T rate</span>` : ""}</label><input id="rr-sf" inputmode="decimal" class="money" value="${moneyFmt(Number(o.shipFee) || "")}" placeholder="0"><label class="rr-free"><input type="checkbox" id="rr-free" ${o.shipFree ? "checked" : ""}> Free shipping</label><button class="btn sm" type="button" data-act="rr-sf-save" data-id="${o.id}">Save</button></div>`;
-  return `<div class="panel bdo-box"><div class="bdo-h"><b>How the buyer pays</b></div>${seg}${body}${sf}</div>`;
+  return `<div class="panel bdo-box"><div class="bdo-h"><b>How the buyer pays</b></div>${seg}${body}${o.web ? "" : sf}</div>`;
 }
 const payBtns = o => o.payLink && rrPayable(o) && o.payVia !== "manual" ? `<a class="btn sm" href="${esc(o.payLink)}" target="_blank" rel="noopener">💳 Pay link</a><button class="btn sm" type="button" data-copy="${esc(o.payLink)}">Copy pay link</button>` : "";
 const RR = { brand: "#3d1a6e", gold: "#b8913a", ink: "#2a2230", muted: "#7a6f80", line: "#e8e1ec", bg: "#faf7fb" };
@@ -4963,8 +5082,8 @@ async function receiptSend(o, quiet) {
   const r = await S.site.email({ to: o.email, subject: receiptSubject(o), html: receiptHTML(o, true), text: receiptText(o), kind: "receipt" }).catch(e => ({ ok: false, error: e && e.message }));
   if (!r || !r.ok) { if (r && MAIL_LIMIT_RE.test(r.error || "")) { mailLimitHit(); toast("Royal Receipt not sent: Gmail's daily email limit is reached. Send it again tomorrow, or Copy text (for chat) now."); return false; }
     toast(`Royal Receipt not sent: ${(r && r.error) || "the website didn't answer"}. Copy it from the order instead.`); return false; }
-  const cur = S.orders.find(x => x.id === o.id) || o;
-  await patch("orders", o.id, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
+  const cur = rrFind(o.id) || o;
+  await rrPatch(cur, { receipt: { at: Date.now(), to: o.email, by: actor(), link: o.payLink || "" }, log: logAdd(cur, [`emailed the Royal Receipt to ${o.email}`]) });
   toast(`Royal Receipt emailed to ${o.email}.`); return true;
 }
 /* ---------- customer update emails (store Gmail via the website backend opsEmail) ----------
@@ -5569,10 +5688,10 @@ async function copyRich(html, text) {
   catch (e) { try { await navigator.clipboard.writeText(text); return true; } catch (e2) { return false; } }
 }
 function openReceipt(id) {
-  const o = S.orders.find(x => x.id === id) || S.archived.find(x => x.id === id); if (!o) return;
+  const o = rrFind(id); if (!o) return;
   // No shipping fee yet: fill the J&T rate for the buyer's province (once; staff can change it in the box below).
   const sfR = sfAuto((o.ship || shipOf(o)).province);
-  if (sfR && !Number(o.shipFee) && !o.shipFree && !o.pickup && !Number(o.adjust) && !o.sfAutoAt && !S.readOnly && o.payment !== "paid") {
+  if (sfR && !o.web && !Number(o.shipFee) && !o.shipFree && !o.pickup && !Number(o.adjust) && !o.sfAutoAt && !S.readOnly && o.payment !== "paid") {
     Object.assign(o, { shipFee: sfR, sfAutoAt: Date.now() });
     patch("orders", o.id, { shipFee: sfR, sfAutoAt: Date.now(), log: logAdd(o, [`shipping fee set to the J&T rate ${peso2(sfR)} (${SF_AREA[shipRegion((o.ship || shipOf(o)).province)]})`]) }).catch(() => {});
   }
@@ -5584,7 +5703,7 @@ function openReceipt(id) {
       ${o.email ? `<button class="btn primary sm" type="button" data-act="rr-send" data-id="${o.id}">${o.receipt && o.receipt.at ? "Send again" : "Email to " + esc(o.email)}</button>` : ""}
       <button class="btn sm" type="button" data-act="rr-copy" data-id="${o.id}">Copy text (for chat)</button>
       <button class="btn sm" type="button" data-act="rr-copyhtml" data-id="${o.id}">Copy formatted (for email)</button>
-      ${S.canEdit || canAll() ? `<button class="btn ghost sm" type="button" data-act="edit-contact" data-id="${o.id}">Edit contact & pay link</button>` : ""}
+      ${(S.canEdit || canAll()) && !o.web ? `<button class="btn ghost sm" type="button" data-act="edit-contact" data-id="${o.id}">Edit contact & pay link</button>` : ""}
     </div>
     ${rrViaPanel(o)}
     ${rrPayable(o) && !o.payLink && !o.payVia ? `<div class="notice" style="font-size:13px">No payment link yet, so the receipt says "we'll send your payment link". Add the Maya or BDO link in <b>Edit contact & pay link</b> and the updated receipt is emailed automatically.</div>` : ""}
@@ -7897,6 +8016,7 @@ document.addEventListener("click", guard(async ev => {
   if (ev.target.closest("[data-orgchart]")) { S.view = "dept"; S.dept = "ADMIN"; S.tab = "orgchart"; saveNav(); render(); window.scrollTo(0, 0); return; }
   const spm = ev.target.closest("[data-spmode]"); if (spm) { S.sp.mode = spm.dataset.spmode; S.sel.clear(); render(); return; }
   const tsp = ev.target.closest("[data-tsup]"); if (tsp) { S.sp.tsup = tsp.dataset.tsup; render(); return; }
+  const srb = ev.target.closest("[data-srq],[data-srg],[data-srby]"); if (srb) { const sr = srRange(); if (srb.dataset.srq) [sr.from, sr.to] = srb.dataset.srq.split("|"); if (srb.dataset.srg) sr.group = srb.dataset.srg; if (srb.dataset.srby) sr.by = srb.dataset.srby; render(); return; }
   const ivs = ev.target.closest("[data-invst]"); if (ivs) { S.invF.st = ivs.dataset.invst; render(); return; }
   const ivst = ev.target.closest("[data-ivst]"); if (ivst) { $("#iv-st").value = ivst.dataset.ivst; ivst.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === ivst)); return; }
   const go = ev.target.closest("[data-goorders]");
@@ -7907,7 +8027,7 @@ document.addEventListener("click", guard(async ev => {
   const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
   const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
   const rvt = ev.target.closest("[data-rvtab]"); if (rvt) { S.rv.status = rvt.dataset.rvtab; render(); return; }
-  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "ret" ? "ret" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
+  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "manual" ? "manual" : cxt.dataset.cx === "ret" ? "ret" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
   const rtf = ev.target.closest("[data-retf]"); if (rtf) { S.cx.rf = rtf.dataset.retf; render(); return; }
   const rtd = ev.target.closest("[data-retdec]"); if (rtd) { await returnDecide(rtd.dataset.ref, rtd.dataset.retdec, rtd); return; }
   const rtr = ev.target.closest("[data-retdone]"); if (rtr) { const ref = rtr.dataset.retdone; if (!confirm(`Mark #${String(ref).replace(/^#/, "")} as Refunded? Do this after the return / refund is finished. The buyer sees it under Cancelled.`)) return; rtr.disabled = true; const r = await S.site.update(ref, { status: "Refunded" }).catch(e => ({ ok: false, error: e && e.message })); if (!r || !r.ok) { toast("Website: " + ((r && r.error) || "couldn't save.")); rtr.disabled = false; return; } toast(`#${String(ref).replace(/^#/, "")} marked Refunded.`); await webLoad(true); return; }
@@ -8023,17 +8143,17 @@ document.addEventListener("click", guard(async ev => {
       if (v === (Number(o.shipFee) || 0) && free === !!o.shipFree) { toast("No change."); return; }
       await patch("orders", o.id, { shipFee: v, shipFree: free && !v, log: logAdd(o, [`set Shipping fee → ${v ? peso2(v) : free ? "Free" : "none"}`]) });
       toast(`Shipping fee saved · total ${peso2(total({ ...o, shipFee: v }))}. Tap Email to send the updated receipt.`); openReceipt(o.id); return; }
-    case "rr-via": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const v = b.dataset.v;
-      await patch("orders", o.id, { payVia: v, ...(v === "maya" ? { mop: "Maya" } : v === "bdo" ? { mop: "BDO" } : {}), log: logAdd(o, [`set how the buyer pays → ${(PAYVIA.find(x => x[0] === v) || [, v])[1]}`]) });
+    case "rr-via": { const o = rrFind(b.dataset.id); if (!o) return; const v = b.dataset.v;
+      await rrPatch(o, { payVia: v, ...(v === "maya" ? { mop: "Maya" } : v === "bdo" ? { mop: "BDO" } : {}), log: logAdd(o, [`set how the buyer pays → ${(PAYVIA.find(x => x[0] === v) || [, v])[1]}`]) });
       openReceipt(o.id); return; }
-    case "rr-maya": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Making link…"; await mayaLink(o); openReceipt(o.id); return; }
-    case "rr-bdo-save": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; const l = ($("#rr-bdo") || {}).value ? $("#rr-bdo").value.trim() : "";
+    case "rr-maya": { const o = rrFind(b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Making link…"; await mayaLink(o); openReceipt(o.id); return; }
+    case "rr-bdo-save": { const o = rrFind(b.dataset.id); if (!o) return; const l = ($("#rr-bdo") || {}).value ? $("#rr-bdo").value.trim() : "";
       if (!/^https:\/\/([a-z0-9-]+\.)*bdo\.com\.ph\/\S*$/i.test(l)) { toast("Paste the BDO link (https://…bdo.com.ph/…)."); return; }
-      b.disabled = true; await patch("orders", o.id, { payLink: l, payVia: "bdo", mop: "BDO", log: logAdd(o, ["added the BDO payment link"]) });
-      const nw = S.orders.find(x => x.id === o.id); if (nw && nw.email) await receiptSend(nw, true); else toast("BDO link saved. Copy it for the buyer.");
+      b.disabled = true; await rrPatch(o, { payLink: l, payVia: "bdo", mop: "BDO", log: logAdd(o, ["added the BDO payment link"]) });
+      const nw = rrFind(o.id); if (nw && nw.email) await receiptSend(nw, true); else toast("BDO link saved. Copy it for the buyer.");
       openReceipt(o.id); return; }
-    case "rr-send": { const o = S.orders.find(x => x.id === b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Sending…"; await receiptSend(o); if ($("#sheet") && S.sheetReopen) openReceipt(o.id); return; }
-    case "rr-copy": case "rr-copyhtml": { const o = S.orders.find(x => x.id === b.dataset.id) || S.archived.find(x => x.id === b.dataset.id); if (!o) return; const ok = b.dataset.act === "rr-copy" ? await navigator.clipboard.writeText(receiptText(o)).then(() => true, () => false) : await copyRich(receiptHTML(o, true), receiptText(o)); const was = b.textContent; b.textContent = ok ? "Copied ✓" : "Couldn't copy"; setTimeout(() => { b.textContent = was; }, 1400); return; }
+    case "rr-send": { const o = rrFind(b.dataset.id); if (!o) return; b.disabled = true; b.textContent = "Sending…"; await receiptSend(o); if ($("#sheet") && S.sheetReopen) openReceipt(o.id); return; }
+    case "rr-copy": case "rr-copyhtml": { const o = rrFind(b.dataset.id); if (!o) return; const ok = b.dataset.act === "rr-copy" ? await navigator.clipboard.writeText(receiptText(o)).then(() => true, () => false) : await copyRich(receiptHTML(o, true), receiptText(o)); const was = b.textContent; b.textContent = ok ? "Copied ✓" : "Couldn't copy"; setTimeout(() => { b.textContent = was; }, 1400); return; }
     case "lock-dept": S.unlocked.delete(S.dept); saveUnlocked(); render(); toast(`${dept(S.dept).name} locked.`); return;
     case "new-review": return openReviewForm();
     case "edit-review": return openReviewForm(id);
@@ -8165,6 +8285,9 @@ document.addEventListener("click", guard(async ev => {
     case "ask-del-forever": { const o = findOrder(id); if (!o) return; if (b.dataset.sure) { await remove("orders", id); if (!S.db) { S.archived = S.archived.filter(x => x.id !== id); render(); } toast(`${onum(o)} deleted for good.`); } else { b.dataset.sure = "1"; b.textContent = "Tap again to delete forever"; b.classList.add("danger"); } return; }
     case "sup-list": return openSupplierList();
     case "sup-mark": await supMark(b.dataset.sup); return;
+    case "vat-other": await vatOther(); return;
+    case "go-manual": if (!$("#scrim").hidden) closeSheet(); S.view = "orders"; S.cx.show = "manual"; S.sel.clear(); saveNav(); if (!S.web.loaded) webLoad(); render(); window.scrollTo(0, 0); return;
+    case "sr-dl": try { await S.dl.save({ data: csv(S.srCsv || []), filename: `sales-report-${srRange().from}-to-${srRange().to}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
     case "sup-copy": try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
     case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${String(S.supLabel || S.of.sup || "all").toLowerCase().replace(/\s+/g, "-")}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
     case "jnt-export": return jntExport();
@@ -8327,6 +8450,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset && t.dataset.spitem != null) { const a = S.spAgg && S.spAgg.get(t.dataset.spitem); if (a) a.ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if ((t.id === "sp-bulk-ful" || t.id === "sp-bulk-pay") && t.value) return bulkAction((t.id === "sp-bulk-pay" ? "pay:" : "ful:") + t.value);
   if (t.id === "inv-sup") { S.invF.sup = t.value; render(); return; }
+  if (t.id === "sr-from" || t.id === "sr-to") { if (t.value) srRange()[t.id === "sr-from" ? "from" : "to"] = t.value; render(); return; }
   if (t.id === "l-selall") { const ids = S.lrowIds || []; ids.forEach(id => t.checked ? S.lsel.add(id) : S.lsel.delete(id)); render(); return; }
   if (t.dataset.lsel) { t.checked ? S.lsel.add(t.dataset.lsel) : S.lsel.delete(t.dataset.lsel); render(); return; }
   if (t.dataset.lbulk) { const f = t.dataset.lbulk, v = t.value; if (!v) return;
