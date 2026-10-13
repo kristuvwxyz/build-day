@@ -134,3 +134,9 @@ Finish with:
 - `automations/`: scripts, scheduled tasks, workflows
 - `docs/`: writing, notes, templates
 - Keep this file updated as my preferences change. If I correct you, add the rule here.
+
+## Oct 14, 2026 · listing rules from K
+- Middle Eastern (Arabian) listings: description ends with "Inspired by <original perfume>" (copied from the old Shopify "… Alternative" line; field `inspiredBy`, sent to the website as `insp`), and photo 2 is a side-by-side comparison picture (our bottle vs the original, field `cmpImg`, built by scratchpad cmp.py style: two template panels, labels Regal Spritz PH / The Inspiration). Applies to future Middle Eastern listings too: needs the original's photo from an image search, so it is done by Claude on request, not in-app.
+- Titles: no shortcuts ("Bm" = Blu Mediterraneo), no stray digits ("Edt6" -> EDT). Renaming a listing regenerates its scent card (card key includes the name).
+- Photos: when a new box + bottle photo 1 replaces an older template cut-out, the older cut-out is removed from the listing (no near-duplicate template photos). Photo 1 of a single-bottle listing must not be a set photo.
+- Manual Processing website orders: Royal Receipt offers only e-wallet / bank QR (never Maya / BDO). The 24 h pay timer starts when the Royal Receipt is sent (RS OS calls site.update(ref,{receiptSent:true}) after emailing it).
