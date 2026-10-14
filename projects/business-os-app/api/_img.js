@@ -1,14 +1,13 @@
 // Listing photos for the website, served through Vercel's CDN and cached for a year: https://regal-spritz-os.vercel.app/img/listings/<file>
+// (/img/* is routed to /api/products?img=…; it lives there because the Hobby plan allows only 12 server functions.)
 // Why: Supabase sends these photos with "no-cache", so every page view downloaded them again from Supabase, which used up the free quota
 // (Oct 2026: 22.8 GB cached egress of 5 GB). Photo files are named by their content (api/photo.js), so a file never changes and
 // caching it for a year is safe. /api/products rewrites the photo addresses to this one.
 // Only the public listing-photos bucket; nothing else can be fetched through here.
 const TYPES = /^image\/(jpeg|png|webp|gif)$/;
 
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  if (req.method !== "GET" && req.method !== "HEAD") return res.status(405).send("GET only");
-  const p = String((req.query && req.query.p) || "");
+export async function serveImg(req, res) {
+  const p = String((req.query && req.query.img) || "");
   if (!/^[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.(jpe?g|png|webp|gif)$/i.test(p) || !process.env.SUPABASE_URL) {
     res.setHeader("Cache-Control", "public, max-age=300");
     return res.status(404).send("Not found");

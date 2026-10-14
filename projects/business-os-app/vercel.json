@@ -7,15 +7,12 @@
     },
     "api/push-listings.js": {
       "maxDuration": 60
-    },
-    "api/img.js": {
-      "maxDuration": 15
     }
   },
   "rewrites": [
     {
       "source": "/img/:path*",
-      "destination": "/api/img?p=:path*"
+      "destination": "/api/products?img=:path*"
     }
   ],
   "headers": [

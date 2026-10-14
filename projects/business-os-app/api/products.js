@@ -6,12 +6,14 @@
 // Before sending, every piece is checked against live RS OS stock: on-hand pieces with stock 0 are left out and
 // sold-out pre-orders are marked soldOut: true, even if the backend copy is a little behind.
 import { liveStock, applyStock } from "./_stock.js";
+import { serveImg } from "./_img.js";
 const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbz7R17lKloaq_VaFMK-nDge-9AUXNFmNgaH7WZr2gWJjxRLMn1hEa6HubmeaDbaPzdU4g/exec";
 let last = { body: "", type: "", at: 0, photos: [] };
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   if (req.method !== "GET" && req.method !== "HEAD") return res.status(405).send("GET only");
+  if (req.query && req.query.img) return serveImg(req, res);  // /img/* listing photos (api/_img.js)
   try {
     const r = await fetch((process.env.RS_BACKEND_URL || DEFAULT_URL) + "?action=products.js", { redirect: "follow" });
     const body = await r.text();
