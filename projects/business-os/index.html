@@ -390,6 +390,9 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .hero-att b { font-family: var(--font-display); font-weight: 400; font-size: 20px; }
 .hero-att > span { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; opacity: .75; font-weight: 700; }
 .hero-att .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.hero-att .btn { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.28); }
+.hero-att .btn:hover { background: rgba(255,255,255,.24); }
+.hero-att .btn.primary { background: var(--hero-gold, #C9A55A); color: #2B1B2E; border-color: transparent; }
 .home-alerts { display: flex; flex-direction: column; gap: 10px; }
 .home-h { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 4px 2px -2px; }
 @media (max-width: 600px) { .hero-w { padding: 18px; } .hero-w .hero-greet { font-size: 27px; } .hero-att { min-width: 0; width: 100%; } }
@@ -412,7 +415,7 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 @media (max-width: 480px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* home body: my tasks beside a side column (Employee of the Month, goals) */
 .home-grid { display: grid; gap: 14px; align-items: start; }
-@media (min-width: 1000px) { .home-grid.has-side { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); } }
+@media (min-width: 1100px) { .home-grid.has-side { grid-template-columns: minmax(0, 1fr) 320px; } }
 .home-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .goals-card h2 { margin: 0; }
 .goals-card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
@@ -5443,11 +5446,30 @@ async function annOnTemplate(blob) {
   return corners >= 3 && bar;
 }
 // A drawn copy of the website template with the cut-out bottle standing on the marble.
+// Plain white-background product photo (most brand photos)? Then the white around the bottle is simply made clear
+// (flood fill from the edges, so white labels inside the bottle stay); no cut-out model needed. Oct 14, 2026.
+async function whiteCut(blob) {
+  const src = await createImageBitmap(blob), k = Math.min(1, 1000 / Math.max(src.width, src.height)), w = Math.max(1, Math.round(src.width * k)), h = Math.max(1, Math.round(src.height * k));
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(src, 0, 0, w, h);
+  const im = g.getImageData(0, 0, w, h), d = im.data, wh = i => d[i] > 236 && d[i + 1] > 236 && d[i + 2] > 236;
+  let edge = 0, white = 0; for (let x = 0; x < w; x += 3) for (const y of [0, h - 1]) { edge++; if (wh((y * w + x) * 4)) white++; } for (let y = 0; y < h; y += 3) for (const x of [0, w - 1]) { edge++; if (wh((y * w + x) * 4)) white++; }
+  if (white / edge < .92) return null;
+  const seen = new Uint8Array(w * h), st = []; const push = (x, y) => { const j = y * w + x; if (!seen[j] && wh(j * 4)) { seen[j] = 1; st.push(j); } };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); } for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  while (st.length) { const j = st.pop(), x = j % w, y = (j - x) / w; d[j * 4 + 3] = 0; if (x > 0) push(x - 1, y); if (x < w - 1) push(x + 1, y); if (y > 0) push(x, y - 1); if (y < h - 1) push(x, y + 1); }
+  // soften the edge: pixels next to the cleared area become half clear
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const j = y * w + x; if (seen[j]) continue; if (seen[j - 1] || seen[j + 1] || seen[j - w] || seen[j + w]) d[j * 4 + 3] = 150; }
+  g.putImageData(im, 0, 0); return c;
+}
 async function annCompose(blob) {
-  let cut = null;
-  try { const m = await import(BGR_LIB).catch(() => import("https://esm.sh/@imgly/background-removal@1.4.5")); const rb = m.removeBackground || m.default; cut = await rb(blob, { model: "medium", output: { format: "image/png" } }); }
-  catch (e) { console.warn("cutout", e); throw new Error("couldn't cut out the photo"); }
-  const im = await createImageBitmap(cut), W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
+  let im = null;
+  try { im = await whiteCut(blob); } catch (e) {}
+  if (!im) { let cut = null;
+    try { const m = await import(BGR_LIB).catch(() => import("https://esm.sh/@imgly/background-removal@1.4.5")); const rb = m.removeBackground || m.default;
+      cut = await Promise.race([rb(blob, { model: "medium", output: { format: "image/png" } }), new Promise((_, rj) => setTimeout(() => rj(new Error("cut-out took too long")), 4 * 60e3))]); }
+    catch (e) { console.warn("cutout", e); throw new Error("couldn't cut out the photo"); }
+    im = await createImageBitmap(cut); }
+  const W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
   const bg = g.createRadialGradient(W / 2, H * .38, 30, W / 2, H * .45, W * .8); bg.addColorStop(0, "#FCFAF5"); bg.addColorStop(.55, "#F4EFE6"); bg.addColorStop(1, "#E6DED1");
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
   // marble stand + gold bar
