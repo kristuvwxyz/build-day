@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       if (kept && oh(kept) >= oh(list) * 2 / 3) out = out.slice(0, start) + JSON.stringify(kept) + out.slice(end);
     }
   } catch (e) { /* stock check failed: send the backend copy as is */ }
-  // A live listing always wins over an old sold-out copy with the same id (soldout.js); whichever file loads second drops them.
+  // A live listing always wins over an old sold-out copy with the same id (soldout.js); SOLDOUT is filtered whenever soldout.js sets it, even an old cached copy.
   if (!/json/.test(last.type)) out += ";" + DROP_SOLD_DUPES;
   res.setHeader("Content-Type", (/json/.test(last.type) ? "application/json" : "application/javascript") + "; charset=utf-8");
   // Browsers keep it briefly; Place Order re-checks stock with a no-store fetch, so sold-out items still can't be bought.
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   return res.status(200).send(out);
 }
 
-const DROP_SOLD_DUPES = "(function(){var P=window.RS_PRODUCTS,S=window.SOLDOUT;if(!P||!S)return;var l=new Set(P.map(function(p){return p.id}));window.SOLDOUT=S.filter(function(r){return !l.has(r[0])})})();";
+const DROP_SOLD_DUPES = "(function(){var P=window.RS_PRODUCTS;if(!P)return;var l=new Set(P.map(function(p){return p.id})),f=function(S){return S&&S.filter?S.filter(function(r){return !l.has(r[0])}):S},v=f(window.SOLDOUT);try{Object.defineProperty(window,\"SOLDOUT\",{configurable:true,get:function(){return v},set:function(S){v=f(S)}})}catch(e){window.SOLDOUT=v}})();";
 
 // Listing photos go through /img (api/img.js, cached a year on Vercel) instead of straight from Supabase, which sends them
 // with "no-cache" (every page view downloaded them again and used up the Supabase free quota).
