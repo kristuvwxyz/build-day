@@ -3851,7 +3851,7 @@ function orderCell(k, o, table) {
   const st = (s, f, opts2) => `<select class="status st-${clsKey(s)}" data-oset="${f}" data-id="${o.id}" aria-label="${f}">${opts2}</select>`;
   switch (k) {
     case "num": return `<td class="strike nowrap"><span class="onum">${esc(onum(o))}</span></td>`;
-    case "source": return `<td class="nowrap src-td"><div class="src-cell">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>${o.cancel && o.cancel.status === "Pending" ? ` <span class="badge red">Cancel request</span>` : ""}${bdoNeeds(S.web.orders.find(x => x.ref === o.ref)) ? ` <span class="badge amber" title="Make a BDO Checkout link for this order">BDO link needed</span>` : ""}` : `<span class="chip">${esc(orderSource(o))}</span>`}${disputeChip(o)}${exChip(o)}</div></td>`;
+    case "source": return `<td class="nowrap src-td"><div class="src-cell">${o.web ? `<span class="chip" title="${esc(o.payMethod || "")}">Website</span>` : `<span class="chip">${esc(orderSource(o))}</span>`}</div></td>`;
     case "date": return `<td class="strike nowrap">${relTime(o.createdAt)}</td>`;
     case "items": return `<td class="nowrap"><button type="button" class="items-btn" data-items="${o.id}">${itemsLabel(o)} ▾</button></td>`;
     case "ikind": return `<td class="nowrap">${kindCell(o)}</td>`;
