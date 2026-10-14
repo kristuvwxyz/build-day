@@ -3762,7 +3762,7 @@ function tagCell(tags) {
 
 /* ---------- order table columns (arrangeable per department) ---------- */
 const ORDER_COLS = {
-  num: { label: "Order" }, source: { label: "Source" }, date: { label: "Date" }, items: { label: "Items" }, ikind: { label: "Item type" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
+  num: { label: "Order" }, source: { label: "Source" }, date: { label: "Date" }, items: { label: "Qty" }, ikind: { label: "Items" }, customer: { label: "Customer" }, assigned: { label: "Assigned to" },
   total: { label: "Total", cls: "r" }, payment: { label: "Payment status" }, mop: { label: "Mode of payment" }, fulfillment: { label: "Fulfillment status" }, courier: { label: "Courier" },
   tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, note: { label: "Note" }, activity: { label: "History" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
@@ -3894,7 +3894,7 @@ function notesPop(btn) {
 function ordersTable(rows, table, st, attr, selAllId) {
   const cols = visCols(table), selectable = canPay() || canShip();
   const allSel = rows.length && rows.every(o => S.sel.has(o.id));
-  return `<div class="table-wrap"><table class="otable ordtable" data-own="1">
+  return `<div class="table-wrap lwrap"><table class="otable ordtable" data-own="1">
     <thead><tr>${selectable ? `<th class="cb"><input type="checkbox" id="${selAllId}" aria-label="Select all" ${allSel ? "checked" : ""}></th>` : ""}${cols.map(k => ORDER_COLS[k].nosort ? `<th>${ORDER_COLS[k].label}</th>` : sortTh(k, ORDER_COLS[k].label, ORDER_COLS[k].cls || "", st, attr)).join("")}</tr></thead>
     <tbody>${rows.map(o => { const v = isVoid(o) && o.payment === "voided"; const done = !v && (isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)));
       return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>` : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
@@ -4601,7 +4601,7 @@ function viewCustomers() {
   </div>
   <div class="toolbar"><input id="cq" type="search" placeholder="Search name, email, phone, city or tag" value="${esc(S.cq)}" aria-label="Search customers"></div>
   
-  <div class="table-wrap"><table class="otable" data-own="1">
+  <div class="table-wrap lwrap"><table class="otable" data-own="1">
     <thead><tr>${canAll() ? pickTh("cust", page.map(custKey)) : ""}${[["name", "Customer"], ["phone", "Phone"], ["loc", "Location"], ["channels", "Channels"], ["orders", "Orders", "r"], ["spent", "Amount spent", "r"], ["last", "Last order"], ["tags", "Tags"]].map(([k, l, c]) => sortTh(k, l, c || "", cs, "csort")).join("")}</tr></thead>
     <tbody>${page.map(c => `<tr data-cust="${esc(custKey(c))}">${canAll() ? pickTd("cust", custKey(c)) : ""}
       <td><div style="font-weight:600">${esc(c.name)}${c.example ? ' <span class="chip ex">Example</span>' : ""}${c.orders > 1 ? ' <span class="chip good">Repeat</span>' : ""}</div><div class="s">${esc(c.email || "")}</div></td>
