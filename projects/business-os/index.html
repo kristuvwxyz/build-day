@@ -699,6 +699,18 @@ th[aria-sort="ascending"] .sarr, th[aria-sort="descending"] .sarr { opacity: 1; 
 .olog { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
 .olog-h { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
 .olog b { color: var(--fg); font-weight: 600; } .olog span { opacity: .8; }
+.olog-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .olog-top .btn { font-size: 12px; }
+.olog-img { display: block; width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); margin: 3px 0 4px; cursor: zoom-in; background: var(--surface-2); }
+.pgal-it img { cursor: zoom-in; }
+/* Photo preview (click a listing photo or an order photo) */
+.imgview { position: fixed; inset: 0; z-index: 9999; background: rgba(10,6,12,.88); display: flex; align-items: center; justify-content: center; padding: 48px 56px; }
+.imgview img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+.imgview button, .imgview a { position: absolute; border: 0; background: rgba(255,255,255,.14); color: #fff; font: inherit; font-size: 22px; line-height: 1; border-radius: 999px; width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.imgview button:hover, .imgview a:hover { background: rgba(255,255,255,.28); }
+.imgview .iv-x { top: 14px; right: 14px; } .imgview .iv-open { top: 14px; right: 66px; font-size: 16px; }
+.imgview .iv-prev { left: 10px; top: 50%; transform: translateY(-50%); } .imgview .iv-next { right: 10px; top: 50%; transform: translateY(-50%); }
+.imgview .iv-n { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; color: #fff; font-size: 13px; opacity: .8; }
+@media (max-width: 600px) { .imgview { padding: 56px 8px; } .imgview .iv-prev, .imgview .iv-next { top: auto; bottom: 8px; transform: none; } }
 .supbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; }
 .supbar .lab { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 4px; }
 .supbar button[data-sup] { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; color: inherit; }
@@ -3203,7 +3215,8 @@ function openWebOrder(ref) {
     ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${FUL_PICK.map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
       <div class="field"><label for="web-track">Tracking number</label><input id="web-track" value="${esc(o.tracking || "")}" autocomplete="off" placeholder="e.g. JT0012345678"></div>
       <div style="display:flex;gap:8px"><button class="btn primary" type="button" data-act="web-save" data-ref="${esc(o.ref)}">Save status</button><button class="btn ghost" type="button" data-act="close">Close</button></div>` : `<button class="btn ghost" type="button" data-act="close">Close</button>`}
-    <div class="sheet-err" id="sheet-err" hidden></div>`);
+    <div class="sheet-err" id="sheet-err" hidden></div>
+    ${oLogHtml((S.webmeta.find(d => d.ref === o.ref) || {}).log, "w:" + o.ref)}`);
 }
 // BDO Checkout has no API: staff make the link or email bill on BDO's site, then paste the link here (website backend v18 saves it as Pay Ref).
 const isBdo = o => !!o && /bdo/i.test(o.payment || "");
@@ -5773,7 +5786,7 @@ function openOrderDetails(id) {
     ${cs ? `<div class="field"><label for="d-track">Tracking # (waybill) · ${esc(COURIER_LABEL[courierOf(o)] || "")}</label><input id="d-track" value="${esc(o.tracking || "")}" autocomplete="off"></div>${o.tracking ? `<div style="font-size:12.5px">🚚 ${esc(COURIER_LABEL[courierOf(o)])} ${esc(o.tracking)}</div>` : ""}` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${editable ? "Cancel" : "Close"}</button>${editable ? `<button class="btn primary" type="submit">Save changes</button>` : ""}</div>
-    ${(o.log || []).length ? `<div class="olog"><div class="olog-h">Team activity</div>${[...o.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>` : ""}`,
+    ${oLogHtml(o.log, "o:" + o.id)}`,
   editable ? async () => {
     const ch = {};
     if (all) Object.assign(ch, { assignee: val("d-assign") });
@@ -6017,6 +6030,62 @@ function pgalHtml(list) {
 }
 const pgalGet = () => { try { return JSON.parse(($("#p-imgs") || {}).value || "[]"); } catch (e) { return []; } };
 const pgalSet = list => { $("#p-imgs").value = JSON.stringify(list); $("#p-photos").innerHTML = pgalHtml(list); };
+
+/* ---------- Photo preview: click a listing photo or an order photo to see it large (Oct 14, 2026) ---------- */
+function viewImg(list, i = 0) {
+  list = list.filter(Boolean); if (!list.length) return;
+  closeImgView();
+  const box = document.createElement("div"); box.className = "imgview"; box.id = "imgview"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Photo preview");
+  const show = n => { i = (n + list.length) % list.length; const u = list[i];
+    box.innerHTML = `<img src="${esc(u)}" alt="" referrerpolicy="no-referrer"><button type="button" class="iv-x" aria-label="Close">×</button>${/^https?:/.test(u) ? `<a class="iv-open" href="${esc(u)}" target="_blank" rel="noopener" title="Open the original in a new tab" aria-label="Open original">↗</a>` : ""}${list.length > 1 ? `<button type="button" class="iv-prev" aria-label="Previous photo">‹</button><button type="button" class="iv-next" aria-label="Next photo">›</button><div class="iv-n">${i + 1} of ${list.length}</div>` : ""}`; };
+  box.addEventListener("click", e => { e.stopPropagation(); const c = e.target.closest("button, a");
+    if (c && c.classList.contains("iv-prev")) return show(i - 1); if (c && c.classList.contains("iv-next")) return show(i + 1);
+    if (c && c.tagName === "A") return; if (e.target.tagName !== "IMG") closeImgView(); });
+  imgViewKey = e => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closeImgView(); } else if (e.key === "ArrowLeft") show(i - 1); else if (e.key === "ArrowRight") show(i + 1); };
+  window.addEventListener("keydown", imgViewKey, true);
+  show(i); document.body.appendChild(box);
+}
+let imgViewKey = null;
+function closeImgView() { const b = $("#imgview"); if (b) b.remove(); if (imgViewKey) window.removeEventListener("keydown", imgViewKey, true); imgViewKey = null; }
+document.addEventListener("click", e => {
+  const im = e.target.closest && e.target.closest(".pgal-it img, img.olog-img"); if (!im) return;
+  e.preventDefault(); e.stopPropagation();
+  const group = im.classList.contains("olog-img") ? [...im.closest(".olog").querySelectorAll("img.olog-img")] : [...$("#p-photos").querySelectorAll(".pgal-it img")];
+  viewImg(group.map(x => x.getAttribute("src")), Math.max(0, group.indexOf(im)));
+}, true);
+
+/* ---------- Order Team activity with photos (receipts, proofs) ---------- */
+// key: "o:<order id>" (RS OS order) or "w:<website ref>" (website order). Entries with img show a thumbnail.
+function oLogHtml(log, key) {
+  const canAdd = !S.readOnly && !!S.db;
+  if (!(log || []).length && !canAdd) return "";
+  return `<div class="olog" id="olog-box"><div class="olog-top"><div class="olog-h">Team activity</div>${canAdd ? `<label class="btn sm ghost" title="Attach a receipt or any photo to this order">📎 Attach photo<input type="file" id="o-attach-file" data-key="${esc(key)}" accept="image/*" multiple hidden></label>` : ""}</div>${[...(log || [])].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span>${l.img ? `<img class="olog-img" src="${esc(l.img)}" alt="Attached photo" loading="lazy" referrerpolicy="no-referrer">` : ""}</div>`).join("")}</div>`;
+}
+async function orderAttach(input) {
+  const key = input.dataset.key || "", files = [...input.files]; input.value = "";
+  if (!files.length) return;
+  if (!S.photos) return toast("Photos can only be saved in the RS App online. Try again in a moment.");
+  toast(`Saving ${files.length} photo${files.length === 1 ? "" : "s"}…`);
+  const add = [];
+  for (const f of files) {
+    try { const d = await resizeImage(f, 1600, false), r = await S.photos.save({ data: d }).catch(e => ({ ok: false, error: e && e.message }));
+      if (r && r.ok && r.url) add.push({ at: Date.now(), by: actor(), msg: "attached a photo", img: r.url }); else toast("Couldn't save a photo: " + ((r && r.error) || "try again."));
+    } catch (e) { toast("Couldn't read that photo."); }
+  }
+  if (!add.length) return;
+  let log;
+  if (key.startsWith("o:")) {
+    const o = findOrder(key.slice(2)); if (!o) return;
+    log = [...(o.log || []), ...add].slice(-80);
+    await patch("orders", o.id, { log });
+  } else if (key.startsWith("w:")) {
+    const ref = key.slice(2), id = ref.replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {};
+    log = [...(cur.log || []), ...add].slice(-50);
+    await save("webmeta", id, { ...clean(cur), ref, log, at: Date.now() });
+  } else return;
+  const box = $("#olog-box"); if (box) box.outerHTML = oLogHtml(log, key);
+  toast(add.length === 1 ? "Photo attached." : `${add.length} photos attached.`);
+}
 // Short forms in listing names: Eau de Parfum → EDP, Eau de Toilette → EDT.
 const shortConc = n => String(n || "").replace(/\beau\s+de\s+parfum\b/gi, "EDP").replace(/\beau\s+de\s+toilette\b/gi, "EDT").replace(/\b(men|women)\b/gi, m => m[0].toUpperCase() + m.slice(1).toLowerCase());   // "Men" / "Women", always capitalised
 function openProductForm(id, preset = {}) {
@@ -8490,6 +8559,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "sel-all") { const ids = filteredOrders().slice(S.page * PAGE, S.page * PAGE + PAGE).map(o => o.id); ids.forEach(id => t.checked ? S.sel.add(id) : S.sel.delete(id)); render(); return; }
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
   if (t.id === "p-photo-file" && t.files[0]) { try { const l = pgalGet(); for (const f of [...t.files]) { const d = await resizeImage(f, 1600, false); const r = S.photos ? await S.photos.save({ data: d }).catch(() => null) : null; l.push(r && r.ok && r.url ? r.url : await resizeImage(f, 600, false)); } pgalSet(l); t.value = ""; } catch (e) { sheetError(e.message); } return; }
+  if (t.id === "o-attach-file" && t.files[0]) return orderAttach(t);
   if (t.id === "scan-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; return scanPhoto(f, "scan"); }
   if (t.id === "pack-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; return scanPhoto(f, "pack"); }
   if (t.id === "l-bc-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; toast("Reading barcode…"); const c = await decodeBarcode(f), el = $(`[data-lset="barcode"][data-id="${S.lbcId}"]`); if (c && el) { el.value = c; listSet(el); } else if (!c) toast("No barcode found in that photo. Try again closer and in good light."); return; }
