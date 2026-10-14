@@ -161,6 +161,9 @@
     let gSince = 0;  // newest server change time seen (ms)
     const seen = t => { const ms = typeof t === "number" ? t : Date.parse(t || ""); if (ms && ms <= Date.now() + 120e3) { if (ms > gSince) gSince = ms; return ms; } return 0; };
     const put = (p, data) => { const c = colOf(parentOf(p)); c.ver = (c.ver || 0) + 1; if (data === undefined) c.rows.delete(leafOf(p)); else c.rows.set(leafOf(p), data); markDirty(parentOf(p)); };
+    // Server change time of the copy we hold, per record: the 8-second check skips records we already have (saves Supabase data).
+    const applied = new Map();
+    const got = (p, t) => { const ms = seen(t); if (ms) applied.set(p, ms); return ms; };
     const same = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
     const SLACK = 120e3; // read a little before the last change time, so nothing is missed between devices
     let hasTomb = null;  // doc_deletes table (supabase/fast-sync.sql) remembers deletions
@@ -176,7 +179,7 @@
       for (let off = 0; ; off += 1000) {
         const { data, error } = await sb.from("docs").select("id,data,updated_at").eq("col", c).gt("updated_at", from).order("updated_at").range(off, off + 999);
         if (error) throw error;
-        for (const r of data) { max = Math.max(max, seen(r.updated_at)); if (!same(x.rows.get(r.id), r.data)) { x.rows.set(r.id, r.data); changed = true; } }
+        for (const r of data) { max = Math.max(max, got(c + "/" + r.id, r.updated_at)); if (!same(x.rows.get(r.id), r.data)) { x.rows.set(r.id, r.data); changed = true; } }
         if (data.length < 1000) break;
       }
       const tomb = await tombsSince(c, from);
@@ -204,7 +207,7 @@
         // First time on this device: download everything. Big collections (Orders has ~9,000) load 4 pages of 1,000 at a time.
         let max = 0;
         const page = 1000, get = from => sb.from("docs").select("id,data,updated_at").eq("col", c).order("id").range(from, from + page - 1);
-        const take = rows => rows.forEach(r => { if (!x.rows.has(r.id) || !x.ver) x.rows.set(r.id, r.data); max = Math.max(max, seen(r.updated_at)); });
+        const take = rows => rows.forEach(r => { if (!x.rows.has(r.id) || !x.ver) x.rows.set(r.id, r.data); max = Math.max(max, got(c + "/" + r.id, r.updated_at)); });
         const first = await get(0); if (first.error) throw first.error; take(first.data);
         for (let from = page, more = first.data.length === page; more; from += page * 4) {
           const res = await Promise.all([0, 1, 2, 3].map(k => get(from + k * page)));
@@ -220,17 +223,27 @@
     async function pollAll(force) {
       if (polling || !gSince || (document.hidden && !force)) return; polling = true;
       try {
-        const from = new Date(gSince - SLACK).toISOString(), touched = new Set();
+        const from = new Date(gSince - SLACK).toISOString(), touched = new Set(), need = [];
+        // First only which records changed (tiny); then the full records we don't already hold.
         for (let off = 0; ; off += 1000) {
-          const { data, error } = await sb.from("docs").select("path,col,id,data,updated_at").gt("updated_at", from).order("updated_at").range(off, off + 999);
+          const { data, error } = await sb.from("docs").select("path,col,updated_at").gt("updated_at", from).order("updated_at").range(off, off + 999);
           if (error) return;
           for (const r of data) {
-            seen(r.updated_at); const x = cols.get(r.col);
+            const t = seen(r.updated_at), x = cols.get(r.col);
             if (!(x && x.loaded) && !docs.has(r.path)) continue;
-            if (!same(docVal(r.path), r.data)) { put(r.path, r.data); touched.add(r.path); }
-            if (x) x.since = Math.max(x.since || 0, Date.parse(r.updated_at) || 0);
+            if (!t || applied.get(r.path) !== t) need.push(r.path);
+            else if (x) x.since = Math.max(x.since || 0, t);
           }
           if (data.length < 1000) break;
+        }
+        for (let i = 0; i < need.length; i += 100) {
+          const { data, error } = await sb.from("docs").select("path,col,data,updated_at").in("path", need.slice(i, i + 100));
+          if (error) return;
+          for (const r of data) {
+            const t = got(r.path, r.updated_at), x = cols.get(r.col);
+            if (!same(docVal(r.path), r.data)) { put(r.path, r.data); touched.add(r.path); }
+            if (x) x.since = Math.max(x.since || 0, t);
+          }
         }
         const tomb = await tombsSince(null, from);
         if (tomb) for (const t of tomb) if (docVal(t.path) !== undefined) { put(t.path, undefined); touched.add(t.path); }
@@ -245,7 +258,7 @@
     sb.channel("rs-docs").on("postgres_changes", { event: "*", schema: "public", table: "docs" }, ch => {
       const p = (ch.new && ch.new.path) || (ch.old && ch.old.path); if (!p) return;
       const c = cols.get(parentOf(p)); if (!c && !docs.has(p)) return;
-      if (ch.new && ch.new.updated_at) { const t = seen(ch.new.updated_at); if (c && t) c.since = Math.max(c.since || 0, t); }
+      if (ch.new && ch.new.updated_at) { const t = got(p, ch.new.updated_at); if (c && t) c.since = Math.max(c.since || 0, t); }
       put(p, ch.eventType === "DELETE" ? undefined : ch.new.data); emitSoon(p);
     }).subscribe(st => { if (st === "SUBSCRIBED") pollAll(); });
     const fail = e => { const err = { code: /row-level security|permission|42501/i.test((e && (e.message || e.code)) || "") ? "permission_denied" : "unavailable", message: (e && e.message) || String(e) }; throw err; };
