@@ -1326,8 +1326,12 @@ async function save(col, id, data) {
   if (S.db) { await wdb().collection(col).doc(id).set(data); }
   else { const arr = S[col]; const i = arr.findIndex(r => r.id === id); const row = { id, ...data }; i >= 0 ? arr.splice(i, 1, row) : arr.push(row); render(); }
 }
+// A listing that comes back on the website (restocked, reactivated, or switched to Pre-order) counts as new there, so it shows first under "Newest".
+const liveOnWeb = p => (p.status || "active") === "active" && (p.kind === "preorder" ? !p.soldOut : (Number(p.stock) || 0) > 0);
 async function patch(col, id, data) {
   undoNote(col, id);
+  if (col === "products" && data && !("webCreated" in data)) { const old = S.products.find(r => r.id === id);
+    if (old && liveOnWeb({ ...old, ...data }) && (!liveOnWeb(old) || (data.kind === "preorder" && old.kind !== "preorder"))) { data = { ...data, webCreated: new Date().toISOString().replace(/\.\d+Z$/, "+00:00"), webSync: "pending" }; } }
   if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).update(data); }
   else { const r = S[col].find(r => r.id === id); if (r) Object.assign(r, data); render(); }
