@@ -866,7 +866,7 @@ body.no-orders .gs { display: none !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .oactions .oassign { width: auto; max-width: 220px; padding: 6px 10px; font-size: 13px; background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; }
 .oactions .chip { cursor: pointer; border: 0; font: inherit; font-size: 12px; }
-.item-link { text-align: left; font: inherit; font-weight: 600; color: inherit; }
+.item-link { text-align: left; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 3px; }
 #viewas-bar { position: sticky; top: 0; z-index: 60; background: #7c3aed; color: #fff; font-size: 13px; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 #viewas-bar select { width: auto; max-width: 100%; padding: 4px 8px; font-size: 13px; font-weight: 600; color: #1E141D; background: #fff; border: 0; border-radius: 8px; }
 #viewas-bar .btn { background: #fff; color: #4c1d95; border-color: #fff; }
@@ -3273,7 +3273,7 @@ function openWebOrder(ref) {
     <div class="panel" style="padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px">
       <b>${esc(o.name || "")}</b><span>${esc(o.mobile || "")}${o.email ? " · " + esc(o.email) : ""}</span><span>${esc(addr)}</span>${o.delivery ? `<span style="color:var(--muted)">${esc(o.delivery)}</span>` : ""}
     </div>
-    <div class="table-wrap" style="flex-shrink:0"><table class="otable"><tbody>${(o.items || []).map(i => `<tr><td>${esc(i.title || "")}${i.variant ? `<br><small style="color:var(--muted)">${esc(i.variant)}</small>` : ""}</td><td class="r num">${Number(i.qty) || 1} × ${peso(i.price)}</td></tr>`).join("")}
+    <div class="table-wrap" style="flex-shrink:0"><table class="otable"><tbody>${(o.items || []).map(i => `<tr><td>${(pr => pr ? `<button type="button" class="linkish item-link" data-act="item-inv" data-pid="${pr.id}" data-name="${esc(pr.name)}" title="Open the listing">${esc(i.title || "")}</button>` : esc(i.title || ""))(webItemProduct(i))}${i.variant ? `<br><small style="color:var(--muted)">${esc(i.variant)}</small>` : ""}</td><td class="r num">${Number(i.qty) || 1} × ${peso(i.price)}</td></tr>`).join("")}
       ${Number(o.shipping) ? `<tr><td>Shipping</td><td class="r num">${peso(o.shipping)}</td></tr>` : ""}
       ${(() => { const w = (Number(o.discount) || 0) - (Number(o.voucherOff) || 0), c = o.discountCode && o.discountCode !== o.voucher ? o.discountCode : ""; return c && w > 0 ? `<tr><td>Welcome code ${esc(c)}</td><td class="r num">−${peso(w)}</td></tr>` : ""; })()}
       ${Number(o.voucherOff) ? `<tr><td>Voucher ${esc(o.voucher || "")}</td><td class="r num">−${peso(o.voucherOff)}</td></tr>` : ""}
