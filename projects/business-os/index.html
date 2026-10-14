@@ -5177,7 +5177,7 @@ async function custMail(o, step, x) {
   return true;
 }
 // After a status change: email the step the customer cares about (fire and forget).
-function custMailStep(o, ful) { const step = MAIL_STEP[ful]; if (!step || !o.email) return; if (ful === "cancelled" && o.web && isManualWeb(o)) return;   // website sends the cancel email for Manual Processing (backend v36) setTimeout(() => { const cur = o.web ? webAsOrders().find(x => x.ref === o.ref) : S.orders.find(x => x.id === o.id); custMail(cur || o, step).catch(() => {}); }, 1500); }
+function custMailStep(o, ful) { const step = MAIL_STEP[ful]; if (!step || !o.email) return; if (ful === "cancelled" && o.web && isManualWeb(o)) return; /* website sends the cancel email for Manual Processing (backend v36) */ setTimeout(() => { const cur = o.web ? webAsOrders().find(x => x.ref === o.ref) : S.orders.find(x => x.id === o.id); custMail(cur || o, step).catch(() => {}); }, 1500); }
 /* ---------- review invitations: after an order ships, email the buyer a link to review each item on its product page ----------
    NCR / Luzon after 3 days, Visayas after 5, Mindanao after 7 (no province: 7). Sooner if the buyer taps "Order received" on the website.
    Orders shipped from Oct 8, 2026. Once per order (mailed.review). Runs on any open team device (lock webmeta/_reviewmail). */
