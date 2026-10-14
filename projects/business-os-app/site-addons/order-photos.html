@@ -23,9 +23,18 @@
       var p = list[i], img = p.imgs && p.imgs[0];
       if (img) rows.push([nk(p.brand), nk(p.name), nk(p.size), img]);
     }
-    var extra = list[0] && list[0]._photos;
-    if (extra && extra.length) rows = rows.concat(extra);
     return rows;
+  }
+  // The extra photo table is not in the product list any more; it is fetched once, only when an order line needs it.
+  var EXTRA_URL = 'https://regal-spritz-os.vercel.app/api/products?photos=1', extraState = 0;
+  function loadExtra() {
+    if (extraState) return;
+    extraState = 1;
+    fetch(EXTRA_URL).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }).then(function (rows) {
+      extraState = 2;
+      if (Array.isArray(rows) && rows.length && index) index = index.concat(rows);
+      fix();
+    });
   }
   // Order titles look like "Kayali Freedom Discovery Layering Set" (brand + name); the line under it starts with the size.
   function photoFor(title, detail) {
@@ -58,6 +67,7 @@
     for (var i = 0; i < details.length; i++) {
       var d = details[i];
       if (d.children.length || !/\bQty\s*\d/i.test(txt(d))) continue;
+      if (!extraState) { loadExtra(); }
       var info = d.parentElement, title = info && info.firstElementChild && info.firstElementChild !== d ? txt(info.firstElementChild) : '';
       if (!title) { var prev = d.previousElementSibling; title = prev ? txt(prev) : ''; }
       var line = info && info.parentElement, box = null;

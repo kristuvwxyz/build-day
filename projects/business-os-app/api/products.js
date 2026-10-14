@@ -7,7 +7,7 @@
 // sold-out pre-orders are marked soldOut: true, even if the backend copy is a little behind.
 import { liveStock, applyStock } from "./_stock.js";
 const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbz7R17lKloaq_VaFMK-nDge-9AUXNFmNgaH7WZr2gWJjxRLMn1hEa6HubmeaDbaPzdU4g/exec";
-let last = { body: "", type: "", at: 0 };
+let last = { body: "", type: "", at: 0, photos: [] };
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -16,10 +16,17 @@ export default async function handler(req, res) {
     const r = await fetch((process.env.RS_BACKEND_URL || DEFAULT_URL) + "?action=products.js", { redirect: "follow" });
     const body = await r.text();
     if (!r.ok || body.length < 20) throw new Error("backend " + r.status);
-    last = { body, type: (r.headers.get("content-type") || "application/javascript").split(";")[0], at: Date.now() };
+    const split = splitPhotos(body);
+    last = { body: split.body, photos: split.photos, type: (r.headers.get("content-type") || "application/javascript").split(";")[0], at: Date.now() };
   } catch (e) {
     // Backend down or slow: keep the site working with the last good copy.
     if (!last.body) { res.setHeader("Cache-Control", "no-store"); return res.status(502).send("/* product list unavailable */"); }
+  }
+  // ?photos=1: the order-photo lookup table on its own (the product list no longer carries it).
+  if (req.query && req.query.photos) {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800");
+    return res.status(200).send(JSON.stringify(last.photos || []));
   }
   let out = last.body;
   try {
@@ -33,8 +40,20 @@ export default async function handler(req, res) {
     }
   } catch (e) { /* stock check failed: send the backend copy as is */ }
   res.setHeader("Content-Type", (/json/.test(last.type) ? "application/json" : "application/javascript") + "; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=15, stale-while-revalidate=86400, stale-if-error=86400");
+  // Browsers keep it briefly; Place Order re-checks stock with a no-store fetch, so sold-out items still can't be bought.
+  res.setHeader("Cache-Control", "public, max-age=60, s-maxage=15, stale-while-revalidate=86400");
   return res.status(200).send(out);
+}
+
+// Takes RS_PRODUCTS[0]._photos (about 530 KB of order-photo rows) out of the product list; returns it separately.
+function splitPhotos(body) {
+  const m = /RS_PRODUCTS\s*=\s*\[/.exec(body);
+  if (!m) return { body, photos: [] };
+  const start = m.index + m[0].length - 1, { list, end } = readArray(body, start);
+  if (!list || !list[0] || !("_photos" in list[0])) return { body, photos: [] };
+  const photos = list[0]._photos || [];
+  delete list[0]._photos;
+  return { body: body.slice(0, start) + JSON.stringify(list) + body.slice(end), photos };
 }
 
 // Reads the JSON array that starts at body[start] ("["); returns the list and where it ends.
