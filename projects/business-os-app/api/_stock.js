@@ -25,11 +25,11 @@ export async function liveStock(maxAgeMs = 5000) {
   } catch (e) { return null; }
 }
 
-// On-hand pieces with no live stock (or no active listing) are left out; sold-out pre-orders get soldOut: true.
+// Pieces with no active listing are left out; on-hand pieces with no live stock and sold-out pre-orders get soldOut: true.
 export function applyStock(list, map) {
   return list.flatMap(p => {
     const s = map.get(p.id);
-    if (p.kind !== "preorder") return s && s.stock > 0 ? [p] : [];
+    if (p.kind !== "preorder") return !s ? [] : s.stock > 0 ? [p] : [p.soldOut ? p : { ...p, soldOut: true }];
     return s && s.soldOut && !p.soldOut ? [{ ...p, soldOut: true }] : [p];
   });
 }

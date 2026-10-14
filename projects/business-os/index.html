@@ -1331,6 +1331,7 @@ const liveOnWeb = p => (p.status || "active") === "active" && (p.kind === "preor
 async function patch(col, id, data) {
   undoNote(col, id);
   if (col === "products" && data && !("webCreated" in data)) { const old = S.products.find(r => r.id === id);
+    if (old && old.status === "hidden" && (!("status" in data) || data.status === "hidden") && "stock" in data && (Number(data.stock) || 0) > 0 && !((Number(old.stock) || 0) > 0)) data = { ...data, status: "active", webSync: "pending" };   // restocking an archived listing brings it back
     if (old && liveOnWeb({ ...old, ...data }) && (!liveOnWeb(old) || (data.kind === "preorder" && old.kind !== "preorder"))) { data = { ...data, webCreated: new Date().toISOString().replace(/\.\d+Z$/, "+00:00"), webSync: "pending" }; } }
   if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).update(data); }
@@ -3830,7 +3831,7 @@ const TABLE_COLS = {
   orders: { all: ["num", "source", "date", "items", "ikind", "customer", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "ikind", "customer", "total", "payment", "mop", "fulfillment", "courier", "tracking", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, barcode: { label: "Barcode" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r pcell" }, compare: { label: "Compare at", cls: "r pcell" }, cost: { label: "Cost", cls: "r pcell" }, stock: { label: "In stock", cls: "r" }, committed: { label: "Committed", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
-    all: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"], show: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"] },
+    all: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "web"], show: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "web"] },
   packing: { all: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "total", "actions"], show: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
 // Listings columns are saved per person; order tables per department.
@@ -5436,7 +5437,7 @@ function annPicks() {
     if (L.length >= 2) return L.slice(0, L.length >= 4 ? 4 : 2);
   }
   if (Date.now() - annPickMemo.at < 60000 && annPickMemo.list.length) return annPickMemo.list;
-  let L = []; try { L = webProducts().filter(p => p.kind === "onhand" && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
+  let L = []; try { L = webProducts().filter(p => p.kind === "onhand" && !p.soldOut && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
   L.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
   annPickMemo = { at: Date.now(), list: L.slice(0, L.length >= 4 ? 4 : 2) }; return annPickMemo.list;
 }
@@ -5733,7 +5734,7 @@ async function annPrepare() {
   const have = S.webmeta.find(d => d.id === "_annpicks"); if (have && have.v === ANN_PICKS_V && (have.picks || []).filter(x => x.img).length >= 2) return true;
   if (!S.photos || S.readOnly || S.viewAs) return false;
   annPrepBusy = (async () => {
-    let C = []; try { C = webProducts().filter(p => p.kind === "onhand" && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
+    let C = []; try { C = webProducts().filter(p => p.kind === "onhand" && !p.soldOut && /^https:\/\//.test((p.imgs || [])[0] || "") && p.price > 0); } catch (e) {}
     C.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
     // Picks made before stay the same perfumes; only their photos are redone.
     const keep = have && Array.isArray(have.picks) ? have.picks.map(x => C.find(p => p.id === x.id)).filter(Boolean) : [];
@@ -6292,14 +6293,13 @@ function varRowHtml(v, main, isNew) {
     <td><input data-vf="compareAt" class="money" inputmode="decimal" value="${Number(v.compareAt) ? moneyFmt(v.compareAt) : ""}" aria-label="Compare-at price" style="width:82px"></td>
     <td><input data-vf="cost" class="money" inputmode="decimal" value="${Number(v.cost) ? moneyFmt(v.cost) : ""}" aria-label="Cost" style="width:82px"></td>
     <td><input data-vf="stock" type="number" step="1" value="${Number(v.stock) || 0}" aria-label="Stock" style="width:58px"></td>
-    <td><select data-vf="status" aria-label="Status">${opt(Object.entries(LIST_STATUS).map(([k, st]) => [k, k === "hidden" ? "Inactive" : st.name]), v.status || "active")}</select></td>
     <td><input data-vf="supplier" value="${esc(v.supplier || "")}" placeholder="S-…" aria-label="Supplier code" style="width:76px"></td>
     <td style="text-align:center"><input type="radio" name="v-main" value="${esc(v.id)}" ${main ? "checked" : ""} aria-label="Main photo"></td></tr>`;
 }
 function varsHtml(p) {
   const vars = scentVars(p).sort(varSort), m = scentMainOf(vars) || p;
   return `<div class="field"><label>Variations <span style="font-weight:400;color:var(--muted)">· one listing per scent. Each option has its own photo (tap it to change); “Main” is the listing’s main photo.</span></label>
-    <div class="table-wrap var-wrap"><table class="otable var-table"><thead><tr><th>Photo</th><th>Size</th><th>Type</th><th>On hand / Pre-order</th><th>ETA</th><th>SRP</th><th>Compare at</th><th>Cost</th><th>Stock</th><th>Status</th><th>Supplier</th><th>Main</th></tr></thead>
+    <div class="table-wrap var-wrap"><table class="otable var-table"><thead><tr><th>Photo</th><th>Size</th><th>Type</th><th>On hand / Pre-order</th><th>ETA</th><th>SRP</th><th>Compare at</th><th>Cost</th><th>Stock</th><th>Supplier</th><th>Main</th></tr></thead>
     <tbody id="var-rows">${vars.map(v => varRowHtml(v, v.id === m.id)).join("")}</tbody></table></div>
     <datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
     <div><button class="btn sm" type="button" data-act="var-add" data-id="${esc(p.id)}">+ Add variation</button></div></div>`;
@@ -6324,7 +6324,7 @@ const varNum = v => { const n = String(v || "").replace(/[^\d.]/g, ""); return n
 function varRowsRead() {
   return [...document.querySelectorAll("#var-rows tr[data-var]")].map(tr => { const g = k => (tr.querySelector(`[data-vf="${k}"]`) || {}).value || "";
     const kind = g("kind") === "preorder" ? "preorder" : "onhand";
-    return { id: tr.dataset.var, isNew: !!tr.dataset.new, img: g("img"), f: { size: g("size").trim(), ptype: g("ptype"), kind, eta: kind === "preorder" ? g("eta") : "", price: varNum(g("price")), compareAt: varNum(g("compareAt")), cost: varNum(g("cost")), stock: Math.round(Number(g("stock")) || 0), status: g("status") || "active", supplier: g("supplier").toUpperCase().replace(/\s+/g, "") } }; });
+    return { id: tr.dataset.var, isNew: !!tr.dataset.new, img: g("img"), f: { size: g("size").trim(), ptype: g("ptype"), kind, eta: kind === "preorder" ? g("eta") : "", price: varNum(g("price")), compareAt: varNum(g("compareAt")), cost: varNum(g("cost")), stock: Math.round(Number(g("stock")) || 0), supplier: g("supplier").toUpperCase().replace(/\s+/g, "") } }; });
 }
 // Saves the other options of the scent: the listing's shared details (name, notes, badges…) plus each row; adds new variations.
 async function varsSave(p, data, vrows, main) {
@@ -6332,7 +6332,7 @@ async function varsSave(p, data, vrows, main) {
   const shared = { brand: data.brand, category: data.category, badges: data.badges, isNew: data.isNew, notes: data.notes, accords: data.accords, fragrantica: data.fragrantica, description: data.description };
   for (const r of vrows) {
     if (r.id === p.id) continue;
-    if (r.isNew) { const nid = uid("p"), rec = { ...shared, name: base, ...r.f, reorder: 1, createdAt: now, imgs: r.img ? [r.img] : [], photo: r.img || "", scentMain: main === r.id, webSync: "pending", editedAt: now, editedBy: by, log: [{ at: now, by, msg: `added as a variation of ${base} (${varLabel(r.f)})` }] };
+    if (r.isNew) { const nid = uid("p"), rec = { ...shared, name: base, ...r.f, status: "active", reorder: 1, createdAt: now, imgs: r.img ? [r.img] : [], photo: r.img || "", scentMain: main === r.id, webSync: "pending", editedAt: now, editedBy: by, log: [{ at: now, by, msg: `added as a variation of ${base} (${varLabel(r.f)})` }] };
       tidyListing(rec); await save("products", nid, rec); out.push(nid); continue; }
     const v = S.products.find(x => x.id === r.id); if (!v) continue;
     const u = { ...shared, ...r.f, scentMain: main === r.id };
@@ -6367,7 +6367,6 @@ function openProductForm(id, preset = {}) {
     <div class="row">
       ${id ? "" : `<div class="field"><label for="p-stock">Units in stock <span style="font-weight:400">(free to sell)</span></label><input id="p-stock" type="number" step="1" value="${p.stock ?? 0}">${id && reservedOf(p) ? `<small style="color:var(--muted)">+ ${reservedOf(p)} reserved in checked-out orders · ${(Number(p.stock) || 0) + reservedOf(p)} on hand</small>` : ""}</div>`}
       <div class="field"><label for="p-reorder">Low-stock alert at</label><input id="p-reorder" type="number" min="0" step="1" value="${p.reorder ?? 1}"></div>
-      ${id ? "" : `<div class="field"><label for="p-status">Listing status</label><select id="p-status">${Object.entries(LIST_STATUS).map(([k, s]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>`}
     </div>
     <div class="row">
       <div class="field"><label for="p-sku">SKU</label><input id="p-sku" value="${esc(p.sku || "")}"></div>
@@ -6403,7 +6402,7 @@ function openProductForm(id, preset = {}) {
     if (!val("p-name")) return sheetError("Give the product a name.");
     const bc = val("p-barcode");
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
-    const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : val("p-status"), kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), supplier: val("p-supplier").toUpperCase().replace(/\s+/g, ""), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : "active", kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), supplier: val("p-supplier").toUpperCase().replace(/\s+/g, ""), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     // Fields that are edited in the Listings table aren't in Edit listing: keep them as they are.
     if (id) for (const k of ["size", "price", "compareAt", "cost", "stock"]) { if (k in p) data[k] = p[k]; else delete data[k]; }
     // Variations: this option's row (size, type, prices, stock…) and its own photo, then the other options after saving.
@@ -6437,10 +6436,12 @@ function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), qWords = q.split(/\s+/).filter(Boolean), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products, lb = S.lbrand || "", lc = S.lcat || "", lbd = S.lbadge || "", lst = S.lstat || "";
   const brands = [...new Set(all.map(p => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const counts = { onhand: all.filter(p => p.kind !== "preorder").length, preorder: all.filter(p => p.kind === "preorder").length, all: all.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: all.filter(isOut).length, pending: all.filter(p => p.webSync === "pending").length };
+  // No Active / Inactive status (K, Oct 14, 2026): old listings sit in the Archive (status "hidden"), out of the normal views; search still finds them.
+  const arch = p => p.status === "hidden", cur = all.filter(p => !arch(p));
+  const counts = { onhand: cur.filter(p => p.kind !== "preorder").length, preorder: cur.filter(p => p.kind === "preorder").length, all: cur.length, active: all.filter(p => (p.status || "active") === "active").length, draft: all.filter(p => p.status === "draft").length, hidden: all.filter(p => p.status === "hidden").length, out: cur.filter(isOut).length, pending: all.filter(p => p.webSync === "pending").length };
   const fs = LSORTS[ls.sort] || LSORTS.edited, dir = ls.dir === "asc" ? 1 : -1;
   const rows = all.filter(p => (f === "all" || (f === "onhand" ? p.kind !== "preorder" : f === "preorder" ? p.kind === "preorder" : f === "out" ? isOut(p) : f === "pending" ? p.webSync === "pending" : (p.status || "active") === f))
-    && (!lst || (p.status || "active") === lst) && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
+    && (f === "hidden" || q || !arch(p)) && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
     && (!q || qWords.every(w => [p.brand, p.name, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta, p.kind === "preorder" ? "pre-order preorder" : "on hand"].join(" ").toLowerCase().includes(w))))
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
   // One scent = one listing: options of the same scent are shown together under one heading (paged by scent).
@@ -6455,12 +6456,11 @@ function viewListings() {
   const etaOpts = p => { const opts2 = [...new Set([...MONTHS, p.eta].filter(Boolean))]; return `<option value="">–</option>${opts2.map(m => `<option ${p.eta === m ? "selected" : ""}>${esc(m)}</option>`).join("")}`; };
   return `${webPushErr && counts.pending ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span><strong>Website:</strong> ${counts.pending} change${counts.pending === 1 ? "" : "s"} couldn’t reach <a href="${SITE}" target="_blank" rel="noopener">your website</a> yet (${esc(webPushErr)}). RS OS keeps trying on its own.</span></div>` : ""}
     <div class="bigsearch">${svg("search")}<input id="liq" type="search" placeholder="Search name, brand, SKU, barcode or ETA" value="${esc(S.liq || "")}" aria-label="Search listings" autocomplete="off"><button type="button" class="btn sm" data-act="liq-scan" title="Find a listing by scanning its barcode" aria-label="Scan barcode to search" style="flex:none">📷 Scan</button><input id="liq-cam" type="file" accept="image/*" capture="environment" hidden><input id="l-bc-cam" type="file" accept="image/*" capture="environment" hidden></div>
-    <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"]].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
+    <div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[["all", "All"], ["onhand", "On hand"], ["preorder", "Pre-order"], ["out", "Sold out"], ["hidden", "Archive"], ...(counts.draft ? [["draft", "Draft"]] : [])].map(([k, l]) => `<button type="button" data-lfilter="${k}" aria-pressed="${f === k}">${l} <span style="opacity:.6">${counts[k]}</span></button>`).join("")}</div>
       <select id="l-brand" aria-label="Filter by brand"><option value="">All brands</option>${brands.map(b => `<option ${b === lb ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
       <select id="l-cat" aria-label="Filter by collection"><option value="">All collections</option>${WEB_CATS.map(([k, l]) => `<option value="${k}" ${k === lc ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select id="l-badge" aria-label="Filter by badge"><option value="">All badges</option><option value="_any" ${lbd === "_any" ? "selected" : ""}>Any badge</option>${BADGES.map(b => `<option ${b === lbd ? "selected" : ""}>${esc(b)}</option>`).join("")}<option value="_none" ${lbd === "_none" ? "selected" : ""}>No badge</option></select>
-      <select id="l-stat" aria-label="Filter by status"><option value="">All statuses</option>${[["active", "Active"], ["hidden", "Inactive"], ["draft", "Draft"]].map(([v, n]) => `<option value="${v}" ${v === lst ? "selected" : ""}>${n}</option>`).join("")}</select>
-      ${f !== "all" || q || lb || lc || lbd || lst ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
+      ${f !== "all" || q || lb || lc || lbd ? `<button class="btn ghost" type="button" data-act="l-clear">✕ Clear filters</button>` : ""}
       <button class="btn" type="button" data-act="columns" data-table="listings">⚙︎ Columns</button></div>
     ${can && S.lsel.size ? (() => { const o = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`; return `<div class="bulk"><strong>${S.lsel.size} selected</strong>
       <select data-lbulk="ptype" aria-label="Set type"><option value="">Set type…</option>${LIST_TYPES.map(t => o(t, t)).join("")}</select>
@@ -6469,7 +6469,7 @@ function viewListings() {
       <select data-lbulk="eta" aria-label="Set ETA"><option value="">Set ETA (pre-orders)…</option>${MONTHS.map(m => o(m, m)).join("")}</select>
       <select data-lbadge="add" aria-label="Add badge"><option value="">Add badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
       <select data-lbadge="remove" aria-label="Remove badge"><option value="">Remove badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
-      <select data-lbulk="status" aria-label="Set status"><option value="">Set status…</option>${Object.entries(LIST_STATUS).map(([k, st]) => o(k, k === "hidden" ? "Inactive" : st.name)).join("")}</select>
+      <select data-lbulk="status" aria-label="Archive"><option value="">Archive…</option>${o("hidden", "Move to archive")}${o("active", "Back to the shop")}</select>
       <input inputmode="decimal" class="money lb-num" id="lb-price" placeholder="SRP" aria-label="New SRP"><input inputmode="decimal" class="money lb-num" id="lb-compare" placeholder="Compare" aria-label="New compare-at price"><input inputmode="decimal" class="money lb-num" id="lb-cost" placeholder="Cost" aria-label="New cost">
       <button class="btn sm" type="button" data-act="lb-prices">Apply prices</button>
       <button class="btn sm" type="button" data-act="l-dup">⧉ Duplicate</button>
@@ -6479,7 +6479,7 @@ function viewListings() {
     <div class="table-wrap lwrap"><table class="otable ltable" data-own="1"><thead><tr><th class="cb">${can ? `<input type="checkbox" id="l-selall" aria-label="Select all ${rows.length} listings in this view" ${rows.length && rows.every(p => S.lsel.has(p.id)) ? "checked" : ""}>` : ""}</th><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
     <tbody>${pageG.map(g => (g.length > 1 ? lGroupHead(g, cols.length) : "") + g.map(p => { const sub = g.length > 1, out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}" class="${S.lsel.has(p.id) ? "sel" : ""}${sub ? " lsub" : ""}"><td class="cb">${can ? `<input type="checkbox" data-lsel="${p.id}" aria-label="Select ${esc(p.name)}" ${S.lsel.has(p.id) ? "checked" : ""}>` : ""}</td>
       <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
-      ${sub ? `<td class="lvar">${esc(varLabel(p))}${scentSuffix(p.name) ? ` <span style="color:var(--muted);font-weight:400">${esc(scentSuffix(p.name).trim())}</span>` : ""}</td>` : `<td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" || b === "Clearance sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>`}
+      ${sub ? `<td class="lvar">${esc(varLabel(p))}${scentSuffix(p.name) ? ` <span style="color:var(--muted);font-weight:400">${esc(scentSuffix(p.name).trim())}</span>` : ""}${p.status === "hidden" ? ` <span class="chip">Archived</span>` : p.status === "draft" ? ` <span class="chip">Draft</span>` : ""}</td>` : `<td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}${p.status === "hidden" ? ` <span class="chip">Archived</span>` : p.status === "draft" ? ` <span class="chip">Draft</span>` : ""}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" || b === "Clearance sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>`}
       ${cols.map(k => ({
         size: () => `<td class="nowrap">${can ? `<input class="lcell" data-lset="size" data-id="${p.id}" list="l-size-list" value="${esc(p.size || "")}" aria-label="Size" style="width:78px">` : esc(p.size || "")}</td>`,
         type: () => `<td class="nowrap">${can ? `<select class="lcell" data-lset="ptype" data-id="${p.id}" aria-label="Type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : esc(p.ptype || "")}</td>`,
@@ -6568,10 +6568,11 @@ async function readListingFile(file) {
 /* ---------- website code (WebCake custom HTML block) ---------- */
 const slug = s => String(s || "").toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 90);
 function webProducts() {
-  const live = S.products.filter(p => (p.status || "active") === "active" && p.name && (p.kind === "preorder" || (Number(p.stock) || 0) > 0 || p.webId));
-  return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || poOut(a) - poOut(b) || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
-    .filter(p => p.kind === "preorder" || (Number(p.stock) || 0) > 0)
-    .map(p => ({ id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [], isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", ...(poOut(p) ? { soldOut: true } : {}), vac: !!p.vac, ...(p.inspiredBy ? { insp: p.inspiredBy } : {}), created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
+  // Every active listing goes to the site (K, Oct 14, 2026): on-hand options with no stock show there as Sold out. Same as api/_webfeed.js.
+  const isOutW = p => p.kind === "preorder" ? !!p.soldOut : !((Number(p.stock) || 0) > 0);
+  const live = S.products.filter(p => (p.status || "active") === "active" && p.name);
+  return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || isOutW(a) - isOutW(b) || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
+    .map(p => ({ id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [], isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", ...(isOutW(p) ? { soldOut: true } : {}), vac: !!p.vac, ...(p.inspiredBy ? { insp: p.inspiredBy } : {}), created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
 }
 const webCodeText = () => "<script>\nwindow.PRODUCTS=" + JSON.stringify(webProducts()).replace(/<\//g, "<\\/") + ";\n</" + "script>";
 function openWebCode() {
@@ -8829,7 +8830,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "l-selall") { const ids = S.lrowIds || []; ids.forEach(id => t.checked ? S.lsel.add(id) : S.lsel.delete(id)); render(); return; }
   if (t.dataset.lsel) { t.checked ? S.lsel.add(t.dataset.lsel) : S.lsel.delete(t.dataset.lsel); render(); return; }
   if (t.dataset.lbulk) { const f = t.dataset.lbulk, v = t.value; if (!v) return;
-    const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? KIND_LAB[v] : f === "status" ? "status → " + (v === "hidden" ? "Inactive" : (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
+    const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? KIND_LAB[v] : f === "status" ? (v === "hidden" ? "moved to archive" : v === "active" ? "back to the shop" : "status → " + (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
     await listingsBulk(f === "kind" ? kindUpd(v) : { [f]: v }, lab); return; }
   if (t.id === "l-badge") { S.lbadge = t.value; S.lpage = 0; render(); return; }
   if (t.id === "l-stat") { S.lstat = t.value; S.lpage = 0; render(); return; }
