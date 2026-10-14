@@ -850,6 +850,8 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webki
 tr.lgrp td { background: var(--surface-2); border-top: 2px solid var(--line); }
 .var-table td, .var-table th { padding: 5px 6px; white-space: nowrap; }
 .var-table input, .var-table select { padding: 5px 6px; font-size: 13px; }
+.var-table select { min-width: 96px; } .var-table select[data-vf="eta"] { min-width: 110px; } .var-table select[data-vf="kind"] { min-width: 112px; }
+.sheet:has(.var-table) { width: min(1080px, 100%); }
 .var-ph { display: block; width: 46px; height: 46px; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--surface-2); border: 1px dashed var(--line); }
 .var-ph img, .var-ph svg { width: 100%; height: 100%; object-fit: cover; display: block; }
 .var-ph svg { padding: 8px; color: var(--gold); }
