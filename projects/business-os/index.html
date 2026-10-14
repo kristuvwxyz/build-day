@@ -847,6 +847,16 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webki
 .sheet-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .list.costs .li { font-size: 12.5px; padding-top: 5px; padding-bottom: 5px; }
 .ltable td { vertical-align: middle; } .lthumb { width: 52px; } .lthumb img, .lthumb svg { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: var(--surface-2); display: block; } .lthumb svg { padding: 8px; color: var(--gold); }
+tr.lgrp td { background: var(--surface-2); border-top: 2px solid var(--line); }
+.var-table td, .var-table th { padding: 5px 6px; white-space: nowrap; }
+.var-table input, .var-table select { padding: 5px 6px; font-size: 13px; }
+.var-ph { display: block; width: 46px; height: 46px; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--surface-2); border: 1px dashed var(--line); }
+.var-ph img, .var-ph svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.var-ph svg { padding: 8px; color: var(--gold); }
+.var-ph.busy { opacity: .45; }
+tr.lgrp .lgrp-n { font-size: 12px; color: var(--muted); }
+tr.lsub td.lvar { padding-left: 22px; font-weight: 600; font-size: 13px; white-space: nowrap; }
+tr.lsub .lthumb img, tr.lsub .lthumb svg { width: 34px; height: 34px; margin-left: 8px; }
 tr[data-lrow] { cursor: pointer; } tr[data-lrow]:hover td { background: var(--surface-2); }
 .gs { position: relative; display: flex; align-items: center; }
 body.no-orders .gs { display: none !important; }
@@ -2854,7 +2864,6 @@ function viewHome() {
   ${side ? `<div class="home-side">${side}</div>` : ""}
   </div>
   ${vatCard()}
-  ${APP_BUILD && !isStandalone() && !installHidden() ? `<div class="panel install-card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px"><span style="font-size:22px">📲</span><span style="flex:1;min-width:180px;font-size:14px"><b>Add RS OS to your Home Screen</b><br><span style="color:var(--muted);font-size:12.5px">Open it like an app, in one tap.</span></span><button type="button" class="btn sm primary" data-act="install-open">Show me how</button><button type="button" class="btn ghost sm" data-act="install-hide" aria-label="Hide this">✕</button></div>` : ""}
   ${orgChart(false)}
   <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>`;
 }
@@ -5619,8 +5628,11 @@ const prNorm = x => String(x || "").toLowerCase().normalize("NFKD").replace(/[^a
 const prKey = p => [p.brand, p.name, p.size].map(prNorm).join("|");
 const prSkip = p => /beauty|arabian/i.test(p.category || "") || (p.status || "active") !== "active";
 function prLead(p) {
-  if (prSkip(p) || p.ptype === "Sealed") return true;
-  const k = prKey(p), sib = S.products.filter(x => !prSkip(x) && prKey(x) === k); if (sib.some(x => x.ptype === "Sealed")) return false;
+  if (prSkip(p)) return true;
+  if (p.ptype === "Sealed" && !S.products.some(x => x.scentMain && x.id !== p.id && !prSkip(x) && prKey(x) === prKey(p))) return true;
+  const k = prKey(p), sib = S.products.filter(x => !prSkip(x) && prKey(x) === k);
+  const chosen = sib.find(x => x.scentMain); if (chosen) return chosen.id === p.id;
+  if (sib.some(x => x.ptype === "Sealed")) return false;
   const rank = x => { const i = PR_ORDER.indexOf(x.ptype); return i < 0 ? 99 : i; };
   sib.sort((a, b) => rank(a) - rank(b) || (a.kind === "preorder") - (b.kind === "preorder") || String(a.id).localeCompare(String(b.id)));
   return !sib.length || sib[0].id === p.id;
@@ -5635,6 +5647,19 @@ function prWant(p, L = tplImgs(p)) {
   // Lead with no scent card of ours yet (no notes): leave its photos alone until it has one.
   return card && card !== L[0] && L.includes(card) ? [L[0], card] : null;
 }
+/* One scent = one listing (K, Oct 14, 2026). Every option (size, Sealed / Tester / Partial / Decant, on hand / pre-order)
+   stays its own record (stock, orders and the website work per option), but RS OS shows and edits them together as one
+   listing: same brand + name, ignoring notes in brackets like (No Box), (2025), (Seal). scentKey on a record overrides
+   the automatic match. scentMain marks the option whose photo is the listing's main photo (default: Sealed first). */
+const SCENT_NOISE = /\s*\((?:no box|seal|sealed|dmg|damaged|dented|new|tester|fsm|\d{4}|unboxed|boxed|box|no cap|cap|copy|vial|mini|partial|decant|unsealed)\)/gi;
+const scentBase = n => String(n || "").replace(SCENT_NOISE, "").replace(/\s+/g, " ").trim();
+const scentSuffix = n => (String(n || "").match(SCENT_NOISE) || []).join("");
+const scentKeyOf = p => p.scentKey || [p.brand, scentBase(p.name)].map(prNorm).join("|");
+const scentVars = p => { const k = scentKeyOf(p); return S.products.filter(x => scentKeyOf(x) === k); };
+const VAR_RANK = ["Sealed", "Boxed, New", "Unsealed, New", "Tester", "Partial", "Set", "Mini", "Vial", "Decant", "Other"];
+const varSort = (a, b) => ((a.status || "active") !== "active") - ((b.status || "active") !== "active") || (VAR_RANK.indexOf(a.ptype) + 1 || 99) - (VAR_RANK.indexOf(b.ptype) + 1 || 99) || sizeKey(b.size || "") - sizeKey(a.size || "") || (a.kind === "preorder") - (b.kind === "preorder");
+const scentMainOf = list => list.find(x => x.scentMain) || [...list].sort(varSort)[0];
+const varLabel = p => [p.size, p.ptype, p.kind === "preorder" ? "Pre-order" + (p.eta ? " · " + p.eta : "") : "On hand"].filter(Boolean).join(" · ");
 const prNeeds = p => { const w = prWant(p); return !!w && JSON.stringify(w) !== JSON.stringify(tplImgs(p)); };
 const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
   if (prBroken(p)) return false;
@@ -6247,6 +6272,72 @@ document.addEventListener("drop", e => { const a = e.target.closest && e.target.
 document.addEventListener("keydown", e => { if (e.target.id === "olog-text" && e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ologPost($('#olog-add [data-act="olog-post"]')); } });
 // Short forms in listing names: Eau de Parfum → EDP, Eau de Toilette → EDT.
 const shortConc = n => String(n || "").replace(/\beau\s+de\s+parfum\b/gi, "EDP").replace(/\beau\s+de\s+toilette\b/gi, "EDT").replace(/\b(men|women)\b/gi, m => m[0].toUpperCase() + m.slice(1).toLowerCase());   // "Men" / "Women", always capitalised
+/* Variations inside Edit listing (K, Oct 14, 2026): every option of the scent in one table, each with its own photo.
+   "Main" picks whose photo is the listing's main photo (Sealed first when nobody picked). New photos go on the marble template by themselves. */
+function varRowHtml(v, main, isNew) {
+  const opt = (list, cur) => list.map(([k, l]) => `<option value="${esc(k)}" ${cur === k ? "selected" : ""}>${esc(l)}</option>`).join("");
+  return `<tr data-var="${esc(v.id)}"${isNew ? ' data-new="1"' : ""}>
+    <td><label class="var-ph" title="Change this option's photo">${v.photo ? `<img src="${esc(v.photo)}" alt="">` : BOTTLE}<input type="file" accept="image/*" data-varph="1" hidden></label><input type="hidden" data-vf="img" value=""></td>
+    <td><input data-vf="size" list="p-size-list" value="${esc(v.size || "")}" aria-label="Size" style="width:74px"></td>
+    <td><select data-vf="ptype" aria-label="Type"><option value="">–</option>${opt([...new Set([...LIST_TYPES, v.ptype].filter(Boolean))].map(t => [t, t]), v.ptype || "")}</select></td>
+    <td><select data-vf="kind" aria-label="On hand or pre-order">${opt([["onhand", "On hand"], ["preorder", "Pre-order"]], v.kind === "preorder" ? "preorder" : "onhand")}</select></td>
+    <td><select data-vf="eta" aria-label="ETA"><option value="">–</option>${opt([...new Set([...MONTHS, v.eta].filter(Boolean))].map(m => [m, m]), v.eta || "")}</select></td>
+    <td><input data-vf="price" class="money" inputmode="decimal" value="${moneyFmt(v.price)}" aria-label="SRP" style="width:82px"></td>
+    <td><input data-vf="compareAt" class="money" inputmode="decimal" value="${Number(v.compareAt) ? moneyFmt(v.compareAt) : ""}" aria-label="Compare-at price" style="width:82px"></td>
+    <td><input data-vf="cost" class="money" inputmode="decimal" value="${Number(v.cost) ? moneyFmt(v.cost) : ""}" aria-label="Cost" style="width:82px"></td>
+    <td><input data-vf="stock" type="number" step="1" value="${Number(v.stock) || 0}" aria-label="Stock" style="width:58px"></td>
+    <td><select data-vf="status" aria-label="Status">${opt(Object.entries(LIST_STATUS).map(([k, st]) => [k, k === "hidden" ? "Inactive" : st.name]), v.status || "active")}</select></td>
+    <td><input data-vf="supplier" value="${esc(v.supplier || "")}" placeholder="S-…" aria-label="Supplier code" style="width:76px"></td>
+    <td style="text-align:center"><input type="radio" name="v-main" value="${esc(v.id)}" ${main ? "checked" : ""} aria-label="Main photo"></td></tr>`;
+}
+function varsHtml(p) {
+  const vars = scentVars(p).sort(varSort), m = scentMainOf(vars) || p;
+  return `<div class="field"><label>Variations <span style="font-weight:400;color:var(--muted)">· one listing per scent. Each option has its own photo (tap it to change); “Main” is the listing’s main photo.</span></label>
+    <div class="table-wrap var-wrap"><table class="otable var-table"><thead><tr><th>Photo</th><th>Size</th><th>Type</th><th>On hand / Pre-order</th><th>ETA</th><th>SRP</th><th>Compare at</th><th>Cost</th><th>Stock</th><th>Status</th><th>Supplier</th><th>Main</th></tr></thead>
+    <tbody id="var-rows">${vars.map(v => varRowHtml(v, v.id === m.id)).join("")}</tbody></table></div>
+    <datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
+    <div><button class="btn sm" type="button" data-act="var-add" data-id="${esc(p.id)}">+ Add variation</button></div></div>`;
+}
+function varAdd(id) {
+  const p = S.products.find(x => x.id === id), tb = $("#var-rows"); if (!p || !tb) return;
+  tb.insertAdjacentHTML("beforeend", varRowHtml({ id: "new" + Date.now(), size: p.size || "", ptype: "", kind: "preorder", eta: "", price: "", stock: 0, status: "active", supplier: "" }, false, true));
+}
+async function varPhoto(inp) {
+  const f = inp.files && inp.files[0]; inp.value = ""; if (!f) return;
+  if (!S.photos) return toast("Photos can only be saved in the RS App online. Try again in a moment.");
+  const tr = inp.closest("tr[data-var]"), lab = inp.closest(".var-ph"); lab.classList.add("busy");
+  try { const r = await S.photos.save({ data: await resizeImage(f, 1600, false) }).catch(e => ({ ok: false, error: e && e.message }));
+    if (!r || !r.ok || !r.url) throw new Error((r && r.error) || "try again");
+    tr.querySelector('[data-vf="img"]').value = r.url; lab.querySelector("svg")?.remove();
+    const im = lab.querySelector("img") || lab.insertBefore(document.createElement("img"), lab.firstChild); im.src = r.url;
+    toast("Photo ready. It goes on the marble template after you save.");
+  } catch (e) { toast("Couldn't save the photo: " + e.message); } finally { lab.classList.remove("busy"); }
+}
+const varPhotoReset = url => ({ imgs: [url], photo: url, tplOk: null, tplFrom: null, tplFail: null, card: null });
+const varNum = v => { const n = String(v || "").replace(/[^\d.]/g, ""); return n ? Number(n) : 0; };
+function varRowsRead() {
+  return [...document.querySelectorAll("#var-rows tr[data-var]")].map(tr => { const g = k => (tr.querySelector(`[data-vf="${k}"]`) || {}).value || "";
+    const kind = g("kind") === "preorder" ? "preorder" : "onhand";
+    return { id: tr.dataset.var, isNew: !!tr.dataset.new, img: g("img"), f: { size: g("size").trim(), ptype: g("ptype"), kind, eta: kind === "preorder" ? g("eta") : "", price: varNum(g("price")), compareAt: varNum(g("compareAt")), cost: varNum(g("cost")), stock: Math.round(Number(g("stock")) || 0), status: g("status") || "active", supplier: g("supplier").toUpperCase().replace(/\s+/g, "") } }; });
+}
+// Saves the other options of the scent: the listing's shared details (name, notes, badges…) plus each row; adds new variations.
+async function varsSave(p, data, vrows, main) {
+  const by = data.editedBy, now = Date.now(), base = scentBase(data.name), oldBase = scentBase(p.name), out = [];
+  const shared = { brand: data.brand, category: data.category, badges: data.badges, isNew: data.isNew, notes: data.notes, accords: data.accords, fragrantica: data.fragrantica, description: data.description };
+  for (const r of vrows) {
+    if (r.id === p.id) continue;
+    if (r.isNew) { const nid = uid("p"), rec = { ...shared, name: base, ...r.f, reorder: 1, createdAt: now, imgs: r.img ? [r.img] : [], photo: r.img || "", scentMain: main === r.id, webSync: "pending", editedAt: now, editedBy: by, log: [{ at: now, by, msg: `added as a variation of ${base} (${varLabel(r.f)})` }] };
+      tidyListing(rec); await save("products", nid, rec); out.push(nid); continue; }
+    const v = S.products.find(x => x.id === r.id); if (!v) continue;
+    const u = { ...shared, ...r.f, scentMain: main === r.id };
+    if (base !== oldBase) u.name = base + scentSuffix(v.name);
+    if (r.img) Object.assign(u, varPhotoReset(r.img));
+    const ch = Object.keys(u).filter(k => JSON.stringify(v[k] ?? "") !== JSON.stringify(u[k] ?? "") && !(u[k] === false && !v[k]) && !(Array.isArray(u[k]) && !u[k].length && !v[k]) && !(k === "notes" && !Object.keys(u.notes || {}).length && !v.notes));
+    if (!ch.length) continue;
+    await patch("products", v.id, { ...u, webSync: "pending", editedAt: now, editedBy: by, log: logAdd(v, ["changed " + ch.join(", ") + " (in the listing)"], by) }); out.push(v.id);
+  }
+  return out;
+}
 function openProductForm(id, preset = {}) {
   const p = id ? S.products.find(x => x.id === id) : { status: "active", reorder: 1, stock: 0, ...preset };
   openSheet(`
@@ -6255,6 +6346,7 @@ function openProductForm(id, preset = {}) {
       <div id="p-photos" class="pgal">${pgalHtml(galListingImgs(p))}</div>
       <input id="p-photo-file" type="file" accept="image/*" multiple hidden>
       <input type="hidden" id="p-imgs" value="${esc(JSON.stringify(galListingImgs(p)))}"></div>
+    ${id ? varsHtml(p) : ""}
     <div class="field"><label for="p-brand">Brand</label><input id="p-brand" list="p-brand-list" value="${esc(p.brand || "")}" placeholder="Pick or type a brand" autocomplete="off"><datalist id="p-brand-list">${listOptions("brand").sort((a, b) => a.localeCompare(b)).map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
     <div class="field"><label for="p-name">Product name</label><input id="p-name" value="${esc(p.name || "")}" placeholder="e.g. Carolina Herrera Good Girl EDP 80ml"></div>
     <div class="row">
@@ -6308,19 +6400,33 @@ function openProductForm(id, preset = {}) {
     const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : val("p-status"), kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), supplier: val("p-supplier").toUpperCase().replace(/\s+/g, ""), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     // Fields that are edited in the Listings table aren't in Edit listing: keep them as they are.
     if (id) for (const k of ["size", "price", "compareAt", "cost", "stock"]) { if (k in p) data[k] = p[k]; else delete data[k]; }
+    // Variations: this option's row (size, type, prices, stock…) and its own photo, then the other options after saving.
+    const vrows = id ? varRowsRead() : [], vmain = (document.querySelector('input[name="v-main"]:checked') || {}).value || "";
+    if (vrows.some(r => r.isNew && !r.f.ptype)) return sheetError("Pick a Type for each new variation.");
+    const vme = vrows.find(r => r.id === id);
+    if (vme) { Object.assign(data, vme.f); if (vme.img) Object.assign(data, varPhotoReset(vme.img)); if (vrows.length > 1 || vmain) data.scentMain = vmain === id; }
     if (!id) data.createdAt = Date.now();
     const PLAB = { name: "name", brand: "brand", size: "size", ptype: "type", sku: "SKU", barcode: "barcode", category: "collection", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", reorder: "low-stock alert", status: "status", kind: "availability", eta: "ETA", badges: "badges", notes: "notes", accords: "accords", fragrantica: "Fragrantica link", description: "description", url: "website link", batch: "batch no.", photo: "photo" };
     const changed = id ? Object.keys(PLAB).filter(k => JSON.stringify(p[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !p[k]) && !(k === "notes" && !Object.keys(data.notes).length && !p.notes)) : [];
     data.log = logAdd(p, [id ? (changed.length ? "changed " + changed.map(k => PLAB[k]).join(", ") : "saved with no changes") : "added this listing"]);
     tidyListing(data);
     const pid = id || uid("p"); await save("products", pid, data);
-    closeSheet(); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
+    const vt = id ? await varsSave(p, data, vrows, vmain) : [];
+    closeSheet();
+    vt.forEach((t, k) => setTimeout(() => tplOne(t).then(ch => { if (ch) scheduleWebPush(true); }).catch(e => console.warn("tpl", e)), 2500 + k * 1500)); toast(id ? "Listing updated. Marked to sync with the website." : "Listing added. Marked to sync with the website.");
     setTimeout(() => tplOne(pid).then(ch => { if (ch) { scheduleWebPush(true); toast("Template photo + scent card added to the listing."); } }).catch(e => console.warn("tpl", e)), 1500);
   });
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const LSORTS = { name: p => (p.brand + " " + p.name).toLowerCase(), size: p => (p.size || "").toLowerCase(), type: p => (p.ptype || "").toLowerCase(), cat: p => p.category || "unisex", kind: p => p.kind || "", eta: p => { const i = MONTHS.indexOf(p.eta); return i < 0 ? 99 : i; }, price: p => Number(p.price) || 0, compare: p => Number(p.compareAt) || 0, cost: p => Number(p.cost) || 0, stock: p => Number(p.stock) || 0, committed: p => committedOf(p), status: p => p.status || "active", web: p => p.webSync || "", edited: p => p.editedAt || p.createdAt || 0 };
+// Heading row of a scent with several options: main photo, brand, name; click opens the whole listing.
+function lGroupHead(g, ncols) {
+  const all = scentVars(g[0]).sort(varSort), m = scentMainOf(all) || g[0], live = all.filter(onSite).length;
+  return `<tr class="lgrp" data-lrow="${m.id}"><td class="cb"></td><td class="lthumb">${m.photo ? `<img src="${esc(m.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
+    <td colspan="${ncols + 1}"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(m.brand || "")}</div><div style="font-weight:600;font-size:15px">${esc(scentBase(m.name))}</div>
+      <span class="lgrp-n">${all.length} options · ${live} on the website${all.length > g.length ? ` · ${g.length} shown by the filter` : ""}</span>${badgesOf(m).map(b => ` <span class="chip ${b === "New arrival" ? "warn" : b === "On sale" || b === "Clearance sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join("")}</td></tr>`;
+}
 function viewListings() {
   const q = (S.liq || "").trim().toLowerCase(), qWords = q.split(/\s+/).filter(Boolean), f = S.lfilter && S.lfilter !== "pending" ? S.lfilter : "all", ls = S.ls || (S.ls = { sort: "edited", dir: "desc" });
   const all = S.products, lb = S.lbrand || "", lc = S.lcat || "", lbd = S.lbadge || "", lst = S.lstat || "";
@@ -6331,8 +6437,11 @@ function viewListings() {
     && (!lst || (p.status || "active") === lst) && (!lb || (p.brand || "") === lb) && (!lc || (p.category || "unisex") === lc) && (!lbd || (lbd === "_none" ? !badgesOf(p).length : lbd === "_any" ? badgesOf(p).length : badgesOf(p).includes(lbd)))
     && (!q || qWords.every(w => [p.brand, p.name, p.sku, p.barcode, p.category, p.size, p.ptype, p.webId, p.eta, p.kind === "preorder" ? "pre-order preorder" : "on hand"].join(" ").toLowerCase().includes(w))))
     .sort((a, b) => { const x = fs(a), y = fs(b); return (typeof x === "string" ? x.localeCompare(y, "en", { numeric: true }) : x - y) * dir; });
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
-  const page = rows.slice(S.lpage * PAGE, S.lpage * PAGE + PAGE);
+  // One scent = one listing: options of the same scent are shown together under one heading (paged by scent).
+  const groups = [], gix = new Map(); for (const p of rows) { const k = scentKeyOf(p); if (!gix.has(k)) { gix.set(k, groups.length); groups.push([]); } groups[gix.get(k)].push(p); }
+  groups.forEach(g => g.sort(varSort));
+  const pages = Math.max(1, Math.ceil(groups.length / PAGE)); S.lpage = Math.min(S.lpage || 0, pages - 1);
+  const pageG = groups.slice(S.lpage * PAGE, S.lpage * PAGE + PAGE);
   S.lrowIds = rows.map(p => p.id);
   S.lsel = S.lsel || new Set(); for (const id of [...S.lsel]) if (!all.some(p => p.id === id)) S.lsel.delete(id);
   const can = !S.readOnly, cols = visCols("listings").filter(k => !(k === "eta" && f === "onhand"));
@@ -6362,9 +6471,9 @@ function viewListings() {
       <button class="btn ghost sm" type="button" data-act="lb-clear">Clear selection</button></div>`; })() : ""}
     <datalist id="l-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
     <div class="table-wrap lwrap"><table class="otable ltable" data-own="1"><thead><tr><th class="cb">${can ? `<input type="checkbox" id="l-selall" aria-label="Select all ${rows.length} listings in this view" ${rows.length && rows.every(p => S.lsel.has(p.id)) ? "checked" : ""}>` : ""}</th><th></th>${th("name", "Product")}${cols.map(k => th(k, colLabel("listings", k), TABLE_COLS.listings.labels[k].cls)).join("")}</tr></thead>
-    <tbody>${page.map(p => { const out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}" class="${S.lsel.has(p.id) ? "sel" : ""}"><td class="cb">${can ? `<input type="checkbox" data-lsel="${p.id}" aria-label="Select ${esc(p.name)}" ${S.lsel.has(p.id) ? "checked" : ""}>` : ""}</td>
+    <tbody>${pageG.map(g => (g.length > 1 ? lGroupHead(g, cols.length) : "") + g.map(p => { const sub = g.length > 1, out = p.kind !== "preorder" && (Number(p.stock) || 0) <= 0; return `<tr data-lrow="${p.id}" class="${S.lsel.has(p.id) ? "sel" : ""}${sub ? " lsub" : ""}"><td class="cb">${can ? `<input type="checkbox" data-lsel="${p.id}" aria-label="Select ${esc(p.name)}" ${S.lsel.has(p.id) ? "checked" : ""}>` : ""}</td>
       <td class="lthumb">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : BOTTLE}</td>
-      <td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" || b === "Clearance sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>
+      ${sub ? `<td class="lvar">${esc(varLabel(p))}${scentSuffix(p.name) ? ` <span style="color:var(--muted);font-weight:400">${esc(scentSuffix(p.name).trim())}</span>` : ""}</td>` : `<td style="min-width:220px"><div class="s" style="font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;font-size:11px">${esc(p.brand || "")}</div><div style="font-weight:600">${esc(p.name)}</div>${badgesOf(p).map(b => `<span class="chip ${b === "New arrival" ? "warn" : b === "On sale" || b === "Clearance sale" ? "bad" : "info"}">${esc(b === "New arrival" ? "New" : b)}</span>`).join(" ")}</td>`}
       ${cols.map(k => ({
         size: () => `<td class="nowrap">${can ? `<input class="lcell" data-lset="size" data-id="${p.id}" list="l-size-list" value="${esc(p.size || "")}" aria-label="Size" style="width:78px">` : esc(p.size || "")}</td>`,
         type: () => `<td class="nowrap">${can ? `<select class="lcell" data-lset="ptype" data-id="${p.id}" aria-label="Type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : esc(p.ptype || "")}</td>`,
@@ -6379,9 +6488,9 @@ function viewListings() {
         committed: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : (() => { const c = committedOf(p); return c ? `<button type="button" class="linkish num" data-commit="${p.id}" title="See the orders holding these" style="font-weight:700">${c}</button>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
         web: () => `<td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : onSite(p) ? `<a class="site-link" href="${esc(webUrl(p))}" target="_blank" rel="noopener" title="Open this product on regalspritz.com">View on site ↗</a>` : `<span style="color:var(--muted);font-size:12px">Not on site</span>`}</td>`
-      })[k]()).join("")}</tr>`; }).join("")}</tbody></table>
+      })[k]()).join("")}</tr>`; }).join("")).join("")}</tbody></table>
     ${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No listings match." : "No listings yet. Click “Add listing”."}</div>`}</div>
-    <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${rows.length ? `${S.lpage * PAGE + 1}–${Math.min(rows.length, S.lpage * PAGE + PAGE)} of ${rows.length}` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
+    <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${groups.length ? `${S.lpage * PAGE + 1}–${Math.min(groups.length, S.lpage * PAGE + PAGE)} of ${groups.length} listings · ${rows.length} options` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
 }
 
 // Duplicate listings: same details + photos, name ends with " (COPY)", saved as Draft (not on the website until set Active).
@@ -8454,6 +8563,7 @@ document.addEventListener("click", guard(async ev => {
       if (op === "del") l.splice(i, 1); else if (op === "main") l.unshift(...l.splice(i, 1)); else { const j = op === "left" ? i - 1 : i + 1; if (j >= 0 && j < l.length) [l[i], l[j]] = [l[j], l[i]]; }
       pgalSet(l); return; }
     case "olog-post": return ologPost(b);
+    case "var-add": return varAdd(b.dataset.id);
     case "olog-unpend": { const f = ologPend.splice(Number(b.dataset.i), 1)[0]; if (f && f._url) URL.revokeObjectURL(f._url); ologPendShow(); return; }
     case "m-photo-clear": $("#m-photo").value = ""; $("#m-photo-prev").innerHTML = "<span>?</span>"; b.remove(); return;
     case "scent-web": { const q = val("sc-name"); window.open("https://www.google.com/search?tbm=isch&q=" + encodeURIComponent((q || "perfume") + " perfume bottle"), "_blank", "noopener"); return; }
@@ -8724,6 +8834,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "imp-file" && t.files[0]) return readImportFile(t.files[0]);
   if (t.id === "p-photo-file" && t.files[0]) { try { const l = pgalGet(); for (const f of [...t.files]) { const d = await resizeImage(f, 1600, false); const r = S.photos ? await S.photos.save({ data: d }).catch(() => null) : null; l.push(r && r.ok && r.url ? r.url : await resizeImage(f, 600, false)); } pgalSet(l); t.value = ""; } catch (e) { sheetError(e.message); } return; }
   if (t.id === "olog-file" && t.files[0]) { ologAddFiles(t.files); t.value = ""; return; }
+  if (t.dataset && t.dataset.varph && t.files && t.files[0]) { varPhoto(t); return; }
   if (t.id === "scan-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; return scanPhoto(f, "scan"); }
   if (t.id === "pack-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; return scanPhoto(f, "pack"); }
   if (t.id === "l-bc-cam" && t.files[0]) { const f = t.files[0]; t.value = ""; toast("Reading barcode…"); const c = await decodeBarcode(f), el = $(`[data-lset="barcode"][data-id="${S.lbcId}"]`); if (c && el) { el.value = c; listSet(el); } else if (!c) toast("No barcode found in that photo. Try again closer and in good light."); return; }
