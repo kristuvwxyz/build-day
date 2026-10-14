@@ -1,6 +1,23 @@
 {
   "buildCommand": "node build.mjs",
   "outputDirectory": "public",
+  "functions": {
+    "api/site.js": {
+      "maxDuration": 60
+    },
+    "api/push-listings.js": {
+      "maxDuration": 60
+    },
+    "api/img.js": {
+      "maxDuration": 15
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/img/:path*",
+      "destination": "/api/img?p=:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/soldout.js",
@@ -58,13 +75,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "api/site.js": {
-      "maxDuration": 60
-    },
-    "api/push-listings.js": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }

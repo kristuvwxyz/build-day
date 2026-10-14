@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     const r = await fetch((process.env.RS_BACKEND_URL || DEFAULT_URL) + "?action=products.js", { redirect: "follow" });
     const body = await r.text();
     if (!r.ok || body.length < 20) throw new Error("backend " + r.status);
-    const split = splitPhotos(body);
+    const split = splitPhotos(viaCdn(body));
     last = { body: split.body, photos: split.photos, type: (r.headers.get("content-type") || "application/javascript").split(";")[0], at: Date.now() };
   } catch (e) {
     // Backend down or slow: keep the site working with the last good copy.
@@ -43,6 +43,13 @@ export default async function handler(req, res) {
   // Browsers keep it briefly; Place Order re-checks stock with a no-store fetch, so sold-out items still can't be bought.
   res.setHeader("Cache-Control", "public, max-age=60, s-maxage=15, stale-while-revalidate=86400");
   return res.status(200).send(out);
+}
+
+// Listing photos go through /img (api/img.js, cached a year on Vercel) instead of straight from Supabase, which sends them
+// with "no-cache" (every page view downloaded them again and used up the Supabase free quota).
+function viaCdn(body) {
+  const SB = process.env.SUPABASE_URL;
+  return SB ? body.split(SB.replace(/\/+$/, "") + "/storage/v1/object/public/listing-photos/").join("https://regal-spritz-os.vercel.app/img/") : body;
 }
 
 // Takes RS_PRODUCTS[0]._photos (about 530 KB of order-photo rows) out of the product list; returns it separately.
