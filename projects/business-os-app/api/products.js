@@ -41,11 +41,15 @@ export default async function handler(req, res) {
       if (kept && oh(kept) >= oh(list) * 2 / 3) out = out.slice(0, start) + JSON.stringify(kept) + out.slice(end);
     }
   } catch (e) { /* stock check failed: send the backend copy as is */ }
+  // A live listing always wins over an old sold-out copy with the same id (soldout.js); whichever file loads second drops them.
+  if (!/json/.test(last.type)) out += ";" + DROP_SOLD_DUPES;
   res.setHeader("Content-Type", (/json/.test(last.type) ? "application/json" : "application/javascript") + "; charset=utf-8");
   // Browsers keep it briefly; Place Order re-checks stock with a no-store fetch, so sold-out items still can't be bought.
   res.setHeader("Cache-Control", "public, max-age=60, s-maxage=15, stale-while-revalidate=86400");
   return res.status(200).send(out);
 }
+
+const DROP_SOLD_DUPES = "(function(){var P=window.RS_PRODUCTS,S=window.SOLDOUT;if(!P||!S)return;var l=new Set(P.map(function(p){return p.id}));window.SOLDOUT=S.filter(function(r){return !l.has(r[0])})})();";
 
 // Listing photos go through /img (api/img.js, cached a year on Vercel) instead of straight from Supabase, which sends them
 // with "no-cache" (every page view downloaded them again and used up the Supabase free quota).
