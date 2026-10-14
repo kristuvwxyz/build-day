@@ -3767,11 +3767,11 @@ const ORDER_COLS = {
   tracking: { label: "Tracking #" }, waybill: { label: "Waybill" }, tags: { label: "Tags" }, note: { label: "Note" }, activity: { label: "History" }, phone: { label: "Phone" }, address: { label: "Ship to" }, actions: { label: "Actions", nosort: true },
 };
 const TABLE_COLS = {
-  orders: { all: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "ikind", "customer", "assigned", "total", "payment", "mop", "fulfillment", "courier", "tracking", "note", "activity"],
+  orders: { all: ["num", "source", "date", "items", "ikind", "customer", "total", "payment", "mop", "fulfillment", "courier", "tracking", "waybill", "note", "activity", "phone", "address", "actions"], show: ["num", "source", "date", "items", "ikind", "customer", "total", "payment", "mop", "fulfillment", "courier", "tracking", "note", "activity"],
     byDept: { PACKING: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] } },
   listings: { personal: true, labels: { size: { label: "Size" }, type: { label: "Type" }, cat: { label: "Collection" }, barcode: { label: "Barcode" }, kind: { label: "On hand / Pre-order" }, eta: { label: "ETA" }, price: { label: "SRP", cls: "r pcell" }, compare: { label: "Compare at", cls: "r pcell" }, cost: { label: "Cost", cls: "r pcell" }, stock: { label: "In stock", cls: "r" }, committed: { label: "Committed", cls: "r" }, status: { label: "Status" }, web: { label: "Website" } },
     all: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"], show: ["size", "type", "cat", "barcode", "kind", "eta", "price", "compare", "cost", "stock", "committed", "status", "web"] },
-  packing: { all: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "assigned", "total", "actions"], show: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
+  packing: { all: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "mop", "total", "actions"], show: ["num", "date", "customer", "items", "ikind", "address", "phone", "courier", "waybill", "fulfillment", "payment", "actions"] },
 };
 // Listings columns are saved per person; order tables per department.
 const colKey = table => TABLE_COLS[table].personal ? `u_${myMemberId() || S.uid || "me"}_${table}` : `${ctxDept()}_${table}`;
@@ -4600,14 +4600,14 @@ function viewCustomers() {
     <div class="kpi"><span class="label">Avg per customer</span><span class="value">${peso(all.length ? sum / all.length : 0)}</span></div>
   </div>
   <div class="toolbar"><input id="cq" type="search" placeholder="Search name, email, phone, city or tag" value="${esc(S.cq)}" aria-label="Search customers"></div>
-  ${canAll() ? pickBar("cust", [["select", "Assign to…", "cust-assign", [["", "Unassigned"], ...salesTeam().map(m => [m.id, m.nickname || m.name])]]], rows.map(custKey)) : ""}
+  
   <div class="table-wrap"><table class="otable" data-own="1">
-    <thead><tr>${canAll() ? pickTh("cust", page.map(custKey)) : ""}${[["name", "Customer"], ["phone", "Phone"], ["loc", "Location"], ["assigned", "Assigned to"], ["channels", "Channels"], ["orders", "Orders", "r"], ["spent", "Amount spent", "r"], ["last", "Last order"], ["tags", "Tags"]].map(([k, l, c]) => sortTh(k, l, c || "", cs, "csort")).join("")}</tr></thead>
+    <thead><tr>${canAll() ? pickTh("cust", page.map(custKey)) : ""}${[["name", "Customer"], ["phone", "Phone"], ["loc", "Location"], ["channels", "Channels"], ["orders", "Orders", "r"], ["spent", "Amount spent", "r"], ["last", "Last order"], ["tags", "Tags"]].map(([k, l, c]) => sortTh(k, l, c || "", cs, "csort")).join("")}</tr></thead>
     <tbody>${page.map(c => `<tr data-cust="${esc(custKey(c))}">${canAll() ? pickTd("cust", custKey(c)) : ""}
       <td><div style="font-weight:600">${esc(c.name)}${c.example ? ' <span class="chip ex">Example</span>' : ""}${c.orders > 1 ? ' <span class="chip good">Repeat</span>' : ""}</div><div class="s">${esc(c.email || "")}</div></td>
       <td class="nowrap">${esc(c.phone || "")}</td>
       <td>${esc(c.city || (c.address || "").split(",").slice(-3, -2)[0] || "")}</td>
-      <td>${canAll() && c.orderIds.length ? `<select class="status st-grey" data-cassign="${esc(custKey(c))}" aria-label="Assigned to"><option value="">Unassigned</option>${salesTeam().map(m => `<option value="${m.id}" ${assigneeOf(c) === m.id ? "selected" : ""}>${esc(m.nickname || m.name)}</option>`).join("")}</select>` : esc(assigneeOf(c) ? memberName(assigneeOf(c)) : "–")}</td>
+      
       <td>${[...c.platforms].map(esc).join(", ")}</td>
       <td class="r num">${c.orders.toLocaleString("en-PH")}</td>
       <td class="r num" style="font-weight:700">${peso2(c.spent)}</td>
@@ -5769,7 +5769,7 @@ function openOrderDetails(id) {
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
     <div class="sheet-title"><h3>${esc(onum(o))}</h3></div>
-    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}<button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button><select id="d-assign" class="oassign" aria-label="Assigned to"><option value="">Assigned to: nobody</option>${[...salesTeam(), ...(o.assignee && !salesTeam().some(m => m.id === o.assignee) ? [member(o.assignee)].filter(Boolean) : [])].map(m => `<option value="${m.id}" ${o.assignee === m.id ? "selected" : ""}>Assigned to: ${esc(m.nickname || m.name)}</option>`).join("")}</select>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm cancel-btn" type="button" data-act="archive-order" data-id="${o.id}">✕ Cancel order</button></div>` : ""}
+    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}<button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm cancel-btn" type="button" data-act="archive-order" data-id="${o.id}">✕ Cancel order</button></div>` : ""}
     ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${arch ? "" : `<button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}`}${cp ? `<button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button>` : ""}</div>` : ""}
     ${(() => { const ts = S.tasks.filter(t => t.orderId === o.id).sort((a, b) => (a.due || "").localeCompare(b.due || "")); return ts.length ? `<div class="oactions" style="font-size:13px">📅 On the calendar: ${ts.map(t => `<button type="button" class="chip" data-task="${t.id}">${t.due ? fmtDate(t.due) : "No date"} · ${esc(t.title.slice(0, 40))} · ${esc(tstat(t.status).name)}</button>`).join("")}</div>` : ""; })()}
     ${isDispute(o) ? `<div class="notice" style="border-color:var(--bad);color:var(--bad)">⚠️ <b>Dispute.</b> Check that this is resolved before dispatch. Remove the DISPUTE tag once it is.</div>` : ""}
@@ -5799,7 +5799,6 @@ function openOrderDetails(id) {
     ${oLogHtml(o.log, "o:" + o.id)}`,
   editable ? async () => {
     const ch = {};
-    if (all) Object.assign(ch, { assignee: val("d-assign") });
     if (cs) { const tr = val("d-track").trim(); if (tr !== (o.tracking || "")) Object.assign(ch, { tracking: tr, trackingAt: tr ? Date.now() : 0 }); }
     const disp = (ch.tags || o.tags || []).some(t => normTag(t) === "DISPUTE");
     if (disp && ["unfulfilled", "fulfilled"].includes(ch.fulfillment) && ch.fulfillment !== o.fulfillment && !S.dispOk) { S.dispOk = true; return sheetError(`⚠️ This order has a DISPUTE tag. Make sure it's resolved before it goes to ${ful(ch.fulfillment).name}. Press Save again to continue.`); }
