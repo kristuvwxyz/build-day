@@ -381,6 +381,18 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 
 /* home header: one compact strip (greeting + date on the left, the day's quote on the right) */
 .hero { border-radius: 14px; background: linear-gradient(120deg, #3A1C36 0%, var(--hero-bg) 60%, var(--hero-bg2) 100%); color: var(--hero-ink); --gold: var(--hero-gold); padding: 12px 20px; display: flex; align-items: center; gap: 8px 24px; flex-wrap: wrap; }
+.hero-w { padding: 22px 26px; border-radius: 18px; align-items: center; box-shadow: 0 10px 30px rgba(40,10,40,.25); }
+.hero-w .hero-l { flex-direction: column; align-items: flex-start; gap: 6px; flex: 1 1 320px; }
+.hero-w .hero-greet { font-size: 34px; }
+.hero-w .hero-q { margin: 2px 0 0; justify-content: flex-start; flex: none; max-width: 100%; }
+.hero-w .hero-q blockquote { white-space: normal; }
+.hero-att { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 14px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); min-width: 200px; }
+.hero-att b { font-family: var(--font-display); font-weight: 400; font-size: 20px; }
+.hero-att > span { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; opacity: .75; font-weight: 700; }
+.hero-att .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.home-alerts { display: flex; flex-direction: column; gap: 10px; }
+.home-h { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 4px 2px -2px; }
+@media (max-width: 600px) { .hero-w { padding: 18px; } .hero-w .hero-greet { font-size: 27px; } .hero-att { min-width: 0; width: 100%; } }
 .hero-l { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; min-width: 0; }
 .hero-greet { font-family: var(--font-display); font-weight: 400; font-size: 22px; line-height: 1.15; margin: 0; color: inherit; text-transform: none; letter-spacing: 0; }
 .hero-date { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); font-weight: 700; white-space: nowrap; }
@@ -2804,7 +2816,7 @@ async function vatOther() {
   await save("webmeta", "_vatother", { ...clean(d), ref: "_vatother", months }); toast("VAT tracker updated."); render();
 }
 function viewHome() {
-  const fn = firstName(), h = S.home || {}, mid = myMemberId();
+  const h = S.home || {}, mid = myMemberId(), fn = ((member(mid) || {}).nickname || "").trim() || firstName();
   const [q, who] = quoteOfDay();
   const mine = S.tasks.filter(t => (t.assigneeId && t.assigneeId === mid || isAllTask(t)) && t.status !== "done" && t.status !== "cancelled").sort((a, b) => (a.due || "9").localeCompare(b.due || "9"));
   const dueToday = visTasks().filter(t => t.due === today() && t.status !== "done" && t.status !== "cancelled").length;
@@ -2816,23 +2828,21 @@ function viewHome() {
   const overdue = mine.filter(t => t.due && t.due < today()).length;
   const web = S.site && S.web.loaded && canOrders();
   const side = (isCEO() ? eomHomeCard() : "") + (goals.length ? `<section class="panel quiet goals-card"><h2>Our goals</h2><ul>${goals.map(g => `<li>${esc(g)}</li>`).join("")}</ul></section>` : "");
-  return `${birthdayBanner()}${rvApproveAlert()}${retAlert()}${manualAlert()}${announceCard()}
-  <section class="hero" aria-label="Welcome">
-    <div class="hero-l"><h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}</h2><span class="hero-date">${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span></div>
-    <figure class="hero-q" title="${esc(q)}${who ? " — " + esc(who) : ""}"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure>
+  const att = st ? `<div class="hero-att"><b>${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div></div>` : "";
+  const alerts = [birthdayBanner(), manualAlert(), retAlert(), rvApproveAlert(), duesAlert(), announceCard()].filter(Boolean).join("");
+  // Home (K, Oct 14, 2026): greeting widget always on top, then today's numbers, then what needs attention, then tasks and goals.
+  return `<section class="hero hero-w" aria-label="Welcome">
+    <div class="hero-l"><span class="hero-date">${new Date(mToday() + "T12:00:00+08:00").toLocaleDateString("en-PH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span><h2 class="hero-greet">${greeting()}${fn ? ", " + esc(fn) : ""}!</h2>
+      <figure class="hero-q" title="${esc(q)}${who ? " — " + esc(who) : ""}"><blockquote>“${esc(q)}”</blockquote>${who ? `<figcaption>${esc(who)}</figcaption>` : ""}</figure></div>
+    ${att}
   </section>
   <section class="kpis" aria-label="Today">
     <button type="button" data-nav="tasks"${overdue ? ' class="hot"' : ""}><b class="num">${mine.length}</b><span>My open tasks${overdue ? ` · ${overdue} late` : ""}</span></button>
     <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
     ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="tasks"><b class="num">${visTasks().filter(t => t.status === "in_progress").length}</b><span>In progress</span></button>`}
     ${showOrders && S.live != null ? `<button type="button" data-act="live-now" title="People on regalspritz.com right now (updates every 30 seconds)"><b class="num" id="live-n">${S.live}</b><span><span class="live-dot"></span>Live on website</span></button>` : ""}
-    <div class="att">${st ? `<b style="font-size:18px">${onBreak(r) ? "On break" : astat(st).name}</b><span>${r && r.in ? `In ${mTime(r.in)}${r.out ? " · out " + mTime(r.out) : ""}` : "Attendance"}</span><div class="actions">${clockButtons(mid, mToday())}</div>`
-      : `<b style="font-size:18px">–</b><span>Attendance · not linked</span>`}</div>
   </section>
-  ${APP_BUILD && !isStandalone() && !installHidden() ? `<div class="panel install-card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px"><span style="font-size:22px">📲</span><span style="flex:1;min-width:180px;font-size:14px"><b>Add RS OS to your Home Screen</b><br><span style="color:var(--muted);font-size:12.5px">Open it like an app, in one tap.</span></span><button type="button" class="btn sm primary" data-act="install-open">Show me how</button><button type="button" class="btn ghost sm" data-act="install-hide" aria-label="Hide this">✕</button></div>` : ""}
-  <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>
-  ${duesAlert()}
-  ${vatCard()}
+  ${alerts ? `<div class="home-alerts"><div class="home-h">Needs attention</div>${alerts}</div>` : ""}
   <div class="home-grid${side ? " has-side" : ""}">
   <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
     ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>${mine.length > 6 ? `<button type="button" class="linkish" data-nav="tasks" style="font-size:12.5px">+${mine.length - 6} more in Tasks</button>` : ""}` : `<div class="empty">You're all caught up.</div>`)
@@ -2840,7 +2850,10 @@ function viewHome() {
   </section>
   ${side ? `<div class="home-side">${side}</div>` : ""}
   </div>
-  ${orgChart(false)}`;
+  ${vatCard()}
+  ${APP_BUILD && !isStandalone() && !installHidden() ? `<div class="panel install-card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px"><span style="font-size:22px">📲</span><span style="flex:1;min-width:180px;font-size:14px"><b>Add RS OS to your Home Screen</b><br><span style="color:var(--muted);font-size:12.5px">Open it like an app, in one tap.</span></span><button type="button" class="btn sm primary" data-act="install-open">Show me how</button><button type="button" class="btn ghost sm" data-act="install-hide" aria-label="Hide this">✕</button></div>` : ""}
+  ${orgChart(false)}
+  <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>`;
 }
 // Organization chart: the CEO on top, then one column per department, most senior first.
 function orgChart(full) {
@@ -3219,11 +3232,21 @@ async function returnDecide(ref, status, btn) {
   toast(status === "Approved" ? `Return for #${num} approved. Do the return / refund, then tap Mark refunded.` : `Return for #${num} declined.`);
   await webLoad(true); renderNav && renderNav();
 }
+// Requests and to-dos on a website order, shown at the top of its details (the Orders table's Source column shows only the source).
+function webReqChips(o) { const w = webAsOrders().find(x => x.ref === o.ref) || {}, rc = w.receipt && w.receipt.at, out = [];
+  if (o.cancel && o.cancel.status === "Pending") out.push(`<span class="badge red">Cancel request</span>`);
+  if (retReq(o) && !/done|closed|refunded|rejected/i.test(retReq(o).status)) out.push(`<span class="badge red">Return request</span>`);
+  if (isDispute(w)) out.push(disputeChip(w));
+  if (bdoNeeds(o)) out.push(`<span class="badge amber" title="Make a BDO Checkout link for this order">BDO link needed</span>`);
+  else if (isBdo(o) && !o.paid) out.push(`<span class="badge violet">BDO Checkout</span>`);
+  if (isManualWeb(o)) { out.push(`<span class="badge violet">Manual Processing</span>`); if (!o.paid && !/cancel/i.test(o.status || "")) out.push(rc ? `<span class="badge green">Receipt sent ${esc(relTime(rc))}</span>` : `<span class="badge amber">Receipt not sent yet</span>`); }
+  return out.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${out.join("")}</div>` : ""; }
 function openWebOrder(ref) {
   const o = S.web.orders.find(x => x.ref === ref); if (!o) return;
   const addr = [o.address, o.city, o.province].filter(Boolean).join(", ");
   openSheet(`<h2 style="margin:0">#${esc(String(o.ref || "").replace(/^#/, ""))} ${webBadge(o)}</h2>
     <p style="margin:0;color:var(--muted);font-size:13px">${esc(webTime(o.date, o))} · ${esc(o.payment || "")}${o.payRef && !/bdo\.com\.ph/i.test(o.payRef) ? ` · Maya ref <code>${esc(o.payRef)}</code>` : ""}</p>
+    ${webReqChips(o)}
     ${(() => { const m = S.webmeta.find(d => d.ref === o.ref), sh = o.shippedAt ? webTime(o.shippedAt) : m && m.shippedAt ? webTime(m.shippedAt) : "", rc = o.receivedAt ? webTime(o.receivedAt) : ""; return sh || rc ? `<div style="font-size:13px;display:flex;gap:14px;flex-wrap:wrap">${sh ? `<span>🚚 Shipped <b>${esc(sh)}</b></span>` : ""}${rc ? `<span>✅ Buyer tapped Order received <b>${esc(rc)}</b></span>` : `<span style="color:var(--muted)">Not marked received by the buyer yet</span>`}</div>` : ""; })()}
     ${retReq(o) ? `<div class="notice" style="border-left:4px solid var(--bad)">↩️ Return request · <b>${esc(retReq(o).status)}</b>: ${esc(retReq(o).reason || "")}${retReq(o).details ? " · " + esc(retReq(o).details) : ""} <button type="button" class="btn ghost sm" data-act="ret-go">Open Returns</button></div>` : ""}
     ${o.shipPref && SHIP_PREF[o.shipPref] ? `<div style="font-size:13px">${shipPrefChip(o)} <span style="color:var(--muted)">${esc(SHIP_PREF_TIP[o.shipPref].replace(/^Buyer chose at checkout: /, ""))}</span></div>` : ""}
@@ -5565,8 +5588,35 @@ function shadeCardImg(p, s, hex) {
   g.fillStyle = "#A8987A"; g.font = "500 14px Jost"; g.fillText("Shade shown is a guide; colours vary by screen.", W / 2, 740);
   return cv.toDataURL("image/jpeg", .9);
 }
+/* Photo rule (K, Oct 14, 2026): per perfume page (same brand, name and size), the lead option (Sealed; with no Sealed, the
+   first option) shows 2 photos: its bottle on the template + the scent card. Every other option (Tester, Partial, …) shows
+   1 photo: its own bottle on the template. Beauty (product + shade) and Middle Eastern (product + comparison) keep theirs.
+   Photos taken off are listed in photoTrim, so they can be put back. */
+const PR_ORDER = ["Sealed", "Boxed, New", "Unsealed, New", "Tester", "Partial", "Mini", "Vial", "Set", "Other"];
+const prNorm = x => String(x || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
+const prKey = p => [p.brand, p.name, p.size].map(prNorm).join("|");
+const prSkip = p => /beauty|arabian/i.test(p.category || "") || (p.status || "active") !== "active";
+function prLead(p) {
+  if (prSkip(p) || p.ptype === "Sealed") return true;
+  const k = prKey(p), sib = S.products.filter(x => !prSkip(x) && prKey(x) === k); if (sib.some(x => x.ptype === "Sealed")) return false;
+  const rank = x => { const i = PR_ORDER.indexOf(x.ptype); return i < 0 ? 99 : i; };
+  sib.sort((a, b) => rank(a) - rank(b) || (a.kind === "preorder") - (b.kind === "preorder") || String(a.id).localeCompare(String(b.id)));
+  return !sib.length || sib[0].id === p.id;
+}
+const prCards = p => [(p.card || {}).url, (p.shadeCard || {}).url].filter(Boolean);
+// Photo 1 is a scent card put on the template (a bottle photo was lost): leave it for a person to fix, never trim it.
+const prBroken = p => { const L = tplImgs(p); return !!L.length && (prCards(p).includes(L[0]) || (!!p.tplFrom && L[0] === p.tplOk && prCards(p).includes(p.tplFrom))); };
+function prWant(p, L = tplImgs(p)) {
+  if (prSkip(p) || !L.length || prBroken(p) || p.tplOk !== L[0]) return null;
+  const card = (p.card || {}).url;
+  if (!prLead(p)) return [L[0]];
+  // Lead with no scent card of ours yet (no notes): leave its photos alone until it has one.
+  return card && card !== L[0] && L.includes(card) ? [L[0], card] : null;
+}
+const prNeeds = p => { const w = prWant(p); return !!w && JSON.stringify(w) !== JSON.stringify(tplImgs(p)); };
 const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
-  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || (scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p); };
+  if (prBroken(p)) return false;
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || prNeeds(p) || (prLead(p) && scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p); };
 // Finds a scent card photo the listing already had (e.g. Fragrantica's), so it can be replaced by ours.
 async function oldCardOf(list, ours, skip = []) { for (const u of list) { if (u === ours || u === list[0] || skip.includes(u)) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
 async function tplOne(id) {
@@ -5575,7 +5625,8 @@ async function tplOne(id) {
   UNDO.at = 0; await patch("products", id, { tplBusy: Date.now() }).catch(() => {});
   const L = tplImgs(p); let imgs = [...L]; const u = { tplBusy: 0 };
   try {
-    if (p.tplOk !== L[0] && p.tplFail !== L[0]) {
+    if (prCards(p).includes(L[0])) u.tplFail = L[0];
+    else if (p.tplOk !== L[0] && p.tplFail !== L[0]) {
       try { const bl = await annBlob(L[0]);
         if (await annOnTemplate(bl)) u.tplOk = L[0];
         else { let url = tplMemo.get(L[0]); if (!url) { const r = await S.photos.save({ data: await annCompose(bl) }); if (!r || !r.ok || !r.url) throw new Error((r && r.error) || "photo save failed"); url = r.url; tplMemo.set(L[0], url); }
@@ -5584,9 +5635,9 @@ async function tplOne(id) {
     }
     const key = scKey(p), mine = [u.tplOk, p.tplOk, p.tplFrom, u.tplFrom].filter(Boolean);
     // K, Oct 13, 2026: Fragrantica's own scent cards are replaced by ours (our template), never kept. Without notes we can't make ours, so theirs stays.
-    if (key) {
+    if (key && prLead(p)) {
       const cur = p.card && p.card.url && imgs.includes(p.card.url) ? p.card : null;
-      const theirs = typeof (p.card || {}).skip === "string" && imgs.includes(p.card.skip) ? p.card.skip : cur && cur.chk === 2 && cur.key === key ? "" : await oldCardOf(L, cur ? cur.url : "", mine);
+      const theirs = typeof (p.card || {}).skip === "string" && imgs.includes(p.card.skip) ? p.card.skip : "";   // Oct 14: no more guessing (it took real bottle photos)
       if (theirs) { imgs = imgs.filter(x => x !== theirs); u.fragCardGone = theirs; }
       if (cur && cur.key === key) { if (cur.chk !== 2 || theirs) u.card = { key, url: cur.url, chk: 2 }; }
       else { const at = cur ? imgs.indexOf(cur.url) : -1; let url = cardMemo.get(key + "|" + imgs[0]);
@@ -5605,8 +5656,10 @@ async function tplOne(id) {
         if (r && r.ok && r.url) { imgs = imgs.filter(x => x !== old); imgs.splice(Math.min(1, imgs.length), 0, r.url); u.shadeCard = { key: skey, url: r.url, hex }; } } }
   } finally {
     p = S.products.find(x => x.id === id); if (!p) return false;
+    const want = prWant({ ...p, ...u }, imgs);
+    if (want && JSON.stringify(want) !== JSON.stringify(imgs)) { const gone = imgs.filter(x => !want.includes(x)); u.photoTrim = { at: Date.now(), removed: [...new Set([...((p.photoTrim || {}).removed || []), ...gone])] }; imgs = want; }
     const changed = JSON.stringify(imgs) !== JSON.stringify(L);
-    UNDO.at = 0; await patch("products", id, { ...u, ...(changed ? { photo: imgs[0], imgs, log: logAdd(p, ["photos: template first" + (u.card && u.card.url ? " + scent card" : "") + (u.shadeCard && u.shadeCard.url ? " + shade card" : "")], "Auto · photos") } : {}) }).catch(() => {});
+    UNDO.at = 0; await patch("products", id, { ...u, ...(changed ? { photo: imgs[0], imgs, log: logAdd(p, [(u.photoTrim ? "photos: " + (imgs.length === 1 ? "own photo only" : "photo + scent card") + " (rule Oct 14)" : "photos: template first") + (u.card && u.card.url ? " + scent card" : "") + (u.shadeCard && u.shadeCard.url ? " + shade card" : "")], "Auto · photos") } : {}) }).catch(() => {});
     return changed;
   }
 }
