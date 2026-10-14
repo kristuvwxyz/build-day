@@ -1,7 +1,7 @@
 // Live stock check for the website checkout: GET /api/stock?ids=id1,id2 (website product ids, up to 50).
 // Answers { ok, items: { id: { ok, stock, soldOut } } }; ok false = can't be bought now (sold out or not listed).
 // Public on purpose: only stock numbers, no keys, no customer data. Never cached.
-import { liveStock } from "./_stock.js";
+import { liveStock, QTY_CAP } from "./_stock.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   const items = {};
   for (const id of ids) {
     const s = map.get(id);
-    items[id] = s ? { ok: !s.soldOut, stock: s.kind === "preorder" ? null : s.stock, soldOut: s.soldOut, kind: s.kind } : { ok: false, stock: 0, soldOut: true, kind: null };
+    items[id] = s ? { ok: !s.soldOut, stock: s.kind === "preorder" ? null : s.stock, max: s.stock > 0 ? Math.min(QTY_CAP, Math.floor(s.stock)) : QTY_CAP, soldOut: s.soldOut, kind: s.kind } : { ok: false, stock: 0, soldOut: true, kind: null };
   }
   return res.status(200).json({ ok: true, items });
 }

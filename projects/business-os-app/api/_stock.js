@@ -26,10 +26,14 @@ export async function liveStock(maxAgeMs = 5000) {
 }
 
 // Pieces with no active listing are left out; on-hand pieces with no live stock and sold-out pre-orders get soldOut: true.
+// Every piece also gets max: how many one buyer can check out (the Dashboard stock, never more than QTY_CAP;
+// a pre-order with no stock number set gets QTY_CAP).
+export const QTY_CAP = 20;
+const maxOf = s => (s && s.stock > 0 ? Math.min(QTY_CAP, Math.floor(s.stock)) : QTY_CAP);
 export function applyStock(list, map) {
   return list.flatMap(p => {
-    const s = map.get(p.id);
-    if (p.kind !== "preorder") return !s ? [] : s.stock > 0 ? [p] : [p.soldOut ? p : { ...p, soldOut: true }];
-    return s && s.soldOut && !p.soldOut ? [{ ...p, soldOut: true }] : [p];
+    const s = map.get(p.id), q = { ...p, max: maxOf(s) };
+    if (p.kind !== "preorder") return !s ? [] : s.stock > 0 ? [q] : [p.soldOut ? q : { ...q, soldOut: true }];
+    return s && s.soldOut && !p.soldOut ? [{ ...q, soldOut: true }] : [q];
   });
 }
