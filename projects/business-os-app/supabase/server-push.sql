@@ -45,11 +45,29 @@ begin
 end $$;
 
 -- 2. Every listing record, as one JSON array (Supabase sends at most 1,000 rows per answer, so not as rows).
+-- Only the fields the website list needs (keeps Supabase data use low): active listings get the website fields,
+-- inactive ones only what the order-photo table needs (brand, name, size, first photo).
 create or replace function public.web_push_docs(p_key text) returns jsonb
 language sql stable security definer set search_path = public as $$
-  select coalesce(jsonb_agg(jsonb_build_object('id', d.id, 'data', d.data)), '[]'::jsonb)
-  from public.docs d
-  where d.col = 'products' and p_key is not null and exists (select 1 from public.app_settings s where s.id = 1 and s.site_key = p_key);
+  with t as (
+    select d.id, d.data, coalesce(d.data->>'status', 'active') = 'active' as act
+    from public.docs d
+    where d.col = 'products' and d.data->>'name' is not null
+      and p_key is not null and exists (select 1 from public.app_settings s where s.id = 1 and s.site_key = p_key))
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'data', case when act then jsonb_strip_nulls(jsonb_build_object(
+      'status', data->'status', 'name', data->'name', 'brand', data->'brand', 'size', data->'size', 'kind', data->'kind',
+      'stock', data->'stock', 'webId', data->'webId', 'ptype', data->'ptype', 'imgs', data->'imgs',
+      'photo', case when coalesce(data->>'photo', '') like 'data:%' then null else data->'photo' end,
+      'webOrder', data->'webOrder', 'createdAt', data->'createdAt', 'rank', data->'rank', 'category', data->'category',
+      'price', data->'price', 'compareAt', data->'compareAt', 'wasNull', data->'wasNull', 'notes', data->'notes',
+      'accords', data->'accords', 'isNew', data->'isNew', 'badges', data->'badges', 'eta', data->'eta',
+      'soldOut', data->'soldOut', 'vac', data->'vac', 'inspiredBy', data->'inspiredBy', 'webCreated', data->'webCreated'))
+    else jsonb_strip_nulls(jsonb_build_object(
+      'status', data->'status', 'name', data->'name', 'brand', data->'brand', 'size', data->'size',
+      'imgs', case when jsonb_typeof(data->'imgs') = 'array' and jsonb_array_length(data->'imgs') > 0 then jsonb_build_array(data->'imgs'->0) end,
+      'photo', case when coalesce(data->>'photo', '') like 'data:%' then null else data->'photo' end))
+    end)), '[]'::jsonb)
+  from t;
 $$;
 
 -- 3. After the website took the list: mark the listings it sent as synced.
