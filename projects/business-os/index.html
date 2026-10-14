@@ -421,6 +421,15 @@ tr.u-row.u-soon td:first-child { box-shadow: inset 4px 0 0 var(--amber); }
 .dues-alert.has-today { border-left-color: var(--orange); }
 .dues-alert.has-over { border-left-color: var(--bad); background: linear-gradient(90deg, var(--bad-bg), var(--surface) 40%); }
 @media (max-width: 720px) { .dues-alert table, .dues-alert tbody { display: block; } .dues-alert tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 0 10px 10px; border-bottom: 1px solid var(--line); } .dues-alert td { display: block; padding: 0 !important; border: 0 !important; } .dues-alert td:first-child { grid-column: 1 / -1; box-shadow: none !important; } .dues-alert tr.u-overdue { box-shadow: inset 4px 0 0 var(--bad); } .dues-alert tr.u-today { box-shadow: inset 4px 0 0 var(--orange); } .dues-alert tr.u-soon { box-shadow: inset 4px 0 0 var(--amber); } .dues-alert tr { padding-left: 14px !important; } .dues-alert td:nth-child(2) { font-size: 12.5px; color: var(--muted); } .dues-alert td:nth-child(3) { justify-self: end; } .dues-alert td:nth-child(4) { text-align: left; } }
+/* Folded by default (opens itself when something is overdue); a slim one-line bar when closed. */
+.dues-alert { padding: 0; gap: 0; }
+.dues-alert > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; }
+.dues-alert > summary::-webkit-details-marker { display: none; }
+.dues-alert > summary h2 { margin: 0; font-size: 13px; }
+.dues-alert > summary .chev { margin-left: auto; color: var(--muted); font-size: 12px; transition: transform .15s; }
+.dues-alert[open] > summary .chev { transform: rotate(180deg); }
+.dues-alert > .table-wrap, .dues-alert > .dues-more { margin: 0 16px 10px; }
+.dues-alert td { padding-top: 6px; padding-bottom: 6px; }
 .dues-alert .urg-sum { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; }
 .nbadge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 800; display: inline-grid; place-items: center; }
 .seg .nbadge { margin-left: 4px; }
@@ -7308,11 +7317,14 @@ function duesAlert() {
   const btn = e => e.kind === "invoice" ? `<button class="btn sm primary" type="button" data-act="inv-paid" data-id="${e.id}">Mark paid</button>`
     : e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">Update</button>`
     : `<button class="btn sm primary" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">Mark paid</button>`;
-  return `<section class="panel dues-alert${n("overdue") ? " has-over" : n("today") ? " has-today" : ""}" aria-label="Payments needing attention">
-    <div class="head"><h2>💸 Payments needing attention · ${peso(sum)}</h2><span class="urg-sum">${n("overdue") ? urgChip("overdue") + ` <b>${n("overdue")}</b>` : ""} ${n("today") ? urgChip("today") + ` <b>${n("today")}</b>` : ""} ${n("soon") ? urgChip("soon") + ` <b>${n("soon")}</b>` : ""}</span></div>
+  const open = S.duesOpen != null ? S.duesOpen : n("overdue") > 0;
+  return `<details class="panel dues-alert${n("overdue") ? " has-over" : n("today") ? " has-today" : ""}" aria-label="Payments needing attention" ${open ? "open" : ""} data-dues>
+    <summary><h2>💸 ${list.length} payment${list.length > 1 ? "s" : ""} due · ${peso(sum)}</h2><span class="urg-sum">${n("overdue") ? urgChip("overdue") + ` <b>${n("overdue")}</b>` : ""} ${n("today") ? urgChip("today") + ` <b>${n("today")}</b>` : ""} ${n("soon") ? urgChip("soon") + ` <b>${n("soon")}</b>` : ""}</span><span class="chev">${open ? "Hide" : "Show"} ▾</span></summary>
     <div class="table-wrap" style="border:0"><table><tbody>${list.slice(0, 8).map(e => `<tr class="u-row u-${moneyUrg(e)}"><td style="font-weight:600">${esc(e.title)}<div class="s">${esc(e.sub || "")}</div></td><td class="nowrap">${fmtDate(e.date)}</td><td>${urgChip(moneyUrg(e))}</td><td class="r num nowrap">${peso(e.amount)}</td><td class="r">${S.readOnly ? "" : btn(e)}</td></tr>`).join("")}</tbody></table></div>
-    ${list.length > 8 ? `<div style="font-size:12px;color:var(--muted)">+${list.length - 8} more on the Tasks calendar.</div>` : ""}</section>`;
+    ${list.length > 8 ? `<div class="dues-more" style="font-size:12px;color:var(--muted)">+${list.length - 8} more on the Tasks calendar.</div>` : ""}</details>`;
 }
+// Remember open/closed while RS OS is open, so a re-render doesn't flip it back.
+document.addEventListener("toggle", e => { const d = e.target; if (!d.matches || !d.matches("details[data-dues]")) return; S.duesOpen = d.open; const c = d.querySelector(".chev"); if (c) c.textContent = (d.open ? "Hide" : "Show") + " ▾"; }, true);
 
 /* ---------- supplier invoices & budget requests ---------- */
 // One collection: an uploaded supplier invoice ("invoice") or a plain budget request ("request").
