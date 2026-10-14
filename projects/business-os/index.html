@@ -5627,7 +5627,7 @@ function shadeCardImg(p, s, hex) {
    Photos taken off are listed in photoTrim, so they can be put back. */
 const PR_ORDER = ["Sealed", "Boxed, New", "Unsealed, New", "Tester", "Partial", "Mini", "Vial", "Set", "Other"];
 const prNorm = x => String(x || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
-const prKey = p => [p.brand, p.name, p.size].map(prNorm).join("|");
+const prKey = p => [p.brand, scentBase(p.name), p.size].map(prNorm).join("|");   // (No Box), (2025)… are the same perfume page
 const prSkip = p => /beauty|arabian/i.test(p.category || "") || (p.status || "active") !== "active";
 function prLead(p) {
   if (prSkip(p)) return true;
