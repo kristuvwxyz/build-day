@@ -140,3 +140,4 @@ Finish with:
 - Titles: no shortcuts ("Bm" = Blu Mediterraneo), no stray digits ("Edt6" -> EDT). Renaming a listing regenerates its scent card (card key includes the name).
 - Photos: when a new box + bottle photo 1 replaces an older template cut-out, the older cut-out is removed from the listing (no near-duplicate template photos). Photo 1 of a single-bottle listing must not be a set photo.
 - Manual Processing website orders: Royal Receipt offers only e-wallet / bank QR (never Maya / BDO). The 24 h pay timer starts when the Royal Receipt is sent (RS OS calls site.update(ref,{receiptSent:true}) after emailing it).
+- Restocks show first (K, Oct 14, 2026): when a listing comes back on the website (restocked from 0, reactivated, or switched to Pre-order), RS OS patch() stamps webCreated = now, so the site's "Newest" sort puts it first. The S-JOY batch (18 testers, ETA October) was bumped by hand the same day.
