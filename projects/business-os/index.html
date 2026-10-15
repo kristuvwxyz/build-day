@@ -5389,7 +5389,7 @@ async function shopeeFile() {
   try {
     await Promise.all(['600 24px "Cormorant Garamond"'].map(f => document.fonts.load(f).catch(() => {})));
     const memo = { ...(((S.webmeta.find(d => d.id === "_shopee") || {}).imgs) || {}) }, k = u => emailHash(u);
-    const photosOf = p => (p.imgs || []).filter(u => !(p.card && p.card.skip === u)).slice(0, 9);   // Fragrantica's own card photo never goes to Shopee
+    const photosOf = p => (p.imgs || []).filter(u => !(p.card && (p.card.skip === u || (p.card.official && p.card.url === u)))).slice(0, 9);   // Fragrantica's own card photo never goes to Shopee
     const need = [...new Set(L.flatMap(photosOf))].filter(u => !memo[k(u)]);
     let done = 0, fail = 0;
     for (const u of need) {
@@ -5671,7 +5671,7 @@ const varLabel = p => [p.size, p.ptype, p.kind === "preorder" ? "Pre-order" + (p
 const prNeeds = p => { const w = prWant(p); return !!w && JSON.stringify(w) !== JSON.stringify(tplImgs(p)); };
 const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
   if (prBroken(p)) return false;
-  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || prNeeds(p) || (prLead(p) && scKey(p) && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p); };
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || prNeeds(p) || (prLead(p) && scKey(p) && !(p.card || {}).official && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p); };
 // Finds a scent card photo the listing already had (e.g. Fragrantica's), so it can be replaced by ours.
 async function oldCardOf(list, ours, skip = []) { for (const u of list) { if (u === ours || u === list[0] || skip.includes(u)) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
 async function tplOne(id) {
@@ -5694,7 +5694,8 @@ async function tplOne(id) {
       const cur = p.card && p.card.url && imgs.includes(p.card.url) ? p.card : null;
       const theirs = typeof (p.card || {}).skip === "string" && imgs.includes(p.card.skip) ? p.card.skip : "";   // Oct 14: no more guessing (it took real bottle photos)
       if (theirs) { imgs = imgs.filter(x => x !== theirs); u.fragCardGone = theirs; }
-      if (cur && cur.key === key) { if (cur.chk !== 2 || theirs) u.card = { key, url: cur.url, chk: 2 }; }
+      if (cur && cur.official) { /* K, Oct 15, 2026: Fragrantica's official perfume card is kept as is */ }
+      else if (cur && cur.key === key) { if (cur.chk !== 2 || theirs) u.card = { key, url: cur.url, chk: 2 }; }
       else { const at = cur ? imgs.indexOf(cur.url) : -1; let url = cardMemo.get(key + "|" + imgs[0]);
         if (!url) { await Promise.all(['600 44px "Cormorant Garamond"', "500 16px Jost", "600 16px Jost", "700 16px Jost", '40px "Noto Color Emoji"'].map(f => document.fonts.load(f).catch(() => {})));
           let bottle = null; try { bottle = await createImageBitmap(await annBlob(imgs[0])); } catch (e) {}
