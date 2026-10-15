@@ -950,6 +950,15 @@ main > .gs.mobile-only { margin-bottom: 12px; }
 select:not([multiple]) { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23857a83' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: right 11px center !important; background-size: 11px 8px !important; padding-right: 30px !important; }
 select.status:not([multiple]), select.lcell:not([multiple]) { background-position: right 7px center !important; background-size: 9px 6px !important; padding-right: 22px !important; }
 .col-grip { cursor: grab; touch-action: none; user-select: none; padding: 4px 10px; font-size: 18px; color: var(--muted); line-height: 1; } .colrow.dragging { opacity: .85; box-shadow: 0 6px 18px rgba(0,0,0,.18); background: var(--surface); position: relative; z-index: 2; } .colrow.dragging .col-grip { cursor: grabbing; }
+.tabs.pills { gap: 6px; border-bottom: 0; flex-wrap: wrap; padding: 2px 0 6px; overflow-x: visible; }
+.tabs.pills button { border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; margin: 0; background: var(--surface); color: var(--fg); font-size: 13px; }
+.tabs.pills button:hover { border-color: var(--dc, var(--brand)); }
+.tabs.pills button[aria-selected="true"] { background: var(--dc, var(--brand)); border-color: var(--dc, var(--brand)); color: #fff; }
+.tabs.pills .tab-arrange { margin-left: auto; color: var(--muted); background: none; border-style: dashed; font-weight: 500; }
+@media (max-width: 720px) { .tabs.pills { flex-wrap: nowrap; overflow-x: auto; } }
+.fixedtbl td { vertical-align: top; } .fixedtbl .fx-name { font-weight: 600; } .fixedtbl .fx-amt { font-weight: 600; }
+.fixedtbl .fx-bd { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 5px; } .fixedtbl .fx-bd span { font-size: 12px; color: var(--muted); background: var(--bg-soft, rgba(127,127,127,.08)); border-radius: 6px; padding: 2px 7px; }
+.fixedtbl .fx-notes { color: var(--muted); }
 </style>
 
 <div class="app">
@@ -2253,9 +2262,9 @@ function renderInner() {
   }
   if (!canSee(S.dept)) { v.innerHTML = `<div class="panel lock-card">${svg("lock", "lock-big")}<h2 style="font-size:15px;color:var(--fg);text-transform:none;letter-spacing:0">${d.name} isn't part of your access</h2><div class="empty">${myMemberId() ? "Your department decides what you can open. Ask the owner if you need this one." : "Your account isn't linked to the team directory yet."}</div></div>`; return; }
   if (!isUnlocked(S.dept)) { v.innerHTML = viewLock(d); const pw = $("#unlock-pw"); if (pw) pw.focus(); return; }
-  const dtabs = d.tabs.filter(tabAllowed);
+  const dtabs = tabOrder(d.id, d.tabs.filter(tabAllowed));
   if (!dtabs.includes(S.tab)) S.tab = dtabs[0];
-  const tabs = `<div class="tabs" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}${t === "reviews" ? rvBadge() : ""}</button>`).join("")}</div>`;
+  const tabs = `<div class="tabs pills" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}${t === "reviews" ? rvBadge() : ""}</button>`).join("")}${dtabs.length > 2 ? `<button type="button" class="tab-arrange" data-act="tabs-arrange" data-dept="${d.id}" title="Arrange these tabs" aria-label="Arrange tabs">⠿ Arrange</button>` : ""}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), budget: viewBudget, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
     dashboard: viewDashboard, salesreport: viewSalesReport, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
@@ -3851,6 +3860,21 @@ const TABLE_COLS = {
 const colKey = table => TABLE_COLS[table].personal ? `u_${myMemberId() || S.uid || "me"}_${table}` : `${ctxDept()}_${table}`;
 const colLabel = (table, k) => (TABLE_COLS[table].labels || ORDER_COLS)[k].label;
 const colPref = table => S.colprefs.find(p => p.id === colKey(table));
+// Department tabs (K, Oct 15, 2026): each person can drag them into their own order (saved in colprefs).
+const tabKey = dep => `u_${myMemberId() || S.uid || "me"}_tabs_${dep}`;
+function tabOrder(dep, tabs) { const pr = S.colprefs.find(p => p.id === tabKey(dep)); if (!pr || !Array.isArray(pr.order)) return tabs;
+  const known = pr.order.filter(t => tabs.includes(t)); return [...known, ...tabs.filter(t => !known.includes(t))]; }
+function openTabsArrange(dep) {
+  const d = dept(dep), tabs = tabOrder(dep, d.tabs.filter(tabAllowed));
+  openSheet(`<h3>Arrange tabs · ${esc(d.name)}</h3>
+    <div style="font-size:13px;color:var(--muted)">Drag ⠿ to move. Saved for you.</div>
+    <div id="colrows" class="colrows">${tabs.map(t => `<div class="colrow" data-ck="${t}"><label>${esc(TAB_NAMES[t] || t)}</label><span class="col-grip" title="Drag to move" aria-label="Drag to move">⠿</span></div>`).join("")}</div>
+    <button class="btn ghost sm" type="button" data-act="tabs-reset" data-dept="${dep}" style="align-self:flex-start">Reset to default</button>
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => { const order = [...document.querySelectorAll("#colrows .colrow")].map(r => r.dataset.ck);
+    await save("colprefs", tabKey(dep), { table: "tabs", dept: dep, order, by: actor(), at: Date.now() }); closeSheet(); toast("Tabs arranged."); });
+  colDragInit(document.getElementById("colrows"));
+}
 function colOrder(table) {
   const T = TABLE_COLS[table], pr = colPref(table);
   const show = (T.byDept && T.byDept[ctxDept()]) || T.show;
@@ -7736,15 +7760,11 @@ function viewFixed() {
   const list = [...S.fixedexp].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
   const tot = list.reduce((a, x) => a + (Number(x.amount) || 0), 0);
   const can = !S.readOnly;
-  return `<div class="kpis">
-      <div class="kpi"><span class="label">Monthly fixed expenses</span><span class="value">${peso(tot)}</span><span class="sub">${list.length} lines</span></div>
-      <div class="kpi"><span class="label">Per day</span><span class="value">${peso(Math.round(tot / 30))}</span><span class="sub">÷ 30 days</span></div>
-      <div class="kpi"><span class="label">Sales needed per day</span><span class="value">${peso(Math.round(tot / 26))}</span><span class="sub">to cover fixed costs over 26 work days</span></div>
-      <div class="kpi"><span class="label">Investors' interest (live)</span><span class="value">${peso(S.investments.filter(v => !v.closed && v.kind !== "loan").reduce((a, v) => a + invMonthly(v), 0))}</span><span class="sub">from Finance → Investors</span></div>
-    </div>
-    <div class="table-wrap"><table class="otable fixed"><thead><tr><th>Description</th><th class="r">Amount</th><th>Notes</th></tr></thead>
-    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td><div style="font-weight:600">${esc(x.desc)}</div>${x.breakdown ? `<div class="s" style="white-space:pre-line">${esc(x.breakdown)}</div>` : ""}</td><td class="r num nowrap">${x.amount ? peso(x.amount) : "–"}</td><td>${esc(x.notes || "")}</td></tr>`).join("")}</tbody>
-    <tfoot><tr><td style="font-weight:800">TOTAL</td><td class="r num" style="font-weight:800">${peso(tot)}</td><td></td></tr></tfoot></table>
+  // K, Oct 15, 2026: no stat cards; a compact table (description, amount right next to it, notes) with the total at the bottom.
+  return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:44%"><col style="width:16%"><col></colgroup>
+    <thead><tr><th>Description</th><th class="r">Amount / month</th><th>Notes</th></tr></thead>
+    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td><div class="fx-name">${esc(x.desc)}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="r num nowrap fx-amt">${x.amount ? peso(x.amount) : `<span class="s">–</span>`}</td><td class="fx-notes">${esc(x.notes || "")}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td style="font-weight:800">Total · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td></tr></tfoot></table>
     ${list.length ? "" : `<div class="empty" style="padding:16px">No fixed expenses yet. Click “Add expense line”.</div>`}</div>`;
 }
 function openFixedForm(id) {
@@ -8669,6 +8689,8 @@ document.addEventListener("click", guard(async ev => {
     case "edit-items": return openItemsEdit(id);
     case "columns": return openColumns(b.dataset.table);
     case "web-retry": S.web.err = ""; render(); await webLoad(true); return;
+    case "tabs-arrange": openTabsArrange(b.dataset.dept); return;
+    case "tabs-reset": await remove("colprefs", tabKey(b.dataset.dept)).catch(() => {}); closeSheet(); toast("Tabs back to default."); return;
     case "col-up": case "col-down": { const r = b.closest(".colrow"); if (b.dataset.act === "col-up" && r.previousElementSibling) r.parentNode.insertBefore(r, r.previousElementSibling); if (b.dataset.act === "col-down" && r.nextElementSibling) r.parentNode.insertBefore(r.nextElementSibling, r); return; }
     case "col-reset": { const pr = colPref(b.dataset.table); if (pr) await remove("colprefs", pr.id); closeSheet(); toast("Columns reset to default."); return; }
     case "merge": return openMerge();
