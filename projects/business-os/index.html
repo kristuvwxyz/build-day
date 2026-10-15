@@ -843,6 +843,7 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webki
 .nicons:hover { color: var(--fg); }
 .nprev { font-size: 11px; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
 .ipop-n { border-top: 1px solid var(--line); padding-top: 6px; }
+.ipop-stk { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); } .ipop-stk b { color: var(--text, inherit); font-weight: 600; }
 .ipop-pl { text-align: left; font: inherit; padding: 0; color: inherit; text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 3px; } .ipop-pl:hover { color: var(--brand, inherit); }
 .notebox { display: flex; flex-direction: column; gap: 8px; background: var(--warn-bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .sheet-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
@@ -853,6 +854,8 @@ tr.lgrp td { background: var(--surface-2); border-top: 2px solid var(--line); }
 .var-table input, .var-table select { padding: 5px 6px; font-size: 13px; }
 .var-table select { min-width: 96px; } .var-table select[data-vf="eta"] { min-width: 110px; } .var-table select[data-vf="kind"] { min-width: 112px; }
 .sheet:has(.var-table) { width: min(1080px, 100%); }
+.var-del { border: 0; background: none; color: var(--muted); font-size: 15px; padding: 4px 8px; border-radius: 6px; cursor: pointer; } .var-del:hover { color: var(--bad, #b42318); background: var(--surface-2); }
+.var-cmt b { cursor: help; text-decoration: underline dotted; }
 .var-ph { display: block; width: 46px; height: 46px; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--surface-2); border: 1px dashed var(--line); }
 .var-ph img, .var-ph svg { width: 100%; height: 100%; object-fit: cover; display: block; }
 .var-ph svg { padding: 8px; color: var(--gold); }
@@ -4416,7 +4419,7 @@ function itemsPop(btn) {
   closePop(); const o = findOrder(btn.dataset.items); if (!o) return;
   const r = btn.getBoundingClientRect();
   const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop"; el.setAttribute("role", "dialog");
-  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${custLink(o)}</span></div>${(o.items || []).map(i => `<div class="ipop-i"><span class="num">${esc(i.qty)}×</span><span>${(pr => pr ? `<button type="button" class="linkish ipop-pl" data-iprod="${pr.id}" title="Open the listing">${esc(i.name)}</button>` : esc(i.name))(S.products.find(x => x.id === i.productId) || webItemProduct({ name: i.name }))}${i.from && (o.merged || []).length ? ` <span class="from">#${esc(i.from)}</span>` : ""}</span><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("") || `<div class="ipop-i">No items</div>`}<div class="ipop-t"><span>Total</span><b class="num">${peso2(total(o))}</b></div><button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
+  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>${custLink(o)}</span></div>${(o.items || []).map(i => `<div class="ipop-i"><span class="num">${esc(i.qty)}×</span><span>${(pr => pr ? `<button type="button" class="linkish ipop-pl" data-iprod="${pr.id}" title="Open the listing">${esc(i.name)}</button><small class="ipop-stk">Qty <b>${Number(pr.stock) || 0}</b> · Committed <b>${committedOf(pr)}</b></small>` : esc(i.name))(S.products.find(x => x.id === i.productId) || webItemProduct({ name: i.name }))}${i.from && (o.merged || []).length ? ` <span class="from">#${esc(i.from)}</span>` : ""}</span><span class="num">${peso2(i.qty * i.price)}</span></div>`).join("") || `<div class="ipop-i">No items</div>`}<div class="ipop-t"><span>Total</span><b class="num">${peso2(total(o))}</b></div><button type="button" class="linkish" data-open="${o.id}">Open order →</button>`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
   el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
@@ -6359,16 +6362,30 @@ function varRowHtml(v, main, isNew) {
     <td><input data-vf="compareAt" class="money" inputmode="decimal" value="${Number(v.compareAt) ? moneyFmt(v.compareAt) : ""}" aria-label="Compare-at price" style="width:82px"></td>
     <td><input data-vf="cost" class="money" inputmode="decimal" value="${Number(v.cost) ? moneyFmt(v.cost) : ""}" aria-label="Cost" style="width:82px"></td>
     <td><input data-vf="stock" type="number" step="1" value="${Number(v.stock) || 0}" aria-label="Stock" style="width:58px"></td>
+    <td class="num var-cmt">${(() => { const rows = isNew ? [] : committedOrders(v), n = rows.reduce((a, r) => a + r.q, 0);
+      return n ? `<b title="${esc(rows.map(r => "#" + String(r.o ? r.o.num : r.w.ref || "").replace(/^#/, "") + " · " + r.q).join("\n"))}">${n}</b>` : `<span style="color:var(--muted)">0</span>`; })()}</td>
     <td><input data-vf="supplier" value="${esc(v.supplier || "")}" placeholder="S-…" aria-label="Supplier code" style="width:76px"></td>
-    <td style="text-align:center"><input type="radio" name="v-main" value="${esc(v.id)}" ${main ? "checked" : ""} aria-label="Main photo"></td></tr>`;
+    <td style="text-align:center"><input type="radio" name="v-main" value="${esc(v.id)}" ${main ? "checked" : ""} aria-label="Main photo"></td>
+    <td style="text-align:center"><button type="button" class="var-del" data-act="var-del" title="Delete this variation" aria-label="Delete this variation">✕</button></td></tr>`;
 }
 function varsHtml(p) {
-  const vars = scentVars(p).sort(varSort), m = scentMainOf(vars) || p;
+  const vars = scentVars(p).filter(v => v.id === p.id || v.status !== "hidden").sort(varSort), m = scentMainOf(vars) || p;   // deleted (archived) options stay out of the table
   return `<div class="field"><label>Variations <span style="font-weight:400;color:var(--muted)">· one listing per scent. Each option has its own photo (tap it to change); “Main” is the listing’s main photo.</span></label>
-    <div class="table-wrap var-wrap"><table class="otable var-table"><thead><tr><th>Photo</th><th>Size</th><th>Type</th><th>On hand / Pre-order</th><th>ETA</th><th>SRP</th><th>Compare at</th><th>Cost</th><th>Stock</th><th>Supplier</th><th>Main</th></tr></thead>
+    <div class="table-wrap var-wrap"><table class="otable var-table"><thead><tr><th>Photo</th><th>Size</th><th>Type</th><th>On hand / Pre-order</th><th>ETA</th><th>SRP</th><th>Compare at</th><th>Cost</th><th>Stock</th><th title="Units held by open orders that aren't shipped yet">Committed</th><th>Supplier</th><th>Main</th><th></th></tr></thead>
     <tbody id="var-rows">${vars.map(v => varRowHtml(v, v.id === m.id)).join("")}</tbody></table></div>
     <datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist>
     <div><button class="btn sm" type="button" data-act="var-add" data-id="${esc(p.id)}">+ Add variation</button></div></div>`;
+}
+// Delete variation (K, Oct 15, 2026): the row goes away now; on Save the option moves to the Archive with qty 0 (orders that used it keep their history).
+function varDel(btn) {
+  const tr = btn.closest("tr[data-var]"), left = document.querySelectorAll("#var-rows tr[data-var]:not([data-del])").length; if (!tr) return;
+  if (left <= 1) return toast("A listing needs at least one variation. Use Delete listing instead.");
+  const c = Number((tr.querySelector(".var-cmt b") || {}).textContent) || 0;
+  if (c && !confirm(`${c} unit${c === 1 ? " is" : "s are"} still committed to open orders for this option. Delete it anyway?`)) return;
+  if (tr.dataset.new) return tr.remove();
+  tr.dataset.del = "1"; tr.hidden = true;
+  const r = tr.querySelector('input[name="v-main"]'); if (r && r.checked) { r.checked = false; const n = document.querySelector('#var-rows tr[data-var]:not([data-del]) input[name="v-main"]'); if (n) n.checked = true; }
+  toast("Variation removed. Click Save listing to keep the change.");
 }
 function varAdd(id) {
   const p = S.products.find(x => x.id === id), tb = $("#var-rows"); if (!p || !tb) return;
@@ -6390,7 +6407,7 @@ const varNum = v => { const n = String(v || "").replace(/[^\d.]/g, ""); return n
 function varRowsRead() {
   return [...document.querySelectorAll("#var-rows tr[data-var]")].map(tr => { const g = k => (tr.querySelector(`[data-vf="${k}"]`) || {}).value || "";
     const kind = g("kind") === "preorder" ? "preorder" : "onhand";
-    return { id: tr.dataset.var, isNew: !!tr.dataset.new, img: g("img"), f: { size: g("size").trim(), ptype: g("ptype"), kind, eta: kind === "preorder" ? g("eta") : "", price: varNum(g("price")), compareAt: varNum(g("compareAt")), cost: varNum(g("cost")), stock: Math.round(Number(g("stock")) || 0), supplier: g("supplier").toUpperCase().replace(/\s+/g, "") } }; });
+    return { id: tr.dataset.var, isNew: !!tr.dataset.new, del: !!tr.dataset.del, img: g("img"), f: { size: g("size").trim(), ptype: g("ptype"), kind, eta: kind === "preorder" ? g("eta") : "", price: varNum(g("price")), compareAt: varNum(g("compareAt")), cost: varNum(g("cost")), stock: Math.round(Number(g("stock")) || 0), supplier: g("supplier").toUpperCase().replace(/\s+/g, "") } }; });
 }
 // Saves the other options of the scent: the listing's shared details (name, notes, badges…) plus each row; adds new variations.
 async function varsSave(p, data, vrows, main) {
@@ -6398,6 +6415,8 @@ async function varsSave(p, data, vrows, main) {
   const shared = { brand: data.brand, category: data.category, badges: data.badges, isNew: data.isNew, notes: data.notes, accords: data.accords, fragrantica: data.fragrantica, description: data.description };
   for (const r of vrows) {
     if (r.id === p.id) continue;
+    if (r.del) { const v = S.products.find(x => x.id === r.id); if (!v || v.status === "hidden") continue;
+      await patch("products", v.id, { status: "hidden", stock: 0, scentMain: false, webSync: "pending", editedAt: now, editedBy: by, log: logAdd(v, ["deleted this variation (moved to the Archive, qty 0)"], by) }); out.push(v.id); continue; }
     if (r.isNew) { const nid = uid("p"), rec = { ...shared, name: base, ...r.f, status: "active", reorder: 1, createdAt: now, imgs: r.img ? [r.img] : [], photo: r.img || "", scentMain: main === r.id, webSync: "pending", editedAt: now, editedBy: by, log: [{ at: now, by, msg: `added as a variation of ${base} (${varLabel(r.f)})` }] };
       tidyListing(rec); await save("products", nid, rec); out.push(nid); continue; }
     const v = S.products.find(x => x.id === r.id); if (!v) continue;
@@ -6475,7 +6494,8 @@ function openProductForm(id, preset = {}) {
     const vrows = id ? varRowsRead() : [], vmain = (document.querySelector('input[name="v-main"]:checked') || {}).value || "";
     if (vrows.some(r => r.isNew && !r.f.ptype)) return sheetError("Pick a Type for each new variation.");
     const vme = vrows.find(r => r.id === id);
-    if (vme) { Object.assign(data, vme.f); if (vme.img) Object.assign(data, varPhotoReset(vme.img)); if (vrows.length > 1 || vmain) data.scentMain = vmain === id; }
+    if (vme && vme.del) { Object.assign(data, vme.f, { status: "hidden", stock: 0, scentMain: false }); }
+    else if (vme) { Object.assign(data, vme.f); if (vme.img) Object.assign(data, varPhotoReset(vme.img)); if (vrows.length > 1 || vmain) data.scentMain = vmain === id; }
     if (!id) data.createdAt = Date.now();
     const PLAB = { name: "name", brand: "brand", size: "size", ptype: "type", sku: "SKU", barcode: "barcode", category: "collection", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", reorder: "low-stock alert", status: "status", kind: "availability", eta: "ETA", badges: "badges", notes: "notes", accords: "accords", fragrantica: "Fragrantica link", description: "description", url: "website link", batch: "batch no.", photo: "photo" };
     const changed = id ? Object.keys(PLAB).filter(k => JSON.stringify(p[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !p[k]) && !(k === "notes" && !Object.keys(data.notes).length && !p.notes)) : [];
@@ -8634,6 +8654,7 @@ document.addEventListener("click", guard(async ev => {
       pgalSet(l); return; }
     case "olog-post": return ologPost(b);
     case "var-add": return varAdd(b.dataset.id);
+    case "var-del": return varDel(b);
     case "olog-unpend": { const f = ologPend.splice(Number(b.dataset.i), 1)[0]; if (f && f._url) URL.revokeObjectURL(f._url); ologPendShow(); return; }
     case "m-photo-clear": $("#m-photo").value = ""; $("#m-photo-prev").innerHTML = "<span>?</span>"; b.remove(); return;
     case "scent-web": { const q = val("sc-name"); window.open("https://www.google.com/search?tbm=isch&q=" + encodeURIComponent((q || "perfume") + " perfume bottle"), "_blank", "noopener"); return; }
