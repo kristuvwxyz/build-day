@@ -564,6 +564,7 @@ body.has-pomo #view { padding-bottom: 64px; }
 .tcol-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 700; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
 .tcol-h span { font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .tcol .tpill { font-size: 12.5px; padding: 4px 6px; }
+.tpill.s-done, .tpill.s-cancelled { opacity: .45; filter: grayscale(1); } tr.t-closed { opacity: .5; } tr.t-closed td { color: var(--muted); }
 .tgrp td { background: var(--surface-2); font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .03em; }
 .cal-more { font-size: 11px; color: var(--muted); padding: 2px 4px; background: none; border: 0; font: inherit; font-size: 11px; text-align: left; cursor: pointer; border-radius: 6px; }
 .cal-more:hover { color: var(--fg); background: var(--surface-2, rgba(0,0,0,.05)); text-decoration: underline; }
@@ -1015,6 +1016,7 @@ const STAGES = [
   { id: "to_confirm", name: "To Confirm", tag: "7.CONF", cls: "violet hollow" },
   { id: "billed", name: "Billed", tag: "6.BILLED", cls: "blue hollow" },
   { id: "dp", name: "Partially paid", tag: "5.DP", cls: "blue hollow" },
+  { id: "in_transit", name: "In Transit", tag: "4.TRANSIT", cls: "violet" },
   { id: "arrived", name: "Arrived", tag: "4.ARRIVED", cls: "teal hollow" },
   { id: "sorted", name: "Sorted", tag: "3.SORTED", cls: "teal hollow" },
   { id: "arrived_hold", name: "Arrived-Hold", tag: "2.AB", cls: "orange hollow" },
@@ -1143,7 +1145,9 @@ const plat = id => (PLATFORMS.find(p => p.id === id) || PLATFORMS[4]).name;
 const pay = id => PAYMENTS.find(s => s.id === id) || PAYMENTS[0];
 const paidish = p => p === "paid" || p === "partial"; // the website only knows paid / not paid; a 50% DP counts as paid there
 // Delivered is no longer offered (K, 2026-10-08); old Delivered orders still show it.
-const FUL_PICK = FULFILLMENTS.filter(f => f.id !== "delivered");
+// "Partially paid" is no longer a fulfillment choice (K, Oct 15, 2026): the Payment status already says it. Old orders still show it until changed.
+const FUL_PICK = FULFILLMENTS.filter(f => f.id !== "delivered" && f.id !== "dp");
+const fulPick = cur => cur && !FUL_PICK.some(f => f.id === cur) ? [...FUL_PICK, ful(cur)] : FUL_PICK;
 const ful = id => FULFILLMENTS.find(s => s.id === id) || FULFILLMENTS[0];
 const badge = s => `<span class="badge ${s.cls}">${esc(s.name)}</span>`;
 const fmtDate = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "";
@@ -1175,12 +1179,12 @@ const svg = (k, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none
 const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Has note"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
 const DEPTS = [
-  { id: "CEO", name: "CEO", tabs: ["overview", "dtasks"], blurb: "Whole-business overview" },
-  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "logins", "homecontent", "expenses", "dtasks"], blurb: "Directory, logins, Home page, expenses & cash" },
-  { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "salesreport", "payroll", "payrecords", "fixed", "investors", "bir", "dtasks"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
-  { id: "SALES", name: "Sales", tabs: ["suppliers", "customers", "dtasks"], blurb: "Orders, product listings, customers" },
-  { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "dtasks"], blurb: "Channels, listings, audience" },
-  { id: "PACKING", name: "Packing", tabs: ["inventory", "dtasks"], blurb: "Packing queue, barcode scan, stock" },
+  { id: "CEO", name: "CEO", tabs: ["overview"], blurb: "Whole-business overview" },
+  { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "logins", "homecontent", "expenses"], blurb: "Directory, logins, Home page, expenses & cash" },
+  { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "salesreport", "payroll", "payrecords", "fixed", "investors", "bir"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
+  { id: "SALES", name: "Sales", tabs: ["suppliers", "customers"], blurb: "Orders, product listings, customers" },
+  { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers"], blurb: "Channels, listings, audience" },
+  { id: "PACKING", name: "Packing", tabs: ["inventory"], blurb: "Packing queue, barcode scan, stock", hidden: true },   // hidden from the menu (K, Oct 15, 2026): stock is done in Listings; the role stays for access rules
 ];
 const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
@@ -1230,7 +1234,7 @@ function allowedDepts() {
   return [m.department];
 }
 const canSee = d => allowedDepts().includes(d);
-const visDepts = () => DEPTS.filter(d => canSee(d.id));
+const visDepts = () => DEPTS.filter(d => !d.hidden && canSee(d.id));
 const finOpen = () => canSee("FINANCE") && isUnlocked("FINANCE");
 
 function relTime(t) {
@@ -2568,9 +2572,12 @@ function taskPill(t) {
   return `<button type="button" class="tpill s-${t.status}${isOverdue(t) ? " overdue" : ""}${taskUrg(t) ? " u-" + taskUrg(t) : ""}" ${o ? `data-open="${o.id}"` : `data-task="${t.id}"`} title="${o ? esc(onum(o)) + " · " : ""}${esc(t.title)} · ${esc(memberName(t.assigneeId))} · ${tstat(t.status).name}">${o ? `<span class="ini">📦</span>` : a ? `<span class="ini">${esc(initials(a.name))}</span>` : ""}<span class="tt">${o ? "#" + esc(o.num) + " " : ""}${esc(t.title)}</span></button>`;
 }
 const TASK_BULK = [["✓ Mark done", "task-sel-done", "primary"], ["Delete…", "task-sel-del", "danger"]];
+// Task order everywhere on the Tasks page (K, Oct 15, 2026): open tasks first, most recent (latest due date, then newest) on top; done / cancelled go last, greyed out.
+const taskClosed = t => t.status === "done" || t.status === "cancelled";
+const taskCmp = (a, b) => taskClosed(a) - taskClosed(b) || (b.due || "").localeCompare(a.due || "") || (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0);
 function taskRow(t, pick) {
   const ed = !S.readOnly, pr = t.status === "done" ? 100 : Number(t.progress) || 0;
-  return `<tr data-task="${t.id}" style="cursor:pointer">${pick === true ? pickTd("task", t.id) : ""}
+  return `<tr data-task="${t.id}"${taskClosed(t) ? ' class="t-closed"' : ""} style="cursor:pointer">${pick === true ? pickTd("task", t.id) : ""}
     <td><div style="font-weight:600;${t.status === "cancelled" ? "text-decoration:line-through;color:var(--muted)" : ""}">${esc(t.title)}${t.priority === "high" ? ' <span class="chip bad">High</span>' : ""}${t.orderId && findOrder(t.orderId) ? ` <button type="button" class="chip" data-open="${t.orderId}">📦 #${esc(findOrder(t.orderId).num)}</button>` : ""}</div>${t.notes ? `<div class="s">${esc(t.notes.slice(0, 80))}</div>` : ""}</td>
     <td class="nowrap">${isAllTask(t) && !t.assigneeId ? `<span style="color:var(--muted)">By</span> ${esc(t.createdByName || memberName(t.createdById) || "–")}` : esc(memberName(t.assigneeId))}</td>
     <td class="nowrap">${t.department ? `<span class="dchip" style="--dc:${DEPT_COLORS[t.department]}">${esc(taskDeptName(t.department))}</span>` : "–"}</td>
@@ -2616,9 +2623,8 @@ function viewTasks(forceDept) {
     const g = new Map();
     if (groupBy === "person") for (const m of (forceDept ? activeTeam().filter(m => m.department === forceDept) : S.t.scope === "dept" && S.t.dept ? activeTeam().filter(m => m.department === S.t.dept) : taskTeam())) g.set(m.id, []);
     if (groupBy === "dept") for (const d of DEPTS.filter(d => taskDepts().includes(d.id))) g.set(d.id, []);
-    const ord = t => [t.status === "done" ? 2 : isOverdue(t) ? 0 : 1, t.due || ""];
     for (const t of todayTasks) { const k = groupBy === "dept" ? t.department || "" : groupBy === "person" ? t.assigneeId || "" : "all"; if (!g.has(k)) g.set(k, []); g.get(k).push(t); }
-    return [...g.entries()].map(([k, ts]) => ({ k, ts: ts.sort((a, b) => { const x = ord(a), y = ord(b); return x[0] - y[0] || x[1].localeCompare(y[1]); }), name: groupBy === "dept" ? (k ? taskDeptName(k) : "No department") : groupBy === "person" ? memberName(k) : "" }))
+    return [...g.entries()].map(([k, ts]) => ({ k, ts: ts.sort(taskCmp), name: groupBy === "dept" ? (k ? taskDeptName(k) : "No department") : groupBy === "person" ? memberName(k) : "" }))
       .filter(r => r.ts.length || groupBy === "person").sort((a, b) => (b.ts.filter(t => t.status !== "done").length - a.ts.filter(t => t.status !== "done").length) || a.name.localeCompare(b.name));
   };
   const openCount = ts => ts.filter(t => t.status !== "done").length;
@@ -2643,7 +2649,7 @@ function viewTasks(forceDept) {
     const weeks = Math.ceil((first.getDay() + dim) / 7);
     const cells = [];
     for (let i = 0; i < weeks * 7; i++) { const d = new Date(y, m - 1, 1 - first.getDay() + i, 12); cells.push(dstr(d.getTime())); }
-    const dayTasks = scoped.filter(t => onDay(t, S.t.day));
+    const dayTasks = scoped.filter(t => onDay(t, S.t.day)).sort(taskCmp);
     const pPerson = !forceDept && S.t.scope === "person" ? S.t.person : !forceDept && S.t.scope === "me" ? myMemberId() : "";
     const showMoney = (finOpen() || DUE_PEOPLE.includes(myMemberId())) && (!forceDept || forceDept === "FINANCE");
     const showInv = canInvoices() && (!forceDept || forceDept === "FINANCE" || forceDept === "SALES");
@@ -2652,7 +2658,7 @@ function viewTasks(forceDept) {
     const dayMoney = moneyOn(S.t.day);
     main = `<div class="cal">
       ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => `<div class="cal-h">${d}</div>`).join("")}
-      ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)); const out = d.slice(0, 7) !== ym; const uc = moneyOn(d).map(moneyUrg).concat(ts.map(taskUrg)); return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${uc.includes("overdue") ? " u-overdue" : uc.includes("today") ? " u-today" : uc.includes("soon") ? " u-soon" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
+      ${cells.map(d => { const ts = scoped.filter(t => onDay(t, d)).sort(taskCmp); const out = d.slice(0, 7) !== ym; const uc = moneyOn(d).map(moneyUrg).concat(ts.map(taskUrg)); return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${uc.includes("overdue") ? " u-overdue" : uc.includes("today") ? " u-today" : uc.includes("soon") ? " u-soon" : ""}${d === S.t.day ? " picked" : ""}" data-day="${d}">
         <div class="cal-n"><span>${Number(d.slice(8))}</span>${S.readOnly ? "" : `<button type="button" class="cal-add" data-act="new-task" data-date="${d}" aria-label="Add task on ${fmtDate(d)}">+</button>`}</div>
         <div class="cal-items">${(() => { const op = (S.calOpen || (S.calOpen = new Set())).has(d), mo = moneyOn(d), mN = op ? mo.length : 2, tN = op ? ts.length : 3;
           return `${mo.slice(0, mN).map(moneyPill).join("")}${mo.length > mN ? `<button type="button" class="cal-more" data-act="cal-more" data-date="${d}">+${mo.length - mN} payments</button>` : ""}${ts.slice(0, tN).map(taskPill).join("")}${ts.length > tN ? `<button type="button" class="cal-more" data-act="cal-more" data-date="${d}">+${ts.length - tN} more</button>` : ""}${op && (mo.length > 2 || ts.length > 3) ? `<button type="button" class="cal-more" data-act="cal-more" data-date="${d}">Show less</button>` : ""}`; })()}</div>
@@ -2665,7 +2671,7 @@ function viewTasks(forceDept) {
     </section>
     ${showMoney ? "" : canSee("FINANCE") ? `<div style="font-size:12px;color:var(--muted)">Unlock Finance to see investor, credit card and check due dates on this calendar.</div>` : ""}`;
   } else {
-    const sorted = [...monthTasks].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
+    const sorted = [...monthTasks].sort(taskCmp);
     main = `${pickBar("task", TASK_BULK)}<div class="table-wrap"><table>
       <thead><tr>${pickTh("task", sorted.map(t => t.id))}<th>Task</th><th>Assigned to</th><th>Department</th><th>Due</th><th>Progress</th><th>Status · Priority</th></tr></thead>
       <tbody>${sorted.map(t => taskRow(t, true)).join("")}</tbody></table>${sorted.length ? "" : `<div class="empty" style="padding:16px">No tasks due in ${monthLabel(ym)}.</div>`}</div>`;
@@ -2676,7 +2682,7 @@ function viewTasks(forceDept) {
     : S.t.scope === "dept" ? workload(monthTasks, "person") : "";
   const noTeam = !S.team.length ? `<div class="notice" style="background:var(--info-bg);color:var(--info)"><span>Add your team in <strong>Admin → Team</strong> so you can assign tasks to people.</span></div>` : "";
   return `${noTeam}${forceDept && forceDept !== "FINANCE" ? "" : duesAlert()}${isToday ? taskSummary(todayTasks, `Today · ${esc(scopeName)}`) : taskSummary(monthTasks, `${monthLabel(ym)} · ${esc(scopeName)}`)}${controls}${main}
-    ${undated.length && !isToday ? `<section class="panel"><h2>No due date</h2><div class="table-wrap" style="border:0"><table><tbody>${undated.map(taskRow).join("")}</tbody></table></div></section>` : ""}
+    ${undated.length && !isToday ? `<section class="panel"><h2>No due date</h2><div class="table-wrap" style="border:0"><table><tbody>${[...undated].sort(taskCmp).map(taskRow).join("")}</tbody></table></div></section>` : ""}
     ${extra}`;
 }
 
@@ -3051,7 +3057,7 @@ function webAsOrders() {
 // Edits on a website order: payment, status and tracking go to the website; assignee, courier, tags,
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
 // RS OS Fulfillment status is the one the team edits; the customer's profile on regalspritz.com shows this status for it.
-const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
+const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", in_transit: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
   sorted: "Packed", unfulfilled: "Packed", fulfilled: "Shipped", delivered: "Shipped", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
@@ -3308,7 +3314,7 @@ function openWebOrder(ref) {
     ${bdoBox(o)}
     <p style="margin:0;font-size:12.5px;color:var(--muted)">Before shipping, check the amount paid matches <b>${peso(Number(o.due) || o.total)}</b>.</p>
     ${canPay() ? `<div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ${o.paid ? "" : "primary"}" type="button" data-act="web-paid" data-ref="${esc(o.ref)}" data-paid="${o.paid ? "0" : "1"}">${o.paid ? "Mark unpaid" : "Mark paid"}</button></div>` : ""}
-    ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${FUL_PICK.map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
+    ${canFul() ? `<div class="field"><label for="web-ful">Fulfillment status</label><select id="web-ful">${fulPick((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment).map(x => `<option value="${x.id}" ${x.id === ((webAsOrders().find(w => w.ref === o.ref) || {}).fulfillment) ? "selected" : ""}>${esc(x.name)}${WEB_STATUS_OF[x.id] ? " · customer sees " + WEB_STATUS_OF[x.id] : ""}</option>`).join("")}</select></div>
       <div class="field"><label for="web-track">Tracking number</label><input id="web-track" value="${esc(o.tracking || "")}" autocomplete="off" placeholder="e.g. JT0012345678"></div>
       <div style="display:flex;gap:8px"><button class="btn primary" type="button" data-act="web-save" data-ref="${esc(o.ref)}">Save status</button><button class="btn ghost" type="button" data-act="close">Close</button></div>` : `<button class="btn ghost" type="button" data-act="close">Close</button>`}
     <div class="sheet-err" id="sheet-err" hidden></div>
@@ -3781,6 +3787,8 @@ function filteredOrders() {
     if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
     if (S.of.sup && S.of.sup !== "all" && !(o.tags || []).some(t => t.toUpperCase() === S.of.sup)) return false;
     if (S.of.pay !== "all" && o.payment !== S.of.pay) return false;
+    if (S.of.mop && S.of.mop !== "all" && (mopOf(o) || "–") !== S.of.mop) return false;
+    if (S.of.cour && S.of.cour !== "all" && courierOf(o) !== S.of.cour) return false;
     if (S.of.month && dstr(o.createdAt || 0).slice(0, 7) !== S.of.month) return false;
     if (vw === "bdo" && !(o.web && bdoNeeds(S.web.orders.find(x => x.ref === o.ref)))) return false;
     if (vw === "unfulfilled" && (o.fulfillment !== "unfulfilled" || isVoid(o))) return false;
@@ -3979,7 +3987,7 @@ function orderCell(k, o, table) {
     case "payment": return `<td>${canPay() ? st(pay(o.payment), "payment", opts(PAYMENTS, o.payment)) : badge(pay(o.payment))}</td>`;
     case "mop": { const m = mopOf(o);
       return !o.web && canPay() && !o.archived ? `<td><select class="status ${m ? mopSt(m) : "st-grey"}" data-oset="mop" data-id="${o.id}" aria-label="Mode of payment"><option value="">–</option>${[...MOPS, ...(m && !MOPS.includes(m) ? [m] : [])].map(x => `<option ${m === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></td>` : `<td class="nowrap">${m ? `<span class="status mop-pill ${mopSt(m)}">${esc(m)}</span>` : `<span style="color:var(--muted)">–</span>`}</td>`; }
-    case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(o.fulfillment === "delivered" ? FULFILLMENTS : FUL_PICK, o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
+    case "fulfillment": return `<td>${canFul() ? st(ful(o.fulfillment), "fulfillment", opts(fulPick(o.fulfillment), o.fulfillment)) : badge(ful(o.fulfillment))}</td>`;
     case "courier": return `<td>${canShip() ? `<select class="status ${COURIER_ST[courierOf(o)] || "st-grey"}" data-oset="courier" data-id="${o.id}" aria-label="Courier">${COURIERS.map(c => `<option value="${c}" ${courierOf(o) === c ? "selected" : ""}>${COURIER_LABEL[c]}</option>`).join("")}</select>` : esc(COURIER_LABEL[courierOf(o)])}</td>`;
     case "tracking": return `<td class="nowrap num" style="font-size:12.5px">${o.tracking ? `${esc(o.tracking)}${o.shopShippedAt ? ` <span title="Sent to Shopify" style="color:var(--good)">✓</span>` : ""}` : `<span style="color:var(--muted)">–</span>`}</td>`;
     case "waybill": return `<td class="wb-cell">${o.tracking ? `<div class="num" style="font-size:12.5px;font-weight:600">${esc(o.tracking)}${o.shopShippedAt ? ` <span style="color:var(--good)" title="Sent to Shopify">✓</span>` : o.shopShipErr ? ` <span style="color:var(--bad)" title="${esc(o.shopShipErr)}">!</span>` : ""}</div>` : ""}${canShip() ? `<div class="wb-row"><input class="wb-in" data-wb="${o.id}" autocomplete="off" placeholder="${o.tracking ? "Re-scan" : "Scan / type + Enter"}" aria-label="Waybill for ${esc(onum(o))}"><label class="btn sm" for="wbc-${o.id}" style="cursor:pointer" title="Scan with camera">📷</label><input id="wbc-${o.id}" data-wbcam="${o.id}" type="file" accept="image/*" capture="environment" hidden></div>` : ""}</td>`;
@@ -4043,7 +4051,7 @@ function monthSelect() {
   const m = memo("omonths", [S.orders, S.orders.length], () => { const c = new Map(); for (const o of S.orders) { if (!o.createdAt) continue; const k = dstr(o.createdAt).slice(0, 7), x = c.get(k) || { n: 0, open: 0 }; x.n++; if (OPEN_FUL.has(o.fulfillment) && !isVoid(o)) x.open++; c.set(k, x); } return [...c].sort((a, b) => b[0].localeCompare(a[0])); });
   return `<select id="of-month" aria-label="Month placed"><option value="">All months</option>${m.map(([k, x]) => `<option value="${k}" ${S.of.month === k ? "selected" : ""}>${monUp(k)} · ${x.n} order${x.n === 1 ? "" : "s"}${x.open ? ` · ${x.open} still open` : ""}</option>`).join("")}</select>`;
 }
-const ofActive = () => !!(S.of.month || S.of.q || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all" || (S.of.sup && S.of.sup !== "all"));
+const ofActive = () => !!(S.of.month || S.of.q || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all" || (S.of.sup && S.of.sup !== "all") || (S.of.mop && S.of.mop !== "all") || (S.of.cour && S.of.cour !== "all"));
 function packTools() {
   const open = S.orders.filter(o => !isVoid(o) && PACK_SHOW.includes(o.fulfillment)), toShip = open.filter(o => o.fulfillment === "unfulfilled");
   return `<div class="kpis">
@@ -4104,6 +4112,9 @@ function viewOrders() {
     <select id="of-view" aria-label="Order view">${ORDER_VIEWS.map(v => `<option value="${v.id}" ${S.of.view === v.id ? "selected" : ""}>${v.name}</option>`).join("")}</select>
     <select id="of-ful" aria-label="Fulfillment status"><option value="all">All fulfillment</option>${FUL_PICK.map(f => `<option value="${f.id}" ${S.of.ful === f.id ? "selected" : ""}>${f.name}${f.tag ? " · " + f.tag : ""} (${S.orders.filter(o => o.fulfillment === f.id).length})</option>`).join("")}</select>
     <select id="of-pay" aria-label="Payment status"><option value="all">All payment</option>${PAYMENTS.map(f => `<option value="${f.id}" ${S.of.pay === f.id ? "selected" : ""}>${f.name} (${S.orders.filter(o => o.payment === f.id).length})</option>`).join("")}</select>
+    ${(() => { const rows = allOrderRows(), mops = [...new Set(rows.map(o => mopOf(o) || "–"))].sort((a, b) => (a === "–") - (b === "–") || a.localeCompare(b));
+      return `<select id="of-mop" aria-label="Mode of payment"><option value="all">All modes of payment</option>${mops.map(m => `<option value="${esc(m)}" ${S.of.mop === m ? "selected" : ""}>${esc(m === "–" ? "Not set" : m)} (${rows.filter(o => (mopOf(o) || "–") === m).length})</option>`).join("")}</select>
+    <select id="of-cour" aria-label="Courier"><option value="all">All couriers</option>${COURIERS.map(c => `<option value="${c}" ${S.of.cour === c ? "selected" : ""}>${c === "SDD" ? "SDD / Pickup" : c} (${rows.filter(o => courierOf(o) === c).length})</option>`).join("")}</select>`; })()}
     ${ofActive() ? `<button class="btn ghost" type="button" data-act="of-clear">✕ Clear filters</button>` : ""}
     <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
   </div>
@@ -4906,7 +4917,7 @@ function orderDisc(items, sub) {
 
 function openOrderForm() {
   S.mergeAns = null;
-  if (!S.products.length) { toast("Add your products first in Packing → Inventory, then create orders."); S.view = "dept"; S.dept = "PACKING"; S.tab = "inventory"; render(); return; }
+  if (!S.products.length) { toast("Add your products first in Listings, then create orders."); S.view = "listings"; render(); return; }
   const num = nextNum();
   openSheet(`
     <h3>${S.db && !S.loaded.orders ? `Create order <small style="font-size:13px;color:var(--muted);font-weight:500">· the order # is given when you save</small>` : `Create order #${num}`}</h3>
@@ -8754,7 +8765,7 @@ document.addEventListener("click", guard(async ev => {
     case "wbu-save": return wbSaveAll(b);
     case "jnt-file": return openJntFile();
     case "jnt-dl": return jntDownload();
-    case "of-clear": Object.assign(S.of, { q: "", view: "all", ful: "all", pay: "all", sup: "all", month: "" }); S.page = 0; render(); return;
+    case "of-clear": Object.assign(S.of, { q: "", view: "all", ful: "all", pay: "all", sup: "all", mop: "all", cour: "all", month: "" }); S.page = 0; render(); return;
     case "tclock": return tclock();
     case "backup-dl": return downloadBackup();
     case "tc": { const mid = myMemberId(); await clock(mid, b.dataset.dir); closeSheet(); return; }
@@ -8766,7 +8777,7 @@ document.addEventListener("click", guard(async ev => {
     case "gal-copy": await galCopy(b.dataset.k); return;
     case "gal-use": await galUse(b.dataset.h, Number(b.dataset.k)); return;
     case "shop-find-open": await openShopFound(b.dataset.num); return;
-    case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all" }); S.page = 0; render(); return;
+    case "of-clear-keepq": Object.assign(S.of, { month: "", view: "all", ful: "all", pay: "all", sup: "all", mop: "all", cour: "all" }); S.page = 0; render(); return;
     case "lb-clear": S.lsel.clear(); render(); return;
     case "lb-prices": { const upd = {}, labs = []; for (const [id, k, l] of [["lb-price", "price", "SRP"], ["lb-compare", "compareAt", "compare at"], ["lb-cost", "cost", "cost"]]) { const v = val(id); if (v === "") continue; if (isNaN(Number(v))) { toast("Enter a number."); return; } upd[k] = Number(v); labs.push(l + " → " + peso(Number(v))); }
       if (!labs.length) { toast("Type a price first."); return; } await listingsBulk(upd, labs.join(", ")); return; }
@@ -8967,6 +8978,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.id === "sp-pay") { S.sp.pay = t.value; render(); return; }
   if (t.classList.contains("jnt-f")) { jntField(t, t.tagName === "INPUT"); return; } // text boxes update in place: redrawing here would swap out the box being clicked into next
   if (t.id === "of-ful") { S.of.ful = t.value; S.page = 0; render(); return; }
+  if (t.id === "of-mop" || t.id === "of-cour") { S.of[t.id === "of-mop" ? "mop" : "cour"] = t.value; S.page = 0; render(); return; }
   if (t.id === "bk-file" && t.files[0]) { const f = t.files[0]; t.value = ""; return importBackup(f); }
   if (t.id === "dev-viewas" || t.id === "viewas-pick") { try { t.value ? sessionStorage.setItem("rs-viewas", t.value) : sessionStorage.removeItem("rs-viewas"); } catch (e) {} location.reload(); return; }
   if (t.id === "of-month") { S.of.month = t.value; S.page = 0; render(); return; }
