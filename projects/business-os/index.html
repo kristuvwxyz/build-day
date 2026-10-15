@@ -2334,7 +2334,7 @@ function boundMember() {
 }
 const myMemberId = () => (boundMember() || {}).id || "";
 const gated = () => !!S.uid && !S.isOwner && !S.realOwner && S.loaded.team && !boundMember();
-const canOrders = () => myDept() !== "MARKETING";
+const canOrders = () => (S.isOwner || !!myMemberId()) && myDept() !== "MARKETING";   // a login not linked to an active team member (e.g. someone who left) sees no orders
 const LISTING_DEPTS = ["SALES", "MARKETING", "ADMIN"];
 const canListings = () => LISTING_DEPTS.some(d => canSee(d));
 const canAttendance = () => S.isOwner || ["CEO", "ADMIN", "FINANCE"].includes(myDept());
