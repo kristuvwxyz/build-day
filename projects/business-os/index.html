@@ -853,7 +853,7 @@ tr.lgrp td { background: var(--surface-2); border-top: 2px solid var(--line); }
 .var-table td, .var-table th { padding: 5px 6px; white-space: nowrap; }
 .var-table input, .var-table select { padding: 5px 6px; font-size: 13px; }
 .var-table select { min-width: 96px; } .var-table select[data-vf="eta"] { min-width: 110px; } .var-table select[data-vf="kind"] { min-width: 112px; }
-.sheet:has(.var-table) { width: min(1080px, 100%); }
+.sheet:has(.var-table) { width: min(1200px, 100%); }
 .var-del { border: 0; background: none; color: var(--muted); font-size: 15px; padding: 4px 8px; border-radius: 6px; cursor: pointer; } .var-del:hover { color: var(--bad, #b42318); background: var(--surface-2); }
 .var-cmt b { cursor: help; text-decoration: underline dotted; }
 .var-ph { display: block; width: 46px; height: 46px; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--surface-2); border: 1px dashed var(--line); }
@@ -6369,7 +6369,7 @@ function varRowHtml(v, main, isNew) {
     <td style="text-align:center"><button type="button" class="var-del" data-act="var-del" title="Delete this variation" aria-label="Delete this variation">✕</button></td></tr>`;
 }
 function varsHtml(p) {
-  const vars = scentVars(p).filter(v => v.id === p.id || v.status !== "hidden").sort(varSort), m = scentMainOf(vars) || p;   // deleted (archived) options stay out of the table
+  const vars = scentVars(p).filter(v => v.id === p.id || !v.varDeleted).sort(varSort), m = scentMainOf(vars) || p;   // deleted (archived) options stay out of the table
   return `<div class="field"><label>Variations <span style="font-weight:400;color:var(--muted)">· one listing per scent. Each option has its own photo (tap it to change); “Main” is the listing’s main photo.</span></label>
     <div class="table-wrap var-wrap"><table class="otable var-table"><thead><tr><th>Photo</th><th>Size</th><th>Type</th><th>On hand / Pre-order</th><th>ETA</th><th>SRP</th><th>Compare at</th><th>Cost</th><th>Stock</th><th title="Units held by open orders that aren't shipped yet">Committed</th><th>Supplier</th><th>Main</th><th></th></tr></thead>
     <tbody id="var-rows">${vars.map(v => varRowHtml(v, v.id === m.id)).join("")}</tbody></table></div>
@@ -6416,7 +6416,7 @@ async function varsSave(p, data, vrows, main) {
   for (const r of vrows) {
     if (r.id === p.id) continue;
     if (r.del) { const v = S.products.find(x => x.id === r.id); if (!v || v.status === "hidden") continue;
-      await patch("products", v.id, { status: "hidden", stock: 0, scentMain: false, webSync: "pending", editedAt: now, editedBy: by, log: logAdd(v, ["deleted this variation (moved to the Archive, qty 0)"], by) }); out.push(v.id); continue; }
+      await patch("products", v.id, { status: "hidden", varDeleted: true, stock: 0, scentMain: false, webSync: "pending", editedAt: now, editedBy: by, log: logAdd(v, ["deleted this variation (moved to the Archive, qty 0)"], by) }); out.push(v.id); continue; }
     if (r.isNew) { const nid = uid("p"), rec = { ...shared, name: base, ...r.f, status: "active", reorder: 1, createdAt: now, imgs: r.img ? [r.img] : [], photo: r.img || "", scentMain: main === r.id, webSync: "pending", editedAt: now, editedBy: by, log: [{ at: now, by, msg: `added as a variation of ${base} (${varLabel(r.f)})` }] };
       tidyListing(rec); await save("products", nid, rec); out.push(nid); continue; }
     const v = S.products.find(x => x.id === r.id); if (!v) continue;
@@ -6494,7 +6494,7 @@ function openProductForm(id, preset = {}) {
     const vrows = id ? varRowsRead() : [], vmain = (document.querySelector('input[name="v-main"]:checked') || {}).value || "";
     if (vrows.some(r => r.isNew && !r.f.ptype)) return sheetError("Pick a Type for each new variation.");
     const vme = vrows.find(r => r.id === id);
-    if (vme && vme.del) { Object.assign(data, vme.f, { status: "hidden", stock: 0, scentMain: false }); }
+    if (vme && vme.del) { Object.assign(data, vme.f, { status: "hidden", varDeleted: true, stock: 0, scentMain: false }); }
     else if (vme) { Object.assign(data, vme.f); if (vme.img) Object.assign(data, varPhotoReset(vme.img)); if (vrows.length > 1 || vmain) data.scentMain = vmain === id; }
     if (!id) data.createdAt = Date.now();
     const PLAB = { name: "name", brand: "brand", size: "size", ptype: "type", sku: "SKU", barcode: "barcode", category: "collection", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", reorder: "low-stock alert", status: "status", kind: "availability", eta: "ETA", badges: "badges", notes: "notes", accords: "accords", fragrantica: "Fragrantica link", description: "description", url: "website link", batch: "batch no.", photo: "photo" };
@@ -8917,7 +8917,7 @@ document.addEventListener("change", guard(async ev => {
   if (t.dataset.lsel) { t.checked ? S.lsel.add(t.dataset.lsel) : S.lsel.delete(t.dataset.lsel); render(); return; }
   if (t.dataset.lbulk) { const f = t.dataset.lbulk, v = t.value; if (!v) return;
     const lab = f === "category" ? "collection → " + (WEB_CATS.find(x => x[0] === v) || [v, v])[1] : f === "kind" ? KIND_LAB[v] : f === "status" ? (v === "hidden" ? "moved to archive" : v === "active" ? "back to the shop" : "status → " + (LIST_STATUS[v] || { name: v }).name) : (f === "ptype" ? "type" : "ETA") + " → " + v;
-    await listingsBulk(f === "kind" ? kindUpd(v) : { [f]: v }, lab); return; }
+    await listingsBulk(f === "kind" ? kindUpd(v) : f === "status" && v === "active" ? { status: v, varDeleted: false } : { [f]: v }, lab); return; }
   if (t.id === "l-badge") { S.lbadge = t.value; S.lpage = 0; render(); return; }
   if (t.id === "l-stat") { S.lstat = t.value; S.lpage = 0; render(); return; }
   if (t.dataset.lbadge) { const v = t.value, add = t.dataset.lbadge === "add"; if (!v) return;
