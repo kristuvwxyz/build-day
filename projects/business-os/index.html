@@ -949,6 +949,7 @@ main > .gs.mobile-only { margin-bottom: 12px; }
 /* One dropdown arrow app-wide (filters, forms, strips, table pills). */
 select:not([multiple]) { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23857a83' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: right 11px center !important; background-size: 11px 8px !important; padding-right: 30px !important; }
 select.status:not([multiple]), select.lcell:not([multiple]) { background-position: right 7px center !important; background-size: 9px 6px !important; padding-right: 22px !important; }
+.col-grip { cursor: grab; touch-action: none; user-select: none; padding: 4px 10px; font-size: 18px; color: var(--muted); line-height: 1; } .colrow.dragging { opacity: .85; box-shadow: 0 6px 18px rgba(0,0,0,.18); background: var(--surface); position: relative; z-index: 2; } .colrow.dragging .col-grip { cursor: grabbing; }
 </style>
 
 <div class="app">
@@ -1331,6 +1332,9 @@ async function save(col, id, data) {
 const liveOnWeb = p => (p.status || "active") === "active" && (p.kind === "preorder" ? !p.soldOut : (Number(p.stock) || 0) > 0);
 async function patch(col, id, data) {
   undoNote(col, id);
+  if (col === "products" && data && ("stock" in data || "kind" in data)) { const old = S.products.find(r => r.id === id) || {}, m = { ...old, ...data };
+    // Oct 15, 2026 (K): no separate "Sold out (pre-order)" choice; a pre-order with qty 0 is sold out, more than 0 is orderable.
+    if (m.kind === "preorder") { const out = !((Number(m.stock) || 0) > 0); if (!!old.soldOut !== out || ("soldOut" in data && !!data.soldOut !== out)) data = { ...data, soldOut: out, webSync: "pending" }; } }
   if (col === "products" && data && !("webCreated" in data)) { const old = S.products.find(r => r.id === id);
     if (old && old.status === "hidden" && (!("status" in data) || data.status === "hidden") && "stock" in data && (Number(data.stock) || 0) > 0 && !((Number(old.stock) || 0) > 0)) data = { ...data, status: "active", webSync: "pending" };   // restocking an archived listing brings it back
     if (old && liveOnWeb({ ...old, ...data }) && (!liveOnWeb(old) || (data.kind === "preorder" && old.kind !== "preorder"))) { data = { ...data, webCreated: new Date().toISOString().replace(/\.\d+Z$/, "+00:00"), webSync: "pending" }; } }
@@ -1358,7 +1362,8 @@ async function adjustStock(productId, delta) {
 /* Reserved stock: units in checked-out orders that haven't shipped yet.
    "stock" is what's still free to sell; it drops at checkout and comes back if the order is cancelled. */
 const isCancelled = (pay, fl) => VOIDPAY.has(pay) || fl === "cancelled";
-const onHandProduct = pid => { const p = S.products.find(x => x.id === pid); return p && p.kind !== "preorder" ? p : null; };
+// Oct 15, 2026 (K): pre-order qty = what the supplier still has, so orders take it off too (0 = Sold out).
+const onHandProduct = pid => S.products.find(x => x.id === pid) || null;
 function stockTake(items) { const m = {}; for (const i of items || []) if (i.productId && onHandProduct(i.productId)) m[i.productId] = (m[i.productId] || 0) + (Number(i.qty) || 0); return m; }
 async function applyStockMap(m, sign) { for (const [pid, q] of Object.entries(m || {})) if (q) await adjustStock(pid, sign * q); }
 // Works out whether a status change cancels or un-cancels the order, and moves stock once either way.
@@ -1377,10 +1382,10 @@ function reservedMap() {
   for (const o of S.orders) { if (o.archived || !OPEN_FUL.has(o.fulfillment) || isVoid(o)) continue; for (const i of o.items || []) if (i.productId) m[i.productId] = (m[i.productId] || 0) + (Number(i.qty) || 0); }
   resvCache = { ref: S.orders, n, map: m }; return m;
 }
-const reservedOf = p => p && p.kind !== "preorder" ? (reservedMap()[p.id] || 0) : 0;
+const reservedOf = p => p ? (reservedMap()[p.id] || 0) : 0;
 // Committed = units held by open, unshipped orders: RS OS orders + website orders whose stock was taken off.
 function committedOf(p) {
-  if (!p || p.kind === "preorder") return 0;
+  if (!p) return 0;
   let n = reservedOf(p);
   for (const o of (S.web && S.web.orders) || []) { if (webDone(o)) continue; const m = S.webmeta.find(d => d.id === webMetaId(o.ref)); if (m && m.stock === "taken" && m.stockMap) n += Number(m.stockMap[p.id]) || 0; }
   return n;
@@ -1389,7 +1394,7 @@ function committedOf(p) {
 // The open orders holding a listing's committed units (RS OS orders + website orders whose stock was taken off).
 function committedOrders(p) {
   const out = [];
-  if (!p || p.kind === "preorder") return out;
+  if (!p) return out;
   for (const o of S.orders) { if (o.archived || !OPEN_FUL.has(o.fulfillment) || isVoid(o)) continue; const q = (o.items || []).filter(i => i.productId === p.id).reduce((a, i) => a + (Number(i.qty) || 0), 0); if (q) out.push({ o, q }); }
   for (const w of (S.web && S.web.orders) || []) { if (webDone(w)) continue; const m = S.webmeta.find(d => d.id === webMetaId(w.ref)); const q = m && m.stock === "taken" && m.stockMap ? Number(m.stockMap[p.id]) || 0 : 0; if (q) out.push({ w, q }); }
   return out.sort((a, b) => ((b.o && b.o.createdAt) || Date.parse((b.w && b.w.date) || "") || 0) - ((a.o && a.o.createdAt) || Date.parse((a.w && a.w.date) || "") || 0));
@@ -3074,6 +3079,7 @@ const allOrderRows = () => [...S.orders, ...webAsOrders()];
    Only orders placed after the first run count; older ones were already handled by hand. What was taken is kept per
    order number in webmeta (product ids and quantities only). A short claim makes sure only one open RS App moves stock. */
 const webMetaId = ref => String(ref).replace(/[^A-Za-z0-9_-]/g, "_");
+const PO_STOCK_FROM = Date.parse("2026-10-14T14:40:00Z");   // S-JOY pre-order qty was set then; earlier pre-order orders are left alone
 function webItemProduct(i) {
   const key = i.id || i.h || i.handle || i.pid || "";
   if (key) { const p = S.products.find(x => rvWebId(x) === key); if (p) return p; }
@@ -3092,7 +3098,7 @@ async function webStockSync() {
   const todo = S.web.orders.filter(o => {
     const t = webOMs(o); if (!o.ref || !t || t < cfg.from) return false;
     const m = metaOf(o), cancel = /cancel/i.test(o.status || ""), taken = m.stock === "taken";
-    if (cancel === !taken) return false;
+    if (cancel === !taken && !(taken && !cancel && !m.poTaken && t >= PO_STOCK_FROM && !webDone(o))) return false;
     return !(m.stockClaim && m.stockClaim.by !== me && now - m.stockClaim.at < 60000);
   });
   if (!todo.length) return;
@@ -3104,15 +3110,21 @@ async function webStockSync() {
       const m = metaOf(o); if (!m.stockClaim || m.stockClaim.by !== me) continue;
       const cancel = /cancel/i.test(o.status || ""), upd = { ...clean(m), ref: o.ref, stockClaim: null, at: Date.now() };
       let msg;
-      if (!cancel) {
+      if (!cancel && m.stock === "taken") {   // counted before pre-orders were: take its pre-order items now, once
+        const add = {}; for (const i of o.items || []) { const p = webItemProduct(i); if (p && p.kind === "preorder") add[p.id] = (add[p.id] || 0) + (Number(i.qty) || 1); }
+        await applyStockMap(add, -1); const map = { ...(m.stockMap || {}) }; for (const [k, q] of Object.entries(add)) map[k] = (map[k] || 0) + q;
+        upd.stockMap = map; upd.poTaken = true; Object.assign(m, { stockMap: map });
+        msg = Object.keys(add).length ? "pre-order qty taken off for " + Object.entries(add).map(([pid, q]) => q + "× " + ((S.products.find(x => x.id === pid) || {}).name || "item")).join(", ") : "";
+        if (!msg) { await save("webmeta", webMetaId(o.ref), upd); continue; }
+      } else if (!cancel) {
         const map = {}, miss = [];
-        for (const i of o.items || []) { const p = webItemProduct(i); if (p && p.kind !== "preorder") map[p.id] = (map[p.id] || 0) + (Number(i.qty) || 1); else if (!p) miss.push(i.title || i.name || "item"); }
+        for (const i of o.items || []) { const p = webItemProduct(i); if (p) map[p.id] = (map[p.id] || 0) + (Number(i.qty) || 1); else miss.push(i.title || i.name || "item"); }
         // Oversold check: a piece with less stock than ordered (or a sold-out pre-order) is flagged for the team.
         const short = [];
         for (const [pid, q] of Object.entries(map)) { const p = S.products.find(x => x.id === pid); if (p && (Number(p.stock) || 0) < q) short.push(q + "× " + (p.name || "item") + " (had " + (Number(p.stock) || 0) + ")"); }
         for (const i of o.items || []) { const p = webItemProduct(i); if (p && p.kind === "preorder" && p.soldOut) short.push((p.name || "item") + " (pre-order sold out)"); }
         await applyStockMap(map, -1);
-        upd.stock = "taken"; upd.stockMap = map; upd.stockMiss = miss;
+        upd.stock = "taken"; upd.stockMap = map; upd.stockMiss = miss; upd.poTaken = true;
         if (short.length) { upd.oversold = short; toast("⚠️ " + o.ref + " has sold-out items: " + short.join(", ")); }
         msg = "stock taken off for " + (Object.keys(map).length ? Object.entries(map).map(([pid, q]) => q + "× " + ((S.products.find(x => x.id === pid) || {}).name || "item")).join(", ") : (o.items || []).length && !miss.length ? "no on-hand items (pre-order only)" : "nothing on hand") + (miss.length ? " · not found in Listings: " + miss.join(", ") : "") + (short.length ? " · ⚠️ OVERSOLD: " + short.join(", ") : "");
       } else {
@@ -3850,10 +3862,10 @@ function colOrder(table) {
 const visCols = table => { const c = colOrder(table); return c.order.filter(k => !c.hidden.includes(k)); };
 function openColumns(table) {
   const c = colOrder(table), pr = colPref(table), mine = TABLE_COLS[table].personal, who = mine ? "you" : "everyone in " + dept(ctxDept()).name;
-  const row = k => `<div class="colrow" data-ck="${k}"><label><input type="checkbox" ${c.hidden.includes(k) ? "" : "checked"}> ${esc(colLabel(table, k))}</label><span><button class="btn ghost sm" type="button" data-act="col-up" aria-label="Move up">↑</button><button class="btn ghost sm" type="button" data-act="col-down" aria-label="Move down">↓</button></span></div>`;
+  const row = k => `<div class="colrow" data-ck="${k}"><label><input type="checkbox" ${c.hidden.includes(k) ? "" : "checked"}> ${esc(colLabel(table, k))}</label><span class="col-grip" title="Drag to move" aria-label="Drag to move">⠿</span></div>`;
   openSheet(`
     <h3>Arrange columns${mine ? "" : ` · ${esc(dept(ctxDept()).name)}`}</h3>
-    <div style="font-size:13px;color:var(--muted)">Tick to show, use the arrows to move. Saved for ${esc(who)}.${pr && pr.by && !mine ? ` Last arranged by ${esc(pr.by)}.` : ""}</div>
+    <div style="font-size:13px;color:var(--muted)">Tick to show, drag ⠿ to move. Saved for ${esc(who)}.${pr && pr.by && !mine ? ` Last arranged by ${esc(pr.by)}.` : ""}</div>
     <div id="colrows" class="colrows">${c.order.map(row).join("")}</div>
     <button class="btn ghost sm" type="button" data-act="col-reset" data-table="${table}" style="align-self:flex-start">Reset to default</button>
     <div id="sheet-err" class="confirm" hidden></div>
@@ -3864,6 +3876,22 @@ function openColumns(table) {
     if (hidden.length === order.length) return sheetError("Keep at least one column.");
     await save("colprefs", colKey(table), { dept: mine ? "" : ctxDept(), table, order, hidden, by: actor(), at: Date.now() });
     closeSheet(); toast(mine ? "Columns saved." : "Columns saved for " + dept(ctxDept()).name + ".");
+  });
+  colDragInit(document.getElementById("colrows"));
+}
+// Arrange columns (K, Oct 15, 2026): drag a row by its ⠿ handle (mouse or finger) instead of up/down arrows.
+function colDragInit(box) {
+  if (!box) return;
+  box.addEventListener("pointerdown", e => {
+    const grip = e.target.closest(".col-grip"); if (!grip) return;
+    const row = grip.closest(".colrow"); e.preventDefault(); grip.setPointerCapture(e.pointerId); row.classList.add("dragging");
+    const move = ev => {
+      const sibs = [...box.querySelectorAll(".colrow:not(.dragging)")];
+      const next = sibs.find(r => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+      if (next) { if (row.nextElementSibling !== next) box.insertBefore(row, next); } else if (box.lastElementChild !== row) box.appendChild(row);
+    };
+    const end = () => { row.classList.remove("dragging"); grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", end); grip.removeEventListener("pointercancel", end); };
+    grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", end); grip.addEventListener("pointercancel", end);
   });
 }
 
@@ -6479,7 +6507,7 @@ function viewListings() {
     ${can && S.lsel.size ? (() => { const o = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`; return `<div class="bulk"><strong>${S.lsel.size} selected</strong>
       <select data-lbulk="ptype" aria-label="Set type"><option value="">Set type…</option>${LIST_TYPES.map(t => o(t, t)).join("")}</select>
       <select data-lbulk="category" aria-label="Set collection"><option value="">Set collection…</option>${WEB_CATS.map(([k, l]) => o(k, l)).join("")}</select>
-      <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}${o("preorder-out", "Pre-order · Sold out")}</select>
+      <select data-lbulk="kind" aria-label="Set on hand or pre-order"><option value="">Set on hand / pre-order…</option>${o("onhand", "On hand")}${o("preorder", "Pre-order")}</select>
       <select data-lbulk="eta" aria-label="Set ETA"><option value="">Set ETA (pre-orders)…</option>${MONTHS.map(m => o(m, m)).join("")}</select>
       <select data-lbadge="add" aria-label="Add badge"><option value="">Add badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
       <select data-lbadge="remove" aria-label="Remove badge"><option value="">Remove badge…</option>${BADGES.map(b => o(b, b)).join("")}</select>
@@ -6499,13 +6527,13 @@ function viewListings() {
         type: () => `<td class="nowrap">${can ? `<select class="lcell" data-lset="ptype" data-id="${p.id}" aria-label="Type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : esc(p.ptype || "")}</td>`,
         cat: () => `<td class="nowrap">${(() => { const c = p.category || "unisex", opts = [...WEB_CATS, ...(WEB_CATS.some(x => x[0] === c) ? [] : [[c, c]])]; return can ? `<select class="lcell" data-lset="category" data-id="${p.id}" aria-label="Collection">${opts.map(([k, l]) => `<option value="${esc(k)}" ${c === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : esc((opts.find(x => x[0] === c) || [c, c])[1]); })()}</td>`,
         barcode: () => `<td class="nowrap">${can ? `<span class="bc-cell"><input class="lcell num" data-lset="barcode" data-id="${p.id}" value="${esc(p.barcode || "")}" placeholder="–" inputmode="numeric" aria-label="Barcode" style="width:128px"><button type="button" class="btn ghost sm" data-act="l-bc-scan" data-id="${p.id}" title="Scan this item's barcode" aria-label="Scan barcode">📷</button></span>` : esc(p.barcode || "–")}</td>`,
-        kind: () => `<td class="nowrap">${can ? `<select class="status ${poOut(p) ? "st-red" : p.kind === "preorder" ? "st-blue" : "st-grey"}" data-lset="kind" data-id="${p.id}" aria-label="On hand or pre-order"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand</option><option value="preorder" ${p.kind === "preorder" && !p.soldOut ? "selected" : ""}>Pre-order</option><option value="preorder-out" ${poOut(p) ? "selected" : ""}>Sold out (pre-order)</option></select>` : poOut(p) ? `<span class="chip bad">Sold out (pre-order)</span>` : p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>`,
+        kind: () => `<td class="nowrap">${can ? `<select class="status ${poOut(p) ? "st-red" : p.kind === "preorder" ? "st-blue" : "st-grey"}" data-lset="kind" data-id="${p.id}" aria-label="On hand or pre-order"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select>${poOut(p) ? `<div class="s" style="color:var(--bad,#b3261e);font-size:11px">Sold out · qty 0</div>` : ""}` : poOut(p) ? `<span class="chip bad">Sold out (pre-order)</span>` : p.kind === "preorder" ? `<span class="chip info">Pre-order</span>` : `<span class="chip">On hand</span>`}</td>`,
         eta: () => `<td>${p.kind === "preorder" ? (can ? `<select class="status st-blue" data-lset="eta" data-id="${p.id}" aria-label="ETA">${etaOpts(p)}</select>` : esc(p.eta || "–")) : `<span style="color:var(--muted)">–</span>`}</td>`,
         price: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="price" data-id="${p.id}" value="${moneyFmt(p.price)}" placeholder="SRP" aria-label="SRP"></span>` : peso(p.price)}</td>`,
         compare: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="compareAt" data-id="${p.id}" value="${Number(p.compareAt) ? moneyFmt(p.compareAt) : ""}" placeholder="Compare" aria-label="Compare-at price"></span>` : p.compareAt ? peso(p.compareAt) : "–"}</td>`,
         cost: () => `<td class="r num nowrap pcell">${can ? `<span class="pbox"><span>₱</span><input class="lcell num money" inputmode="decimal" data-lset="cost" data-id="${p.id}" value="${Number(p.cost) ? moneyFmt(p.cost) : ""}" placeholder="Cost" aria-label="Cost"></span>` : p.cost ? peso(p.cost) : "–"}</td>`,
         stock: () => `<td class="r num nowrap">${can ? `<input class="lcell num" type="number" step="1" data-lset="stock" data-id="${p.id}" value="${Number(p.stock) || 0}" aria-label="Units in stock" style="width:62px;text-align:right;${out ? "color:var(--bad)" : ""}">` : `<span style="color:${out ? "var(--bad)" : "inherit"}">${Number(p.stock) || 0}</span>`}</td>`,
-        committed: () => `<td class="r num nowrap">${p.kind === "preorder" ? "–" : (() => { const c = committedOf(p); return c ? `<button type="button" class="linkish num" data-commit="${p.id}" title="See the orders holding these" style="font-weight:700">${c}</button>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
+        committed: () => `<td class="r num nowrap">${(() => { const c = committedOf(p); return c ? `<button type="button" class="linkish num" data-commit="${p.id}" title="See the orders holding these" style="font-weight:700">${c}</button>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
         web: () => `<td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : onSite(p) ? `<a class="site-link" href="${esc(webUrl(p))}" target="_blank" rel="noopener" title="Open this product on regalspritz.com">View on site ↗</a>` : `<span style="color:var(--muted);font-size:12px">Not on site</span>`}</td>`
       })[k]()).join("")}</tr>`; }).join("")).join("")}</tbody></table>
