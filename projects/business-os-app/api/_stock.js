@@ -5,8 +5,13 @@ const webIdOf = r => r.web_id || slug([r.kind === "preorder" ? "preorder" : "", 
 let memo = { at: 0, map: null };
 
 // Returns Map(webId → { stock, soldOut }) of active listings, or null when Supabase can't be reached.
+// If Supabase doesn't answer (short outages happen), it tries once more, then uses the last good answer up to 15 min old.
 export async function liveStock(maxAgeMs = 5000) {
   if (memo.map && Date.now() - memo.at < maxAgeMs) return memo.map;
+  const fresh = (await readStock()) || (await readStock());
+  return fresh || (memo.map && Date.now() - memo.at < 15 * 60e3 ? memo.map : null);
+}
+async function readStock() {
   const SB = process.env.SUPABASE_URL, ANON = process.env.SUPABASE_ANON_KEY;
   if (!SB || !ANON) return null;
   try {
