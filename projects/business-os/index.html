@@ -5487,26 +5487,32 @@ async function annCompose(blob) {
     catch (e) { console.warn("cutout", e); throw new Error("couldn't cut out the photo"); }
     im = await createImageBitmap(cut); }
   const W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
-  const bg = g.createRadialGradient(W / 2, H * .38, 30, W / 2, H * .45, W * .8); bg.addColorStop(0, "#FCFAF5"); bg.addColorStop(.55, "#F4EFE6"); bg.addColorStop(1, "#E6DED1");
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  // marble stand + gold bar
-  const sx = W * .14, sw = W * .72, sy = H * .70, shh = H * .115, by = sy + shh, bh = H * .026;
-  const mg = g.createLinearGradient(0, sy, 0, by); mg.addColorStop(0, "#FFFFFF"); mg.addColorStop(.12, "#F3F2F0"); mg.addColorStop(1, "#E4E2DF"); g.fillStyle = mg; g.fillRect(sx, sy, sw, shh);
-  g.save(); g.beginPath(); g.rect(sx, sy, sw, shh); g.clip(); g.filter = "blur(1.2px)"; let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  for (let i = 0; i < 7; i++) { g.strokeStyle = `rgba(120,118,115,${.08 + rnd() * .14})`; g.lineWidth = .8 + rnd() * 1.8; g.beginPath(); const x0 = sx + rnd() * sw; g.moveTo(x0, sy); g.bezierCurveTo(x0 + (rnd() - .5) * 140, sy + shh * .35, x0 + (rnd() - .5) * 160, sy + shh * .7, x0 + (rnd() - .5) * 200, by); g.stroke(); }
-  g.restore();
-  const gb = g.createLinearGradient(0, by, 0, by + bh); gb.addColorStop(0, "#D9B86A"); gb.addColorStop(.5, "#B8913F"); gb.addColorStop(1, "#8C6A2C"); g.fillStyle = gb; g.fillRect(sx - W * .03, by, sw + W * .06, bh);
-  const fl = g.createLinearGradient(0, by + bh, 0, by + bh + 22); fl.addColorStop(0, "rgba(60,45,20,.18)"); fl.addColorStop(1, "rgba(60,45,20,0)"); g.fillStyle = fl; g.fillRect(sx - W * .03, by + bh, sw + W * .06, 22);
-  // trim transparent edges so every bottle is sized the same, then stand it on the marble
+  await tplBackdrop(g, W, H);
+  // trim transparent edges so every bottle is sized the same, then stand it on the marble (like the website stage: fits 70% x 60%, base at 78.5%)
   const t = document.createElement("canvas"); t.width = im.width; t.height = im.height; const tg = t.getContext("2d"); tg.drawImage(im, 0, 0);
   const px = tg.getImageData(0, 0, t.width, t.height).data; let x0 = t.width, y0 = t.height, x1 = 0, y1 = 0;
   for (let y = 0; y < t.height; y += 2) for (let x = 0; x < t.width; x += 2) if (px[(y * t.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   if (x1 <= x0 || y1 <= y0) throw new Error("nothing found in the photo");
-  const bw = x1 - x0, bh2 = y1 - y0, sc = Math.min((sw * .9) / bw, (H * .5) / bh2), dw = bw * sc, dh = bh2 * sc, dx = (W - dw) / 2, dy = sy + 4 - dh;
-  const sh = g.createRadialGradient(W / 2, sy + 4, 4, W / 2, sy + 4, dw * .55); sh.addColorStop(0, "rgba(60,45,30,.22)"); sh.addColorStop(1, "rgba(60,45,30,0)");
-  g.save(); g.translate(W / 2, sy + 4); g.scale(1, .08); g.translate(-W / 2, -(sy + 4)); g.fillStyle = sh; g.beginPath(); g.arc(W / 2, sy + 4, dw * .55, 0, Math.PI * 2); g.fill(); g.restore();
-  g.drawImage(t, x0, y0, bw, bh2, dx, dy, dw, dh);
+  const bw = x1 - x0, bh2 = y1 - y0, sc = Math.min((W * .70) / bw, (H * .60) / bh2), dw = bw * sc, dh = bh2 * sc, dx = (W - dw) / 2, dy = H * .785 - dh;
+  g.save(); g.shadowColor = "rgba(50,30,10,.35)"; g.shadowBlur = 10; g.shadowOffsetY = 12; g.drawImage(t, x0, y0, bw, bh2, dx, dy, dw, dh); g.restore();
   return cv.toDataURL("image/jpeg", .9);
+}
+// Listing template = the website's stage (K, Oct 15, 2026, "PIC 1"): cream radial backdrop, marble block (light top face + real
+// marble front), gold bar. Same numbers as the regalspritz.com .stage CSS and scratchpad tplpy2.py. Default for every listing photo.
+const MARBLE_TEX = "data:image/jpeg;base64,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";
+let marbleImg = null;
+async function tplBackdrop(g, W, H) {
+  g.save(); // radial-gradient(120% 85% at 50% 28%) g.translate(W * .5, H * .28); g.scale(W * .6, H * .425); const rg = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+  rg.addColorStop(0, "#FCFAF6"); rg.addColorStop(.62, "#F2EDE5"); rg.addColorStop(1, "#E8E1D6"); g.fillStyle = rg; g.fillRect(-2, -2, 4, 4); g.restore();
+  g.fillStyle = "#E8E1D6"; g.globalCompositeOperation = "destination-over"; g.fillRect(0, 0, W, H); g.globalCompositeOperation = "source-over";
+  if (!marbleImg) { marbleImg = new Image(); marbleImg.src = MARBLE_TEX; await marbleImg.decode().catch(() => {}); }
+  const sx = W * .15, sw = W * .70, sy = H * .765, sh = H * .14, top = sh * .26;
+  g.save(); g.shadowColor = "rgba(70,50,25,.45)"; g.shadowBlur = 18; g.shadowOffsetY = 10; g.fillStyle = "#ECE7DF"; g.fillRect(sx + 12, sy + 12, sw - 24, sh - 12); g.restore();
+  const tg = g.createLinearGradient(0, sy, 0, sy + top); tg.addColorStop(0, "#FBFAF7"); tg.addColorStop(1, "#ECE7DF"); g.fillStyle = tg; g.fillRect(sx, sy, sw, top);
+  if (marbleImg.naturalWidth) g.drawImage(marbleImg, sx, sy + top, sw, sh - top); else { g.fillStyle = "#EAE5DE"; g.fillRect(sx, sy + top, sw, sh - top); }
+  const gx = W * .125, gw = W * .75, gy = H * .905, gh = Math.max(2, Math.round(H * .024));
+  g.save(); g.shadowColor = "rgba(70,50,25,.5)"; g.shadowBlur = 10; g.shadowOffsetY = 6; g.fillStyle = "#B8924A"; g.fillRect(gx + 6, gy, gw - 12, gh); g.restore();
+  const bar = g.createLinearGradient(0, gy, 0, gy + gh); bar.addColorStop(0, "#E6CB8A"); bar.addColorStop(.55, "#B8924A"); bar.addColorStop(1, "#8C6B2E"); g.fillStyle = bar; g.fillRect(gx, gy, gw, gh);
 }
 /* ---------- Listing photos: website template first, Scent card second (automatic, Oct 9, 2026) ----------
    Every listing's 1st photo is on our listing template (cream backdrop, white marble stand, gold bar). A photo already on
@@ -5671,7 +5677,7 @@ const varLabel = p => [p.size, p.ptype, p.kind === "preorder" ? "Pre-order" + (p
 const prNeeds = p => { const w = prWant(p); return !!w && JSON.stringify(w) !== JSON.stringify(tplImgs(p)); };
 const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
   if (prBroken(p)) return false;
-  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || prNeeds(p) || (prLead(p) && scKey(p) && !(p.card || {}).official && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p); };
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || prNeeds(p) || (prLead(p) && scKey(p) && !(p.card || {}).official && (p.card || {}).key !== scKey(p)) || (p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p) || (!!p.retpl && /^https?:/.test(p.tplFrom || "")); };
 // Finds a scent card photo the listing already had (e.g. Fragrantica's), so it can be replaced by ours.
 async function oldCardOf(list, ours, skip = []) { for (const u of list) { if (u === ours || u === list[0] || skip.includes(u)) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
 async function tplOne(id) {
@@ -5681,6 +5687,12 @@ async function tplOne(id) {
   const L = tplImgs(p); let imgs = [...L]; const u = { tplBusy: 0 };
   try {
     if (prCards(p).includes(L[0])) u.tplFail = L[0];
+    // retpl (Oct 15, 2026): remake photo 1 from its original (tplFrom) on the current template; the old one stays until the new one is ready.
+    else if (p.retpl && /^https?:/.test(p.tplFrom || "")) {
+      try { const r = await S.photos.save({ data: await annCompose(await annBlob(p.tplFrom)) }); if (!r || !r.ok || !r.url) throw new Error((r && r.error) || "photo save failed");
+        imgs = [r.url, ...imgs.slice(1)]; u.tplOk = r.url; u.retpl = null; u.imgsBeforeRetpl = L; }
+      catch (e) { console.warn("retemplate", id, e); u.retpl = null; u.retplFail = p.tplFrom; }
+    }
     else if (p.tplOk !== L[0] && p.tplFail !== L[0]) {
       try { const bl = await annBlob(L[0]);
         if (await annOnTemplate(bl)) u.tplOk = L[0];
@@ -5715,7 +5727,7 @@ async function tplOne(id) {
     const want = prWant({ ...p, ...u }, imgs);
     if (want && JSON.stringify(want) !== JSON.stringify(imgs)) { const gone = imgs.filter(x => !want.includes(x)); u.photoTrim = { at: Date.now(), removed: [...new Set([...((p.photoTrim || {}).removed || []), ...gone])] }; imgs = want; }
     const changed = JSON.stringify(imgs) !== JSON.stringify(L);
-    UNDO.at = 0; await patch("products", id, { ...u, ...(changed ? { photo: imgs[0], imgs, log: logAdd(p, [(u.photoTrim ? "photos: " + (imgs.length === 1 ? "own photo only" : "photo + scent card") + " (rule Oct 14)" : "photos: template first") + (u.card && u.card.url ? " + scent card" : "") + (u.shadeCard && u.shadeCard.url ? " + shade card" : "")], "Auto · photos") } : {}) }).catch(() => {});
+    UNDO.at = 0; await patch("products", id, { ...u, ...(changed ? { photo: imgs[0], imgs, webSync: "pending", log: logAdd(p, [(u.photoTrim ? "photos: " + (imgs.length === 1 ? "own photo only" : "photo + scent card") + " (rule Oct 14)" : "photos: template first") + (u.card && u.card.url ? " + scent card" : "") + (u.shadeCard && u.shadeCard.url ? " + shade card" : "")], "Auto · photos") } : {}) }).catch(() => {});
     return changed;
   }
 }
