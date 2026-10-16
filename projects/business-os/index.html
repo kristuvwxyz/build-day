@@ -5635,7 +5635,11 @@ async function cleanCut(blob) {
     let aF = 0, aA = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
     for (let j = 0; j < N; j++) { if (A[j] >= 128) aA++; if (!bg[j]) { aF++; const x = j % w, y = (j - x) / w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
     const fill = aF / Math.max(1, (x1 - x0 + 1) * (y1 - y0 + 1)), panel = fill > .93 && aF > aA * 1.4;   // a plain square behind the product: leave it out
-    if (!modelOk || !panel) for (let j = 0; j < N; j++) if (!bg[j]) A[j] = 255;
+    // the white flood also grabs the faint mirror reflection under bottles: trust the model when it already has (almost) all of it,
+    // otherwise add only what the model missed above its own bottom edge (a dropped box), never the reflection below
+    let aU = 0, mY = -1; for (let j = 0; j < N; j++) { if (A[j] >= 128 || !bg[j]) aU++; if (A[j] >= 128) mY = (j - j % w) / w; }
+    const useU = !modelOk || (!panel && aA < aU * .9), yMax = modelOk && aA > aU * .3 ? mY + 2 : h;
+    if (useU) for (let j = 0; j < N; j++) if (!bg[j] && (j - j % w) / w <= yMax) A[j] = 255;
   } else if (!modelOk) throw new Error("couldn't cut out the photo");
   // keep the product, drop stray specks / lines (parts under 0.8% of the biggest part)
   const lab = new Int32Array(N), sizes = [0]; let n = 0;
