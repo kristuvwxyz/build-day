@@ -774,7 +774,8 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .tbar .tbar-sp { flex: 1; }
 .tbar select { width: auto; }
 @media (max-width: 760px) { .tbar .tbar-sp { display: none; } }
-.ordtable .hist-btn { align-items: center; text-align: center; margin: 0 auto; }
+.ordtable .hist-btn, .dc .hist-btn { align-items: center; text-align: center; margin: 0 auto; }
+.dc td.hist-td { min-width: 170px; } .dc select.ied.status { width: auto; min-width: 0; font-size: 12px; font-weight: 600; padding: 3px 22px 3px 10px; border-radius: 6px; }
 .ordtable .note-t { text-align: center; }
 /* Compact rows */
 .ordtable td { padding-top: 3px; padding-bottom: 3px; line-height: 1.25; }
@@ -1369,13 +1370,18 @@ const recLogHtml = (col, id) => { const r = (S[col] || []).find(x => x.id === id
 // One editable table cell. col/id = the record, path = field ("rows.2.net" for a line inside a pay record / BIR month).
 function iedP(col, id, path, cur, type, lab, o = {}) {
   const ro = o.ro != null ? o.ro : S.readOnly, a = `class="ied${type === "money" ? " money" : ""}" data-ied="${col}|${id}|${path}|${type}" data-lab="${esc(lab)}" aria-label="${esc(lab)}" ${ro ? "disabled" : ""} ${o.attrs || ""}`;
-  if (type === "sel") return `<select ${a}>${(o.opts || []).map(([k, l]) => `<option value="${esc(k)}" ${String(cur ?? "") === String(k) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+  if (type === "sel") return `<select ${a.replace('class="ied', `class="ied status ${o.st ? o.st(cur) : "st-grey"}`)}>${(o.opts || []).map(([k, l]) => `<option value="${esc(k)}" ${String(cur ?? "") === String(k) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
   if (type === "money") return `<input ${a} inputmode="decimal" value="${moneyFmt(cur)}">`;
   if (type === "date") return `<input ${a} type="date" value="${esc(cur || "")}">`;
   if (type === "num") return `<input ${a} type="number" step="any" value="${esc(cur ?? "")}">`;
   return `<input ${a} value="${esc(cur ?? "")}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ""}>`;
 }
 const ied = (col, r, f, type, lab, o) => iedP(col, r.id, f, r[f], type, lab, o);
+// History column like Orders: last change, when, and how many; click for the full list.
+const recHistTd = (col, r) => { const l = (r && r.log) || [], last = l[l.length - 1];
+  return `<td class="hist-td">${last ? `<button type="button" class="hist-btn" data-hist="r:${col}:${r.id}" title="${esc((last.by || "") + " " + (last.msg || ""))} · click for full history"><span class="hist-t"><b>${esc(String(last.by || "").split(",")[0])}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length}` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; };
+const CHIP_ST = { good: "st-green", warn: "st-amber", bad: "st-red", info: "st-blue", "": "st-grey" };
+const stMap = m => v => CHIP_ST[(m[v] || {}).cls || ""] || "st-grey";
 document.addEventListener("change", async e => {
   const el = e.target.closest && e.target.closest("[data-ied]"); if (!el || el.disabled) return;
   const [col, id, path, type] = el.dataset.ied.split("|"), lab = el.dataset.lab || path; let v = el.value;
@@ -3539,7 +3545,7 @@ function viewTeamDir() {
     <div class="toolbar"><input id="tq" type="search" placeholder="Search ID, name, phone, email, address" value="${esc(S.tq || "")}" aria-label="Search directory">
       <select id="tstatus" aria-label="Status">${[["active", "Active"], ["inactive", "Inactive"], ["all", "All"]].map(([k, l]) => `<option value="${k}" ${sf === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     <div class="table-wrap"><table class="otable dir">
-    <thead><tr><th>ID Number</th><th>Nickname</th><th class="l">Full Name</th><th>Phone</th><th>Email</th><th class="l">Address</th><th>Department / role</th><th>Birthday</th><th>Favorite scent</th><th>Date Started</th><th>Emergency contact</th><th>Company IDs</th><th>Status</th></tr></thead>
+    <thead><tr><th>ID Number</th><th>Nickname</th><th class="l">Full Name</th><th>Phone</th><th>Email</th><th class="l">Address</th><th>Department / role</th><th>Birthday</th><th>Favorite scent</th><th>Date Started</th><th>Emergency contact</th><th>Company IDs</th><th>Status</th><th>History</th></tr></thead>
     <tbody>${rows.map(m => `<tr ${S.canEdit ? `data-act="edit-member" data-id="${m.id}"` : ""} style="${S.canEdit ? "" : "cursor:default"}">
       <td class="nowrap num" style="box-shadow:inset 4px 0 0 ${DEPT_COLORS[m.department] || "var(--line)"}">${esc(m.idNumber || "")}</td>
       <td style="font-weight:600"><span style="display:inline-flex;gap:10px;align-items:center">${avatar(m, 34)}${ied("team", m, "nickname", "text", "Nickname", { ro: !S.canEdit })}</span></td>
@@ -3553,7 +3559,7 @@ function viewTeamDir() {
       <td class="nowrap">${ied("team", m, "started", "date", "Date started", { ro: !S.canEdit })}</td>
       <td style="font-size:12.5px;min-width:160px">${m.emergency && m.emergency.name ? `${esc(m.emergency.name)}${m.emergency.relation ? " (" + esc(m.emergency.relation) + ")" : ""}<br><span class="num" style="user-select:all">${esc(m.emergency.phone || "")}</span>` : ""}</td>
       <td class="nowrap" style="font-size:12.5px">${m.govIds ? "🔒 On file" : `<span style="color:var(--muted)">–</span>`}</td>
-      <td><span class="chip ${m.status === "inactive" ? "" : "good"}">${m.status === "inactive" ? "Inactive" : "Active"}</span></td></tr>`).join("")}</tbody>
+      <td>${S.canEdit ? iedP("team", m.id, "status", m.status === "inactive" ? "inactive" : "active", "sel", "Status", { st: v => v === "inactive" ? "st-grey" : "st-green", opts: [["active", "Active"], ["inactive", "Inactive"]] }) : `<span class="chip ${m.status === "inactive" ? "" : "good"}">${m.status === "inactive" ? "Inactive" : "Active"}</span>`}</td>${recHistTd("team", m)}</tr>`).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.team.length ? "No one matches." : S.canEdit ? "No team members yet. Click “Add team member”, including staff without a Claude account." : "Ask the owner to add the team."}</div>`}</div>`;
 }
 const GOV_IDS = [["tin", "TIN"], ["sss", "SSS"], ["philhealth", "PhilHealth"], ["pagibig", "Pag-IBIG"]];
@@ -4505,10 +4511,11 @@ function itemsPop(btn) {
   el.style.top = (r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px";
 }
 function histPop(btn) {
-  closePop(); const o = findOrder(btn.dataset.hist); if (!o) return;
+  closePop(); const hk = btn.dataset.hist.split(":"), rc = hk[0] === "r" ? (S[hk[1]] || []).find(x => x.id === hk[2]) : null;
+  const o = rc ? { log: rc.log || [], _t: rc.name || rc.payee || rc.desc || rc.account || rc.nickname || rc.code || rc.supplier || rc.category || LOGGED[hk[1]] } : findOrder(btn.dataset.hist); if (!o) return;
   const r = btn.getBoundingClientRect();
   const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop"; el.setAttribute("role", "dialog");
-  el.innerHTML = `<div class="ipop-h"><b>${esc(onum(o))}</b><span>Team activity</span></div><div class="olog" style="max-height:300px;overflow:auto;border:0;padding-top:4px">${[...(o.log || [])].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>`;
+  el.innerHTML = `<div class="ipop-h"><b>${esc(o._t != null ? o._t : onum(o))}</b><span>${o._t != null ? "History" : "Team activity"}</span></div><div class="olog" style="max-height:300px;overflow:auto;border:0;padding-top:4px">${[...(o.log || [])].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("")}</div>`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
   el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
@@ -4860,8 +4867,8 @@ function viewExpenses() {
   </div>
   ${pickBar("exp", [["Delete…", "exp-sel-del", "danger"]], all.map(e => e.id))}
   <div class="table-wrap"><table>
-    <thead><tr>${pickTh("exp", all.map(e => e.id))}<th>Date</th><th>Category</th><th class="l">Note</th><th>Paid with</th><th>OR / receipt</th><th>By</th><th>Amount</th><th></th></tr></thead>
-    <tbody>${all.map(e => { const ci = isCashIn(e), ro = S.readOnly; return `<tr>${pickTd("exp", e.id)}<td class="nowrap">${ied("expenses", e, "date", "date", "Date")}</td><td>${ci ? `<span class="chip good">Cash in</span>` : ied("expenses", e, "category", "sel", "Category", { opts: EXP_CATS.map(c => [c, c]) })}${exChip(e)}</td><td class="l">${ied("expenses", e, "note", "text", "Note")}</td><td>${ci ? "" : ied("expenses", e, "paidWith", "text", "Paid with")}</td><td>${e.file ? `<button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">📎 View</button>` : ci ? "" : `<span style="color:var(--muted)">–</span>`}</td><td style="font-size:12.5px">${esc(e.by || "")}</td><td class="num nowrap" style="font-weight:700;${ci ? "color:var(--good)" : ""}">${ied("expenses", e, "amount", "money", "Amount")}</td><td>${ro ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">History</button>`}</td></tr>`; }).join("")}</tbody>
+    <thead><tr>${pickTh("exp", all.map(e => e.id))}<th>Date</th><th>Category</th><th class="l">Note</th><th>Paid with</th><th>OR / receipt</th><th>By</th><th>Amount</th><th>History</th><th></th></tr></thead>
+    <tbody>${all.map(e => { const ci = isCashIn(e), ro = S.readOnly; return `<tr>${pickTd("exp", e.id)}<td class="nowrap">${ied("expenses", e, "date", "date", "Date")}</td><td>${ci ? `<span class="chip good">Cash in</span>` : ied("expenses", e, "category", "sel", "Category", { st: () => "st-grey", opts: EXP_CATS.map(c => [c, c]) })}${exChip(e)}</td><td class="l">${ied("expenses", e, "note", "text", "Note")}</td><td>${ci ? "" : ied("expenses", e, "paidWith", "text", "Paid with")}</td><td>${e.file ? `<button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">📎 View</button>` : ci ? "" : `<span style="color:var(--muted)">–</span>`}</td><td style="font-size:12.5px">${esc(e.by || "")}</td><td class="num nowrap" style="font-weight:700;${ci ? "color:var(--good)" : ""}">${ied("expenses", e, "amount", "money", "Amount")}</td>${recHistTd("expenses", e)}<td>${ro ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">History</button>`}</td></tr>`; }).join("")}</tbody>
   </table>${all.length ? "" : `<div class="empty" style="padding:16px">No expenses ${periodLabel()}. Log ingredients, packaging, ads and other costs so net profit stays accurate.</div>`}</div>`;
 }
 
@@ -7603,7 +7610,7 @@ function viewInvestors() {
     <td class="nowrap">${ied("investments", v, "start", "date", "Payment start", { ro: !can })}</td>
     <td class="nowrap end-col">${fmtLong(invEnd(v))}</td>
     <td class="r num nowrap" style="font-weight:700">${v.months ? peso2(invDue(v)) : "–"}</td>
-    <td class="nowrap"><span class="chip ${st.cls}">${st.name}</span>${s.length ? `<div class="s">${paidN}/${s.length} paid</div>` : ""}</td></tr>`; };
+    <td class="nowrap"><span class="chip ${st.cls}">${st.name}</span>${s.length ? `<div class="s">${paidN}/${s.length} paid</div>` : ""}</td>${recHistTd("investments", v)}</tr>`; };
   return `<div class="kpis">
       <div class="kpi"><span class="label">Total investments</span><span class="value">${peso(inv.reduce((a, v) => a + (Number(v.amount) || 0), 0))}</span><span class="sub">${inv.filter(v => v.code).length} coded · ${inv.length} total</span></div>
       <div class="kpi"><span class="label">Interest / month</span><span class="value">${peso(live.filter(v => invStatus(v).id === "active").reduce((a, v) => a + invMonthly(v), 0))}</span><span class="sub">Active investments now</span></div>
@@ -7616,7 +7623,7 @@ function viewInvestors() {
         <div style="display:flex;gap:8px;align-items:center"><span class="num" style="font-weight:700">${peso2(p.amount)}</span>${p.paid ? `<span class="chip good">Paid</span>${can ? ` <button class="btn ghost sm" type="button" data-invpay="${v.id}" data-ym="${p.ym}" data-paid="0">Undo</button>` : ""}` : can ? `<button class="btn sm primary" type="button" data-invpay="${v.id}" data-ym="${p.ym}" data-paid="1">Mark paid</button>` : `<span class="chip warn">Due</span>`}</div></div>`).join("")}</div>` : `<div class="empty">No payouts scheduled this month.</div>`}
     </section>
     <div class="table-wrap"><table class="otable inv">
-      <thead><tr><th>INV Code</th><th class="l">Investor's name</th><th>FB account</th><th>Amount</th><th>% / month</th><th>Interest / month</th><th>Months</th><th>Total interest</th><th>Payment start</th><th>End date</th><th>Amount due</th><th>Status</th></tr></thead>
+      <thead><tr><th>INV Code</th><th class="l">Investor's name</th><th>FB account</th><th>Amount</th><th>% / month</th><th>Interest / month</th><th>Months</th><th>Total interest</th><th>Payment start</th><th>End date</th><th>Amount due</th><th>Status</th><th>History</th></tr></thead>
       <tbody>${inv.map(row).join("")}</tbody>
       <tfoot><tr><td colspan="3" style="font-weight:800">TOTAL INVESTMENTS: ${inv.filter(v => v.code).length}</td><td class="r num" style="font-weight:800">${peso2(inv.reduce((a, v) => a + (Number(v.amount) || 0), 0))}</td><td></td><td class="r num" style="font-weight:800">${peso2(inv.reduce((a, v) => a + invMonthly(v), 0))}</td><td colspan="6"></td></tr></tfoot>
     </table>${inv.length ? "" : `<div class="empty" style="padding:16px">No investments yet. Click “Add investment”.</div>`}</div>
@@ -7752,9 +7759,9 @@ function invRow(x, finance, pick) {
     <td>${badge(BUDGET[x.budget || "pending"])}</td>
     <td>${badge(INV_STATUS[x.status || "topay"])}</td>
     <td class="nowrap" style="font-size:12px;color:var(--muted)">${esc(x.createdByName || "")}</td>
-    <td class="r nowrap">${S.readOnly ? "" : (finance && canDecide() && (x.budget || "pending") === "pending" ? `<button class="btn sm" type="button" data-act="inv-approve" data-id="${x.id}">Approve</button> ` : "") + (x.budget === "declined" ? "" : `<button class="btn sm ${x.status === "paid" ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${x.id}">${x.status === "paid" ? "Paid ✓" : "Mark paid"}</button>`)}</td></tr>`;
+    ${recHistTd("invoices", x)}<td class="r nowrap">${S.readOnly ? "" : (finance && canDecide() && (x.budget || "pending") === "pending" ? `<button class="btn sm" type="button" data-act="inv-approve" data-id="${x.id}">Approve</button> ` : "") + (x.budget === "declined" ? "" : `<button class="btn sm ${x.status === "paid" ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${x.id}">${x.status === "paid" ? "Paid ✓" : "Mark paid"}</button>`)}</td></tr>`;
 }
-const invHead = `<thead><tr><th>Date</th><th class="l">Invoice / request</th><th>Amount</th><th>Due</th><th>Budget</th><th>Status</th><th>By</th><th></th></tr></thead>`;
+const invHead = `<thead><tr><th>Date</th><th class="l">Invoice / request</th><th>Amount</th><th>Due</th><th>Budget</th><th>Status</th><th>By</th><th>History</th><th></th></tr></thead>`;
 function viewInvoices() {
   if (!canInvoices()) return `<div class="panel"><div class="empty">Supplier invoices are for the CEO, Senior Sales and Finance.</div></div>`;
   const f = S.invF || (S.invF = { st: "topay", sup: "all", q: "" });
@@ -7906,10 +7913,10 @@ function viewFixed() {
   const tot = list.reduce((a, x) => a + (Number(x.amount) || 0), 0);
   const can = !S.readOnly;
   // K, Oct 15, 2026: no stat cards; a compact table (description, amount right next to it, notes) with the total at the bottom.
-  return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:44%"><col style="width:16%"><col></colgroup>
-    <thead><tr><th class="l">Description</th><th>Amount / month</th><th class="l">Notes</th></tr></thead>
-    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td></tr>`).join("")}</tbody>
-    <tfoot><tr><td style="font-weight:800">Total · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td></tr></tfoot></table>
+  return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:38%"><col style="width:15%"><col><col style="width:200px"></colgroup>
+    <thead><tr><th class="l">Description</th><th>Amount / month</th><th class="l">Notes</th><th>History</th></tr></thead>
+    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td>${recHistTd("fixedexp", x)}</tr>`).join("")}</tbody>
+    <tfoot><tr><td style="font-weight:800">Total · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td><td></td></tr></tfoot></table>
     ${list.length ? "" : `<div class="empty" style="padding:16px">No fixed expenses yet. Click “Add expense line”.</div>`}</div>`;
 }
 function openFixedForm(id) {
@@ -7936,9 +7943,9 @@ function viewDues() {
   const act = list.filter(d => d.active !== false);
   const tot = act.reduce((a, d) => a + (Number(d.amount) || 0), 0), paid = act.filter(d => (d.paid || []).includes(ym));
   const next = act.filter(d => !(d.paid || []).includes(ym) && dueDateIn(d, ym) >= mToday()).sort((a, b) => dueDateIn(a, ym).localeCompare(dueDateIn(b, ym)))[0];
-  const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="${can && pickOn() ? 8 : 7}">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">${can ? pickTd("due", d.id) : ""}
+  const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="${can && pickOn() ? 9 : 8}">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">${can ? pickTd("due", d.id) : ""}
       <td class="l" style="font-weight:600">${ied("dues", d, "name", "text", "Name", { ro: !can })}</td><td class="nowrap">${ied("dues", d, "day", "num", "Due day of the month", { ro: !can, attrs: 'min="1" max="31" style="width:64px"' })}<span class="s"> of the month</span></td><td class="num nowrap">${ied("dues", d, "amount", "money", "Amount", { ro: !can })}</td><td>${ied("dues", d, "method", "text", "Paid via / bank", { ro: !can })}</td><td class="nowrap num">${ied("dues", d, "account", "last4", "Account (last 4 digits)", { ro: !can, attrs: 'maxlength="4" inputmode="numeric" style="width:78px"' })}</td><td>${ied("dues", d, "holder", "text", "Holder", { ro: !can })}</td>
-      <td class="nowrap">${d.active === false ? "Stopped" : `<button class="btn sm ${isPaid ? "" : late ? "danger" : "primary"}" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${ym}">${isPaid ? "Paid ✓" : late ? "Overdue · Mark paid" : "Mark paid"}</button>`}</td></tr>`; }).join(""); };
+      <td class="nowrap">${d.active === false ? "Stopped" : `<button class="btn sm ${isPaid ? "" : late ? "danger" : "primary"}" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${ym}">${isPaid ? "Paid ✓" : late ? "Overdue · Mark paid" : "Mark paid"}</button>`}</td>${recHistTd("dues", d)}</tr>`; }).join(""); };
   return `<div class="kpis">
       <div class="kpi"><span class="label">Due in ${monthLabel(ym)}</span><span class="value">${peso(tot)}</span><span class="sub">${act.length} payments</span></div>
       <div class="kpi"><span class="label">Paid so far</span><span class="value">${paid.length}/${act.length}</span><span class="sub">${peso(paid.reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></div>
@@ -7946,7 +7953,7 @@ function viewDues() {
       <div class="kpi"><span class="label">Calendar</span><span class="value" style="font-size:16px">On the Tasks calendar</span><span class="sub">Visible to people with Finance unlocked</span></div>
     </div>
     ${pickBar("due", [["✓ Mark paid (" + monthLabel(ym) + ")", "due-sel-paid", "primary"], ["Mark unpaid", "due-sel-unpaid"]], list.map(d => d.id))}
-    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th class="l">Name</th><th>Due date</th><th>Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th></tr></thead>
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th class="l">Name</th><th>Due date</th><th>Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th><th>History</th></tr></thead>
       <tbody>${DUE_KINDS.map(k => group(k[0])).join("")}</tbody></table>${list.length ? "" : `<div class="empty" style="padding:16px">No due dates yet.</div>`}</div>
     <div style="font-size:12px;color:var(--muted)">Only the last 4 digits of account and card numbers are kept here, for safety. A due date of the 30th falls on the last day in shorter months.</div>`;
 }
@@ -7995,10 +8002,10 @@ function viewChecks() {
       <div class="kpi"><span class="label">Bounced</span><span class="value" style="color:${list.some(c => c.status === "bounced") ? "var(--bad)" : "inherit"}">${list.filter(c => c.status === "bounced").length}</span></div>
     </div>
     ${pickBar("chk", [["select", "Set status…", "chk-status", Object.entries(CHECK_STATUS).map(([k, v]) => [k, v.name])]], list.map(c => c.id))}
-    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("chk", list.map(c => c.id)) : ""}<th>Check date</th><th>Check no.</th><th>Bank / account</th><th class="l">Payee</th><th>Amount</th><th class="l">Purpose</th><th>Status</th><th>File</th></tr></thead>
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("chk", list.map(c => c.id)) : ""}<th>Check date</th><th>Check no.</th><th>Bank / account</th><th class="l">Payee</th><th>Amount</th><th class="l">Purpose</th><th>Status</th><th>File</th><th>History</th></tr></thead>
     <tbody>${list.map(c => { const st = CHECK_STATUS[c.status || "pending"], over = st === CHECK_STATUS.pending && c.checkDate && c.checkDate < t; return `<tr ${can ? `data-act="edit-check" data-id="${c.id}"` : 'style="cursor:default"'}>${can ? pickTd("chk", c.id) : ""}
       <td class="nowrap" style="color:${over ? "var(--bad)" : "inherit"}">${ied("checks", c, "checkDate", "date", "Check date", { ro: !can })}${over ? `<div class="s" style="color:var(--bad)">past date</div>` : ""}</td><td class="num">${ied("checks", c, "checkNo", "text", "Check no.", { ro: !can })}</td><td>${ied("checks", c, "bank", "text", "Bank / account", { ro: !can })}</td><td class="l" style="font-weight:600">${ied("checks", c, "payee", "text", "Payee", { ro: !can })}</td>
-      <td class="num nowrap">${ied("checks", c, "amount", "money", "Amount", { ro: !can })}</td><td class="l">${ied("checks", c, "purpose", "text", "Purpose", { ro: !can })}</td><td>${ied("checks", c, "status", "sel", "Status", { ro: !can, opts: Object.entries(CHECK_STATUS).map(([k, v]) => [k, v.name]) })}</td><td>${c.file ? `<button class="btn ghost sm" type="button" data-act="chk-file" data-id="${c.id}">📎 View</button>` : `<span style="color:var(--muted)">–</span>`}</td></tr>`; }).join("")}</tbody></table>
+      <td class="num nowrap">${ied("checks", c, "amount", "money", "Amount", { ro: !can })}</td><td class="l">${ied("checks", c, "purpose", "text", "Purpose", { ro: !can })}</td><td>${ied("checks", c, "status", "sel", "Status", { ro: !can, st: stMap(CHECK_STATUS), opts: Object.entries(CHECK_STATUS).map(([k, v]) => [k, v.name]) })}</td><td>${c.file ? `<button class="btn ghost sm" type="button" data-act="chk-file" data-id="${c.id}">📎 View</button>` : `<span style="color:var(--muted)">–</span>`}</td>${recHistTd("checks", c)}</tr>`; }).join("")}</tbody></table>
     ${list.length ? "" : `<div class="empty" style="padding:16px">No checks yet. Click “Add check” each time you issue one. Pending checks show on the Tasks calendar on their date.</div>`}</div>`;
 }
 function openCheckForm(id, date) {
@@ -8235,9 +8242,9 @@ function viewLogins() {
   const can = !S.readOnly;
   const pwCell = l => !l.pw ? `<span style="color:var(--muted)">${esc(l.pwHint || "")}</span>` : `<span class="nowrap" style="display:inline-flex;gap:6px;align-items:center"><code class="pw">${S.pwShown[l.id] != null ? esc(S.pwShown[l.id]) : "••••••••"}</code>
     <button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="${S.pwShown[l.id] != null ? "hide" : "show"}">${S.pwShown[l.id] != null ? "Hide" : "Show"}</button><button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="copy">Copy</button></span>`;
-  const section = (title, rows) => `<tr class="grp"><td colspan="${can && pickOn() ? 7 : 6}">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>${can ? pickTd("login", l.id) : ""}
+  const section = (title, rows) => `<tr class="grp"><td colspan="${can && pickOn() ? 8 : 7}">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>${can ? pickTd("login", l.id) : ""}
       <td style="font-weight:600">${ied("logins", l, "account", "text", "Account", { ro: !can })}</td><td class="l">${ied("logins", l, "accountName", "text", "Account name", { ro: !can })}</td><td>${ied("logins", l, "username", "text", "Username / email", { ro: !can })}</td>
-      <td>${pwCell(l)}</td><td class="nowrap num">${ied("logins", l, "phone", "text", "Phone number", { ro: !can })}</td><td class="l" style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${ied("logins", l, "notes", "text", "Notes", { ro: !can })}</td></tr>`).join("");
+      <td>${pwCell(l)}</td><td class="nowrap num">${ied("logins", l, "phone", "text", "Phone number", { ro: !can })}</td><td class="l" style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${ied("logins", l, "notes", "text", "Notes", { ro: !can })}</td>${recHistTd("logins", l)}</tr>`).join("");
   return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins">${can ? `<span style="flex:1"></span><button class="btn" type="button" data-act="login-import">Import from spreadsheet</button>` : ""}</div>
     ${pickBar("login", [["select", "Set status…", "login-status", [["active", "Active"], ["inactive", "Inactive"]]], ["Delete…", "login-sel-del", "danger"]], list.map(l => l.id))}
     <div class="table-wrap"><table class="otable logins"><thead><tr>${can ? pickTh("login", list.map(l => l.id)) : ""}<th>Account</th><th class="l">Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th class="l">Notes</th></tr></thead>
