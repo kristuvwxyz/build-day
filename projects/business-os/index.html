@@ -852,11 +852,18 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webki
 .ltable td { vertical-align: middle; } .lthumb { width: 52px; } .lthumb img, .lthumb svg { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: var(--surface-2); display: block; } .lthumb svg { padding: 8px; color: var(--gold); }
 tr.lgrp td { background: var(--surface-2); border-top: 2px solid var(--line); }
 .var-table td, .var-table th { padding: 5px 6px; white-space: nowrap; }
+.var-table th, .var-table td, .var-table td.num { text-align: center; } .var-table input, .var-table select { text-align: center; text-align-last: center; }   /* K, Oct 16, 2026: centred titles and values */
 .var-table input, .var-table select { padding: 5px 6px; font-size: 13px; }
 .var-table select { min-width: 96px; } .var-table select[data-vf="eta"] { min-width: 110px; } .var-table select[data-vf="kind"] { min-width: 112px; }
 .sheet:has(.var-table) { width: min(1200px, 100%); }
 .var-del { border: 0; background: none; color: var(--muted); font-size: 15px; padding: 4px 8px; border-radius: 6px; cursor: pointer; } .var-del:hover { color: var(--bad, #b42318); background: var(--surface-2); }
 .var-cmt b { cursor: help; text-decoration: underline dotted; }
+.dc table th, .dc table td { text-align: center; vertical-align: middle; }
+.dc table td.l, .dc table th.l { text-align: left; } .dc table td.r, .dc table th.r { text-align: center; }
+.ied { width: 100%; min-width: 64px; max-width: 100%; border: 1px solid transparent; background: transparent; padding: 5px 6px; border-radius: 6px; font: inherit; color: inherit; text-align: center; text-align-last: center; }
+.dc td.l .ied { text-align: left; text-align-last: left; }
+.ied:hover:not(:disabled) { border-color: var(--line); background: var(--surface); } .ied:focus { border-color: var(--gold); background: var(--surface); outline: none; box-shadow: 0 0 0 3px var(--gold-pale, rgba(184,146,74,.18)); }
+.ied:disabled { opacity: 1; cursor: default; -webkit-text-fill-color: currentColor; } select.ied { cursor: pointer; } input.ied[type=date] { min-width: 128px; } input.ied[type=number] { min-width: 56px; }
 .var-ph { display: block; width: 46px; height: 46px; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--surface-2); border: 1px dashed var(--line); }
 .var-ph img, .var-ph svg { width: 100%; height: 100%; object-fit: cover; display: block; }
 .var-ph svg { padding: 8px; color: var(--gold); }
@@ -1338,7 +1345,57 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && /^y$/i.test(e.key) && !S.readOnly && !(e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) { e.preventDefault(); undoApply(UNDO.redo, UNDO.stack, "Redid"); } });
 
+/* ---------- Records: history log + edit right in the table (K, Oct 16, 2026) ----------
+   Every Admin / Finance record keeps a small history like orders do: who changed what and when, plus notes and pasted photos.
+   Table cells are editable in place (class "ied"); a change is saved at once and written to the record's history. */
+const LOGGED = { dues: "due date", checks: "check", expenses: "expense", fixedexp: "fixed expense", investments: "investment", invoices: "invoice", payrecords: "pay record", bir: "BIR record", team: "team member", logins: "login" };
+const LOG_ONLY = { team: ["nickname", "name", "phone", "email", "address", "role", "department", "status", "birthday", "started", "sched", "ended", "payPosition", "dailyRate"] };
+const LOG_SKIP = new Set(["log", "updatedAt", "at", "id", "editedBy", "createdAt", "order", "rows", "by"]);
+const LOG_LAB = { checkNo: "check no.", checkDate: "check date", paidWith: "paid with", dueDate: "due date", invDate: "invoice date", method: "paid via", day: "due day", desc: "description", fb: "FB account", rate: "% per month", accountName: "account name", payPosition: "position", orderNum: "order ID", mop: "payment", item: "description", idNumber: "ID number" };
+const logLab = k => LOG_LAB[k] || String(k).replace(/([A-Z])/g, " $1").toLowerCase();
+const logShow = (k, v) => /^(pw|password|pwHint|hash)/i.test(k) ? "(hidden)" : v == null || v === "" ? "–" : Array.isArray(v) ? v.length + " items" : typeof v === "object" ? (v.name || "…") : String(v).slice(0, 60);
+function autoLog(col, id, data) {
+  if (!LOGGED[col] || !data || ("log" in data)) return data;
+  const old = (S[col] || []).find(r => r.id === id);
+  if (!old) return { ...data, log: logAdd({}, ["added this " + LOGGED[col]]) };
+  const only = LOG_ONLY[col], msgs = Object.keys(data).filter(k => !LOG_SKIP.has(k) && (!only || only.includes(k)) && JSON.stringify(old[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !old[k]))
+    .map(k => `changed ${logLab(k)}: ${logShow(k, old[k])} → ${logShow(k, data[k])}`);
+  if (data.rows && JSON.stringify(old.rows || []) !== JSON.stringify(data.rows)) { const a = old.rows || [], b = data.rows;
+    if (b.length > a.length) msgs.push("added a row"); else if (b.length < a.length) msgs.push("removed a row");
+    else { const i = b.findIndex((r, k) => JSON.stringify(r) !== JSON.stringify(a[k])); msgs.push(`edited row ${i + 1}${i >= 0 && (b[i].name || b[i].customer) ? " (" + (b[i].name || b[i].customer) + ")" : ""}`); } }
+  return msgs.length ? { ...data, log: logAdd(old, msgs) } : data;
+}
+const recLogHtml = (col, id) => { const r = (S[col] || []).find(x => x.id === id); return r ? oLogHtml(r.log || [], "r:" + col + ":" + id, "History") : ""; };
+// One editable table cell. col/id = the record, path = field ("rows.2.net" for a line inside a pay record / BIR month).
+function iedP(col, id, path, cur, type, lab, o = {}) {
+  const ro = o.ro != null ? o.ro : S.readOnly, a = `class="ied${type === "money" ? " money" : ""}" data-ied="${col}|${id}|${path}|${type}" data-lab="${esc(lab)}" aria-label="${esc(lab)}" ${ro ? "disabled" : ""} ${o.attrs || ""}`;
+  if (type === "sel") return `<select ${a}>${(o.opts || []).map(([k, l]) => `<option value="${esc(k)}" ${String(cur ?? "") === String(k) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+  if (type === "money") return `<input ${a} inputmode="decimal" value="${moneyFmt(cur)}">`;
+  if (type === "date") return `<input ${a} type="date" value="${esc(cur || "")}">`;
+  if (type === "num") return `<input ${a} type="number" step="any" value="${esc(cur ?? "")}">`;
+  return `<input ${a} value="${esc(cur ?? "")}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ""}>`;
+}
+const ied = (col, r, f, type, lab, o) => iedP(col, r.id, f, r[f], type, lab, o);
+document.addEventListener("change", async e => {
+  const el = e.target.closest && e.target.closest("[data-ied]"); if (!el || el.disabled) return;
+  const [col, id, path, type] = el.dataset.ied.split("|"), lab = el.dataset.lab || path; let v = el.value;
+  v = type === "money" ? (Number(String(v).replace(/[^\d.]/g, "")) || 0) : type === "num" ? (v === "" ? "" : Number(v)) : type === "last4" ? v.replace(/\D/g, "").slice(-4) : type === "sel" ? v : v.trim();
+  const rec = (S[col] || []).find(r => r.id === id); if (!rec) return;
+  try {
+    if (path.startsWith("rows.")) { const [, i, k] = path.split("."), rows = JSON.parse(JSON.stringify(rec.rows || [])), old = (rows[+i] || {})[k]; if (!rows[+i] || JSON.stringify(old ?? "") === JSON.stringify(v)) return; rows[+i][k] = v;
+      await patch(col, id, { rows, updatedAt: Date.now(), log: logAdd(rec, [`row ${+i + 1}${rows[+i].name || rows[+i].customer ? " (" + (rows[+i].name || rows[+i].customer) + ")" : ""}: ${logLab(k)}: ${logShow(k, old)} → ${logShow(k, v)}`]) }); }
+    else { if (JSON.stringify(rec[path] ?? "") === JSON.stringify(v)) return; await patch(col, id, { [path]: v, updatedAt: Date.now() }); }
+    toast("Saved.");
+  } catch (err) { toast("Couldn't save: " + ((err && err.message) || "try again.")); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches && e.target.matches("input.ied")) e.target.blur(); });
+// Check attachment: paste a copied picture or drop a file while the Add / Edit check form is open.
+const ckAttach = f => { const inp = document.getElementById("ck-file"); if (!inp || !f) return false; const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; const h = document.getElementById("ck-file-hint"); if (h) h.textContent = "Ready to attach: " + (f.name || "pasted picture") + ". Save the check to keep it."; return true; };
+document.addEventListener("paste", e => { if (!document.getElementById("ck-file")) return; const f = [...((e.clipboardData && e.clipboardData.files) || [])][0]; if (f && ckAttach(f)) e.preventDefault(); });
+document.addEventListener("dragover", e => { if (e.target.closest && e.target.closest("#ck-drop")) e.preventDefault(); });
+document.addEventListener("drop", e => { const z = e.target.closest && e.target.closest("#ck-drop"); if (!z) return; e.preventDefault(); ckAttach(((e.dataTransfer && e.dataTransfer.files) || [])[0]); });
 async function save(col, id, data) {
+  data = autoLog(col, id, data);
   undoNote(col, id);
   if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).set(data); }
@@ -1347,6 +1404,7 @@ async function save(col, id, data) {
 // A listing that comes back on the website (restocked, reactivated, or switched to Pre-order) counts as new there, so it shows first under "Newest".
 const liveOnWeb = p => (p.status || "active") === "active" && (p.kind === "preorder" ? !p.soldOut : (Number(p.stock) || 0) > 0);
 async function patch(col, id, data) {
+  data = autoLog(col, id, data);
   undoNote(col, id);
   if (col === "products" && data && ("stock" in data || "kind" in data)) { const old = S.products.find(r => r.id === id) || {}, m = { ...old, ...data };
     // Oct 15, 2026 (K): no separate "Sold out (pre-order)" choice; a pre-order with qty 0 is sold out, more than 0 is orderable.
@@ -2277,7 +2335,7 @@ function renderInner() {
     dashboard: viewDashboard, salesreport: viewSalesReport, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
-  v.innerHTML = (S.dept === "FINANCE" && S.tab !== "budget" ? duesAlert() : "") + tabs + body;
+  v.innerHTML = tabs + (S.dept === "FINANCE" && S.tab === "dues" ? duesAlert() : "") + `<div class="dc">${body}</div>`;   // K, Oct 16, 2026: the payment-due box lives under Due dates only
 }
 
 /* ---------- people & tasks helpers ---------- */
@@ -3481,18 +3539,18 @@ function viewTeamDir() {
     <div class="toolbar"><input id="tq" type="search" placeholder="Search ID, name, phone, email, address" value="${esc(S.tq || "")}" aria-label="Search directory">
       <select id="tstatus" aria-label="Status">${[["active", "Active"], ["inactive", "Inactive"], ["all", "All"]].map(([k, l]) => `<option value="${k}" ${sf === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     <div class="table-wrap"><table class="otable dir">
-    <thead><tr><th>ID Number</th><th>Nickname</th><th>Full Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Department</th><th>Birthday</th><th>Favorite scent</th><th>Date Started</th><th>Emergency contact</th><th>Company IDs</th><th>Status</th></tr></thead>
+    <thead><tr><th>ID Number</th><th>Nickname</th><th class="l">Full Name</th><th>Phone</th><th>Email</th><th class="l">Address</th><th>Department / role</th><th>Birthday</th><th>Favorite scent</th><th>Date Started</th><th>Emergency contact</th><th>Company IDs</th><th>Status</th></tr></thead>
     <tbody>${rows.map(m => `<tr ${S.canEdit ? `data-act="edit-member" data-id="${m.id}"` : ""} style="${S.canEdit ? "" : "cursor:default"}">
       <td class="nowrap num" style="box-shadow:inset 4px 0 0 ${DEPT_COLORS[m.department] || "var(--line)"}">${esc(m.idNumber || "")}</td>
-      <td style="font-weight:600"><span style="display:inline-flex;gap:10px;align-items:center">${avatar(m, 34)}${esc(m.nickname || "")}</span></td>
-      <td class="nowrap">${esc(m.name)}${m.uid ? ' <span class="chip" title="Linked to a claude.ai account">Linked</span>' : ""}</td>
-      <td class="nowrap num" style="user-select:all">${esc(m.phone || m.contact || "")}</td>
-      <td style="user-select:all">${esc(m.email || "")}</td>
-      <td style="min-width:200px">${esc(m.address || "")}</td>
-      <td class="nowrap">${esc(m.role || (dept(m.department) || { name: "–" }).name)}</td>
-      <td class="nowrap">${m.birthday ? fmtBday(m.birthday) + (isBirthday(m) ? " 🎂" : "") : ""}</td>
+      <td style="font-weight:600"><span style="display:inline-flex;gap:10px;align-items:center">${avatar(m, 34)}${ied("team", m, "nickname", "text", "Nickname", { ro: !S.canEdit })}</span></td>
+      <td class="l nowrap">${ied("team", m, "name", "text", "Full name", { ro: !S.canEdit })}${m.uid ? ' <span class="chip" title="Linked to a claude.ai account">Linked</span>' : ""}</td>
+      <td class="nowrap num">${ied("team", m, "phone", "text", "Phone", { ro: !S.canEdit })}</td>
+      <td>${ied("team", m, "email", "text", "Email", { ro: !S.canEdit })}</td>
+      <td class="l" style="min-width:200px">${ied("team", m, "address", "text", "Address", { ro: !S.canEdit })}</td>
+      <td class="nowrap">${ied("team", m, "role", "text", "Role / position", { ro: !S.canEdit, ph: (dept(m.department) || { name: "" }).name })}${isBirthday(m) ? " 🎂" : ""}</td>
+      <td class="nowrap">${ied("team", m, "birthday", "date", "Birthday", { ro: !S.canEdit })}</td>
       <td>${esc(scentOf(m.id))}</td>
-      <td class="nowrap">${m.started ? new Date(m.started + "T12:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : ""}</td>
+      <td class="nowrap">${ied("team", m, "started", "date", "Date started", { ro: !S.canEdit })}</td>
       <td style="font-size:12.5px;min-width:160px">${m.emergency && m.emergency.name ? `${esc(m.emergency.name)}${m.emergency.relation ? " (" + esc(m.emergency.relation) + ")" : ""}<br><span class="num" style="user-select:all">${esc(m.emergency.phone || "")}</span>` : ""}</td>
       <td class="nowrap" style="font-size:12.5px">${m.govIds ? "🔒 On file" : `<span style="color:var(--muted)">–</span>`}</td>
       <td><span class="chip ${m.status === "inactive" ? "" : "good"}">${m.status === "inactive" ? "Inactive" : "Active"}</span></td></tr>`).join("")}</tbody>
@@ -3546,6 +3604,7 @@ async function openMemberForm(id) {
     <div class="field"><label>Work schedule</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">${SCHED_DAYS.map((d, i) => `<div class="field"><label for="m-sch-${i}" style="font-weight:400">${d}</label><input id="m-sch-${i}" value="${esc((schedOf(m) || {})[i] || "")}" placeholder="${schedOf(m) ? "Day off" : "Shared shift"}"></div>`).join("")}</div>
       <div style="font-size:12px;color:var(--muted)">24-hour times. Split shift: <code>08:00-12:00, 17:00-21:00</code>. Leave a day blank for a day off. Leave all blank to use the shared shift in Attendance settings.</div></div>
     <div style="font-size:12px;color:var(--muted)">Inactive members drop off attendance and can't be assigned new tasks, but their history stays.</div>
+    ${id ? recLogHtml("team", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-member" data-id="${id}">Remove from directory</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -4801,8 +4860,8 @@ function viewExpenses() {
   </div>
   ${pickBar("exp", [["Delete…", "exp-sel-del", "danger"]], all.map(e => e.id))}
   <div class="table-wrap"><table>
-    <thead><tr>${pickTh("exp", all.map(e => e.id))}<th>Date</th><th>Category</th><th>Note</th><th>Paid with</th><th>OR / receipt</th><th>By</th><th class="r">Amount</th><th></th></tr></thead>
-    <tbody>${all.map(e => `<tr>${pickTd("exp", e.id)}<td class="num">${fmtDate(e.date)}</td><td>${isCashIn(e) ? `<span class="chip good">Cash in</span>` : esc(e.category)}${exChip(e)}</td><td>${esc(e.note || "")}</td><td>${isCashIn(e) ? "" : esc(e.paidWith || "")}</td><td>${e.file ? `<button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">📎 View</button>` : isCashIn(e) ? "" : `<span style="color:var(--muted)">–</span>`}</td><td style="font-size:12.5px">${esc(e.by || "")}</td><td class="r num" style="font-weight:700;${isCashIn(e) ? "color:var(--good)" : ""}">${isCashIn(e) ? "+" : ""}${peso(e.amount)}</td><td class="r">${S.readOnly ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">Edit</button>`}</td></tr>`).join("")}</tbody>
+    <thead><tr>${pickTh("exp", all.map(e => e.id))}<th>Date</th><th>Category</th><th class="l">Note</th><th>Paid with</th><th>OR / receipt</th><th>By</th><th>Amount</th><th></th></tr></thead>
+    <tbody>${all.map(e => { const ci = isCashIn(e), ro = S.readOnly; return `<tr>${pickTd("exp", e.id)}<td class="nowrap">${ied("expenses", e, "date", "date", "Date")}</td><td>${ci ? `<span class="chip good">Cash in</span>` : ied("expenses", e, "category", "sel", "Category", { opts: EXP_CATS.map(c => [c, c]) })}${exChip(e)}</td><td class="l">${ied("expenses", e, "note", "text", "Note")}</td><td>${ci ? "" : ied("expenses", e, "paidWith", "text", "Paid with")}</td><td>${e.file ? `<button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">📎 View</button>` : ci ? "" : `<span style="color:var(--muted)">–</span>`}</td><td style="font-size:12.5px">${esc(e.by || "")}</td><td class="num nowrap" style="font-weight:700;${ci ? "color:var(--good)" : ""}">${ied("expenses", e, "amount", "money", "Amount")}</td><td>${ro ? "" : `<button class="btn ghost sm" type="button" data-act="edit-expense" data-id="${e.id}">History</button>`}</td></tr>`; }).join("")}</tbody>
   </table>${all.length ? "" : `<div class="empty" style="padding:16px">No expenses ${periodLabel()}. Log ingredients, packaging, ads and other costs so net profit stays accurate.</div>`}</div>`;
 }
 
@@ -6346,11 +6405,11 @@ document.addEventListener("click", e => {
 // The box under Team activity takes a pasted photo (⌘V / Ctrl+V), a dropped photo, a chosen photo and/or text; Add saves it as one entry.
 let ologPend = [];   // photos in the box, not saved yet (File objects)
 const ologImgs = l => [...(l.imgs || []), ...(l.img ? [l.img] : [])];
-function oLogHtml(log, key) {
+function oLogHtml(log, key, title) {
   const canAdd = !S.readOnly && !!S.db;
   ologPend.forEach(f => f._url && URL.revokeObjectURL(f._url)); ologPend = [];
   if (!(log || []).length && !canAdd) return "";
-  return `<div class="olog" id="olog-box" data-key="${esc(key)}"><div class="olog-h">Team activity</div>
+  return `<div class="olog" id="olog-box" data-key="${esc(key)}"><div class="olog-h">${esc(title || "Team activity")}</div>
     ${canAdd ? `<div class="olog-add" id="olog-add"><textarea id="olog-text" rows="2" placeholder="Paste a receipt photo here (⌘V / Ctrl+V), drop one in, or type a note…" aria-label="Add a note or photo to this order"></textarea><div class="olog-pend" id="olog-pend"></div>
       <div class="olog-row"><label class="olog-pick" title="Choose a photo from this device">📷 Choose photo<input type="file" id="olog-file" accept="image/*" multiple hidden></label><span style="flex:1"></span><button type="button" class="btn sm primary" data-act="olog-post">Add</button></div></div>` : ""}
     ${[...(log || [])].reverse().map(l => { const im = ologImgs(l); return `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span>${l.text ? `<div class="olog-text">${esc(l.text)}</div>` : ""}${im.length ? `<div class="olog-imgs">${im.map(u => `<img class="olog-img" src="${esc(u)}" alt="Attached photo" loading="lazy" referrerpolicy="no-referrer">`).join("")}</div>` : ""}</div>`; }).join("")}</div>`;
@@ -6383,6 +6442,10 @@ async function ologPost(btn) {
       const o = findOrder(key.slice(2)); if (!o) return;
       log = [...(o.log || []), entry].slice(-80);
       await patch("orders", o.id, { log });
+    } else if (key.startsWith("r:")) {
+      const [, col, rid] = key.split(":"), r = (S[col] || []).find(x => x.id === rid); if (!r) return;
+      log = [...(r.log || []), entry].slice(-80);
+      await patch(col, rid, { log });
     } else if (key.startsWith("w:")) {
       const ref = key.slice(2), id = ref.replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {};
       log = [...(cur.log || []), entry].slice(-50);
@@ -6987,6 +7050,7 @@ function openExpenseForm(id, cashin) {
     <div class="field"><label for="e-note">${ci ? "Where the cash came from" : "Note"}</label><input id="e-note" value="${esc(e.note || "")}" placeholder="${ci ? "e.g. Petty cash from K, COD collected" : "e.g. Lalamove to supplier, 200 bubble mailers"}"></div>
     ${ci ? "" : `<div class="field"><label for="e-file">OR / receipt photo</label><input id="e-file" type="file" accept="image/*,application/pdf">
       <div style="font-size:12.5px;color:var(--muted)">${e.file ? `Attached: ${esc(e.file.name || "receipt")} <button class="btn ghost sm" type="button" data-act="exp-file" data-id="${e.id}">View</button>` : "Take a photo of the OR or receipt."}</div></div>`}
+    ${id ? recLogHtml("expenses", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-expense" data-id="${id}">Delete</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -7524,15 +7588,15 @@ function viewInvestors() {
   const next = inv.filter(v => invEnd(v) >= mToday()).sort((a, b) => invEnd(a).localeCompare(invEnd(b)))[0];
   const can = !S.readOnly;
   const row = v => { const st = invStatus(v), s = invSchedule(v), paidN = s.filter(p => p.paid).length; return `<tr data-act="edit-inv" data-id="${v.id}">
-    <td class="nowrap" style="font-weight:700">${esc(v.code || "–")}</td>
-    <td>${esc(v.name)}</td>
-    <td>${esc(v.fb || "")}</td>
-    <td class="r num nowrap">${peso2(v.amount)}</td>
-    <td class="r num">${v.rate ? Number(v.rate) + "%" : "–"}</td>
+    <td class="nowrap" style="font-weight:700">${ied("investments", v, "code", "text", "INV code", { ro: !can })}</td>
+    <td class="l">${ied("investments", v, "name", "text", "Investor's name", { ro: !can })}</td>
+    <td>${ied("investments", v, "fb", "text", "FB account", { ro: !can })}</td>
+    <td class="num nowrap">${ied("investments", v, "amount", "money", "Amount", { ro: !can })}</td>
+    <td class="num">${ied("investments", v, "rate", "num", "% per month", { ro: !can, attrs: 'step="0.01" style="width:78px"' })}</td>
     <td class="r num nowrap">${invMonthly(v) ? peso2(invMonthly(v)) : "–"}${invMismatch(v) ? ` <span class="chip warn" title="${esc(Number(v.rate))}% of ${peso(v.amount)} is ${peso(Math.round(v.amount * v.rate) / 100)}">check</span>` : ""}</td>
-    <td class="r num">${esc(invDur(v))}</td>
+    <td class="num">${ied("investments", v, "months", "num", "Months", { ro: !can, attrs: 'style="width:70px"' })}</td>
     <td class="r num nowrap">${invTotalInterest(v) ? peso2(invTotalInterest(v)) : "–"}</td>
-    <td class="nowrap">${fmtLong(v.start)}</td>
+    <td class="nowrap">${ied("investments", v, "start", "date", "Payment start", { ro: !can })}</td>
     <td class="nowrap end-col">${fmtLong(invEnd(v))}</td>
     <td class="r num nowrap" style="font-weight:700">${v.months ? peso2(invDue(v)) : "–"}</td>
     <td class="nowrap"><span class="chip ${st.cls}">${st.name}</span>${s.length ? `<div class="s">${paidN}/${s.length} paid</div>` : ""}</td></tr>`; };
@@ -7548,7 +7612,7 @@ function viewInvestors() {
         <div style="display:flex;gap:8px;align-items:center"><span class="num" style="font-weight:700">${peso2(p.amount)}</span>${p.paid ? `<span class="chip good">Paid</span>${can ? ` <button class="btn ghost sm" type="button" data-invpay="${v.id}" data-ym="${p.ym}" data-paid="0">Undo</button>` : ""}` : can ? `<button class="btn sm primary" type="button" data-invpay="${v.id}" data-ym="${p.ym}" data-paid="1">Mark paid</button>` : `<span class="chip warn">Due</span>`}</div></div>`).join("")}</div>` : `<div class="empty">No payouts scheduled this month.</div>`}
     </section>
     <div class="table-wrap"><table class="otable inv">
-      <thead><tr><th>INV Code</th><th>Investor's name</th><th>FB account</th><th class="r">Amount</th><th class="r">% / month</th><th class="r">Interest / month</th><th class="r">Months</th><th class="r">Total interest</th><th>Payment start</th><th>End date</th><th class="r">Amount due</th><th>Status</th></tr></thead>
+      <thead><tr><th>INV Code</th><th class="l">Investor's name</th><th>FB account</th><th>Amount</th><th>% / month</th><th>Interest / month</th><th>Months</th><th>Total interest</th><th>Payment start</th><th>End date</th><th>Amount due</th><th>Status</th></tr></thead>
       <tbody>${inv.map(row).join("")}</tbody>
       <tfoot><tr><td colspan="3" style="font-weight:800">TOTAL INVESTMENTS: ${inv.filter(v => v.code).length}</td><td class="r num" style="font-weight:800">${peso2(inv.reduce((a, v) => a + (Number(v.amount) || 0), 0))}</td><td></td><td class="r num" style="font-weight:800">${peso2(inv.reduce((a, v) => a + invMonthly(v), 0))}</td><td colspan="6"></td></tr></tfoot>
     </table>${inv.length ? "" : `<div class="empty" style="padding:16px">No investments yet. Click “Add investment”.</div>`}</div>
@@ -7583,6 +7647,7 @@ function openInvForm(id, kind) {
     ${loan ? "" : `<div class="row"><div class="field"><label for="v-closed">Status</label><select id="v-closed"><option value="0" ${v.closed ? "" : "selected"}>Ongoing</option><option value="1" ${v.closed ? "selected" : ""}>Finished</option></select></div><div class="field"><label for="v-group">Finished year group</label><input id="v-group" value="${esc(v.group || "")}" placeholder="Auto from end date"></div></div>`}
     <div class="field"><label for="v-notes">Notes</label><textarea id="v-notes" rows="2">${esc(v.notes || "")}</textarea></div>
     ${s.length ? `<details><summary style="font-weight:700;cursor:pointer">Payment schedule (${s.filter(p => p.paid).length}/${s.length} paid)</summary><div class="list" style="margin-top:6px">${s.map(p => `<div class="li"><span>${p.i + 1}. ${fmtLong(p.date)}${p.final && !loan ? " · final" : ""}</span><span style="display:flex;gap:8px;align-items:center"><span class="num">${peso2(p.amount)}</span>${S.readOnly ? (p.paid ? '<span class="chip good">Paid</span>' : "") : `<button type="button" class="btn sm ${p.paid ? "" : "primary"}" data-invpay="${v.id}" data-ym="${p.ym}" data-paid="${p.paid ? 0 : 1}" data-insheet="1">${p.paid ? "Paid ✓" : "Mark paid"}</button>`}</span></div>`).join("")}</div></details>` : ""}
+    ${id ? recLogHtml("investments", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id && !S.readOnly ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-inv" data-id="${id}">Delete</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button>${S.readOnly ? "" : `<button class="btn primary" type="submit">Save</button>`}</div>`,
@@ -7677,15 +7742,15 @@ function invRow(x, finance, pick) {
   const u = x.status === "paid" || x.budget === "declined" ? "" : urgOf(x.dueDate);
   return `<tr data-act="view-invoice" data-id="${x.id}" class="${u ? "u-row u-" + u : ""}">${pick ? pickTd("inv", x.id) : ""}
     <td class="nowrap">${fmtDate(x.invDate || dstr(x.createdAt || Date.now()))}</td>
-    <td style="font-weight:600">${esc(invTitle(x))}${x.file ? ' <span title="Has attachment">📎</span>' : ""}<div class="s">${esc(x.kind === "request" ? (x.purpose || "") : (x.orders || x.notes || ""))}</div></td>
-    <td class="r num nowrap">${peso2(x.amount)}</td>
-    <td class="nowrap">${x.dueDate ? fmtDate(x.dueDate) : "–"} ${urgChip(u)}</td>
+    <td class="l" style="font-weight:600">${esc(invTitle(x))}${x.file ? ' <span title="Has attachment">📎</span>' : ""}<div class="s">${esc(x.kind === "request" ? (x.purpose || "") : (x.orders || x.notes || ""))}</div></td>
+    <td class="num nowrap">${ied("invoices", x, "amount", "money", "Amount")}</td>
+    <td class="nowrap">${ied("invoices", x, "dueDate", "date", "Due date")} ${urgChip(u)}</td>
     <td>${badge(BUDGET[x.budget || "pending"])}</td>
     <td>${badge(INV_STATUS[x.status || "topay"])}</td>
     <td class="nowrap" style="font-size:12px;color:var(--muted)">${esc(x.createdByName || "")}</td>
     <td class="r nowrap">${S.readOnly ? "" : (finance && canDecide() && (x.budget || "pending") === "pending" ? `<button class="btn sm" type="button" data-act="inv-approve" data-id="${x.id}">Approve</button> ` : "") + (x.budget === "declined" ? "" : `<button class="btn sm ${x.status === "paid" ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${x.id}">${x.status === "paid" ? "Paid ✓" : "Mark paid"}</button>`)}</td></tr>`;
 }
-const invHead = `<thead><tr><th>Date</th><th>Invoice / request</th><th class="r">Amount</th><th>Due</th><th>Budget</th><th>Status</th><th>By</th><th></th></tr></thead>`;
+const invHead = `<thead><tr><th>Date</th><th class="l">Invoice / request</th><th>Amount</th><th>Due</th><th>Budget</th><th>Status</th><th>By</th><th></th></tr></thead>`;
 function viewInvoices() {
   if (!canInvoices()) return `<div class="panel"><div class="empty">Supplier invoices are for the CEO, Senior Sales and Finance.</div></div>`;
   const f = S.invF || (S.invF = { st: "topay", sup: "all", q: "" });
@@ -7715,7 +7780,7 @@ function viewBudget() {
   const sum = l => peso(l.reduce((a, x) => a + (Number(x.amount) || 0), 0));
   const sort = l => [...l].sort((a, b) => String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")));
   const table = (l, empty) => l.length ? `<div class="table-wrap"><table class="otable">${invHead}<tbody>${sort(l).map(x => invRow(x, true)).join("")}</tbody></table></div>` : `<div class="empty">${empty}</div>`;
-  return `${duesAlert()}<div class="kpis">
+  return `<div class="kpis">
       <div class="kpi"><span class="label">Waiting for approval</span><span class="value">${sum(pend)}</span><span class="sub">${pend.length} request${pend.length === 1 ? "" : "s"}</span></div>
       <div class="kpi"><span class="label">Approved, to release</span><span class="value">${sum(appr)}</span><span class="sub">${appr.length} to pay</span></div>
       <div class="kpi"><span class="label">Released in ${monthLabel(ym)}</span><span class="value">${sum(paidM)}</span><span class="sub">${paidM.length} paid</span></div>
@@ -7775,6 +7840,7 @@ function openInvoiceForm(id, kind) {
     <div class="field"><label for="iv-file">${req ? "Attachment (optional)" : "Invoice file (PDF or photo)"}</label><input id="iv-file" type="file" accept="application/pdf,image/*">
       ${x.file ? `<div style="font-size:12.5px;color:var(--muted)">Current: 📎 ${esc(x.file.name || "file")}. Pick a new file to replace it.</div>` : ""}</div>
     <div class="field"><label for="iv-notes">Notes</label><textarea id="iv-notes" rows="2">${esc(x.notes || "")}</textarea></div>
+    ${id ? recLogHtml("invoices", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id && !S.readOnly ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-invoice" data-id="${id}">Delete</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">${id ? "Save" : req ? "Send to Finance" : "Save invoice"}</button></div>`,
@@ -7837,8 +7903,8 @@ function viewFixed() {
   const can = !S.readOnly;
   // K, Oct 15, 2026: no stat cards; a compact table (description, amount right next to it, notes) with the total at the bottom.
   return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:44%"><col style="width:16%"><col></colgroup>
-    <thead><tr><th>Description</th><th class="r">Amount / month</th><th>Notes</th></tr></thead>
-    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td><div class="fx-name">${esc(x.desc)}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="r num nowrap fx-amt">${x.amount ? peso(x.amount) : `<span class="s">–</span>`}</td><td class="fx-notes">${esc(x.notes || "")}</td></tr>`).join("")}</tbody>
+    <thead><tr><th class="l">Description</th><th>Amount / month</th><th class="l">Notes</th></tr></thead>
+    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td></tr>`).join("")}</tbody>
     <tfoot><tr><td style="font-weight:800">Total · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td></tr></tfoot></table>
     ${list.length ? "" : `<div class="empty" style="padding:16px">No fixed expenses yet. Click “Add expense line”.</div>`}</div>`;
 }
@@ -7849,6 +7915,7 @@ function openFixedForm(id) {
     <div class="row"><div class="field"><label for="fx-amt">Amount per month (₱)</label><input inputmode="decimal" class="money" id="fx-amt" value="${moneyFmt(x.amount ?? "")}"></div>
       <div class="field"><label for="fx-notes">Notes</label><input id="fx-notes" value="${esc(x.notes || "")}" placeholder="monthly, yearly / 12 mos."></div></div>
     <div class="field"><label for="fx-bd">Breakdown (optional, one per line)</label><textarea id="fx-bd" rows="3">${esc(x.breakdown || "")}</textarea></div>
+    ${id ? recLogHtml("fixedexp", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-fixed" data-id="${id}">Delete line</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -7866,7 +7933,7 @@ function viewDues() {
   const tot = act.reduce((a, d) => a + (Number(d.amount) || 0), 0), paid = act.filter(d => (d.paid || []).includes(ym));
   const next = act.filter(d => !(d.paid || []).includes(ym) && dueDateIn(d, ym) >= mToday()).sort((a, b) => dueDateIn(a, ym).localeCompare(dueDateIn(b, ym)))[0];
   const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="${can && pickOn() ? 8 : 7}">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">${can ? pickTd("due", d.id) : ""}
-      <td style="font-weight:600">${esc(d.name)}</td><td class="nowrap">${ordinal(d.day)} of the month</td><td class="r num nowrap">${peso(d.amount)}</td><td>${esc(d.method || "")}</td><td class="nowrap num">${d.account ? "•••• " + esc(d.account) : ""}</td><td>${esc(d.holder || "")}</td>
+      <td class="l" style="font-weight:600">${ied("dues", d, "name", "text", "Name", { ro: !can })}</td><td class="nowrap">${ied("dues", d, "day", "num", "Due day of the month", { ro: !can, attrs: 'min="1" max="31" style="width:64px"' })}<span class="s"> of the month</span></td><td class="num nowrap">${ied("dues", d, "amount", "money", "Amount", { ro: !can })}</td><td>${ied("dues", d, "method", "text", "Paid via / bank", { ro: !can })}</td><td class="nowrap num">${ied("dues", d, "account", "last4", "Account (last 4 digits)", { ro: !can, attrs: 'maxlength="4" inputmode="numeric" style="width:78px"' })}</td><td>${ied("dues", d, "holder", "text", "Holder", { ro: !can })}</td>
       <td class="nowrap">${d.active === false ? "Stopped" : `<button class="btn sm ${isPaid ? "" : late ? "danger" : "primary"}" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${ym}">${isPaid ? "Paid ✓" : late ? "Overdue · Mark paid" : "Mark paid"}</button>`}</td></tr>`; }).join(""); };
   return `<div class="kpis">
       <div class="kpi"><span class="label">Due in ${monthLabel(ym)}</span><span class="value">${peso(tot)}</span><span class="sub">${act.length} payments</span></div>
@@ -7875,7 +7942,7 @@ function viewDues() {
       <div class="kpi"><span class="label">Calendar</span><span class="value" style="font-size:16px">On the Tasks calendar</span><span class="sub">Visible to people with Finance unlocked</span></div>
     </div>
     ${pickBar("due", [["✓ Mark paid (" + monthLabel(ym) + ")", "due-sel-paid", "primary"], ["Mark unpaid", "due-sel-unpaid"]], list.map(d => d.id))}
-    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th>Name</th><th>Due date</th><th class="r">Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th></tr></thead>
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th class="l">Name</th><th>Due date</th><th>Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th></tr></thead>
       <tbody>${DUE_KINDS.map(k => group(k[0])).join("")}</tbody></table>${list.length ? "" : `<div class="empty" style="padding:16px">No due dates yet.</div>`}</div>
     <div style="font-size:12px;color:var(--muted)">Only the last 4 digits of account and card numbers are kept here, for safety. A due date of the 30th falls on the last day in shorter months.</div>`;
 }
@@ -7894,6 +7961,7 @@ function openDueForm(id) {
     <div class="field"><label for="du-notes">Notes</label><input id="du-notes" value="${esc(d.notes || "")}"></div>
     <div class="field"><label>Shows on the calendar of</label><div style="display:flex;gap:12px;flex-wrap:wrap">${activeTeam().filter(m => m.department === "FINANCE" || dueWho(d).includes(m.id)).map(m => `<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="du-who" value="${m.id}" ${dueWho(d).includes(m.id) ? "checked" : ""}> ${esc(m.nickname || m.name)}</label>`).join("")}</div></div>
     ${id ? `<div style="font-size:12px;color:var(--muted)">Paid months: ${(d.paid || []).map(monthLabel).join(", ") || "none yet"}</div>` : ""}
+    ${id ? recLogHtml("dues", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-due" data-id="${id}">Delete</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -7923,10 +7991,10 @@ function viewChecks() {
       <div class="kpi"><span class="label">Bounced</span><span class="value" style="color:${list.some(c => c.status === "bounced") ? "var(--bad)" : "inherit"}">${list.filter(c => c.status === "bounced").length}</span></div>
     </div>
     ${pickBar("chk", [["select", "Set status…", "chk-status", Object.entries(CHECK_STATUS).map(([k, v]) => [k, v.name])]], list.map(c => c.id))}
-    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("chk", list.map(c => c.id)) : ""}<th>Check date</th><th>Check no.</th><th>Bank / account</th><th>Payee</th><th class="r">Amount</th><th>Purpose</th><th>Status</th></tr></thead>
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("chk", list.map(c => c.id)) : ""}<th>Check date</th><th>Check no.</th><th>Bank / account</th><th class="l">Payee</th><th>Amount</th><th class="l">Purpose</th><th>Status</th><th>File</th></tr></thead>
     <tbody>${list.map(c => { const st = CHECK_STATUS[c.status || "pending"], over = st === CHECK_STATUS.pending && c.checkDate && c.checkDate < t; return `<tr ${can ? `data-act="edit-check" data-id="${c.id}"` : 'style="cursor:default"'}>${can ? pickTd("chk", c.id) : ""}
-      <td class="nowrap" style="color:${over ? "var(--bad)" : "inherit"}">${c.checkDate ? fmtLong(c.checkDate) : "–"}${over ? " · past date" : ""}</td><td class="num">${esc(c.checkNo || "")}</td><td>${esc(c.bank || "")}</td><td style="font-weight:600">${esc(c.payee || "")}</td>
-      <td class="r num nowrap">${peso2(c.amount)}</td><td>${esc(c.purpose || "")}</td><td><span class="chip ${st.cls}">${st.name}</span></td></tr>`; }).join("")}</tbody></table>
+      <td class="nowrap" style="color:${over ? "var(--bad)" : "inherit"}">${ied("checks", c, "checkDate", "date", "Check date", { ro: !can })}${over ? `<div class="s" style="color:var(--bad)">past date</div>` : ""}</td><td class="num">${ied("checks", c, "checkNo", "text", "Check no.", { ro: !can })}</td><td>${ied("checks", c, "bank", "text", "Bank / account", { ro: !can })}</td><td class="l" style="font-weight:600">${ied("checks", c, "payee", "text", "Payee", { ro: !can })}</td>
+      <td class="num nowrap">${ied("checks", c, "amount", "money", "Amount", { ro: !can })}</td><td class="l">${ied("checks", c, "purpose", "text", "Purpose", { ro: !can })}</td><td>${ied("checks", c, "status", "sel", "Status", { ro: !can, opts: Object.entries(CHECK_STATUS).map(([k, v]) => [k, v.name]) })}</td><td>${c.file ? `<button class="btn ghost sm" type="button" data-act="chk-file" data-id="${c.id}">📎 View</button>` : `<span style="color:var(--muted)">–</span>`}</td></tr>`; }).join("")}</tbody></table>
     ${list.length ? "" : `<div class="empty" style="padding:16px">No checks yet. Click “Add check” each time you issue one. Pending checks show on the Tasks calendar on their date.</div>`}</div>`;
 }
 function openCheckForm(id, date) {
@@ -7941,12 +8009,17 @@ function openCheckForm(id, date) {
     <div class="row"><div class="field"><label for="ck-purpose">Purpose</label><input id="ck-purpose" value="${esc(c.purpose || "")}" placeholder="e.g. Rent, supplier, investor"></div>
       <div class="field"><label for="ck-status">Status</label><select id="ck-status">${Object.entries(CHECK_STATUS).map(([k, s]) => `<option value="${k}" ${(c.status || "pending") === k ? "selected" : ""}>${s.name}</option>`).join("")}</select></div></div>
     <div class="field"><label for="ck-notes">Notes</label><input id="ck-notes" value="${esc(c.notes || "")}"></div>
+    <div class="field" id="ck-drop"><label for="ck-file">Attach file (photo of the check, deposit slip, PDF)</label><input id="ck-file" type="file" accept="image/*,application/pdf">
+      <div id="ck-file-hint" style="font-size:12.5px;color:var(--muted)">${c.file ? `Attached: ${esc(c.file.name || "file")} <button class="btn ghost sm" type="button" data-act="chk-file" data-id="${id}">View</button> · choose or paste another to replace it.` : "Choose a file, or paste a copied picture here with ⌘V / Ctrl+V, or drop it on this box."}</div></div>
+    ${id ? recLogHtml("checks", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-check" data-id="${id}">Delete check</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
     if (!val("ck-payee") || !numv("ck-amt")) return sheetError("Enter the payee and amount.");
-    const data = { ...(id ? clean(c) : {}), checkNo: val("ck-no"), checkDate: val("ck-date"), payee: val("ck-payee"), amount: numv("ck-amt"), bank: val("ck-bank"), issued: val("ck-issued"), purpose: val("ck-purpose"), status: val("ck-status"), notes: val("ck-notes"), updatedAt: Date.now() };
+    const fin = $("#ck-file"), f = fin && fin.files && fin.files[0]; let file = c.file || null;
+    if (f) { try { const nf = await storeFile(f); if (c.file) await removeFile(c.file); file = nf; } catch (err) { return sheetError((err && err.message) || "Couldn't save the file."); } }
+    const data = { ...(id ? clean(c) : {}), file, checkNo: val("ck-no"), checkDate: val("ck-date"), payee: val("ck-payee"), amount: numv("ck-amt"), bank: val("ck-bank"), issued: val("ck-issued"), purpose: val("ck-purpose"), status: val("ck-status"), notes: val("ck-notes"), updatedAt: Date.now() };
     await save("checks", id || uid("ck"), data); closeSheet(); toast("Check saved.");
   });
 }
@@ -7980,8 +8053,8 @@ function viewPayRecords() {
     <section class="panel"><h2>Per person</h2><div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th>Name</th><th>Latest position</th><th class="r">Pay dates</th><th class="r">Total net</th></tr></thead>
       <tbody>${[...per.entries()].sort((a, b) => b[1].net - a[1].net).map(([n, x]) => `<tr data-prp="${esc(n)}" style="cursor:pointer"><td style="font-weight:600">${esc(n)}</td><td>${esc(x.pos || "")}</td><td class="r num">${x.n}</td><td class="r num">${peso(x.net)}</td></tr>`).join("")}</tbody></table></div></section>
     ${dates.map((d, k) => { const rs = rows.filter(r => r.payDate === d); return `<details class="panel" ${k < 2 ? "open" : ""}><summary class="yr">${fmtLong(d)} <span>${rs.length} people · ${peso(rs.reduce((a, r) => a + (Number(r.net) || 0), 0))}</span></summary>
-      <div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th>ID</th><th>Name</th><th>Position</th><th class="r">Daily rate</th><th class="r">Net pay</th><th>Note</th></tr></thead>
-      <tbody>${rs.map(r => `<tr ${can && !r.fromApp ? `data-act="edit-pr" data-id="${r.doc}" data-i="${r.i}"` : 'style="cursor:default"'}><td class="num">${esc(r.idNumber || "")}</td><td style="font-weight:600">${esc(r.name)}</td><td>${esc(r.position || "")}</td><td class="r num">${r.rate ? peso(r.rate) : ""}</td><td class="r num" style="font-weight:700">${r.net === "" || r.net == null ? "–" : peso(r.net)}</td><td>${esc(r.note || "")}</td></tr>`).join("")}</tbody></table></div></details>`; }).join("")}
+      <div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th>ID</th><th class="l">Name</th><th>Position</th><th>Daily rate</th><th>Net pay</th><th class="l">Note</th></tr></thead>
+      <tbody>${rs.map(r => `<tr ${can && !r.fromApp ? `data-act="edit-pr" data-id="${r.doc}" data-i="${r.i}"` : 'style="cursor:default"'}><td class="num">${r.fromApp ? esc(r.idNumber || "") : iedP("payrecords", r.doc, `rows.${r.i}.idNumber`, r.idNumber, "text", "ID", { ro: !can })}</td><td class="l" style="font-weight:600">${r.fromApp ? esc(r.name) : iedP("payrecords", r.doc, `rows.${r.i}.name`, r.name, "text", "Name", { ro: !can })}</td><td>${r.fromApp ? esc(r.position || "") : iedP("payrecords", r.doc, `rows.${r.i}.position`, r.position, "text", "Position", { ro: !can })}</td><td class="num">${r.fromApp ? (r.rate ? peso(r.rate) : "") : iedP("payrecords", r.doc, `rows.${r.i}.rate`, r.rate, "money", "Daily rate", { ro: !can })}</td><td class="num" style="font-weight:700">${r.fromApp ? (r.net === "" || r.net == null ? "–" : peso(r.net)) : iedP("payrecords", r.doc, `rows.${r.i}.net`, r.net, "money", "Net pay", { ro: !can })}</td><td class="l">${r.fromApp ? esc(r.note || "") : iedP("payrecords", r.doc, `rows.${r.i}.note`, r.note, "text", "Note", { ro: !can })}</td></tr>`).join("")}</tbody></table></div></details>`; }).join("")}
     ${dates.length ? "" : `<div class="panel"><div class="empty">No payroll records yet.</div></div>`}
     <div style="font-size:12px;color:var(--muted)">Payslips you mark Paid in Finance → Payroll are added here automatically.</div>`;
 }
@@ -7995,6 +8068,7 @@ function openPayRecForm(docId, i) {
     <div class="row"><div class="field"><label for="pr-rate">Daily rate (₱)</label><input inputmode="decimal" class="money" id="pr-rate" value="${moneyFmt(r.rate ?? "")}"></div>
       <div class="field"><label for="pr-net">Net pay (₱)</label><input inputmode="decimal" class="money" id="pr-net" value="${moneyFmt(r.net ?? "")}"></div></div>
     <div class="field"><label for="pr-note">Note</label><input id="pr-note" value="${esc(r.note || "")}" placeholder="e.g. Leave"></div>
+    ${docId ? recLogHtml("payrecords", docId) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${docId ? `<div><button class="btn danger sm" type="button" data-act="del-pr" data-id="${docId}" data-i="${i}">Delete record</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -8032,8 +8106,8 @@ function viewBir() {
       <div class="kpi"><span class="label">BIR tax paid (all)</span><span class="value">${peso(S.birtax.reduce((a, t) => a + (Number(t.amount) || 0), 0))}</span><span class="sub">${S.birtax.length} payment${S.birtax.length === 1 ? "" : "s"}</span></div>
     </div>
     ${doc.sheetTotal && Math.abs(doc.sheetTotal - tot) > 1 ? `<div class="notice">The lines add up to ${peso2(tot)}, but your sheet's TOTAL SALES said ${peso(doc.sheetTotal)} (a ${peso2(Math.abs(doc.sheetTotal - tot))} difference). Check for a missing line or a typo before filing.</div>` : ""}
-    <div class="table-wrap"><table class="otable"><thead><tr><th>Date</th><th>Order ID</th><th>Customer</th><th>Description</th><th class="r">Qty</th><th>MOP</th><th class="r">Amount</th></tr></thead>
-      <tbody>${rows.map(r => `<tr ${can ? `data-act="edit-bir" data-id="${doc.id}" data-i="${r.i}"` : 'style="cursor:default"'}><td class="nowrap">${r.date ? fmtDate(r.date) : ""}</td><td class="nowrap num">#${esc(r.orderNum || "")}</td><td>${esc(r.customer || "")}</td><td>${esc(r.item || "")}</td><td class="r num">${esc(r.qty || "")}</td><td>${esc(r.mop || "")}</td><td class="r num nowrap">${peso2(r.amount)}</td></tr>`).join("")}</tbody>
+    <div class="table-wrap"><table class="otable"><thead><tr><th>Date</th><th>Order ID</th><th class="l">Customer</th><th class="l">Description</th><th>Qty</th><th>MOP</th><th>Amount</th></tr></thead>
+      <tbody>${rows.map(r => `<tr ${can ? `data-act="edit-bir" data-id="${doc.id}" data-i="${r.i}"` : 'style="cursor:default"'}><td class="nowrap">${iedP("bir", doc.id, `rows.${r.i}.date`, r.date, "date", "Date", { ro: !can })}</td><td class="nowrap num">${iedP("bir", doc.id, `rows.${r.i}.orderNum`, r.orderNum, "text", "Order ID", { ro: !can })}</td><td class="l">${iedP("bir", doc.id, `rows.${r.i}.customer`, r.customer, "text", "Customer", { ro: !can })}</td><td class="l">${iedP("bir", doc.id, `rows.${r.i}.item`, r.item, "text", "Description", { ro: !can })}</td><td class="num">${iedP("bir", doc.id, `rows.${r.i}.qty`, r.qty, "num", "Qty", { ro: !can, attrs: 'style="width:64px"' })}</td><td>${iedP("bir", doc.id, `rows.${r.i}.mop`, r.mop, "text", "Payment", { ro: !can })}</td><td class="num nowrap">${iedP("bir", doc.id, `rows.${r.i}.amount`, r.amount, "money", "Amount", { ro: !can })}</td></tr>`).join("")}</tbody>
       <tfoot><tr><td colspan="6" style="font-weight:800">TOTAL SALES</td><td class="r num" style="font-weight:800">${peso2(tot)}</td></tr></tfoot></table>
       ${rows.length ? "" : `<div class="empty" style="padding:16px">No sales recorded for ${monthLabel(S.birMonth)} yet.</div>`}</div>
     <section class="panel"><div class="head"><h2>Quarterly sales &amp; BIR tax payments</h2>${can ? `<button class="btn sm" type="button" data-act="new-birtax">Add tax payment</button>` : ""}</div>
@@ -8053,6 +8127,7 @@ function openBirForm(docId, i) {
     <div class="row"><div class="field"><label for="bi-qty">Qty</label><input id="bi-qty" value="${esc(r.qty || "")}"></div>
       <div class="field"><label for="bi-mop">MOP</label><input id="bi-mop" list="bi-mops" value="${esc(r.mop || "")}"><datalist id="bi-mops"><option value="BPI"><option value="BDO"><option value="Gcash"><option value="Maya"><option value="Cash"></datalist></div>
       <div class="field"><label for="bi-amt">Amount (₱)</label><input inputmode="decimal" class="money" id="bi-amt" value="${moneyFmt(r.amount ?? "")}"></div></div>
+    ${docId ? recLogHtml("bir", docId) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${editing ? `<div><button class="btn danger sm" type="button" data-act="del-bir" data-id="${docId}" data-i="${i}">Delete line</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -8157,11 +8232,11 @@ function viewLogins() {
   const pwCell = l => !l.pw ? `<span style="color:var(--muted)">${esc(l.pwHint || "")}</span>` : `<span class="nowrap" style="display:inline-flex;gap:6px;align-items:center"><code class="pw">${S.pwShown[l.id] != null ? esc(S.pwShown[l.id]) : "••••••••"}</code>
     <button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="${S.pwShown[l.id] != null ? "hide" : "show"}">${S.pwShown[l.id] != null ? "Hide" : "Show"}</button><button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="copy">Copy</button></span>`;
   const section = (title, rows) => `<tr class="grp"><td colspan="${can && pickOn() ? 7 : 6}">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>${can ? pickTd("login", l.id) : ""}
-      <td style="font-weight:600">${esc(String(l.account || "").replace(/^["“”']+|["“”']+$/g, ""))}</td><td>${esc(l.accountName || "")}</td><td style="user-select:all">${esc(l.username || "")}</td>
-      <td>${pwCell(l)}</td><td class="nowrap num">${esc(l.phone || "")}</td><td style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${esc(l.notes || "")}</td></tr>`).join("");
+      <td style="font-weight:600">${ied("logins", l, "account", "text", "Account", { ro: !can })}</td><td class="l">${ied("logins", l, "accountName", "text", "Account name", { ro: !can })}</td><td>${ied("logins", l, "username", "text", "Username / email", { ro: !can })}</td>
+      <td>${pwCell(l)}</td><td class="nowrap num">${ied("logins", l, "phone", "text", "Phone number", { ro: !can })}</td><td class="l" style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${ied("logins", l, "notes", "text", "Notes", { ro: !can })}</td></tr>`).join("");
   return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins">${can ? `<span style="flex:1"></span><button class="btn" type="button" data-act="login-import">Import from spreadsheet</button>` : ""}</div>
     ${pickBar("login", [["select", "Set status…", "login-status", [["active", "Active"], ["inactive", "Inactive"]]], ["Delete…", "login-sel-del", "danger"]], list.map(l => l.id))}
-    <div class="table-wrap"><table class="otable logins"><thead><tr>${can ? pickTh("login", list.map(l => l.id)) : ""}<th>Account</th><th>Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th>Notes</th></tr></thead>
+    <div class="table-wrap"><table class="otable logins"><thead><tr>${can ? pickTh("login", list.map(l => l.id)) : ""}<th>Account</th><th class="l">Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th class="l">Notes</th></tr></thead>
     <tbody>${section("Active accounts", list.filter(l => l.status !== "inactive"))}${section("Inactive accounts", list.filter(l => l.status === "inactive"))}</tbody></table></div>
     ${S.canEdit ? `<details class="panel"><summary style="cursor:pointer;font-weight:600">Change vault passphrase</summary>
       <form id="vault-change" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;max-width:360px">
@@ -8183,6 +8258,7 @@ function openLoginForm(id) {
       <div class="field"><label for="l-status">Status</label><select id="l-status"><option value="active" ${l.status !== "inactive" ? "selected" : ""}>Active</option><option value="inactive" ${l.status === "inactive" ? "selected" : ""}>Inactive</option></select></div></div>
     <div class="field"><label for="l-url">Website / link</label><input id="l-url" value="${esc(l.url || "")}"></div>
     <div class="field"><label for="l-notes">Notes</label><textarea id="l-notes" rows="2">${esc(l.notes || "")}</textarea></div>
+    ${id ? recLogHtml("logins", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-login" data-id="${id}">Delete login</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
@@ -8441,6 +8517,7 @@ $("#drawer").addEventListener("click", ev => { if (ev.target.id === "drawer" || 
 function guard(fn) { return async (...a) => { try { await fn(...a); } catch (e) { writeErr(e); } }; }
 
 document.addEventListener("click", guard(async ev => {
+  if (ev.target.closest && ev.target.closest(".ied")) return;
   if (ev.target.closest('[data-act="menu"]')) return openDrawer();
   const tpo = ev.target.closest(".tpill[data-open]");
   if (tpo) return openOrderDetails(tpo.dataset.open);
@@ -8869,6 +8946,7 @@ document.addEventListener("click", guard(async ev => {
     case "restock": return openRestock(id);
     case "new-expense": return openExpenseForm();
     case "new-cashin": return openExpenseForm(null, true);
+    case "chk-file": { const x = S.checks.find(r => r.id === id); if (!x || !x.file) return; const w = window.open("", "_blank"); try { const u = await fileBlobUrl(x.file); if (w) w.location.href = u; else location.href = u; } catch (err) { if (w) w.close(); toast("Couldn't open the file."); } return; }
     case "exp-file": { const x = S.expenses.find(r => r.id === id); if (!x || !x.file) return; const w = window.open("", "_blank"); try { const u = await fileBlobUrl(x.file); if (w) w.location.href = u; else location.href = u; } catch (err) { if (w) w.close(); toast("Couldn't open the receipt."); } return; }
     case "edit-expense": return openExpenseForm(id);
     case "close": return closeSheet();
