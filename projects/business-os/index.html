@@ -5544,14 +5544,49 @@ async function whiteCut(blob) {
   for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const j = y * w + x; if (seen[j]) continue; if (seen[j - 1] || seen[j + 1] || seen[j - w] || seen[j + w]) d[j * 4 + 3] = 150; }
   g.putImageData(im, 0, 0); return c;
 }
+// Clean cut-out (K, Oct 16, 2026: "background messed up"): the cut-out model first (keeps the photo's own colours), then on
+// plain white photos also the white flood mask so whole boxes are never dropped (skipped when it is just a plain square or panel),
+// small stray bits removed, and holes enclosed by the product (box windows) filled back in. Same method as scratchpad rbc2.py.
+async function cleanCut(blob) {
+  const src = await createImageBitmap(blob), k = Math.min(1, 1200 / Math.max(src.width, src.height)), w = Math.max(1, Math.round(src.width * k)), h = Math.max(1, Math.round(src.height * k));
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(src, 0, 0, w, h);
+  const im = g.getImageData(0, 0, w, h), d = im.data, N = w * h, A = new Uint8ClampedArray(N);
+  let modelOk = false;
+  try { const m = await import(BGR_LIB).catch(() => import("https://esm.sh/@imgly/background-removal@1.4.5")); const rb = m.removeBackground || m.default;
+    const cut = await Promise.race([rb(blob, { model: "medium", output: { format: "image/png" } }), new Promise((_, rj) => setTimeout(() => rj(new Error("cut-out took too long")), 4 * 60e3))]);
+    const ci = await createImageBitmap(cut), cc = document.createElement("canvas"); cc.width = w; cc.height = h; const cg = cc.getContext("2d", { willReadFrequently: true }); cg.drawImage(ci, 0, 0, w, h);
+    const cd = cg.getImageData(0, 0, w, h).data; for (let j = 0; j < N; j++) A[j] = cd[j * 4 + 3] < 24 ? 0 : cd[j * 4 + 3]; modelOk = true;
+  } catch (e) { console.warn("cutout model", e); }
+  // plain white photo? flood the pure white in from the edges
+  const wh = j => d[j * 4] >= 247 && d[j * 4 + 1] >= 247 && d[j * 4 + 2] >= 247;
+  let edge = 0, white = 0; for (let x = 0; x < w; x += 3) for (const y of [0, h - 1]) { edge++; if (wh(y * w + x)) white++; } for (let y = 0; y < h; y += 3) for (const x of [0, w - 1]) { edge++; if (wh(y * w + x)) white++; }
+  if (white / edge >= .9) {
+    const bg = new Uint8Array(N), st = []; const push = j => { if (!bg[j] && wh(j)) { bg[j] = 1; st.push(j); } };
+    for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); } for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+    while (st.length) { const j = st.pop(), x = j % w; if (x > 0) push(j - 1); if (x < w - 1) push(j + 1); if (j >= w) push(j - w); if (j < N - w) push(j + w); }
+    let aF = 0, aA = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+    for (let j = 0; j < N; j++) { if (A[j] >= 128) aA++; if (!bg[j]) { aF++; const x = j % w, y = (j - x) / w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+    const fill = aF / Math.max(1, (x1 - x0 + 1) * (y1 - y0 + 1)), panel = fill > .93 && aF > aA * 1.4;   // a plain square behind the product: leave it out
+    if (!modelOk || !panel) for (let j = 0; j < N; j++) if (!bg[j]) A[j] = 255;
+  } else if (!modelOk) throw new Error("couldn't cut out the photo");
+  // keep the product, drop stray specks / lines (parts under 0.8% of the biggest part)
+  const lab = new Int32Array(N), sizes = [0]; let n = 0;
+  for (let j0 = 0; j0 < N; j0++) { if (A[j0] < 128 || lab[j0]) continue; n++; let cnt = 0; const st = [j0]; lab[j0] = n;
+    while (st.length) { const j = st.pop(), x = j % w; cnt++; for (const q of [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, j - w, j + w]) if (q >= 0 && q < N && !lab[q] && A[q] >= 128) { lab[q] = n; st.push(q); } }
+    sizes.push(cnt); }
+  if (n) { const big = Math.max(...sizes.slice(1)); for (let j = 0; j < N; j++) if (lab[j] && sizes[lab[j]] < big * .008) A[j] = 0; }
+  // fill holes fully enclosed by the product (box windows) with the photo itself
+  const out = new Uint8Array(N), st2 = []; const p2 = j => { if (!out[j] && A[j] < 128) { out[j] = 1; st2.push(j); } };
+  for (let x = 0; x < w; x++) { p2(x); p2((h - 1) * w + x); } for (let y = 0; y < h; y++) { p2(y * w); p2(y * w + w - 1); }
+  while (st2.length) { const j = st2.pop(), x = j % w; if (x > 0) p2(j - 1); if (x < w - 1) p2(j + 1); if (j >= w) p2(j - w); if (j < N - w) p2(j + w); }
+  for (let j = 0; j < N; j++) { if (A[j] < 128 && !out[j]) A[j] = 255; d[j * 4 + 3] = A[j]; }
+  g.putImageData(im, 0, 0); return c;
+}
 async function annCompose(blob) {
   let im = null;
-  try { im = await whiteCut(blob); } catch (e) {}
-  if (!im) { let cut = null;
-    try { const m = await import(BGR_LIB).catch(() => import("https://esm.sh/@imgly/background-removal@1.4.5")); const rb = m.removeBackground || m.default;
-      cut = await Promise.race([rb(blob, { model: "medium", output: { format: "image/png" } }), new Promise((_, rj) => setTimeout(() => rj(new Error("cut-out took too long")), 4 * 60e3))]); }
-    catch (e) { console.warn("cutout", e); throw new Error("couldn't cut out the photo"); }
-    im = await createImageBitmap(cut); }
+  try { im = await cleanCut(blob); } catch (e) { console.warn("cleanCut", e); }
+  if (!im) { try { im = await whiteCut(blob); } catch (e) {} }
+  if (!im) throw new Error("couldn't cut out the photo");
   const W = 800, H = 800, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
   await tplBackdrop(g, W, H);
   // trim transparent edges so every bottle is sized the same, then stand it on the marble (like the website stage: fits 70% x 60%, base at 78.5%)
