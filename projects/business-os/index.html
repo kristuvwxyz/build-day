@@ -766,6 +766,8 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .ordtable th.cb + th, .ordtable td.cb + td { border-left: 0; }
 /* K, Oct 16, 2026: column separators like Orders on every department table (Finance, Admin…) */
 .dc table th + th, .dc table td + td { border-left: 1px solid var(--line); }
+.suptbl th, .suptbl td { text-align: center; vertical-align: middle; } .suptbl .l { text-align: left; } .suptbl th + th, .suptbl td + td { border-left: 1px solid var(--line); }
+.suptbl tfoot td { background: var(--surface-2); font-weight: 600; } .suptbl tfoot tr.grand td { font-weight: 800; font-size: 15px; border-top: 2px solid var(--line); }
 .dc table th.cb + th, .dc table td.cb + td, .dc table tr.grp td { border-left: 0; }
 .ordtable th:not(.cb), .ordtable td:not(.cb) { text-align: center; }
 .ordtable td .tags { justify-content: center; }
@@ -4222,19 +4224,28 @@ function supToOrder(code) {
     a.qty += Number(i.qty) || 0; a.orders.push(o.num); agg.set(k, a); }
   return { os, rows: [...agg.values()].sort((a, b) => a.name.localeCompare(b.name)) };
 }
+// Adjustments under the To order list (K, Oct 16, 2026): discount ("10%" or an amount) and shipping / other fees, then the grand total.
+const supAdj = code => { const a = (S.supAdj || (S.supAdj = (() => { try { return JSON.parse(localStorage.getItem("rs-supadj") || "{}"); } catch (e) { return {}; } })()))[code] || {}; return { disc: a.disc || "", fee: a.fee || "" }; };
+const supDisc = (v, sub) => { const t = String(v || "").trim(); if (!t) return 0; const n = Number(t.replace(/[^\d.]/g, "")) || 0; return Math.round((/%$/.test(t) ? sub * n / 100 : n) * 100) / 100; };
+document.addEventListener("change", e => { const el = e.target.closest && e.target.closest("[data-supadj]"); if (!el) return; const [code, k] = el.dataset.supadj.split("|");
+  supAdj(code); S.supAdj[code] = { ...(S.supAdj[code] || {}), [k]: el.value.trim() }; try { localStorage.setItem("rs-supadj", JSON.stringify(S.supAdj)); } catch (er) {} render(); });
 function viewSupToOrder() {
   const codes = [...new Set(["S-JEFF", "S-SUMMER", ...S.products.map(supOfProduct).filter(Boolean)])];
   const sp = S.sp; if (!codes.includes(sp.tsup)) sp.tsup = codes[0];
   const code = sp.tsup, { os, rows } = supToOrder(code), pcs = rows.reduce((a, r) => a + r.qty, 0), cost = rows.reduce((a, r) => a + r.qty * r.cost, 0);
-  const nm = SUP_NAMES[code] || code;
-  S.supText = `ORDER LIST · ${nm} · ${mToday()}\n` + rows.map(r => `${r.qty}x ${r.name}`).join("\n") + `\n\nTotal pcs: ${pcs}`;
-  S.supRows = [["Qty", "Item", "Unit cost", "Total cost", "Orders"], ...rows.map(r => [r.qty, r.name, r.cost, r.qty * r.cost, [...new Set(r.orders)].map(n => "#" + n).join(" ")])];
+  const nm = SUP_NAMES[code] || code, adj = supAdj(code), disc = supDisc(adj.disc, cost), fee = Number(String(adj.fee).replace(/[^\d.]/g, "")) || 0, grand = Math.max(0, cost - disc + fee);
+  S.supText = `ORDER LIST · ${nm} · ${mToday()}\n` + rows.map(r => `${r.name} · ${r.qty} pc${r.qty === 1 ? "" : "s"}${r.cost ? ` × ${peso(r.cost)} = ${peso(r.qty * r.cost)}` : ""}`).join("\n") + `\n\nTotal pcs: ${pcs}${cost ? `\nSubtotal: ${peso2(cost)}${disc ? `\nDiscount${/%$/.test(adj.disc) ? " (" + adj.disc + ")" : ""}: −${peso2(disc)}` : ""}${fee ? `\nShipping / other fees: ${peso2(fee)}` : ""}\nGrand total: ${peso2(grand)}` : ""}`;
+  S.supRows = [["Item", "Qty", "Unit cost", "Total", "Orders"], ...rows.map(r => [r.name, r.qty, r.cost, r.qty * r.cost, [...new Set(r.orders)].map(n => "#" + n).join(" ")]), ["Subtotal", pcs, "", cost, ""], ["Discount", "", adj.disc, -disc, ""], ["Shipping / other fees", "", "", fee, ""], ["Grand total", "", "", grand, ""]];
   S.supLabel = code;
   const done = new Map(); for (const o of allOrderRows()) { const s = (o.supOrdered || {})[code]; if (s && s.at) { const d = mDate(s.at); const b = done.get(d) || { orders: 0 }; b.orders++; done.set(d, b); } }
   const hist = [...done].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
   return `<div class="supbar"><span class="lab">Supplier</span>${codes.map(c => `<button type="button" data-tsup="${esc(c)}" aria-pressed="${c === code}">${esc(SUP_NAMES[c] || c)} <span>${supToOrder(c).rows.reduce((a, r) => a + r.qty, 0)}</span></button>`).join("")}</div>
-  <section class="panel"><div class="head"><h2>To order · ${esc(nm)} · ${pcs} pcs from ${os.length} order${os.length === 1 ? "" : "s"}${cost ? ` · cost ${peso(cost)}` : ""}</h2><div style="display:flex;gap:6px;flex-wrap:wrap">${S.dl ? `<button class="btn sm" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn sm" type="button" data-act="sup-copy">Copy list</button>${os.length ? `<button class="btn sm primary" type="button" data-act="sup-mark" data-sup="${esc(code)}">Mark as ordered</button>` : ""}</div></div>
-    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th class="r">Qty</th><th>Item</th><th class="r">Unit cost</th><th class="r">Total</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr><td class="r"><b>${r.qty}</b></td><td>${esc(r.name)}</td><td class="r">${r.cost ? peso(r.cost) : "–"}</td><td class="r">${r.cost ? peso(r.qty * r.cost) : "–"}</td><td style="font-size:12px;color:var(--muted)">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Nothing to order from ${esc(nm)} right now. New paid or downpaid orders show up here by themselves.</div>`}
+  <section class="panel"><div class="head"><h2>To order · ${esc(nm)} · ${pcs} pcs from ${os.length} order${os.length === 1 ? "" : "s"}${cost ? ` · grand total ${peso(grand)}` : ""}</h2><div style="display:flex;gap:6px;flex-wrap:wrap">${S.dl ? `<button class="btn sm" type="button" data-act="sup-dl">Download CSV</button>` : ""}<button class="btn sm" type="button" data-act="sup-copy">Copy list</button>${os.length ? `<button class="btn sm primary" type="button" data-act="sup-mark" data-sup="${esc(code)}">Mark as ordered</button>` : ""}</div></div>
+    ${rows.length ? `<div class="table-wrap"><table class="suptbl"><thead><tr><th class="l">Item</th><th>Qty</th><th>Unit cost</th><th>Total</th><th>Orders</th></tr></thead><tbody>${rows.map(r => `<tr><td class="l">${esc(r.name)}</td><td><b>${r.qty}</b></td><td class="num">${r.cost ? peso(r.cost) : "–"}</td><td class="num">${r.cost ? peso(r.qty * r.cost) : "–"}</td><td style="font-size:12px;color:var(--muted)">${[...new Set(r.orders)].map(n => "#" + esc(n)).join(", ")}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td class="l">Subtotal</td><td><b>${pcs}</b></td><td></td><td class="num">${peso2(cost)}</td><td></td></tr>
+    <tr><td class="l">Discount <span class="s">(type 10% or an amount)</span></td><td></td><td><input class="ied" data-supadj="${esc(code)}|disc" value="${esc(adj.disc)}" placeholder="–" aria-label="Discount" style="max-width:110px" ${S.readOnly ? "disabled" : ""}></td><td class="num" style="color:${disc ? "var(--good)" : "inherit"}">${disc ? "−" + peso2(disc) : "–"}</td><td></td></tr>
+    <tr><td class="l">Shipping / other fees</td><td></td><td><input class="ied" data-supadj="${esc(code)}|fee" value="${esc(adj.fee)}" placeholder="–" inputmode="decimal" aria-label="Shipping or other fees" style="max-width:110px" ${S.readOnly ? "disabled" : ""}></td><td class="num">${fee ? peso2(fee) : "–"}</td><td></td></tr>
+    <tr class="grand"><td class="l">Grand total</td><td></td><td></td><td class="num">${peso2(grand)}</td><td></td></tr></tfoot></table></div>` : `<div class="empty">Nothing to order from ${esc(nm)} right now. New paid or downpaid orders show up here by themselves.</div>`}
     <div style="font-size:12px;color:var(--muted)">Counts paid and downpaid orders that are still To Confirm, Billed, Partially paid, To ship or On hold. After you place the order with the supplier, tap <b>Mark as ordered</b>: those orders leave this list, so the next list only has new orders.</div></section>
   ${hist.length ? `<section class="panel"><div class="head"><h2>Already ordered from ${esc(nm)}</h2></div><div class="table-wrap"><table><thead><tr><th>Marked on</th><th class="r">Orders</th></tr></thead><tbody>${hist.map(([d, b]) => `<tr><td>${esc(d)}</td><td class="r">${b.orders}</td></tr>`).join("")}</tbody></table></div></section>` : ""}`;
 }
