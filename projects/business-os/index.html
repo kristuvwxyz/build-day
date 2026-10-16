@@ -4134,6 +4134,15 @@ function viewOrders() {
    the supplier yet, added up per item. "Mark as ordered" stamps the orders (supOrdered[code]), so the next list only has new orders.
    A listing's supplier = its Supplier field, else S-JEFF for the S-JEFF file imports, else S-SUMMER for the To Summer brand. */
 const SUP_NAMES = { "S-JEFF": "S-JEFF", "S-SUMMER": "To Summer Boutique (Hong Kong)" };
+// Supplier dropdown (K, Oct 16, 2026): known codes from listings and order tags, plus "+ New supplier…".
+const supCodes = () => [...new Set(["S-JEFF", "S-JOY", "S-SUMMER", ...S.products.map(x => String(x.supplier || "").trim().toUpperCase()).filter(Boolean), ...S.orders.flatMap(o => (o.tags || []).filter(t => /^S-[A-Z0-9]/i.test(t)).map(t => t.trim().toUpperCase()))])].sort();
+const supSelect = (attrs, cur) => { cur = String(cur || "").trim().toUpperCase();
+  return `<select ${attrs} data-supsel="1"><option value="">–</option>${[...new Set([...supCodes(), ...(cur ? [cur] : [])])].sort().map(c => `<option value="${esc(c)}" ${c === cur ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new">+ New supplier…</option></select>`; };
+document.addEventListener("change", e => { const sel = e.target.closest && e.target.closest("select[data-supsel]"); if (!sel || sel.value !== "__new") return;
+  let c = (prompt("New supplier code (for example S-ABC):") || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!c) { sel.value = ""; return; } if (!/^S-/.test(c)) c = "S-" + c.replace(/^S/, "");
+  if (![...sel.options].some(o => o.value === c)) sel.insertBefore(new Option(c, c), sel.querySelector('option[value="__new"]'));
+  sel.value = c; });
 const supOfProduct = p => !p ? "" : String(p.supplier || "").trim().toUpperCase() || (/^S-JEFF/i.test(p.importedFrom || "") ? "S-JEFF" : /to\s*summer/i.test(p.brand || "") ? "S-SUMMER" : "");
 const SUP_OPEN = new Set(["to_confirm", "billed", "dp", "unfulfilled", "on_hold"]);
 function supToOrder(code) {
@@ -6410,7 +6419,7 @@ function varRowHtml(v, main, isNew) {
     <td><input data-vf="stock" type="number" step="1" value="${Number(v.stock) || 0}" aria-label="Stock" style="width:58px"></td>
     <td class="num var-cmt">${(() => { const rows = isNew ? [] : committedOrders(v), n = rows.reduce((a, r) => a + r.q, 0);
       return n ? `<b title="${esc(rows.map(r => "#" + String(r.o ? r.o.num : r.w.ref || "").replace(/^#/, "") + " · " + r.q).join("\n"))}">${n}</b>` : `<span style="color:var(--muted)">0</span>`; })()}</td>
-    <td><input data-vf="supplier" value="${esc(v.supplier || "")}" placeholder="S-…" aria-label="Supplier code" style="width:76px"></td>
+    <td>${supSelect('data-vf="supplier" aria-label="Supplier" style="min-width:96px"', v.supplier)}</td>
     <td style="text-align:center"><input type="radio" name="v-main" value="${esc(v.id)}" ${main ? "checked" : ""} aria-label="Main photo"></td>
     <td style="text-align:center"><button type="button" class="var-del" data-act="var-del" title="Delete this variation" aria-label="Delete this variation">✕</button></td></tr>`;
 }
@@ -6523,7 +6532,7 @@ function openProductForm(id, preset = {}) {
     <div class="row">
       <div class="field"><label for="p-url">Website link${id ? ` · <a href="${esc(webUrl(p))}" target="_blank" rel="noopener">Open on site ↗</a>${onSite(p) ? "" : ` <span style="font-weight:400;color:var(--muted)">(not showing on the site: ${(p.status || "active") !== "active" ? "inactive" : "sold out"})</span>`}` : ""}</label><input id="p-url" value="${esc(id ? webUrl(p) : "")}" placeholder="Filled in after saving"></div>
       <div class="field"><label for="p-batch">Batch / lot no.</label><input id="p-batch" value="${esc(p.batch || "")}"></div>
-      <div class="field"><label for="p-supplier">Supplier code</label><input id="p-supplier" list="p-sup-list" placeholder="e.g. S-JEFF" value="${esc(p.supplier || supOfProduct(p) || "")}"><datalist id="p-sup-list">${[...new Set(["S-JEFF", "S-SUMMER", ...S.products.map(x => x.supplier).filter(Boolean)])].map(c => `<option value="${esc(c)}">`).join("")}</datalist></div>
+      <div class="field"><label for="p-supplier">Supplier code</label>${supSelect('id="p-supplier" aria-label="Supplier"', p.supplier || supOfProduct(p) || "")}</div>
     </div>
     <div id="sheet-err" class="confirm" hidden></div>
     ${id && ((p.log || []).length || p.editedBy) ? `<div class="olog"><div class="olog-h">Team activity</div>${(p.log || []).length ? [...p.log].reverse().map(l => `<div><b>${esc(l.by)}</b> ${esc(l.msg)} <span>· ${relTime(l.at)}</span></div>`).join("") : `<div><b>${esc(p.editedBy)}</b> last edited this <span>· ${relTime(p.editedAt)}</span></div>`}</div>` : ""}
