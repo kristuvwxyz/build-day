@@ -764,6 +764,9 @@ table select.status, table select.lcell, .otable td select { text-align: center;
 .ordtable th, .ordtable td { padding-left: 12px; padding-right: 12px; }
 .ordtable th + th, .ordtable td + td { border-left: 1px solid var(--line); }
 .ordtable th.cb + th, .ordtable td.cb + td { border-left: 0; }
+/* K, Oct 16, 2026: column separators like Orders on every department table (Finance, Admin…) */
+.dc table th + th, .dc table td + td { border-left: 1px solid var(--line); }
+.dc table th.cb + th, .dc table td.cb + td, .dc table tr.grp td { border-left: 0; }
 .ordtable th:not(.cb), .ordtable td:not(.cb) { text-align: center; }
 .ordtable td .tags { justify-content: center; }
 .ordtable td.cust-td { text-align: left; }
