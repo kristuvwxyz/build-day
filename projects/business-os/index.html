@@ -4246,7 +4246,7 @@ function viewSupToOrder() {
   const nm = SUP_NAMES[code] || code, adj = supAdj(code), disc = supDisc(adj.disc, cost), fee = Number(String(adj.fee).replace(/[^\d.]/g, "")) || 0, grand = Math.max(0, cost - disc + fee);
   S.supText = `ORDER LIST · ${nm} · ${mToday()}\n` + rows.map(r => `${r.name} · ${r.qty} pc${r.qty === 1 ? "" : "s"}${r.cost ? ` × ${peso(r.cost)} = ${peso(r.qty * r.cost)}` : ""}`).join("\n") + `\n\nTotal pcs: ${pcs}${cost ? `\nSubtotal: ${peso2(cost)}${disc ? `\nDiscount${/%$/.test(adj.disc) ? " (" + adj.disc + ")" : ""}: −${peso2(disc)}` : ""}${fee ? `\nShipping / other fees: ${peso2(fee)}` : ""}\nGrand total: ${peso2(grand)}` : ""}`;
   S.supRows = [["Item", "Qty", "Unit cost", "Total", "Orders"], ...rows.map(r => [r.name, r.qty, r.cost, r.qty * r.cost, [...new Set(r.orders)].map(n => "#" + n).join(" ")]), ["Subtotal", pcs, "", cost, ""], ["Discount", "", adj.disc, -disc, ""], ["Shipping / other fees", "", "", fee, ""], ["Grand total", "", "", grand, ""]];
-  S.supLabel = code;
+  S.supLabel = code; S.supShownIds = os.map(o => o.id);
   const done = new Map(); for (const o of allOrderRows()) { const s = (o.supOrdered || {})[code]; if (s && s.at) { const d = mDate(s.at); const b = done.get(d) || { orders: 0 }; b.orders++; done.set(d, b); } }
   const hist = [...done].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
   return `<div class="supbar"><span class="lab">Supplier</span>${codes.map(c => `<button type="button" data-tsup="${esc(c)}" aria-pressed="${c === code}">${esc(SUP_NAMES[c] || c)} <span>${supToOrder(c).rows.reduce((a, r) => a + r.qty, 0)}</span></button>`).join("")}</div>
@@ -4260,8 +4260,12 @@ function viewSupToOrder() {
   ${hist.length ? `<section class="panel"><div class="head"><h2>Already ordered from ${esc(nm)}</h2></div><div class="table-wrap"><table><thead><tr><th>Marked on</th><th class="r">Orders</th></tr></thead><tbody>${hist.map(([d, b]) => `<tr><td>${esc(d)}</td><td class="r">${b.orders}</td></tr>`).join("")}</tbody></table></div></section>` : ""}`;
 }
 async function supMark(code) {
-  const { os } = supToOrder(code); if (!os.length) return;
-  if (!confirm(`Mark ${os.length} order${os.length === 1 ? "" : "s"} as ordered from ${SUP_NAMES[code] || code}?`)) return;
+  let { os } = supToOrder(code); if (!os.length) return;
+  // If you copied the list and then more orders came in, only the orders on the copied list are marked; the new ones stay for the next list.
+  const sent = S.supSent, fresh = sent && sent.code === code && sent.ids.length && Date.now() - sent.at < 6 * 36e5 ? os.filter(o => !sent.ids.includes(o.id)) : [];
+  if (fresh.length) os = os.filter(o => sent.ids.includes(o.id));
+  if (!os.length) return toast("Nothing from the list you copied is left to mark.");
+  if (!confirm(`Mark ${os.length} order${os.length === 1 ? "" : "s"} as ordered from ${SUP_NAMES[code] || code}?${fresh.length ? `\n\n${fresh.length} newer order${fresh.length === 1 ? "" : "s"} came in after you copied the list. ${fresh.length === 1 ? "It stays" : "They stay"} on the To order list for next time.` : ""}`)) return;
   const at = Date.now(), by = actor(); let n = 0;
   const meta = new Map(S.webmeta.map(d => [d.ref, d]));
   const { rows } = supToOrder(code), adj = supAdj(code), sub = rows.reduce((a, r) => a + r.qty * r.cost, 0), disc = supDisc(adj.disc, sub), fee = Number(String(adj.fee).replace(/[^\d.]/g, "")) || 0;
@@ -4318,8 +4322,15 @@ function viewGate() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${sent ? `<span class="chip good">Request sent. The owner will link you.</span>` : `<button class="btn primary" type="button" data-act="req-access">Ask the owner for access</button>`}<a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign in with another account</a></div></div>`;
 }
 S.reqProf = {}; S.raw = {};
+// The logins vault locks itself after 5 minutes without a click or key press.
+let vaultIdleAt = Date.now();
+["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { vaultIdleAt = Date.now(); }, true));
+setInterval(() => { if (S.vaultKey && Date.now() - vaultIdleAt > 5 * 60e3) { S.vaultKey = null; S.pwShown = {}; render(); toast("Logins locked after 5 minutes of no use."); } }, 20e3);
+// Offline warning: saves made without internet can't reach the cloud.
+window.addEventListener("offline", () => { try { const t = document.createElement("div"); t.id = "offbar"; t.setAttribute("role", "alert"); t.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#B42318;color:#fff;text-align:center;padding:8px;font:600 13px system-ui"; t.textContent = "No internet. Changes you make now may NOT be saved. Reconnect before continuing."; document.body.appendChild(t); } catch (e) {} });
+window.addEventListener("online", () => { const t = document.getElementById("offbar"); if (t) t.remove(); try { toast("Back online."); } catch (e) {} });
 const BACKUP_COLS = ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices"];
-const BACKUP_DOCS = ["config/home", "config/payroll", "config/attendance", "config/eom", "config/reviews", "config/vault", "config/security", "config/supadj"];
+const BACKUP_DOCS = ["config/home", "config/payroll", "config/attendance", "config/eom", "config/reviews", "config/vault", "config/security", "config/supadj", "config/backupmeta"];
 // Full copy of the shared data (not anyone's private settings), for moving to the standalone app.
 async function downloadBackup() {
   if (!S.dl) return toast("Downloads aren't available in this view.");
@@ -4329,12 +4340,13 @@ async function downloadBackup() {
   // Invoice files saved in the database (in pieces) travel with the backup.
   for (const x of S.invoices) { const f = x.file; if (f && f.fid) for (let i = 0; i < f.chunks; i++) { try { const sn = await S.db.doc(`invfiles/${f.fid}-${i}`).get(); if (sn.exists) rows.push({ path: `invfiles/${f.fid}-${i}`, data: sn.data() }); } catch (e) {} } }
   const json = JSON.stringify({ app: "regal-spritz-os", version: 1, exportedAt: new Date().toISOString(), rows });
-  try { await S.dl.save({ filename: `regal-spritz-backup-${mToday()}.json`, data: json }); toast(`Backup ready: ${rows.length.toLocaleString("en-PH")} records.`); } catch (e) { toast("Download was cancelled."); }
+  try { await S.dl.save({ filename: `regal-spritz-backup-${mToday()}.json`, data: json }); toast(`Backup ready: ${rows.length.toLocaleString("en-PH")} records.`); try { await wdb().doc("config/backupmeta").set({ at: Date.now(), by: actor(), records: rows.length }); } catch (e) {} } catch (e) { toast("Download was cancelled."); }
 }
 async function importBackup(file) {
   let j; try { j = JSON.parse(await file.text()); } catch (e) { return toast("That file isn't a Regal Spritz backup."); }
   if (!j || j.app !== "regal-spritz-os" || !Array.isArray(j.rows)) return toast("That file isn't a Regal Spritz backup.");
   const rows = j.rows.filter(r => r && typeof r.path === "string" && /^[A-Za-z0-9_-]+\/[^/]+$/.test(r.path) && r.data && typeof r.data === "object");
+  if (!confirm(`This backup is from ${j.exportedAt ? new Date(j.exportedAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "an unknown date"} and has ${rows.length.toLocaleString("en-PH")} records.\n\nImporting writes OVER today's orders, stock and other records with the old copy. Download a fresh backup first if you are not sure.\n\nImport it anyway?`)) return;
   const show = t => { S.bkMsg = t; const el = $("#bk-status"); if (el) el.textContent = t; };
   try {
     if (S.db._bulkSet) await S.db._bulkSet(rows, (n, t) => show(`Importing… ${n.toLocaleString("en-PH")} / ${t.toLocaleString("en-PH")}`));
@@ -6203,6 +6215,8 @@ function openItemsEdit(id) {
     const items = eiRead(); if (!items.length) return sheetError("Keep at least one item with a quantity.");
     const sub = items.reduce((a, i) => a + i.qty * i.price, 0), dv = numv("ei-disc");
     const discount = $("#ei-dtype").value === "pct" ? Math.round(sub * dv) / 100 : dv;
+    if ($("#ei-dtype").value === "pct" && dv > 100) return sheetError("A discount can't be more than 100%.");
+    if (discount > sub) return sheetError("The discount is bigger than the items total.");
     if (!o.noStock && !isVoid(o)) {
       const by = {}; (o.items || []).forEach(i => { if (i.productId) by[i.productId] = (by[i.productId] || 0) + (Number(i.qty) || 0); });
       items.forEach(i => { if (i.productId) by[i.productId] = (by[i.productId] || 0) - i.qty; });
@@ -6847,6 +6861,7 @@ let webPushBusy = false, webPushErr = "", webPushFailAt = 0;   // automatic send
 async function pushListings(btn, auto) {
   if (!S.site || !S.site.pushProducts || webPushBusy) return;
   const list = webProducts(), pend = S.products.filter(p => p.webSync === "pending");
+  const sigOf = p => JSON.stringify([p.editedAt, p.stock, p.price, p.status, p.kind, p.soldOut, (p.imgs || []).length, p.name]), sent = new Map(pend.map(p => [p.id, sigOf(p)]));   // what was sent, so an edit made while sending stays pending
   webPushBusy = true; if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
   try {
     // Photos of listings not on the site (sold out, inactive) ride along on the first item, so past orders
@@ -6856,7 +6871,7 @@ async function pushListings(btn, auto) {
     if (list.length) list[0] = { ...list[0], _photos: extra };
     const r = await S.site.pushProducts(list);
     if (!r || !r.ok) throw new Error((r && r.error) || "The website didn't take the update.");
-    for (const p of pend) await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() });
+    for (const p of pend) { const now = S.products.find(x => x.id === p.id); if (now && sigOf(now) !== sent.get(p.id)) continue; await patch("products", p.id, { webSync: "synced", syncedAt: Date.now() }); }
     if (S.db) await save("webmeta", "_push", { at: Date.now(), count: list.length, photos: 1 }).catch(() => {});
     webPushErr = ""; webPushFailAt = 0;
     if (!auto) toast(`Website updated: ${list.length} listing${list.length === 1 ? "" : "s"} live${pend.length ? ` · ${pend.length} change${pend.length === 1 ? "" : "s"} sent` : ""}.`);
@@ -8946,7 +8961,7 @@ document.addEventListener("click", guard(async ev => {
     case "vat-other": await vatOther(); return;
     case "go-manual": if (!$("#scrim").hidden) closeSheet(); S.view = "orders"; S.cx.show = "manual"; S.sel.clear(); saveNav(); if (!S.web.loaded) webLoad(); render(); window.scrollTo(0, 0); return;
     case "sr-dl": try { await S.dl.save({ data: csv(S.srCsv || []), filename: `sales-report-${srRange().from}-to-${srRange().to}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
-    case "sup-copy": try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
+    case "sup-copy": S.supSent = { code: S.sp && S.sp.mode !== "orders" ? S.sp.tsup : "", ids: (S.supShownIds || []).slice(), at: Date.now() }; try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
     case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${String(S.supLabel || S.of.sup || "all").toLowerCase().replace(/\s+/g, "-")}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
     case "jnt-export": return jntExport();
     case "wbu-save": return wbSaveAll(b);
@@ -9760,6 +9775,7 @@ render();
     db.doc("config/eom").onSnapshot(s => { S.eomSettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/reviews").onSnapshot(s => { S.rvCfg = s.exists ? s.data() : {}; S.rvCfgLoaded = true; keep(); }, () => { S.rvCfgLoaded = true; });
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
+    db.doc("config/backupmeta").onSnapshot(s => { S.backupMeta = s.exists ? s.data() : {}; if (!S.backupNagged && S.isOwner && S.realOwner !== false) { S.backupNagged = true; const at = (S.backupMeta || {}).at || 0, days = at ? Math.floor((Date.now() - at) / 864e5) : null; if (days === null || days >= 7) setTimeout(() => toast(days === null ? "No backup yet. Download one: My Account → Developer options → Backup." : `Last backup was ${days} days ago. Download a new one: My Account → Developer options → Backup.`), 6000); } }, () => {});
     db.doc("config/supadj").onSnapshot(s => { S.supAdj = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});

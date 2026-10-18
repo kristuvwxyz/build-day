@@ -46,3 +46,16 @@ These came from a read-only review of `projects/business-os/index.html`. Each it
 - Monthly profit and cash report: sales − cost − expenses − payroll − fixed − investor interest.
 - Auto-cancel or a reminder for unpaid orders older than 24 hours.
 - Automatic daily backup.
+
+---
+## Status after fixing (Oct 18)
+**Fixed:** 1, 2 (partly: reads newest stock before changing it), 3, 4, 7, 9, 10, 11, 14, 16, 18, 21, 22, 25 (warning before import), 26 (offline banner), 27 (vault locks after 5 min). Also a reminder when the last backup is over 7 days old.
+
+**Not fixed — needs your decision:**
+- 5 Refunded website orders: should the bottle go back to stock? (depends on whether it was returned)
+- 6 Unpaid Manual Processing / BDO orders: auto-cancel after 24 h like Maya?
+- 8 / 12 Profit and Sales report rules: which sales count (paid only? website too?)
+- 13 Late deduction: should the grace period (15 min) count?
+- 17 Time-in and edit permissions for Attendance
+
+**Not fixed — bigger jobs:** 15 split-shift edit, 19 items added after "Mark as ordered", 20 website buyers in Customers, 23 staff browsers load all data (needs database access rules), 24 two people editing one order, 28 faster redraw, 29 phone layout, 30 timers, automatic daily backup.
