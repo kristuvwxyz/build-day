@@ -1405,8 +1405,10 @@ const ckAttach = f => { const inp = document.getElementById("ck-file"); if (!inp
 document.addEventListener("paste", e => { if (!document.getElementById("ck-file")) return; const f = [...((e.clipboardData && e.clipboardData.files) || [])][0]; if (f && ckAttach(f)) e.preventDefault(); });
 document.addEventListener("dragover", e => { if (e.target.closest && e.target.closest("#ck-drop")) e.preventDefault(); });
 document.addEventListener("drop", e => { const z = e.target.closest && e.target.closest("#ck-drop"); if (!z) return; e.preventDefault(); ckAttach(((e.dataTransfer && e.dataTransfer.files) || [])[0]); });
+// A task remembers the day it was finished (doneAt), so a later edit doesn't make it look late.
+const stampDone = (col, id, data) => { if (col !== "tasks" || !data || data.status !== "done") return data; const old = (S.tasks || []).find(r => r.id === id); return !old || old.status !== "done" ? { ...data, doneAt: Date.now() } : data; };
 async function save(col, id, data) {
-  data = autoLog(col, id, data);
+  data = stampDone(col, id, autoLog(col, id, data));
   undoNote(col, id);
   if (col === "products" && data && data.webSync === "pending") scheduleWebPush();
   if (S.db) { await wdb().collection(col).doc(id).set(data); }
@@ -1415,7 +1417,7 @@ async function save(col, id, data) {
 // A listing that comes back on the website (restocked, reactivated, or switched to Pre-order) counts as new there, so it shows first under "Newest".
 const liveOnWeb = p => (p.status || "active") === "active" && (p.kind === "preorder" ? !p.soldOut : (Number(p.stock) || 0) > 0);
 async function patch(col, id, data) {
-  data = autoLog(col, id, data);
+  data = stampDone(col, id, autoLog(col, id, data));
   undoNote(col, id);
   if (col === "products" && data && ("stock" in data || "kind" in data)) { const old = S.products.find(r => r.id === id) || {}, m = { ...old, ...data };
     // Oct 15, 2026 (K): no separate "Sold out (pre-order)" choice; a pre-order with qty 0 is sold out, more than 0 is orderable.
@@ -2055,7 +2057,7 @@ function eomScores(ym) {
     for (let d = 1; d <= dim; d++) { const ds = `${ym}-${String(d).padStart(2, "0")}`; if (ds > end) break; const st = attStatus(ds, m.id); if (st === "present") on++; else if (st === "late") late++; else if (st === "absent") abs++; }
     const wd = on + late + abs;
     const tk = S.tasks.filter(t => t.assigneeId === m.id && t.due && t.due.slice(0, 7) === ym && t.due <= end && t.status !== "cancelled");
-    const done = tk.filter(t => t.status === "done"), ok = done.filter(t => !t.updatedAt || mDate(t.updatedAt) <= t.due).length;
+    const done = tk.filter(t => t.status === "done"), ok = done.filter(t => !(t.doneAt || t.updatedAt) || mDate(t.doneAt || t.updatedAt) <= t.due).length;
     const cr = Number((rec.ratings || {})[m.id]) || 0;
     const parts = {
       att: { r: wd ? (on + late * .5) / wd : null, note: wd ? `${on} on time · ${late} late · ${abs} absent` : "No work days yet" },
@@ -7402,6 +7404,7 @@ function attStatus(date, mid) {
   if (isFlex(mid)) return r && r.in ? "present" : "flex";
   if (r && r.in) return mMinutes(r.in) > shiftStart(date, mid) + (Number(attCfg().grace) || 0) ? "late" : "present";
   if (!shiftBlocks(date, mid).length) return "off";
+  { const mm = member(mid); if (mm && mm.started && date < mm.started) return "off"; }   // before the start date: not absent
   if (date < mToday()) return "absent";
   return "notin";
 }
@@ -7904,6 +7907,11 @@ function openInvoiceForm(id, kind) {
     const data = { ...(id ? clean(x) : {}), kind: x.kind, amount, dueDate: val("iv-due"), status: st, notes: val("iv-notes"), file, updatedAt: Date.now(),
       ...(req ? { title: val("iv-title"), purpose: val("iv-purpose") } : { supplier: val("iv-sup").toUpperCase(), invNo: val("iv-no"), orders: val("iv-orders"), invDate: val("iv-date") }) };
     if (!id) { Object.assign(data, { createdAt: Date.now(), createdById: myMemberId() || "", createdByName: me.nickname || me.name || "", budget: canDecide() && st === "paid" ? "approved" : "pending" }); }
+    if (id && !canDecide()) {   // Sales can't approve their own budget: a changed amount goes back to Finance, and nothing unapproved can be marked paid
+      if (x.budget === "approved" && Number(x.amount) !== Number(amount)) data.budget = "pending";
+      if (st === "paid" && x.status !== "paid" && (data.budget || x.budget || "pending") !== "approved") return sheetError("Finance needs to approve this budget before it can be marked paid.");
+    }
+    if (!id && !canDecide() && st === "paid") return sheetError("Finance needs to approve this budget before it can be marked paid.");
     if (st === "paid" && x.status !== "paid") Object.assign(data, { paidAt: Date.now(), paidBy: me.nickname || me.name || "" });
     await save("invoices", id || uid("iv"), data);
     closeSheet(); toast(id ? "Saved." : st === "paid" ? "Saved as paid." : "Saved and sent to Finance → Budget requests.");
@@ -7932,6 +7940,7 @@ async function openInvoiceView(id) {
 async function invSetPaid(id) {
   const x = S.invoices.find(r => r.id === id); if (!x) return; const me = member(myMemberId()) || {};
   const paid = x.status !== "paid";
+  if (paid && (x.budget || "pending") !== "approved" && !canDecide()) { toast(x.budget === "declined" ? "Finance declined this request." : "Finance needs to approve this first."); return; }
   await patch("invoices", id, paid ? { status: "paid", paidAt: Date.now(), paidBy: me.nickname || me.name || "", budget: x.budget === "declined" ? "declined" : "approved" } : { status: "topay", paidAt: 0, paidBy: "" });
   toast(paid ? `${invTitle(x)} marked paid.` : "Marked as to pay again.");
   if (!$("#scrim").hidden) { S.sheetNoPush = true; openInvoiceView(id); }
@@ -7986,6 +7995,9 @@ function viewDues() {
       <div class="kpi"><span class="label">Next due</span><span class="value" style="font-size:18px">${next ? esc(next.name) : "–"}</span><span class="sub">${next ? fmtDate(dueDateIn(next, ym)) + " · " + peso(next.amount) : "All paid for this month"}</span></div>
       <div class="kpi"><span class="label">Calendar</span><span class="value" style="font-size:16px">On the Tasks calendar</span><span class="sub">Visible to people with Finance unlocked</span></div>
     </div>
+    ${(() => { const [yy, mm] = ym.split("-").map(Number), pym = mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, "0")}`;
+      const miss = act.filter(d => (d.paid || []).some(x => x < pym) && !(d.paid || []).includes(pym));   // was paid in earlier months, but not last month
+      return miss.length ? `<div class="notice" style="background:var(--bad-bg);color:var(--bad)"><b>Not marked paid in ${monthLabel(pym)}:</b> ${miss.map(d => `${esc(d.name)} <button class="btn sm" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${pym}">Mark paid</button>`).join(" · ")}</div>` : ""; })()}
     ${pickBar("due", [["✓ Mark paid (" + monthLabel(ym) + ")", "due-sel-paid", "primary"], ["Mark unpaid", "due-sel-unpaid"]], list.map(d => d.id))}
     <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th class="l">Name</th><th>Due date</th><th>Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th><th>History</th></tr></thead>
       <tbody>${DUE_KINDS.map(k => group(k[0])).join("")}</tbody></table>${list.length ? "" : `<div class="empty" style="padding:16px">No due dates yet.</div>`}</div>
@@ -8350,7 +8362,10 @@ function payCalc(m, per) {
   const lateDed = cfg.deductLate ? Math.round(lateMin * rate / 8 / 60 * 100) / 100 : 0;
   const adds = ADD_FIELDS.reduce((a, [k]) => a + (Number(rec[k]) || 0), 0);
   const deds = DED_FIELDS.reduce((a, [k]) => a + (Number(rec[k]) || 0), 0) + lateDed;
-  return { m, rec, rate, worked, late, lateMin, leave, absent, hol, hours, paidDays, basic, lateDed, adds, deds, net: basic + adds - deds, days, status: rec.status || "draft" };
+  const out = { m, rec, rate, worked, late, lateMin, leave, absent, hol, hours, paidDays, basic, lateDed, adds, deds, net: basic + adds - deds, days, status: rec.status || "draft" };
+  // A payslip marked Paid keeps the numbers it was paid with, even if attendance is edited later.
+  if (rec.status === "paid" && rec.snapshot) { const z = rec.snapshot; Object.assign(out, { rate: z.rate, paidDays: z.paidDays, basic: z.basic, adds: z.adds, deds: z.deds, net: z.net }); }
+  return out;
 }
 const PAY_STATUS = { draft: { name: "Draft", cls: "" }, approved: { name: "Approved", cls: "info" }, paid: { name: "Paid", cls: "good" } };
 
@@ -8475,6 +8490,11 @@ function openPayslip(mid) {
     <div id="sheet-err" class="confirm" hidden></div>
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">${ro ? "Close" : "Cancel"}</button>${ro ? "" : `<button class="btn primary" type="submit">Save payslip</button>`}</div>`,
   ro ? null : async () => {
+    {   // the whole month and its two halves overlap: don't approve / pay the same days twice
+      const st0 = val("ps-status"), mo = per.key.slice(0, 7), kind = per.key.slice(8), other = kind === "M" ? ["A", "B"] : ["M"];
+      const hit = st0 !== "draft" && other.map(k => S.payroll.find(r => r.id === `${mo}-${k}_${mid}`)).find(r => r && (r.status === "approved" || r.status === "paid"));
+      if (hit) return sheetError(`${kind === "M" ? "The 1st–15th or 16th–end" : "The whole-month"} payslip for this person is already ${hit.status}. Paying both would pay the same days twice.`);
+    }
     const data = { period: per.key, memberId: mid, status: val("ps-status"), notes: val("ps-notes"), daysOverride: val("ps-days") === "" ? "" : numv("ps-days"), updatedAt: Date.now() };
     [...ADD_FIELDS, ...DED_FIELDS].forEach(([k]) => data[k] = numv("ps-" + k));
     await save("payroll", per.key + "_" + mid, data);
