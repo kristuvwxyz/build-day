@@ -4225,10 +4225,12 @@ function supToOrder(code) {
   return { os, rows: [...agg.values()].sort((a, b) => a.name.localeCompare(b.name)) };
 }
 // Adjustments under the To order list (K, Oct 16, 2026): discount ("10%" or an amount) and shipping / other fees, then the grand total.
-const supAdj = code => { const a = (S.supAdj || (S.supAdj = (() => { try { return JSON.parse(localStorage.getItem("rs-supadj") || "{}"); } catch (e) { return {}; } })()))[code] || {}; return { disc: a.disc || "", fee: a.fee || "" }; };
+// Shared with the whole team (config/supadj), so everyone sees the same numbers.
+const supAdj = code => { const a = (S.supAdj || (S.supAdj = {}))[code] || {}; return { disc: a.disc || "", fee: a.fee || "" }; };
+const supAdjSave = async (code, val) => { const all = { ...(S.supAdj || {}), [code]: val }; S.supAdj = all; if (S.db) await wdb().doc("config/supadj").set(all); render(); };
 const supDisc = (v, sub) => { const t = String(v || "").trim(); if (!t) return 0; const n = Number(t.replace(/[^\d.]/g, "")) || 0; return Math.round((/%$/.test(t) ? sub * n / 100 : n) * 100) / 100; };
 document.addEventListener("change", e => { const el = e.target.closest && e.target.closest("[data-supadj]"); if (!el) return; const [code, k] = el.dataset.supadj.split("|");
-  supAdj(code); S.supAdj[code] = { ...(S.supAdj[code] || {}), [k]: el.value.trim() }; try { localStorage.setItem("rs-supadj", JSON.stringify(S.supAdj)); } catch (er) {} render(); });
+  supAdjSave(code, { ...supAdj(code), [k]: el.value.trim(), by: actor(), at: Date.now() }).then(() => toast("Saved.")).catch(er => toast("Couldn't save: " + ((er && er.message) || "try again."))); });
 function viewSupToOrder() {
   const codes = [...new Set(["S-JEFF", "S-SUMMER", ...S.products.map(supOfProduct).filter(Boolean)])];
   const sp = S.sp; if (!codes.includes(sp.tsup)) sp.tsup = codes[0];
@@ -4254,10 +4256,13 @@ async function supMark(code) {
   if (!confirm(`Mark ${os.length} order${os.length === 1 ? "" : "s"} as ordered from ${SUP_NAMES[code] || code}?`)) return;
   const at = Date.now(), by = actor(); let n = 0;
   const meta = new Map(S.webmeta.map(d => [d.ref, d]));
-  for (const o of os) { const supOrdered = { ...(o.supOrdered || {}), [code]: { at, by } }, line = `ordered from ${SUP_NAMES[code] || code} (supplier list)`;
+  const { rows } = supToOrder(code), adj = supAdj(code), sub = rows.reduce((a, r) => a + r.qty * r.cost, 0), disc = supDisc(adj.disc, sub), fee = Number(String(adj.fee).replace(/[^\d.]/g, "")) || 0;
+  const tot = disc || fee ? ` · subtotal ${peso2(sub)}${disc ? `, discount −${peso2(disc)}` : ""}${fee ? `, fees ${peso2(fee)}` : ""}, grand total ${peso2(Math.max(0, sub - disc + fee))}` : "";
+  for (const o of os) { const supOrdered = { ...(o.supOrdered || {}), [code]: { at, by, ...(disc || fee ? { disc: adj.disc, fee } : {}) } }, line = `ordered from ${SUP_NAMES[code] || code} (supplier list)${tot}`;
     if (o.web) { const m = meta.get(o.ref) || {}; await save("webmeta", webMetaId(o.ref), { ...clean(m), ref: o.ref, supOrdered, log: [...(m.log || []), { at, by, msg: line }].slice(-80) }).then(() => n++).catch(() => {}); }
     else await patch("orders", o.id, { supOrdered, log: logAdd(o, [line], by) }).then(() => n++).catch(() => {}); }
   if (os.some(o => o.web)) S.web.dirty = true;
+  if (adj.disc || adj.fee) await supAdjSave(code, {}).catch(() => {});   // next list starts with no discount / fees
   toast(`${n} order${n === 1 ? "" : "s"} marked as ordered.`); render();
 }
 function viewSuppliers() {
@@ -4306,7 +4311,7 @@ function viewGate() {
 }
 S.reqProf = {}; S.raw = {};
 const BACKUP_COLS = ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices"];
-const BACKUP_DOCS = ["config/home", "config/payroll", "config/attendance", "config/eom", "config/reviews", "config/vault", "config/security"];
+const BACKUP_DOCS = ["config/home", "config/payroll", "config/attendance", "config/eom", "config/reviews", "config/vault", "config/security", "config/supadj"];
 // Full copy of the shared data (not anyone's private settings), for moving to the standalone app.
 async function downloadBackup() {
   if (!S.dl) return toast("Downloads aren't available in this view.");
@@ -9720,6 +9725,7 @@ render();
     db.doc("config/eom").onSnapshot(s => { S.eomSettings = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/reviews").onSnapshot(s => { S.rvCfg = s.exists ? s.data() : {}; S.rvCfgLoaded = true; keep(); }, () => { S.rvCfgLoaded = true; });
     db.doc("config/vault").onSnapshot(s => { S.vault = s.exists ? s.data() : null; keep(); }, () => {});
+    db.doc("config/supadj").onSnapshot(s => { S.supAdj = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
     for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery", "webmeta"]) {
