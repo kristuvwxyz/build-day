@@ -1438,7 +1438,10 @@ async function adjustStock(productId, delta) {
   const p = S.products.find(x => x.id === productId);
   if (!p) return;
   undoNote("products", productId); // before the local change below, so undo knows the old stock
-  const next = (Number(p.stock) || 0) + delta;
+  // Start from the newest number in the database (not this device's copy), so two sales at the same moment don't overwrite each other.
+  let base = Number(p.stock) || 0;
+  if (S.db) { try { const f = await wdb().collection("products").doc(productId).get(); const d = f && (f.exists === undefined || f.exists) && f.data ? f.data() : null; if (d && d.stock != null) base = Number(d.stock) || 0; } catch (e) {} }
+  const next = base + delta;
   p.stock = next;
   // Stock changes from orders (sold, cancelled, restocked) go to regalspritz.com too, so sold-out items come off the site.
   await patch("products", productId, { stock: next, webSync: "pending" });
@@ -1450,6 +1453,9 @@ const isCancelled = (pay, fl) => VOIDPAY.has(pay) || fl === "cancelled";
 // Oct 15, 2026 (K): pre-order qty = what the supplier still has, so orders take it off too (0 = Sold out).
 const onHandProduct = pid => S.products.find(x => x.id === pid) || null;
 function stockTake(items) { const m = {}; for (const i of items || []) if (i.productId && onHandProduct(i.productId)) m[i.productId] = (m[i.productId] || 0) + (Number(i.qty) || 0); return m; }
+// What this order took from stock (so cancelling puts back exactly that). Kept in step when items are edited or orders merged.
+const ordTaken = o => o.noStock ? {} : (o.stockTaken || stockTake(o.items));
+const mapAdd = (a, b, k = 1) => { const m = { ...a }; for (const [p, q] of Object.entries(b || {})) { m[p] = (m[p] || 0) + k * q; if (m[p] <= 0) delete m[p]; } return m; };
 async function applyStockMap(m, sign) { for (const [pid, q] of Object.entries(m || {})) if (q) await adjustStock(pid, sign * q); }
 // Works out whether a status change cancels or un-cancels the order, and moves stock once either way.
 function stockTransition(o, nextPay, nextFul) {
@@ -4447,8 +4453,12 @@ async function restoreOrder(o) {
   const pv = o.archivedPrev || {};
   const payment = pv.payment || o.shopPay || "pending", fulfillment0 = pv.fulfillment || o.shopFul || "unfulfilled", fulfillment = fulfillment0 === "cancelled" ? "to_confirm" : fulfillment0;
   const upd = { archived: false, archivedAt: 0, archivedReason: "", mergedInto: "", payment, fulfillment, log: logAdd(o, [`restored the order (back to ${pay(payment).name} · ${ful(fulfillment).name})`]) };
+  // Cancelling put the bottles back on the shelf; restoring the order takes them off again.
+  const retake = !!o.restocked && !o.noStock && !isCancelled(payment, fulfillment);
+  if (retake) upd.restocked = false;
   if (S.db) await wdb().collection("orders").doc(o.id).update(upd);
   else { S.archived = S.archived.filter(x => x.id !== o.id); S.orders.push(Object.assign(o, upd)); render(); }
+  if (retake) { if (o.stockTaken) await applyStockMap(o.stockTaken, -1); else for (const i of o.items || []) if (i.productId) await adjustStock(i.productId, -(Number(i.qty) || 0)); }
   scheduleStatusSync();
 }
 function openMergePick(id) {
@@ -4485,7 +4495,9 @@ function openMerge() {
     const main = os.find(o => o.id === mainId), rest = os.filter(o => o.id !== mainId);
     const tagIt = o => (o.items || []).map(i => ({ ...i, from: i.from || o.num }));
     const sum = k => rest.reduce((a, o) => a + (Number(o[k]) || 0), Number(main[k]) || 0);
+    const taken = os.reduce((m, x) => mapAdd(m, ordTaken(x)), {}), hasTaken = Object.keys(taken).length > 0;
     await patch("orders", main.id, {
+      ...(hasTaken ? { stockTaken: taken, noStock: false } : {}),
       items: [...tagIt(main), ...rest.flatMap(tagIt)], merged: [...(main.merged || []), ...rest.flatMap(o => [o.num, ...(o.merged || [])])],
       mergedParts: [...(main.mergedParts || []), ...rest.map(o => ({ id: o.id, num: o.num, ref: o.ref || "", adjust: Number(o.adjust) || 0, shipFee: Number(o.shipFee) || 0, discount: Number(o.discount) || 0, nums: [o.num, ...(o.merged || [])] }))],
       adjust: sum("adjust"), shipFee: sum("shipFee"), discount: sum("discount"), tags: [...new Set([...(main.tags || []), ...rest.flatMap(o => o.tags || [])])],
@@ -4499,7 +4511,8 @@ async function unmergeOrder(o) {
   const parts = o.mergedParts || []; const nums = new Set(parts.flatMap(p => p.nums || [p.num]));
   for (const p of parts) { const a = S.archived.find(x => x.id === p.id); if (a) await restoreOrder(a); }
   const sub = k => (Number(o[k]) || 0) - parts.reduce((a, p) => a + (Number(p[k]) || 0), 0);
-  await patch("orders", o.id, { items: (o.items || []).filter(i => !nums.has(i.from)), merged: [], mergedParts: [], adjust: sub("adjust"), shipFee: sub("shipFee"), discount: sub("discount"), log: logAdd(o, [`unmerged ${[...nums].map(n => "#" + n).join(", ")}`]) });
+  const keep = parts.reduce((m, p) => { const a = S.archived.find(x => x.id === p.id) || S.orders.find(x => x.id === p.id); return a ? mapAdd(m, ordTaken(a), -1) : m; }, ordTaken(o));
+  await patch("orders", o.id, { ...(o.stockTaken ? { stockTaken: keep } : {}), items: (o.items || []).filter(i => !nums.has(i.from)), merged: [], mergedParts: [], adjust: sub("adjust"), shipFee: sub("shipFee"), discount: sub("discount"), log: logAdd(o, [`unmerged ${[...nums].map(n => "#" + n).join(", ")}`]) });
   toast("Unmerged. The other orders are active again.");
 }
 /* which order each item came from, for orders merged in Shopify (#RS2604 #RS2612) */
@@ -6193,7 +6206,7 @@ function openItemsEdit(id) {
       items.forEach(i => { if (i.productId) by[i.productId] = (by[i.productId] || 0) - i.qty; });
       for (const [pid, d] of Object.entries(by)) if (d) await adjustStock(pid, d);
     }
-    await patch("orders", o.id, { items, shipFee: numv("ei-sf"), adjust: numv("ei-adj"), discount, discountNote: val("ei-dnote"), editedItemsAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(o, [`edited items/prices (total ${peso2(total(o))} → ${peso2(sub + numv("ei-sf") + numv("ei-adj") - discount)})`]) });
+    await patch("orders", o.id, { items, ...(!o.noStock && o.stockTaken && !isVoid(o) ? { stockTaken: stockTake(items) } : {}), shipFee: numv("ei-sf"), adjust: numv("ei-adj"), discount, discountNote: val("ei-dnote"), editedItemsAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "", log: logAdd(o, [`edited items/prices (total ${peso2(total(o))} → ${peso2(sub + numv("ei-sf") + numv("ei-adj") - discount)})`]) });
     closeSheet(); toast(`#${o.num} updated · total ${peso2(sub + numv("ei-sf") + numv("ei-adj") - discount)}`);
   });
   eiTotal();
@@ -6509,7 +6522,7 @@ function varRowHtml(v, main, isNew) {
     <td><input data-vf="price" class="money" inputmode="decimal" value="${moneyFmt(v.price)}" aria-label="SRP" style="width:82px"></td>
     <td><input data-vf="compareAt" class="money" inputmode="decimal" value="${Number(v.compareAt) ? moneyFmt(v.compareAt) : ""}" aria-label="Compare-at price" style="width:82px"></td>
     <td><input data-vf="cost" class="money" inputmode="decimal" value="${Number(v.cost) ? moneyFmt(v.cost) : ""}" aria-label="Cost" style="width:82px"></td>
-    <td><input data-vf="stock" type="number" step="1" value="${Number(v.stock) || 0}" aria-label="Stock" style="width:58px"></td>
+    <td><input data-vf="stock" data-orig="${Number(v.stock) || 0}" type="number" step="1" value="${Number(v.stock) || 0}" aria-label="Stock" style="width:58px"></td>
     <td class="num var-cmt">${(() => { const rows = isNew ? [] : committedOrders(v), n = rows.reduce((a, r) => a + r.q, 0);
       return n ? `<b title="${esc(rows.map(r => "#" + String(r.o ? r.o.num : r.w.ref || "").replace(/^#/, "") + " · " + r.q).join("\n"))}">${n}</b>` : `<span style="color:var(--muted)">0</span>`; })()}</td>
     <td>${supSelect('data-vf="supplier" aria-label="Supplier" style="min-width:96px"', v.supplier)}</td>
@@ -6555,7 +6568,8 @@ const varNum = v => { const n = String(v || "").replace(/[^\d.]/g, ""); return n
 function varRowsRead() {
   return [...document.querySelectorAll("#var-rows tr[data-var]")].map(tr => { const g = k => (tr.querySelector(`[data-vf="${k}"]`) || {}).value || "";
     const kind = g("kind") === "preorder" ? "preorder" : "onhand";
-    return { id: tr.dataset.var, isNew: !!tr.dataset.new, del: !!tr.dataset.del, img: g("img"), f: { size: g("size").trim(), ptype: g("ptype"), kind, eta: kind === "preorder" ? g("eta") : "", price: varNum(g("price")), compareAt: varNum(g("compareAt")), cost: varNum(g("cost")), stock: Math.round(Number(g("stock")) || 0), supplier: g("supplier").toUpperCase().replace(/\s+/g, "") } }; });
+    return { id: tr.dataset.var, isNew: !!tr.dataset.new, del: !!tr.dataset.del, img: g("img"), f: { size: g("size").trim(), ptype: g("ptype"), kind, eta: kind === "preorder" ? g("eta") : "", price: varNum(g("price")), compareAt: varNum(g("compareAt")), cost: varNum(g("cost")), stock: Math.round(Number(g("stock")) || 0), supplier: g("supplier").toUpperCase().replace(/\s+/g, "") }, so: tr.querySelector('[data-vf="stock"]') }; })
+    .map(r => { const so = r.so; delete r.so; if (so && so.dataset.orig !== undefined && !r.isNew && Number(so.dataset.orig) === r.f.stock) delete r.f.stock; return r; });   // stock untouched: leave it alone, so a sale made meanwhile isn't undone
 }
 // Saves the other options of the scent: the listing's shared details (name, notes, badges…) plus each row; adds new variations.
 async function varsSave(p, data, vrows, main) {
@@ -6637,7 +6651,8 @@ function openProductForm(id, preset = {}) {
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
     const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : "active", kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), supplier: val("p-supplier").toUpperCase().replace(/\s+/g, ""), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     // Fields that are edited in the Listings table aren't in Edit listing: keep them as they are.
-    if (id) for (const k of ["size", "price", "compareAt", "cost", "stock"]) { if (k in p) data[k] = p[k]; else delete data[k]; }
+    const live = (id && S.products.find(x => x.id === id)) || p;   // newest copy, not the one from when the form was opened (a sale may have changed the stock since)
+    if (id) for (const k of ["size", "price", "compareAt", "cost", "stock"]) { if (k in live) data[k] = live[k]; else delete data[k]; }
     // Variations: this option's row (size, type, prices, stock…) and its own photo, then the other options after saving.
     const vrows = id ? varRowsRead() : [], vmain = (document.querySelector('input[name="v-main"]:checked') || {}).value || "";
     if (vrows.some(r => r.isNew && !r.f.ptype)) return sheetError("Pick a Type for each new variation.");
@@ -6646,7 +6661,7 @@ function openProductForm(id, preset = {}) {
     else if (vme) { Object.assign(data, vme.f); if (vme.img) Object.assign(data, varPhotoReset(vme.img)); if (vrows.length > 1 || vmain) data.scentMain = vmain === id; }
     if (!id) data.createdAt = Date.now();
     const PLAB = { name: "name", brand: "brand", size: "size", ptype: "type", sku: "SKU", barcode: "barcode", category: "collection", price: "SRP", compareAt: "compare-at price", cost: "cost", stock: "stock", reorder: "low-stock alert", status: "status", kind: "availability", eta: "ETA", badges: "badges", notes: "notes", accords: "accords", fragrantica: "Fragrantica link", description: "description", url: "website link", batch: "batch no.", photo: "photo" };
-    const changed = id ? Object.keys(PLAB).filter(k => JSON.stringify(p[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !p[k]) && !(k === "notes" && !Object.keys(data.notes).length && !p.notes)) : [];
+    const changed = id ? Object.keys(PLAB).filter(k => JSON.stringify((k === "stock" ? live : p)[k] ?? "") !== JSON.stringify(data[k] ?? "") && !(Array.isArray(data[k]) && !data[k].length && !p[k]) && !(k === "notes" && !Object.keys(data.notes).length && !p.notes)) : [];
     data.log = logAdd(p, [id ? (changed.length ? "changed " + changed.map(k => PLAB[k]).join(", ") : "saved with no changes") : "added this listing"]);
     tidyListing(data);
     const pid = id || uid("p"); await save("products", pid, data);
