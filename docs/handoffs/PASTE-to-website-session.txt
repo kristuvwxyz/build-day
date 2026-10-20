@@ -1,0 +1,15 @@
+Website backend change request (from K, Oct 2026)
+
+Please change the auto-cancel for unpaid orders so BDO Checkout and Manual Processing get a day-off extension. Maya Checkout stays exactly as it is.
+
+Rule: the pay window is 24 hours (Manual Processing starts at the first receiptSent; BDO Checkout starts when the order is placed). If the start OR the end of that window falls on a Sunday or Monday (Manila time, UTC+8), the deadline becomes the following Tuesday 23:59:59 Manila time. It must never be earlier than start + 24 h.
+
+Examples:
+- Receipt Sat Oct 17, 8 PM -> deadline Tue Oct 20, 11:59 PM
+- Receipt Sun Oct 18, 10 AM -> Tue Oct 20, 11:59 PM
+- Receipt Mon Oct 19, 11:30 PM -> Tue Oct 20, 11:59 PM
+- Receipt Tue Oct 20, 9 AM -> Wed Oct 21, 9 AM (no change)
+
+Also please check: has the backend already cancelled any BDO / Manual Processing orders on Sun Oct 18 or Mon Oct 19 that should have been kept? If yes, list them so K can restore them.
+
+Reference: docs/handoffs/day-off-cancel-extension.md. RS OS already shows the same deadline (payDeadline() in projects/business-os/index.html).
