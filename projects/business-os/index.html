@@ -3036,6 +3036,14 @@ function navRefresh() {
 // Unpaid Maya Checkout website orders are cancelled 24 hours after they were placed (orders placed from Oct 8, 2026), and the buyer gets an email.
 // Runs on any team device that has RS OS open; webmeta/_autocancel stops two devices doing it at once.
 const AUTOCANCEL_FROM = Date.parse("2026-10-08T00:00:00+08:00"), PAY_WINDOW = 24 * 3600e3;
+// Day-off rule (K, Oct 2026): BDO Checkout and Manual Processing orders whose 24 h would run out on a Sunday or Monday (shop day off)
+// get until Tuesday 11:59 PM (Manila time). Maya orders are not extended.
+function payDeadline(startMs) {
+  const d = startMs + PAY_WINDOW, dow = x => new Date(x + 8 * 36e5).getUTCDay(), a = dow(startMs), b = dow(d);
+  if (a !== 0 && a !== 1 && b !== 0 && b !== 1) return d;   // neither the start nor the end falls on a day off
+  const last = a === 0 || a === 1 ? startMs : d, k = dow(last), t = new Date(last + 8 * 36e5 + (k === 0 ? 2 : 1) * 864e5).toISOString().slice(0, 10);
+  return Math.max(d, Date.parse(`${t}T23:59:59+08:00`));
+}
 let acBusy = false;
 async function autoCancelUnpaid() {
   if (acBusy || !S.site || !S.web.loaded || !canOrders() || S.readOnly || S.viewAs || !S.loaded.webmeta) return;
@@ -3283,7 +3291,7 @@ function manualPanel() {
   const all = webAsOrders().filter(o => isManualWeb(o) && o.fulfillment !== "cancelled" && o.payment === "pending").sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   if (!all.length) return `<div class="panel"><div class="empty">No Manual Processing orders waiting. 🎉</div></div>`;
   // The 24 h starts when the Royal Receipt is sent; before that the order waits (it never auto-cancels unsent).
-  const left = o => { const at = o.receipt && o.receipt.at; if (!at) return `<span class="badge grey">24 h starts when sent</span>`; const h = 24 - (Date.now() - at) / 36e5; return h <= 0 ? `<span class="badge red">Over 24 h</span>` : `<span class="badge ${h < 6 ? "amber" : "grey"}">${Math.floor(h)} h left to pay</span>`; };
+  const left = o => { const at = o.receipt && o.receipt.at; if (!at) return `<span class="badge grey">24 h starts when sent</span>`; const dl = payDeadline(at), h = (dl - Date.now()) / 36e5, ext = dl > at + PAY_WINDOW; return h <= 0 ? `<span class="badge red">Over time</span>` : `<span class="badge ${h < 6 ? "amber" : "grey"}">${Math.floor(h)} h left to pay${ext ? " · day-off extension" : ""}</span>`; };
   return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Website orders placed with <b>Manual Processing</b>. Step 1: tap <b>👑 Send Royal Receipt</b>, pick how the buyer pays (BDO BNPL, Maya, or e-wallet / bank QR) and email it. Step 2: when the payment comes in, set Payment to Fully paid in Orders. The buyer has 24 hours to pay from when the receipt is sent, then the order cancels by itself. Oldest first.</div>
   <div class="cx-list">${all.map(o => { const sent = o.receipt && o.receipt.at;
     return `<div class="panel cx-card${sent ? "" : " pend"}"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(o.num)}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${esc(relTime(o.createdAt))} · ${peso(total(o))}</span>${left(o)}</div>
@@ -4152,9 +4160,9 @@ function toPayPanel() {
   const rows = toPayRows();
   if (!rows.length) return `<section class="panel" style="padding:12px 16px"><b>To pay</b> <span style="font-size:13px;color:var(--muted)">No Manual Processing orders waiting for payment.</span></section>`;
   return `<section class="panel"><div class="head"><h2>To pay · Manual Processing</h2><span class="s">${rows.length} waiting</span></div>
-    <div style="font-size:13px;color:var(--muted);margin:0 0 10px">Check the buyer's e-wallet / bank payment. Tap <b>Mark fully paid</b> once it's received. If nothing has come in within 24 hours of the Royal Receipt, tap <b>Cancel order</b>.</div>
-    <div class="cx-list">${rows.map(o => { const at = (o.receipt && o.receipt.at) || 0, h = at ? Math.floor((Date.now() - at) / 36e5) : null;
-      return `<div class="panel cx-card"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(o.num)}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${peso(total(o))}</span>${at ? (h >= 24 ? `<span class="badge red">${h} h since receipt · over 24 h</span>` : `<span class="badge grey">${h} h since receipt</span>`) : `<span class="badge amber">Receipt not sent yet</span>`}</div>
+    <div style="font-size:13px;color:var(--muted);margin:0 0 10px">Check the buyer's e-wallet / bank payment. Tap <b>Mark fully paid</b> once it's received. If nothing has come in within 24 hours of the Royal Receipt, tap <b>Cancel order</b>. Days off (Sunday and Monday) are skipped: the deadline moves to Tuesday 11:59 PM.</div>
+    <div class="cx-list">${rows.map(o => { const at = (o.receipt && o.receipt.at) || 0, h = at ? Math.floor((Date.now() - at) / 36e5) : null, over = at && Date.now() > payDeadline(at), ext = at && payDeadline(at) > at + PAY_WINDOW;
+      return `<div class="panel cx-card"><div class="cx-top"><button type="button" class="onum linkish" data-webopen="${esc(o.ref)}">#${esc(o.num)}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${peso(total(o))}</span>${at ? (over ? `<span class="badge red">${h} h since receipt · over time</span>` : `<span class="badge grey">${h} h since receipt${ext ? " · day-off extension to Tue 11:59 PM" : ""}</span>`) : `<span class="badge amber">Receipt not sent yet</span>`}</div>
       <div class="cx-foot">${at ? `<span class="badge green">Receipt sent ${esc(relTime(at))}</span>` : ""}<span style="flex:1"></span><button class="btn sm primary" type="button" data-act="topay-paid" data-id="${esc(o.ref)}">Mark fully paid</button><button class="btn sm cancel-btn" type="button" data-act="topay-cancel" data-id="${esc(o.ref)}">Cancel order</button></div></div>`; }).join("")}</div></section>`;
 }
 function viewOrders() {
