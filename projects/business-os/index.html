@@ -883,7 +883,7 @@ tr.lgrp td { background: var(--surface-2); border-top: 2px solid var(--line); }
 .var-del { border: 0; background: none; color: var(--muted); font-size: 15px; padding: 4px 8px; border-radius: 6px; cursor: pointer; } .var-del:hover { color: var(--bad, #b42318); background: var(--surface-2); }
 .var-cmt b { cursor: help; text-decoration: underline dotted; }
 .dc table th, .dc table td { text-align: center; vertical-align: middle; }
-.dc table td.l, .dc table th.l { text-align: left; } .dc table td.r, .dc table th.r { text-align: center; }
+.dc table td.l { text-align: left; } .dc table th, .dc table th.l, .dc table th.r, .suptbl th, .suptbl th.l { text-align: center; }   /* column titles are always centered (K, Oct 22, 2026) */ .dc table td.r, .dc table th.r { text-align: center; }
 .ied { width: 100%; min-width: 64px; max-width: 100%; border: 1px solid transparent; background: transparent; padding: 5px 6px; border-radius: 6px; font: inherit; color: inherit; text-align: center; text-align-last: center; }
 .dc td.l .ied { text-align: left; text-align-last: left; }
 .ied:hover:not(:disabled) { border-color: var(--line); background: var(--surface); } .ied:focus { border-color: var(--gold); background: var(--surface); outline: none; box-shadow: 0 0 0 3px var(--gold-pale, rgba(184,146,74,.18)); }
@@ -1402,7 +1402,7 @@ function iedP(col, id, path, cur, type, lab, o = {}) {
 const ied = (col, r, f, type, lab, o) => iedP(col, r.id, f, r[f], type, lab, o);
 // History column like Orders: last change, when, and how many; click for the full list.
 const recHistTd = (col, r) => { const l = (r && r.log) || [], last = l[l.length - 1];
-  return `<td class="hist-td">${last ? `<button type="button" class="hist-btn" data-hist="r:${col}:${r.id}" title="${esc((last.by || "") + " " + (last.msg || ""))} · click for full history"><span class="hist-t"><b>${esc(String(last.by || "").split(",")[0])}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length}` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; };
+  return `<td class="hist-td" data-sort="${last ? last.at : 0}">${last ? `<button type="button" class="hist-btn" data-hist="r:${col}:${r.id}" title="${esc((last.by || "") + " " + (last.msg || ""))} · click for full history"><span class="hist-t"><b>${esc(String(last.by || "").split(",")[0])}</b> ${esc(last.msg || "")}</span><small>${esc(relTime(last.at))}${l.length > 1 ? ` · ${l.length}` : ""}</small></button>` : `<span style="color:var(--muted)">–</span>`}</td>`; };
 const CHIP_ST = { good: "st-green", warn: "st-amber", bad: "st-red", info: "st-blue", "": "st-grey" };
 const stMap = m => v => CHIP_ST[(m[v] || {}).cls || ""] || "st-grey";
 document.addEventListener("change", async e => {
@@ -3925,7 +3925,8 @@ const tableKey = (t, i) => [S.view, S.dept, S.tab, i].join(":");
 const cellVal = td => {
   if (!td) return "";
   if (td.dataset.sort !== undefined) { const n = Number(td.dataset.sort); return isNaN(n) ? td.dataset.sort.toLowerCase() : n; }
-  const s = td.innerText.trim();
+  const ed = td.querySelector("input.ied, select.ied");   // editable cells: sort by what is typed / chosen, not by the (empty) cell text
+  const s = ed ? (ed.tagName === "SELECT" ? ((ed.options[ed.selectedIndex] || {}).text || "") : ed.value).trim() : td.innerText.trim();
   const num = s.replace(/[₱,%\s]/g, "").replace(/^−/, "-");
   if (/^-?\d+(\.\d+)?$/.test(num)) return Number(num);
   if (/[A-Za-z]{3} \d{1,2},? \d{4}|^\d{4}-\d{2}-\d{2}/.test(s)) { const t = Date.parse(s.replace(/·.*$/, "")); if (!isNaN(t)) return t; }
@@ -8006,15 +8007,17 @@ async function invDecide(id, ok) {
 }
 
 function viewFixed() {
-  const list = [...S.fixedexp].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-  const tot = list.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  const all = [...S.fixedexp].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  const isOn = x => x.status !== "inactive", list = all.filter(isOn), off = all.filter(x => !isOn(x));
+  const tot = list.reduce((a, x) => a + (Number(x.amount) || 0), 0), offTot = off.reduce((a, x) => a + (Number(x.amount) || 0), 0);
   const can = !S.readOnly;
-  // K, Oct 15, 2026: no stat cards; a compact table (description, amount right next to it, notes) with the total at the bottom.
-  return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:38%"><col style="width:15%"><col><col style="width:200px"></colgroup>
-    <thead><tr><th class="l">Description</th><th>Amount / month</th><th class="l">Notes</th><th>History</th></tr></thead>
-    <tbody>${list.map(x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'}><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td>${recHistTd("fixedexp", x)}</tr>`).join("")}</tbody>
-    <tfoot><tr><td style="font-weight:800">Total · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td><td></td></tr></tfoot></table>
-    ${list.length ? "" : `<div class="empty" style="padding:16px">No fixed expenses yet. Click “Add expense line”.</div>`}</div>`;
+  // K, Oct 22, 2026: Active / Inactive instead of deleting (Inactive lines stay as a record and are left out of the total); every column sorts.
+  const row = x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'} class="${isOn(x) ? "" : "done"}"><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td><td>${iedP("fixedexp", x.id, "status", isOn(x) ? "active" : "inactive", "sel", "Status", { ro: !can, st: v => v === "inactive" ? "st-grey" : "st-green", opts: [["active", "Active"], ["inactive", "Inactive"]] })}</td>${recHistTd("fixedexp", x)}</tr>`;
+  return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:36%"><col style="width:14%"><col><col style="width:130px"><col style="width:200px"></colgroup>
+    <thead><tr><th class="l">Description</th><th>Amount / month</th><th class="l">Notes</th><th>Status</th><th>History</th></tr></thead>
+    <tbody>${list.length ? `<tr class="grp"><td colspan="5">Active <span style="font-weight:500;color:var(--muted)">${list.length} · ${peso(tot)}</span></td></tr>${list.map(row).join("")}` : ""}${off.length ? `<tr class="grp"><td colspan="5">Inactive <span style="font-weight:500;color:var(--muted)">${off.length} · ${peso(offTot)} · kept as a record, not counted in the total</span></td></tr>${off.map(row).join("")}` : ""}</tbody>
+    <tfoot><tr><td style="font-weight:800">Total (Active) · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td><td></td><td></td></tr></tfoot></table>
+    ${all.length ? "" : `<div class="empty" style="padding:16px">No fixed expenses yet. Click “Add expense line”.</div>`}</div>`;
 }
 function openFixedForm(id) {
   const x = id ? S.fixedexp.find(r => r.id === id) : {};
@@ -8022,14 +8025,15 @@ function openFixedForm(id) {
     <div class="field"><label for="fx-desc">Description</label><input id="fx-desc" value="${esc(x.desc || "")}" placeholder="e.g. Bill - Water"></div>
     <div class="row"><div class="field"><label for="fx-amt">Amount per month (₱)</label><input inputmode="decimal" class="money" id="fx-amt" value="${moneyFmt(x.amount ?? "")}"></div>
       <div class="field"><label for="fx-notes">Notes</label><input id="fx-notes" value="${esc(x.notes || "")}" placeholder="monthly, yearly / 12 mos."></div></div>
+    <div class="field"><label for="fx-status">Status</label><select id="fx-status"><option value="active" ${x.status !== "inactive" ? "selected" : ""}>Active (counted in the total)</option><option value="inactive" ${x.status === "inactive" ? "selected" : ""}>Inactive (kept as a record, not counted)</option></select></div>
     <div class="field"><label for="fx-bd">Breakdown (optional, one per line)</label><textarea id="fx-bd" rows="3">${esc(x.breakdown || "")}</textarea></div>
     ${id ? recLogHtml("fixedexp", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
-    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-fixed" data-id="${id}">Delete line</button></div>` : ""}
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-fixed" data-id="${id}">Delete line</button> <span class="s">To keep it for your records, set Status to Inactive instead of deleting.</span></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
     if (!val("fx-desc")) return sheetError("Enter a description.");
-    const data = { ...(id ? clean(x) : { order: S.fixedexp.length + 1 }), desc: val("fx-desc"), amount: numv("fx-amt"), notes: val("fx-notes"), breakdown: val("fx-bd"), updatedAt: Date.now() };
+    const data = { ...(id ? clean(x) : { order: S.fixedexp.length + 1 }), desc: val("fx-desc"), amount: numv("fx-amt"), notes: val("fx-notes"), breakdown: val("fx-bd"), status: val("fx-status") === "inactive" ? "inactive" : "active", updatedAt: Date.now() };
     await save("fixedexp", id || uid("fx"), data); closeSheet(); toast("Saved.");
   });
 }
