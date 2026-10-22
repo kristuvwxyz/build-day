@@ -992,6 +992,7 @@ select.status:not([multiple]), select.lcell:not([multiple]) { background-positio
 .tabs.pills .tab-arrange { margin-left: auto; color: var(--muted); background: none; border-style: dashed; font-weight: 500; }
 @media (max-width: 720px) { .tabs.pills { flex-wrap: nowrap; overflow-x: auto; } }
 .fixedtbl td { vertical-align: top; } .fixedtbl .fx-name { font-weight: 600; } .fixedtbl .fx-amt { font-weight: 600; }
+#fx-items { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; } .fx-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px 34px; gap: 6px; align-items: center; } .fx-row input { min-width: 0; } .fx-ia { text-align: right; }
 .fixedtbl .fx-bd { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 5px; } .fixedtbl .fx-bd span { font-size: 12px; color: var(--muted); background: var(--bg-soft, rgba(127,127,127,.08)); border-radius: 6px; padding: 2px 7px; }
 .fixedtbl .fx-notes { color: var(--muted); }
 </style>
@@ -1375,7 +1376,7 @@ document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && /^y$
 const LOGGED = { dues: "due date", checks: "check", expenses: "expense", fixedexp: "fixed expense", investments: "investment", invoices: "invoice", payrecords: "pay record", bir: "BIR record", team: "team member", logins: "login" };
 const LOG_ONLY = { team: ["nickname", "name", "phone", "email", "address", "role", "department", "status", "birthday", "started", "sched", "ended", "payPosition", "dailyRate"] };
 const LOG_SKIP = new Set(["log", "updatedAt", "at", "id", "editedBy", "createdAt", "order", "rows", "by"]);
-const LOG_LAB = { checkNo: "check no.", checkDate: "check date", paidWith: "paid with", dueDate: "due date", invDate: "invoice date", method: "paid via", day: "due day", desc: "description", fb: "FB account", rate: "% per month", accountName: "account name", payPosition: "position", orderNum: "order ID", mop: "payment", item: "description", idNumber: "ID number" };
+const LOG_LAB = { items: "breakdown", itemsAuto: "total as amount", checkNo: "check no.", checkDate: "check date", paidWith: "paid with", dueDate: "due date", invDate: "invoice date", method: "paid via", day: "due day", desc: "description", fb: "FB account", rate: "% per month", accountName: "account name", payPosition: "position", orderNum: "order ID", mop: "payment", item: "description", idNumber: "ID number" };
 const logLab = k => LOG_LAB[k] || String(k).replace(/([A-Z])/g, " $1").toLowerCase();
 const logShow = (k, v) => /^(pw|password|pwHint|hash)/i.test(k) ? "(hidden)" : v == null || v === "" ? "–" : Array.isArray(v) ? v.length + " items" : typeof v === "object" ? (v.name || "…") : String(v).slice(0, 60);
 function autoLog(col, id, data) {
@@ -8023,13 +8024,30 @@ async function invDecide(id, ok) {
   toast(ok ? "Budget approved." : "Request declined."); if (!$("#scrim").hidden) { S.sheetNoPush = true; openInvoiceView(id); }
 }
 
+// Breakdown of a fixed expense line (K, Oct 22, 2026): one item per row with its own amount; the list total can become the line's amount.
+// Old text breakdowns ("BPI cc - 5k", one per line) are read as items.
+const parseBd = txt => String(txt || "").split(/\n+/).map(l => l.trim()).filter(Boolean).map(l => {
+  let amt = 0, rest = l, m = l.match(/(\d[\d,]*(?:\.\d+)?)\s*k\b/i);
+  if (m) { amt = Math.round(parseFloat(m[1].replace(/,/g, "")) * 1000); rest = l.replace(m[0], ""); }
+  else { m = l.match(/(\d[\d,]*(?:\.\d+)?)\s*$/); if (m) { amt = parseFloat(m[1].replace(/,/g, "")); rest = l.replace(m[0], ""); } }
+  const label = rest.replace(/\(\s*[-–]\s*/g, "(").replace(/\s*[-–]\s*\)/g, ")").replace(/\(\s*\)/g, "").replace(/\s*[-–]\s*$/, "").replace(/\s{2,}/g, " ").trim();
+  return { label: label || l, amount: amt };
+});
+const fxItems = x => Array.isArray(x.items) ? x.items : parseBd(x.breakdown);
+const fxRow = (i = {}) => `<div class="fx-row"><input class="fx-il" value="${esc(i.label || "")}" placeholder="Item, e.g. BPI card" aria-label="Item"><input class="fx-ia money" inputmode="decimal" value="${i.amount ? moneyFmt(i.amount) : ""}" placeholder="Amount" aria-label="Amount"><button type="button" class="btn ghost sm" data-act="fx-del-item" aria-label="Remove this item">✕</button></div>`;
+function fxTotal() {
+  const sum = [...document.querySelectorAll("#sheet .fx-row")].reduce((a, r) => a + (Number(String(r.querySelector(".fx-ia").value).replace(/[^\d.]/g, "")) || 0), 0);
+  const t = $("#fx-itotal"); if (t) t.textContent = peso2(sum);
+  const au = $("#fx-auto"), am = $("#fx-amt"); if (au && am) { am.readOnly = au.checked; if (au.checked) am.value = moneyFmt(sum); }
+  return sum;
+}
 function viewFixed() {
   const all = [...S.fixedexp].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
   const isOn = x => x.status !== "inactive", list = all.filter(isOn), off = all.filter(x => !isOn(x));
   const tot = list.reduce((a, x) => a + (Number(x.amount) || 0), 0), offTot = off.reduce((a, x) => a + (Number(x.amount) || 0), 0);
   const can = !S.readOnly;
   // K, Oct 22, 2026: Active / Inactive instead of deleting (Inactive lines stay as a record and are left out of the total); every column sorts.
-  const row = x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'} class="${isOn(x) ? "" : "done"}"><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${x.breakdown ? `<div class="fx-bd">${String(x.breakdown).split(/\n+/).filter(Boolean).map(l => `<span>${esc(l)}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td><td>${iedP("fixedexp", x.id, "status", isOn(x) ? "active" : "inactive", "sel", "Status", { ro: !can, st: v => v === "inactive" ? "st-grey" : "st-green", opts: [["active", "Active"], ["inactive", "Inactive"]] })}</td>${recHistTd("fixedexp", x)}</tr>`;
+  const row = x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'} class="${isOn(x) ? "" : "done"}"><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${fxItems(x).length ? `<div class="fx-bd">${fxItems(x).map(i => `<span>${esc(i.label)}${i.amount ? " · " + peso(i.amount) : ""}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td><td>${iedP("fixedexp", x.id, "status", isOn(x) ? "active" : "inactive", "sel", "Status", { ro: !can, st: v => v === "inactive" ? "st-grey" : "st-green", opts: [["active", "Active"], ["inactive", "Inactive"]] })}</td>${recHistTd("fixedexp", x)}</tr>`;
   return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:36%"><col style="width:14%"><col><col style="width:130px"><col style="width:200px"></colgroup>
     <thead><tr><th class="l">Description</th><th>Amount / month</th><th class="l">Notes</th><th>Status</th><th>History</th></tr></thead>
     <tbody>${list.length ? `<tr class="grp"><td colspan="5">Active <span style="font-weight:500;color:var(--muted)">${list.length} · ${peso(tot)}</span></td></tr>${list.map(row).join("")}` : ""}${off.length ? `<tr class="grp"><td colspan="5">Inactive <span style="font-weight:500;color:var(--muted)">${off.length} · ${peso(offTot)} · kept as a record, not counted in the total</span></td></tr>${off.map(row).join("")}` : ""}</tbody>
@@ -8038,19 +8056,26 @@ function viewFixed() {
 }
 function openFixedForm(id) {
   const x = id ? S.fixedexp.find(r => r.id === id) : {};
+  const its = fxItems(x), isum = its.reduce((a, i) => a + (Number(i.amount) || 0), 0), auto = !!its.length && (x.itemsAuto !== undefined ? !!x.itemsAuto : isum === Number(x.amount));
   openSheet(`<h3>${id ? "Edit expense line" : "Add expense line"}</h3>
     <div class="field"><label for="fx-desc">Description</label><input id="fx-desc" value="${esc(x.desc || "")}" placeholder="e.g. Bill - Water"></div>
-    <div class="row"><div class="field"><label for="fx-amt">Amount per month (₱)</label><input inputmode="decimal" class="money" id="fx-amt" value="${moneyFmt(x.amount ?? "")}"></div>
+    <div class="row"><div class="field"><label for="fx-amt">Amount per month (₱)</label><input inputmode="decimal" class="money" id="fx-amt" value="${moneyFmt(auto ? isum : x.amount ?? "")}" ${auto ? "readonly" : ""}></div>
       <div class="field"><label for="fx-notes">Notes</label><input id="fx-notes" value="${esc(x.notes || "")}" placeholder="monthly, yearly / 12 mos."></div></div>
     <div class="field"><label for="fx-status">Status</label><select id="fx-status"><option value="active" ${x.status !== "inactive" ? "selected" : ""}>Active (counted in the total)</option><option value="inactive" ${x.status === "inactive" ? "selected" : ""}>Inactive (kept as a record, not counted)</option></select></div>
-    <div class="field"><label for="fx-bd">Breakdown (optional, one per line)</label><textarea id="fx-bd" rows="3">${esc(x.breakdown || "")}</textarea></div>
+    <div class="field"><label>Breakdown <span style="font-weight:400;color:var(--muted)">(optional · one item per row)</span></label>
+      <div id="fx-items">${its.map(fxRow).join("")}</div>
+      <button type="button" class="btn ghost sm" data-act="fx-add-item" style="align-self:flex-start">+ Add item</button>
+      <div class="total-line"><span>Total of the list</span><span id="fx-itotal" class="num">${peso2(its.reduce((a, i) => a + (Number(i.amount) || 0), 0))}</span></div>
+      <label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="fx-auto" ${auto ? "checked" : ""}> Use this total as the Amount per month</label></div>
     ${id ? recLogHtml("fixedexp", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-fixed" data-id="${id}">Delete line</button> <span class="s">To keep it for your records, set Status to Inactive instead of deleting.</span></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
     if (!val("fx-desc")) return sheetError("Enter a description.");
-    const data = { ...(id ? clean(x) : { order: S.fixedexp.length + 1 }), desc: val("fx-desc"), amount: numv("fx-amt"), notes: val("fx-notes"), breakdown: val("fx-bd"), status: val("fx-status") === "inactive" ? "inactive" : "active", updatedAt: Date.now() };
+    const items = [...document.querySelectorAll("#sheet .fx-row")].map(r => ({ label: r.querySelector(".fx-il").value.trim(), amount: Number(String(r.querySelector(".fx-ia").value).replace(/[^\d.]/g, "")) || 0 })).filter(i => i.label || i.amount);
+    const sum = items.reduce((a, i) => a + i.amount, 0), useSum = $("#fx-auto").checked && sum > 0;
+    const data = { ...(id ? clean(x) : { order: S.fixedexp.length + 1 }), desc: val("fx-desc"), amount: useSum ? sum : numv("fx-amt"), notes: val("fx-notes"), items, itemsAuto: useSum, breakdown: "", status: val("fx-status") === "inactive" ? "inactive" : "active", updatedAt: Date.now() };
     await save("fixedexp", id || uid("fx"), data); closeSheet(); toast("Saved.");
   });
 }
@@ -8933,6 +8958,8 @@ document.addEventListener("click", guard(async ev => {
     case "scent-web": { const q = val("sc-name"); window.open("https://www.google.com/search?tbm=isch&q=" + encodeURIComponent((q || "perfume") + " perfume bottle"), "_blank", "noopener"); return; }
     case "new-fixed": return openFixedForm();
     case "edit-fixed": return openFixedForm(id);
+    case "fx-add-item": { $("#fx-items").insertAdjacentHTML("beforeend", fxRow()); const r = [...document.querySelectorAll("#fx-items .fx-il")].pop(); if (r) r.focus(); return fxTotal(); }
+    case "fx-del-item": b.closest(".fx-row").remove(); return fxTotal();
     case "del-fixed": await remove("fixedexp", id); closeSheet(); toast("Deleted."); return;
     case "new-invoice": return openInvoiceForm(null, "invoice");
     case "new-budget": return openInvoiceForm(null, "request");
@@ -9263,6 +9290,7 @@ document.addEventListener("input", ev => {
   if (t.id === "o-sf") { t.dataset.auto = ""; const H = $("#o-sf-hint"); if (H) H.textContent = "Typed by you."; }
   if (t.matches(".it-q, .it-price, #o-disc, #o-sf")) return updateOrderTotal();
   if (t.matches(".ei-q, .ei-p, .ei-name, #ei-adj, #ei-sf, #ei-disc")) return eiTotal();
+  if (t.matches("#sheet .fx-ia, #fx-auto")) return fxTotal();
   if (t.id === "p-frag-text") { if (t.value.trim()) fragFill(fragFromText(t.value), true); return; }
   if (t.id === "k-prog") { $("#k-prog-val").textContent = t.value + "%"; return; }
   if (t.classList.contains("gs-in")) return globalSearch(t);
