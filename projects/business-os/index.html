@@ -1408,7 +1408,8 @@ const stMap = m => v => CHIP_ST[(m[v] || {}).cls || ""] || "st-grey";
 document.addEventListener("change", async e => {
   const el = e.target.closest && e.target.closest("[data-ied]"); if (!el || el.disabled) return;
   const [col, id, path, type] = el.dataset.ied.split("|"), lab = el.dataset.lab || path; let v = el.value;
-  v = type === "money" ? (Number(String(v).replace(/[^\d.]/g, "")) || 0) : type === "num" ? (v === "" ? "" : Number(v)) : type === "last4" ? v.replace(/\D/g, "").slice(-4) : type === "sel" ? v : v.trim();
+  if (path === "active" && type === "sel") v = v === "1";
+  v = path === "active" && type === "sel" ? v : type === "money" ? (Number(String(v).replace(/[^\d.]/g, "")) || 0) : type === "num" ? (v === "" ? "" : Number(v)) : type === "last4" ? v.replace(/\D/g, "").slice(-4) : type === "sel" ? v : v.trim();
   const rec = (S[col] || []).find(r => r.id === id); if (!rec) return;
   try {
     if (path.startsWith("rows.")) { const [, i, k] = path.split("."), rows = JSON.parse(JSON.stringify(rec.rows || [])), old = (rows[+i] || {})[k]; if (!rows[+i] || JSON.stringify(old ?? "") === JSON.stringify(v)) return; rows[+i][k] = v;
@@ -8060,9 +8061,9 @@ function viewDues() {
   const act = list.filter(d => d.active !== false);
   const tot = act.reduce((a, d) => a + (Number(d.amount) || 0), 0), paid = act.filter(d => (d.paid || []).includes(ym));
   const next = act.filter(d => !(d.paid || []).includes(ym) && dueDateIn(d, ym) >= mToday()).sort((a, b) => dueDateIn(a, ym).localeCompare(dueDateIn(b, ym)))[0];
-  const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="${can && pickOn() ? 9 : 8}">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">${can ? pickTd("due", d.id) : ""}
+  const group = k => { const rows = list.filter(d => d.kind === k); if (!rows.length) return ""; return `<tr class="grp"><td colspan="${can && pickOn() ? 10 : 9}">${dueKind(k)}s <span style="font-weight:500;color:var(--muted)">${peso(rows.filter(d => d.active !== false).reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></td></tr>` + rows.map(d => { const dd = dueDateIn(d, ym), isPaid = (d.paid || []).includes(ym), late = !isPaid && dd < mToday(); return `<tr ${can ? `data-act="edit-due" data-id="${d.id}"` : 'style="cursor:default"'} class="${d.active === false ? "done" : ""}">${can ? pickTd("due", d.id) : ""}
       <td class="l" style="font-weight:600">${ied("dues", d, "name", "text", "Name", { ro: !can })}</td><td class="nowrap">${ied("dues", d, "day", "num", "Due day of the month", { ro: !can, attrs: 'min="1" max="31" style="width:64px"' })}<span class="s"> of the month</span></td><td class="num nowrap">${ied("dues", d, "amount", "money", "Amount", { ro: !can })}</td><td>${ied("dues", d, "method", "text", "Paid via / bank", { ro: !can })}</td><td class="nowrap num">${ied("dues", d, "account", "last4", "Account (last 4 digits)", { ro: !can, attrs: 'maxlength="4" inputmode="numeric" style="width:78px"' })}</td><td>${ied("dues", d, "holder", "text", "Holder", { ro: !can })}</td>
-      <td class="nowrap">${d.active === false ? "Stopped" : `<button class="btn sm ${isPaid ? "" : late ? "danger" : "primary"}" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${ym}">${isPaid ? "Paid ✓" : late ? "Overdue · Mark paid" : "Mark paid"}</button>`}</td>${recHistTd("dues", d)}</tr>`; }).join(""); };
+      <td class="nowrap">${d.active === false ? "Inactive" : `<button class="btn sm ${isPaid ? "" : late ? "danger" : "primary"}" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${ym}">${isPaid ? "Paid ✓" : late ? "Overdue · Mark paid" : "Mark paid"}</button>`}</td><td>${iedP("dues", d.id, "active", d.active === false ? "0" : "1", "sel", "Status", { ro: !can, st: v => v === "0" ? "st-grey" : "st-green", opts: [["1", "Active"], ["0", "Inactive"]] })}</td>${recHistTd("dues", d)}</tr>`; }).join(""); };
   return `<div class="kpis">
       <div class="kpi"><span class="label">Due in ${monthLabel(ym)}</span><span class="value">${peso(tot)}</span><span class="sub">${act.length} payments</span></div>
       <div class="kpi"><span class="label">Paid so far</span><span class="value">${paid.length}/${act.length}</span><span class="sub">${peso(paid.reduce((a, d) => a + (Number(d.amount) || 0), 0))}</span></div>
@@ -8073,7 +8074,7 @@ function viewDues() {
       const miss = act.filter(d => (d.paid || []).some(x => x < pym) && !(d.paid || []).includes(pym));   // was paid in earlier months, but not last month
       return miss.length ? `<div class="notice" style="background:var(--bad-bg);color:var(--bad)"><b>Not marked paid in ${monthLabel(pym)}:</b> ${miss.map(d => `${esc(d.name)} <button class="btn sm" type="button" data-act="due-paid" data-id="${d.id}" data-ym="${pym}">Mark paid</button>`).join(" · ")}</div>` : ""; })()}
     ${pickBar("due", [["✓ Mark paid (" + monthLabel(ym) + ")", "due-sel-paid", "primary"], ["Mark unpaid", "due-sel-unpaid"]], list.map(d => d.id))}
-    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th class="l">Name</th><th>Due date</th><th>Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th><th>History</th></tr></thead>
+    <div class="table-wrap"><table class="otable"><thead><tr>${can ? pickTh("due", list.map(d => d.id)) : ""}<th class="l">Name</th><th>Due date</th><th>Amount</th><th>Paid via / bank</th><th>Account</th><th>Holder</th><th>${monthLabel(ym)}</th><th>Status</th><th>History</th></tr></thead>
       <tbody>${DUE_KINDS.map(k => group(k[0])).join("")}</tbody></table>${list.length ? "" : `<div class="empty" style="padding:16px">No due dates yet.</div>`}</div>
     <div style="font-size:12px;color:var(--muted)">Only the last 4 digits of account and card numbers are kept here, for safety. A due date of the 30th falls on the last day in shorter months.</div>`;
 }
@@ -8088,13 +8089,13 @@ function openDueForm(id) {
     <div class="row"><div class="field"><label for="du-method">Paid via / bank</label><input id="du-method" value="${esc(d.method || "")}" placeholder="Maribank, BPI QR code"></div>
       <div class="field"><label for="du-acct">Account (last 4 digits)</label><input id="du-acct" inputmode="numeric" maxlength="4" value="${esc(d.account || "")}"></div></div>
     <div class="row"><div class="field"><label for="du-holder">Holder</label><input id="du-holder" value="${esc(d.holder || "")}"></div>
-      <div class="field"><label for="du-active">Status</label><select id="du-active"><option value="1" ${d.active !== false ? "selected" : ""}>Active</option><option value="0" ${d.active === false ? "selected" : ""}>Stopped</option></select></div></div>
+      <div class="field"><label for="du-active">Status</label><select id="du-active"><option value="1" ${d.active !== false ? "selected" : ""}>Active</option><option value="0" ${d.active === false ? "selected" : ""}>Inactive (kept as a record)</option></select></div></div>
     <div class="field"><label for="du-notes">Notes</label><input id="du-notes" value="${esc(d.notes || "")}"></div>
     <div class="field"><label>Shows on the calendar of</label><div style="display:flex;gap:12px;flex-wrap:wrap">${activeTeam().filter(m => m.department === "FINANCE" || dueWho(d).includes(m.id)).map(m => `<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="du-who" value="${m.id}" ${dueWho(d).includes(m.id) ? "checked" : ""}> ${esc(m.nickname || m.name)}</label>`).join("")}</div></div>
     ${id ? `<div style="font-size:12px;color:var(--muted)">Paid months: ${(d.paid || []).map(monthLabel).join(", ") || "none yet"}</div>` : ""}
     ${id ? recLogHtml("dues", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
-    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-due" data-id="${id}">Delete</button></div>` : ""}
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-due" data-id="${id}">Delete</button> <span class="s">To keep it for your records, set Status to Inactive instead.</span></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
     if (!val("du-name")) return sheetError("Enter a name.");
