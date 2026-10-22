@@ -339,6 +339,19 @@ summary.yr span { font-size: 13px; color: var(--muted); }
 .tag button { border: 0; background: none; padding: 0 0 0 4px; color: var(--muted); }
 .bulk { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); font-size: 13px; }
 .bulk input { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 5px 8px; width: 120px; }
+.mc-pill { display: block; width: 100%; text-align: left; border: 0; border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--fg); font: inherit; font-size: 11.5px; line-height: 1.25; padding: 2px 5px; border-radius: 4px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+.mc-key { border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--fg); font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.mc-key.off { background: transparent; opacity: .45; text-decoration: line-through; }
+.mc-list { display: flex; flex-direction: column; gap: 6px; }
+.mc-row { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; border: 0; border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 8%, var(--surface)); color: var(--fg); font: inherit; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.mc-tag { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--c); min-width: 76px; padding-top: 2px; }
+.mc-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mc-t small { color: var(--muted); font-size: 12px; }
+.mc-day { padding: 8px 0; border-top: 1px solid var(--line); }
+.mc-day:first-child { border-top: 0; }
+.mc-day.today .mc-dh { color: var(--brand); }
+.mc-dh { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 .pager { display: flex; align-items: center; gap: 6px; }
 .pager span { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); padding-inline: 6px; }
 .dropzone { border: 1.5px dashed var(--line); border-radius: var(--radius); padding: 20px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 8px; align-items: center; }
@@ -1247,7 +1260,7 @@ const S = {
   unlocked: new Set(),
   accessreq: [], db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
 };
-try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom", "listings", "gallery", "reviews"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab, oSrc: v.oSrc === "web" ? "web" : "all" }); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("rs-nav") || "{}"); if (["home", "tasks", "attendance", "account", "depts", "dept", "orders", "eom", "listings", "gallery", "reviews", "mcal"].includes(v.view)) Object.assign(S, { view: v.view, dept: dept(v.dept) ? v.dept : S.dept, tab: v.tab || S.tab, oSrc: v.oSrc === "web" ? "web" : "all" }); } catch (e) {}
 try { const y = Number(sessionStorage.getItem("rs-refresh-y")); sessionStorage.removeItem("rs-refresh-y"); if (y > 0) [700, 1600].forEach(ms => setTimeout(() => window.scrollTo(0, y), ms)); } catch (e) {}
 try { JSON.parse(sessionStorage.getItem("rs-unlocked") || "[]").forEach(d => S.unlocked.add(d)); } catch (e) {}
 const hv = location.hash.slice(1); if (["home", "tasks", "attendance", "account", "eom"].includes(hv)) S.view = hv;
@@ -2217,6 +2230,7 @@ function renderNav() {
     (canListings() ? item('data-nav="listings"', "tag", "Listings", S.view === "listings", "", "desktop-only") : "") +
     (canListings() ? item('data-nav="gallery"', "image", "Gallery", S.view === "gallery", "", "desktop-only") : "") +
     (rvSees() ? item('data-nav="reviews"', "star", "Reviews", S.view === "reviews", rvBadge(), "desktop-only") : "") +
+    item('data-nav="mcal"', "tasks", "Marketing calendar", S.view === "mcal", "", "desktop-only") +
     (canAttendance() ? item('data-nav="attendance"', "clock", "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', "award", "Awards", S.view === "eom") : "") +
     item('data-nav="depts"', "depts", "Departments", inDept, "", "mobile-only") +
@@ -2259,6 +2273,7 @@ function headActions() {
     inventory: ex("products") + (can ? `<button class="btn" type="button" data-act="shopee-file" title="Excel for Shopee Mass Upload: in-stock on-hand listings, photos with our logo">🛍 Shopee file</button>` : "") + (can ? `<button class="btn primary" type="button" data-act="new-product">Add product</button>` : ""),
     customers: (SHOPIFY_ON && can ? `<button class="btn" type="button" data-act="import">Import from Shopify</button>` : "") + (S.realOwner && !S.viewAs ? `<button class="btn" type="button" data-act="ann-brevo-list" title="Buyers' emails + first names for Brevo (made in your browser, not saved)">⬇ Buyer list (CSV)</button>` : "") + ex("customers"),
     channels: ex("customers"),
+    mcal: mcEdit() ? `<button class="btn primary" type="button" data-act="mc-new">Add to calendar</button>` : "",
     expenses: ex("expenses") + (can ? `<button class="btn primary" type="button" data-act="new-expense">Add expense</button>` : ""),
     team: ex("team") + (S.canEdit ? `<button class="btn primary" type="button" data-act="new-member">Add team member</button>` : ""),
     logins: S.vaultKey && can ? `<button class="btn ghost" type="button" data-act="vault-lock">${svg("lock", "btn-ico")} Lock logins</button><button class="btn primary" type="button" data-act="new-login">Add login</button>` : "",
@@ -2336,7 +2351,7 @@ function bounceHome(v) {
 function renderInner() {
   renderNav();
   const d = dept(S.dept);
-  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My Account", depts: "Departments", orders: "Orders", listings: "Listings", gallery: "Photo gallery", reviews: "Reviews", eom: "Employee of the Month" }[S.view] || d.name;
+  const title = { home: "Home", tasks: "Tasks", attendance: "Attendance", account: "My Account", depts: "Departments", orders: "Orders", listings: "Listings", gallery: "Photo gallery", reviews: "Reviews", mcal: "Marketing calendar", eom: "Employee of the Month" }[S.view] || d.name;
   $("#view-title").textContent = title;
   const dc = S.view === "dept" ? DEPT_COLORS[S.dept] : "";
   document.documentElement.style.setProperty("--dc", dc || "var(--brand)");
@@ -2361,6 +2376,7 @@ function renderInner() {
   if (S.view === "orders") { if (!canOrders()) return bounceHome(v); v.innerHTML = viewOrders(); return; }
   if (S.view === "gallery") { if (!canListings()) return bounceHome(v); v.innerHTML = viewGallery(); return; }
   if (S.view === "reviews") { if (!rvSees()) return bounceHome(v); v.innerHTML = viewReviews(); return; }
+  if (S.view === "mcal") { v.innerHTML = viewMcal(); return; }
   if (S.view === "listings") {
     if (!canListings()) return bounceHome(v);
     const ld = LISTING_DEPTS.find(x => canSee(x) && isUnlocked(x));
@@ -3669,6 +3685,71 @@ async function openMemberForm(id) {
     if (S.vaultKey && $("#m-g-tin")) { const g = Object.fromEntries(GOV_IDS.map(([k]) => [k, val("m-g-" + k)]).filter(x => x[1])); data.govIds = Object.keys(g).length ? await vEnc(S.vaultKey, JSON.stringify(g)) : null; }
     await save("team", id || uid("m"), data);
     closeSheet(); toast(id ? "Team member updated." : "Team member added.");
+  });
+}
+
+/* ---------- Marketing calendar (K, Oct 22, 2026): everyone sees it; Marketing + owner edit. Events live in webmeta/_mcal {events:[{id,date,end?,kind,title,note?}]}.
+   Until the first edit the Q4 plan below is shown from this file; the first save stores the whole list. ---------- */
+const MC_KINDS = { post: ["Post / content", "#7c3aed"], live: ["Live selling", "#dc2626"], sale: ["Sale day", "#d97706"], pay: ["Payday", "#059669"], hol: ["Holiday", "#64748b"], web: ["Website", "#2563eb"] };
+const MC_SEED = [["2026-10-18","post","Payday Treats stories still up"],["2026-10-20","post","S-JOY arrivals update (Oct ETA)"],["2026-10-21","post","Sealed vs Tester explained"],["2026-10-22","post","Live teaser: first Saturday live"],["2026-10-23","post","FB Group poll: what to feature live"],["2026-10-24","live","Launch Live 8 PM"],["2026-10-27","post","New arrivals"],["2026-10-28","post","Halloween scent edit (dark & smoky)"],["2026-10-30","pay","Payday"],["2026-10-30","post","Payday Treats round 2"],["2026-10-31","hol","Halloween"],["2026-10-31","live","Halloween Live 8 PM"],["2026-11-01","hol","All Saints' Day"],["2026-11-02","hol","All Souls' Day"],["2026-11-03","post","11.11 teaser starts"],["2026-11-05","post","11.11 sneak peek items"],["2026-11-07","live","11.11 preview Live"],["2026-11-10","post","11.11 tomorrow: countdown"],["2026-11-11","sale","11.11 Sale"],["2026-11-11","live","11.11 Live 8 PM"],["2026-11-13","pay","Payday (15th falls on Sun)"],["2026-11-13","post","Payday Treats"],["2026-11-14","live","Payday Live"],["2026-11-17","post","\"Your pre-orders are here\" (S-JEFF)"],["2026-11-20","post","Gift Guide launch: by budget"],["2026-11-21","live","Gift Guide Live"],["2026-11-24","post","Black Friday teaser"],["2026-11-27","sale","Black Friday"],["2026-11-28","live","Black Friday Live"],["2026-11-30","hol","Bonifacio Day"],["2026-11-30","pay","Payday"],["2026-11-30","sale","Cyber Monday (scheduled)"],["2026-12-01","post","Christmas countdown starts"],["2026-12-03","post","Gifts for him"],["2026-12-04","post","Gifts for her"],["2026-12-05","live","Christmas Live 1"],["2026-12-08","hol","Immaculate Conception"],["2026-12-09","post","12.12 teaser"],["2026-12-11","post","12.12 tomorrow"],["2026-12-12","sale","12.12 Sale"],["2026-12-12","live","12.12 Live 8 PM"],["2026-12-15","pay","Payday + 13th-month pay"],["2026-12-15","post","13th-month treats"],["2026-12-16","hol","Simbang Gabi starts"],["2026-12-16","post","Last call for Christmas delivery"],["2026-12-17","sale","Last order day for Christmas (nationwide)"],["2026-12-19","live","Last Christmas Live"],["2026-12-22","post","Metro Manila last orders"],["2026-12-24","hol","Christmas Eve"],["2026-12-24","post","Merry Christmas post (scheduled)"],["2026-12-25","hol","Christmas Day"],["2026-12-26","live","Post-Christmas Live"],["2026-12-29","post","New Year scents"],["2026-12-30","hol","Rizal Day"],["2026-12-30","pay","Payday"],["2026-12-31","hol","New Year's Eve"],["2026-12-31","post","Thank-you + 2027 teaser"]].map(([date, kind, title], i) => ({ id: "q4-" + i, date, kind, title }))
+  .concat([{ id: "q4-w1", date: "2026-10-22", end: "2026-10-31", kind: "web", title: "After Dark (Halloween) on the website", note: "Buy 2 get 10% off (code AFTERDARK) and Double Royal Points" },
+           { id: "q4-w2", date: "2026-10-22", kind: "web", title: "Second Reign: pre-loved gadgets & bags page goes live" }]);
+const mcDoc = () => S.webmeta.find(d => d.id === "_mcal");
+const mcEvents = () => { const d = mcDoc(); return d && Array.isArray(d.events) ? d.events : MC_SEED; };
+const mcEdit = () => !S.readOnly && (S.isOwner || canSee("MARKETING"));
+const mcOn = (e, d) => e.date <= d && d <= (e.end || e.date);
+const mcKind = k => MC_KINDS[k] || ["Other", "#64748b"];
+S.mc = { month: today().slice(0, 7), day: today(), mode: matchMedia("(max-width: 700px)").matches ? "list" : "calendar", off: new Set() };
+async function mcSave(events) { await save("webmeta", "_mcal", { ref: "_mcal", events, at: Date.now(), by: actor() }); }
+function mcPill(e) { const [lab, c] = mcKind(e.kind); return `<button type="button" class="mc-pill" data-mc="${esc(e.id)}" style="--c:${c}" title="${esc(lab)}: ${esc(e.title)}${e.note ? " · " + esc(e.note) : ""}">${esc(e.title)}</button>`; }
+function viewMcal() {
+  const ym = S.mc.month, [y, m] = ym.split("-").map(Number), all = mcEvents(), ev = all.filter(e => !S.mc.off.has(e.kind));
+  const first = new Date(y, m - 1, 1), dim = new Date(y, m, 0).getDate(), weeks = Math.ceil((first.getDay() + dim) / 7), cells = [];
+  for (let i = 0; i < weeks * 7; i++) cells.push(dstr(new Date(y, m - 1, 1 - first.getDay() + i, 12).getTime()));
+  const on = d => ev.filter(e => mcOn(e, d)).sort((a, b) => Object.keys(MC_KINDS).indexOf(a.kind) - Object.keys(MC_KINDS).indexOf(b.kind));
+  const canE = mcEdit();
+  const seg = `<div class="seg" role="group" aria-label="Layout">${[["calendar", "Calendar"], ["list", "List"]].map(([k, l]) => `<button type="button" data-mcmode="${k}" aria-pressed="${S.mc.mode === k}">${l}</button>`).join("")}</div>`;
+  const bar = `<div class="tbar"><div class="pager"><button class="btn sm" type="button" data-mcmonth="-1" aria-label="Previous month">‹</button><strong>${monthLabel(ym)}</strong><button class="btn sm" type="button" data-mcmonth="1" aria-label="Next month">›</button>${ym === today().slice(0, 7) ? "" : `<button class="btn ghost sm" type="button" data-mcmonth="0">This month</button>`}</div><span class="tbar-sp"></span>${seg}</div>`;
+  const keys = `<div class="mc-keys">${Object.entries(MC_KINDS).map(([k, [l, c]]) => `<button type="button" class="mc-key${S.mc.off.has(k) ? " off" : ""}" data-mckind="${k}" style="--c:${c}" aria-pressed="${!S.mc.off.has(k)}">${l}</button>`).join("")}</div>`;
+  let main;
+  if (S.mc.mode === "calendar") {
+    const dayEv = on(S.mc.day);
+    main = `<div class="cal">${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => `<div class="cal-h">${d}</div>`).join("")}
+      ${cells.map(d => { const es = on(d), out = d.slice(0, 7) !== ym, op = (S.calOpen || (S.calOpen = new Set())).has("mc" + d), n = op ? es.length : 3;
+        return `<div class="cal-d${out ? " out" : ""}${d === today() ? " today" : ""}${d === S.mc.day ? " picked" : ""}" data-mcday="${d}"><div class="cal-n"><span>${Number(d.slice(8))}</span>${canE ? `<button type="button" class="cal-add" data-act="mc-new" data-date="${d}" aria-label="Add on ${fmtDate(d)}">+</button>` : ""}</div>
+        <div class="cal-items">${es.slice(0, n).map(mcPill).join("")}${es.length > n ? `<button type="button" class="cal-more" data-act="mc-more" data-date="${d}">+${es.length - n} more</button>` : ""}${op && es.length > 3 ? `<button type="button" class="cal-more" data-act="mc-more" data-date="${d}">Show less</button>` : ""}</div>
+        ${es.length ? `<div class="cal-dots" aria-hidden="true">${es.slice(0, 4).map(e => `<i style="background:${mcKind(e.kind)[1]}"></i>`).join("")}</div>` : ""}</div>`; }).join("")}</div>
+      <section class="panel"><div class="head"><h2>${longDate(S.mc.day)}</h2>${canE ? `<button class="btn sm" type="button" data-act="mc-new" data-date="${S.mc.day}">+ Add for this day</button>` : ""}</div>
+        ${dayEv.length ? `<div class="mc-list">${dayEv.map(mcRow).join("")}</div>` : `<div class="empty">Nothing planned this day.</div>`}</section>`;
+  } else {
+    const days = cells.filter(d => d.slice(0, 7) === ym).filter(d => on(d).length);
+    main = days.length ? `<section class="panel">${days.map(d => `<div class="mc-day${d === today() ? " today" : ""}"><div class="mc-dh">${new Date(d + "T00:00:00").toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" })}</div><div class="mc-list">${on(d).map(mcRow).join("")}</div></div>`).join("")}</section>`
+      : `<section class="panel"><div class="empty">Nothing planned this month.</div></section>`;
+  }
+  return `${bar}${keys}${main}<div style="font-size:12px;color:var(--muted)">${canE ? "Tap an entry to edit it, or + to add one." : "Marketing keeps this calendar up to date. Tap an entry to read it."} Sale days and lives follow the Q4 plan.</div>`;
+}
+function mcRow(e) { const [lab, c] = mcKind(e.kind); return `<button type="button" class="mc-row" data-mc="${esc(e.id)}" style="--c:${c}"><span class="mc-tag">${esc(lab)}</span><span class="mc-t"><b>${esc(e.title)}</b>${e.end ? `<small>${fmtDate(e.date)} to ${fmtDate(e.end)}</small>` : ""}${e.note ? `<small>${esc(e.note)}</small>` : ""}</span></button>`; }
+function openMcForm(id, date) {
+  const all = mcEvents(), e = id ? all.find(x => x.id === id) : { date: date || today(), kind: "post" }; if (!e) return;
+  if (!mcEdit()) { const [lab] = mcKind(e.kind); return openSheet(`<h3>${esc(e.title)}</h3><div style="font-size:14px;line-height:1.5"><div><b>${esc(lab)}</b> · ${fmtDateY(e.date)}${e.end ? " to " + fmtDateY(e.end) : ""}</div>${e.note ? `<div>${esc(e.note)}</div>` : ""}</div><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); }
+  openSheet(`
+    <h3>${id ? "Edit calendar entry" : "Add to calendar"}</h3>
+    <div class="row">
+      <div class="field"><label for="mc-date">Date</label><input id="mc-date" type="date" value="${esc(e.date)}"></div>
+      <div class="field"><label for="mc-end">Until (optional)</label><input id="mc-end" type="date" value="${esc(e.end || "")}"></div>
+    </div>
+    <div class="field"><label for="mc-kind">Type</label><select id="mc-kind">${Object.entries(MC_KINDS).map(([k, [l]]) => `<option value="${k}" ${e.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    <div class="field"><label for="mc-title">Title</label><input id="mc-title" value="${esc(e.title || "")}" placeholder="e.g. 12.12 teaser post"></div>
+    <div class="field"><label for="mc-note">Notes (optional)</label><textarea id="mc-note" rows="3" placeholder="Channels, caption idea, who posts">${esc(e.note || "")}</textarea></div>
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="mc-del" data-id="${esc(id)}">Delete</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    const title = val("mc-title"); if (!title) return sheetError("Enter a title.");
+    const d = val("mc-date") || today(); let end = val("mc-end"); if (end && end <= d) end = "";
+    const item = { id: id || uid("mc"), date: d, ...(end ? { end } : {}), kind: val("mc-kind") || "post", title, ...(val("mc-note") ? { note: val("mc-note") } : {}) };
+    const list = all.filter(x => x.id !== item.id); list.push(item);
+    await mcSave(list); S.mc.month = d.slice(0, 7); S.mc.day = d; closeSheet(); toast(id ? "Calendar updated." : "Added to the calendar.");
   });
 }
 
@@ -8664,6 +8745,7 @@ function openDrawer() {
     (canListings() ? item('data-nav="listings"', ic("tag"), "Listings", S.view === "listings") : "") +
     (canListings() ? item('data-nav="gallery"', ic("image"), "Gallery", S.view === "gallery") : "") +
     (rvSees() ? item('data-nav="reviews"', ic("star"), "Reviews", S.view === "reviews", rvBadge()) : "") +
+    item('data-nav="mcal"', ic("tasks"), "Marketing calendar", S.view === "mcal") +
     (canAttendance() ? item('data-nav="attendance"', ic("clock"), "Attendance", S.view === "attendance") : "") +
     (isCEO() ? item('data-nav="eom"', ic("award"), "Awards", S.view === "eom") : "") +
     `<div class="drawer-l">Departments</div>` +
@@ -8713,6 +8795,16 @@ document.addEventListener("click", guard(async ev => {
   if (trg) { S.t.range = trg.dataset.trange; if (S.t.range === "today") { S.t.month = today().slice(0, 7); S.t.day = today(); } render(); return; }
   const tmn = ev.target.closest("[data-tmonth]");
   if (tmn) { const k = Number(tmn.dataset.tmonth); if (!k) { S.t.month = today().slice(0, 7); S.t.day = today(); } else { const [y, m] = S.t.month.split("-").map(Number); const d = new Date(y, m - 1 + k, 1); S.t.month = dstr(d.getTime()).slice(0, 7); S.t.day = S.t.month === today().slice(0, 7) ? today() : S.t.month + "-01"; } render(); return; }
+  const mcm = ev.target.closest("[data-mcmonth]");
+  if (mcm) { const k = Number(mcm.dataset.mcmonth); if (!k) { S.mc.month = today().slice(0, 7); S.mc.day = today(); } else { const [y, m] = S.mc.month.split("-").map(Number); S.mc.month = dstr(new Date(y, m - 1 + k, 1, 12).getTime()).slice(0, 7); S.mc.day = S.mc.month + "-01"; } render(); return; }
+  const mck = ev.target.closest("[data-mckind]");
+  if (mck) { const k = mck.dataset.mckind; S.mc.off.has(k) ? S.mc.off.delete(k) : S.mc.off.add(k); render(); return; }
+  const mcv = ev.target.closest("[data-mcmode]");
+  if (mcv) { S.mc.mode = mcv.dataset.mcmode; render(); return; }
+  const mce = ev.target.closest("[data-mc]");
+  if (mce) return openMcForm(mce.dataset.mc);
+  const mcd = ev.target.closest("[data-mcday]");
+  if (mcd && !ev.target.closest("[data-act]")) { S.mc.day = mcd.dataset.mcday; render(); return; }
   const wp = ev.target.closest("[data-wperson]");
   if (wp) { if (S.view === "dept") { S.view = "tasks"; saveNav(); } S.t.scope = "person"; S.t.person = wp.dataset.wperson; render(); return; }
   const wd = ev.target.closest("[data-wdept]");
@@ -9114,6 +9206,9 @@ document.addEventListener("click", guard(async ev => {
     case "new-product": return openProductForm();
     case "edit-product": return openProductForm(id);
     case "restock": return openRestock(id);
+    case "mc-new": return openMcForm(null, b.dataset.date);
+    case "mc-more": { const k = "mc" + b.dataset.date, o = S.calOpen || (S.calOpen = new Set()); o.has(k) ? o.delete(k) : o.add(k); render(); return; }
+    case "mc-del": { if (!mcEdit() || !confirm("Delete this calendar entry?")) return; await mcSave(mcEvents().filter(x => x.id !== b.dataset.id)); closeSheet(); toast("Removed from the calendar."); return; }
     case "new-expense": return openExpenseForm();
     case "new-cashin": return openExpenseForm(null, true);
     case "chk-file": { const x = S.checks.find(r => r.id === id); if (!x || !x.file) return; const w = window.open("", "_blank"); try { const u = await fileBlobUrl(x.file); if (w) w.location.href = u; else location.href = u; } catch (err) { if (w) w.close(); toast("Couldn't open the file."); } return; }
