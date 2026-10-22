@@ -4333,6 +4333,18 @@ function viewGate() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${sent ? `<span class="chip good">Request sent. The owner will link you.</span>` : `<button class="btn primary" type="button" data-act="req-access">Ask the owner for access</button>`}<a class="btn" href="https://claude.ai/logout" target="_top" rel="noopener">Sign in with another account</a></div></div>`;
 }
 S.reqProf = {}; S.raw = {};
+// Table axis lock (K, Oct 22, 2026): scrolling up/down must not slide a table left/right (phone swipe or desktop trackpad).
+// A gesture that starts mostly vertical keeps the table's sideways position until it ends.
+(() => { const G = new WeakMap(); let cur = null;
+  const wrapOf = t => t && t.closest ? t.closest(".table-wrap") : null;
+  document.addEventListener("touchstart", e => { cur = wrapOf(e.target); if (!cur) return; const t = e.touches[0]; G.set(cur, { x: t.clientX, y: t.clientY, axis: "", left: cur.scrollLeft, until: 0 }); }, { passive: true, capture: true });
+  document.addEventListener("touchmove", e => { const g = cur && G.get(cur); if (!g || g.axis) return; const t = e.touches[0], dx = Math.abs(t.clientX - g.x), dy = Math.abs(t.clientY - g.y);
+    if (Math.max(dx, dy) > 6) { g.axis = dy > dx * 1.15 ? "y" : "x"; if (g.axis === "y") g.left = cur.scrollLeft; } }, { passive: true, capture: true });
+  document.addEventListener("touchend", () => { const g = cur && G.get(cur); if (g) g.until = Date.now() + 900; }, { passive: true, capture: true });   // keep the lock through momentum scrolling
+  document.addEventListener("wheel", e => { const w = wrapOf(e.target); if (!w) return; if (Math.abs(e.deltaY) > Math.abs(e.deltaX) * 1.15) G.set(w, { axis: "y", left: w.scrollLeft, until: Date.now() + 450 }); else if (Math.abs(e.deltaX) > 0) G.delete(w); }, { passive: true, capture: true });
+  document.addEventListener("scroll", e => { const w = e.target; if (!w || !w.classList || !w.classList.contains("table-wrap")) return; const g = G.get(w); if (!g || g.axis !== "y") return;
+    if ((g.until && Date.now() > g.until) && g.until !== 0) { G.delete(w); return; } if (w.scrollLeft !== g.left) w.scrollLeft = g.left; }, true);
+})();
 // The logins vault locks itself after 5 minutes without a click or key press.
 let vaultIdleAt = Date.now();
 ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { vaultIdleAt = Date.now(); }, true));
