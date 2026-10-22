@@ -14,7 +14,7 @@ export function webProducts(products) {
   const live = products.filter(p => (p.status || "active") === "active" && p.name);
   return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || isOutW(a) - isOutW(b) || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
     .map(p => ({
-      id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: p.category || "unisex",
+      id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: (p.category === "secondreign" ? "beauty" : p.category) || "unisex",
       price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null,
       imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [],
       isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", ...(isOutW(p) ? { soldOut: true } : {}), vac: !!p.vac,
