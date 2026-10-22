@@ -2783,7 +2783,7 @@ function viewTasks(forceDept) {
     </div>
     <section class="panel"><div class="head"><h2>${longDate(S.t.day)}</h2>${S.readOnly ? "" : `<button class="btn sm" type="button" data-act="new-task" data-date="${S.t.day}">+ Add task for this day</button>`}</div>
       ${dayTasks.length ? `<div class="table-wrap" style="border:0"><table><tbody>${dayTasks.map(taskRow).join("")}</tbody></table></div>` : `<div class="empty">No tasks due this day.</div>`}
-      ${dayMoney.length ? `<h2 style="margin-top:6px">Payments due · ${peso(dayMoney.reduce((a, e) => a + e.amount, 0))}</h2><div class="table-wrap" style="border:0"><table><tbody>${dayMoney.map(e => `<tr><td style="font-weight:600">${esc(e.title)}</td><td class="nowrap">${esc(e.sub)}</td><td class="r num nowrap">${peso(e.amount)}</td><td class="r">${moneyUrg(e) ? urgChip(moneyUrg(e)) + " " : ""}${e.kind === "invoice" ? `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${e.id}">${e.paid ? "Paid ✓" : "Mark paid"}</button>` : e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">${CHECK_STATUS[e.status].name}</button>` : e.kind === "fixed" ? `<button class="btn sm" type="button" data-act="edit-fixed" data-id="${e.id}">Open</button>` : `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">${e.paid ? "Paid ✓" : "Mark paid"}</button>`}</td></tr>`).join("")}</tbody></table></div>` : ""}
+      ${dayMoney.length ? `<h2 style="margin-top:6px">Payments due · ${peso(dayMoney.reduce((a, e) => a + e.amount, 0))}</h2><div class="table-wrap" style="border:0"><table><tbody>${dayMoney.map(e => `<tr><td style="font-weight:600">${esc(e.title)}</td><td class="nowrap">${esc(e.sub)}</td><td class="r num nowrap">${peso(e.amount)}</td><td class="r">${moneyUrg(e) ? urgChip(moneyUrg(e)) + " " : ""}${e.kind === "invoice" ? `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="inv-paid" data-id="${e.id}">${e.paid ? "Paid ✓" : "Mark paid"}</button>` : e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">${CHECK_STATUS[e.status].name}</button>` : e.kind === "fixed" ? `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="fixed-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">${e.paid ? "Paid ✓" : "Mark paid"}</button>` : `<button class="btn sm ${e.paid ? "" : "primary"}" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">${e.paid ? "Paid ✓" : "Mark paid"}</button>`}</td></tr>`).join("")}</tbody></table></div>` : ""}
     </section>
     ${showMoney ? "" : canSee("FINANCE") ? `<div style="font-size:12px;color:var(--muted)">Unlock Finance to see investor, credit card and check due dates on this calendar.</div>` : ""}`;
   } else {
@@ -7889,8 +7889,8 @@ function moneyEvents(from, to) {
   const out = [];
   const months = new Set([from.slice(0, 7), to.slice(0, 7)]); { const [y, m] = from.slice(0, 7).split("-").map(Number); months.add(dstr(new Date(y, m, 1).getTime()).slice(0, 7)); }
   for (const d of S.dues) if (d.active !== false) for (const ym of months) { const date = dueDateIn(d, ym); if (date >= from && date <= to) out.push({ who: dueWho(d), kind: d.kind, id: d.id, date, title: d.name, sub: dueKind(d.kind) + (d.method ? " · " + d.method : ""), amount: Number(d.amount) || 0, paid: (d.paid || []).includes(ym) }); }
-  // Fixed expenses with a due day show on the calendar too (reminders; no overdue alerts since they have no paid marker).
-  for (const x of S.fixedexp) if (x.status !== "inactive" && Number(x.due) >= 1 && Number(x.due) <= 31) for (const ym of months) { const date = dueDateIn({ day: x.due }, ym); if (date >= from && date <= to) out.push({ who: dueWho(x), kind: "fixed", id: x.id, date, title: x.desc || "Fixed expense", sub: "Fixed expense" + (x.notes ? " · " + x.notes : ""), amount: Number(x.amount) || 0, paid: false }); }
+  // Fixed expenses with a due day show on the calendar too, with a paid marker per month like Due dates.
+  for (const x of S.fixedexp) if (x.status !== "inactive" && Number(x.due) >= 1 && Number(x.due) <= 31) for (const ym of months) { const date = dueDateIn({ day: x.due }, ym); if (date >= from && date <= to) out.push({ who: dueWho(x), kind: "fixed", id: x.id, date, title: x.desc || "Fixed expense", sub: "Fixed expense" + (x.notes ? " · " + x.notes : ""), amount: Number(x.amount) || 0, paid: (x.paid || []).includes(ym) }); }
   for (const c of S.checks) if (c.checkDate && c.checkDate >= from && c.checkDate <= to && c.status !== "cancelled") out.push({ who: dueWho(c), kind: "check", id: c.id, date: c.checkDate, title: `Check #${c.checkNo || "–"} · ${c.payee || ""}`, sub: c.bank || "Check", amount: Number(c.amount) || 0, status: c.status || "pending", paid: c.status === "cleared" });
   return out;
 }
@@ -7899,7 +7899,7 @@ const moneyPill = e => { const u = moneyUrg(e); return `<button type="button" cl
 const URG = { overdue: { name: "Overdue", cls: "bad" }, today: { name: "Due today", cls: "orange" }, soon: { name: "Due in 1–2 days", cls: "amber" } };
 const plusDays = n => dstr(Date.parse(today() + "T12:00:00+08:00") + n * 864e5);
 const urgOf = date => !date ? "" : date < today() ? "overdue" : date === today() ? "today" : date <= plusDays(2) ? "soon" : "";
-const moneyUrg = e => e.paid || e.kind === "fixed" || e.status === "cleared" || e.status === "bounced" ? "" : urgOf(e.date);
+const moneyUrg = e => e.paid || e.status === "cleared" || e.status === "bounced" ? "" : urgOf(e.date);
 const taskUrg = t => t.status === "done" || t.status === "cancelled" ? "" : urgOf(t.due);
 const urgChip = u => u ? `<span class="chip urg ${URG[u].cls}">${u === "overdue" ? "⚠ " : ""}${URG[u].name}</span>` : "";
 const moneyAccess = () => finOpen() || DUE_PEOPLE.includes(myMemberId()) || isCEO();
@@ -7917,6 +7917,7 @@ function duesAlert() {
   const sum = list.reduce((a, e) => a + e.amount, 0);
   const btn = e => e.kind === "invoice" ? `<button class="btn sm primary" type="button" data-act="inv-paid" data-id="${e.id}">Mark paid</button>`
     : e.kind === "check" ? `<button class="btn sm" type="button" data-act="edit-check" data-id="${e.id}">Update</button>`
+    : e.kind === "fixed" ? `<button class="btn sm primary" type="button" data-act="fixed-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">Mark paid</button>`
     : `<button class="btn sm primary" type="button" data-act="due-paid" data-id="${e.id}" data-ym="${e.date.slice(0, 7)}">Mark paid</button>`;
   const open = S.duesOpen != null ? S.duesOpen : n("overdue") > 0;
   return `<details class="panel dues-alert${n("overdue") ? " has-over" : n("today") ? " has-today" : ""}" aria-label="Payments needing attention" ${open ? "open" : ""} data-dues>
@@ -8128,13 +8129,13 @@ function viewFixed() {
   const all = [...S.fixedexp].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
   const isOn = x => x.status !== "inactive", list = all.filter(isOn), off = all.filter(x => !isOn(x));
   const tot = list.reduce((a, x) => a + (Number(x.amount) || 0), 0), offTot = off.reduce((a, x) => a + (Number(x.amount) || 0), 0);
-  const can = !S.readOnly;
+  const can = !S.readOnly, ym = mToday().slice(0, 7);
   // K, Oct 22, 2026: Status first, then description, amount, due date (day of the month), notes, history. Inactive lines stay as a record and are left out of the total.
-  const row = x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'} class="${isOn(x) ? "" : "done"}"><td>${iedP("fixedexp", x.id, "status", isOn(x) ? "active" : "inactive", "sel", "Status", { ro: !can, st: v => v === "inactive" ? "st-grey" : "st-green", opts: [["active", "Active"], ["inactive", "Inactive"]] })}</td><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${fxItems(x).length ? `<div class="fx-bd">${fxItems(x).map(i => `<span>${esc(i.label)}${i.amount ? " · " + peso(i.amount) : ""}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="nowrap">${ied("fixedexp", x, "due", "num", "Due day of the month", { ro: !can, attrs: 'min="1" max="31" style="width:58px"' })}${x.due ? `<span class="s"> of the month</span>` : ""}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td>${recHistTd("fixedexp", x)}</tr>`;
-  return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:124px"><col style="width:28%"><col style="width:130px"><col style="width:170px"><col><col style="width:190px"></colgroup>
-    <thead><tr><th>Status</th><th>Description</th><th>Amount / month</th><th>Due date</th><th>Notes</th><th>History</th></tr></thead>
-    <tbody>${list.length ? `<tr class="grp"><td colspan="6">Active <span style="font-weight:500;color:var(--muted)">${list.length} · ${peso(tot)}</span></td></tr>${list.map(row).join("")}` : ""}${off.length ? `<tr class="grp"><td colspan="6">Inactive <span style="font-weight:500;color:var(--muted)">${off.length} · ${peso(offTot)} · kept as a record, not counted in the total</span></td></tr>${off.map(row).join("")}` : ""}</tbody>
-    <tfoot><tr><td></td><td style="font-weight:800">Total (Active) · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td></td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td><td></td></tr></tfoot></table>
+  const row = x => `<tr ${can ? `data-act="edit-fixed" data-id="${x.id}"` : 'style="cursor:default"'} class="${isOn(x) ? "" : "done"}"><td>${iedP("fixedexp", x.id, "status", isOn(x) ? "active" : "inactive", "sel", "Status", { ro: !can, st: v => v === "inactive" ? "st-grey" : "st-green", opts: [["active", "Active"], ["inactive", "Inactive"]] })}</td><td class="l"><div class="fx-name">${ied("fixedexp", x, "desc", "text", "Description", { ro: !can })}</div>${fxItems(x).length ? `<div class="fx-bd">${fxItems(x).map(i => `<span>${esc(i.label)}${i.amount ? " · " + peso(i.amount) : ""}</span>`).join("")}</div>` : ""}</td><td class="num nowrap fx-amt">${ied("fixedexp", x, "amount", "money", "Amount per month", { ro: !can })}</td><td class="nowrap">${ied("fixedexp", x, "due", "num", "Due day of the month", { ro: !can, attrs: 'min="1" max="31" style="width:58px"' })}${x.due ? `<span class="s"> of the month</span>` : ""}</td><td class="nowrap">${isOn(x) ? `<button class="btn sm ${(x.paid || []).includes(ym) ? "" : "primary"}" type="button" data-act="fixed-paid" data-id="${x.id}" data-ym="${ym}">${(x.paid || []).includes(ym) ? "Paid ✓" : "Mark paid"}</button>` : `<span style="color:var(--muted)">–</span>`}</td><td class="fx-notes l">${ied("fixedexp", x, "notes", "text", "Notes", { ro: !can })}</td>${recHistTd("fixedexp", x)}</tr>`;
+  return `<div class="table-wrap"><table class="otable fixedtbl"><colgroup><col style="width:124px"><col style="width:28%"><col style="width:130px"><col style="width:170px"><col style="width:120px"><col><col style="width:190px"></colgroup>
+    <thead><tr><th>Status</th><th>Description</th><th>Amount / month</th><th>Due date</th><th>${monthLabel(ym)}</th><th>Notes</th><th>History</th></tr></thead>
+    <tbody>${list.length ? `<tr class="grp"><td colspan="7">Active <span style="font-weight:500;color:var(--muted)">${list.length} · ${peso(tot)}</span></td></tr>${list.map(row).join("")}` : ""}${off.length ? `<tr class="grp"><td colspan="7">Inactive <span style="font-weight:500;color:var(--muted)">${off.length} · ${peso(offTot)} · kept as a record, not counted in the total</span></td></tr>${off.map(row).join("")}` : ""}</tbody>
+    <tfoot><tr><td></td><td style="font-weight:800">Total (Active) · ${list.length} lines</td><td class="r num nowrap" style="font-weight:800">${peso(tot)}</td><td></td><td></td><td class="s">≈ ${peso(Math.round(tot / 30))} a day</td><td></td></tr></tfoot></table>
     ${all.length ? "" : `<div class="empty" style="padding:16px">No fixed expenses yet. Click “Add expense line”.</div>`}</div>`;
 }
 function openFixedForm(id) {
@@ -8213,6 +8214,11 @@ function openDueForm(id) {
     data.who = [...document.querySelectorAll("#sheet .du-who:checked")].map(x => x.value);
     await save("dues", id || uid("du"), data); closeSheet(); toast("Saved.");
   });
+}
+async function toggleFixedPaid(id, ym) {
+  const x = S.fixedexp.find(r => r.id === id); if (!x) return;
+  const set = new Set(x.paid || []); const was = set.has(ym); was ? set.delete(ym) : set.add(ym);
+  await patch("fixedexp", id, { paid: [...set].sort() }); toast(was ? `${x.desc}: marked unpaid.` : `${x.desc}: paid for ${monthLabel(ym)}.`);
 }
 async function toggleDuePaid(id, ym) {
   const d = S.dues.find(r => r.id === id); if (!d) return;
@@ -9070,6 +9076,7 @@ document.addEventListener("click", guard(async ev => {
     case "edit-due": return openDueForm(id);
     case "del-due": await remove("dues", id); closeSheet(); toast("Deleted."); return;
     case "due-paid": return toggleDuePaid(id, b.dataset.ym);
+    case "fixed-paid": return toggleFixedPaid(id, b.dataset.ym);
     case "new-check": return openCheckForm(null, b.dataset.date);
     case "edit-check": return openCheckForm(id);
     case "del-check": await remove("checks", id); closeSheet(); toast("Check deleted."); return;
