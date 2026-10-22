@@ -614,7 +614,10 @@ body.has-pomo #view { padding-bottom: 64px; }
 .bday-cake { margin-left: auto; font-size: 34px; }
 .otable tr.grp td { background: var(--surface-2); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: default; }
 code.pw { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 2px 6px; border-radius: 5px; }
-html, body { overflow-x: clip; }
+/* Phones: the page itself never slides sideways (K, Oct 2026). Only tables / tab strips scroll left-right, inside their own box. */
+html, body { overflow-x: hidden; max-width: 100%; overscroll-behavior-x: none; touch-action: pan-y pinch-zoom; }
+.table-wrap, .tabs, .strip, .team-strip, .acct-tabs, .lwrap, .seg, .supbar { touch-action: pan-x pan-y; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+main, #view { max-width: 100%; min-width: 0; }
 .av .bottle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .av .bottle svg { padding: 12%; }
 .org-scent img { border-radius: 50%; object-fit: contain !important; width: 22px !important; height: 22px !important; background: #fff; box-shadow: 0 0 0 1px var(--line); }
