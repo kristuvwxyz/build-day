@@ -1413,7 +1413,10 @@ document.addEventListener("change", async e => {
   try {
     if (path.startsWith("rows.")) { const [, i, k] = path.split("."), rows = JSON.parse(JSON.stringify(rec.rows || [])), old = (rows[+i] || {})[k]; if (!rows[+i] || JSON.stringify(old ?? "") === JSON.stringify(v)) return; rows[+i][k] = v;
       await patch(col, id, { rows, updatedAt: Date.now(), log: logAdd(rec, [`row ${+i + 1}${rows[+i].name || rows[+i].customer ? " (" + (rows[+i].name || rows[+i].customer) + ")" : ""}: ${logLab(k)}: ${logShow(k, old)} → ${logShow(k, v)}`]) }); }
-    else { if (JSON.stringify(rec[path] ?? "") === JSON.stringify(v)) return; await patch(col, id, { [path]: v, updatedAt: Date.now() }); }
+    else { if (JSON.stringify(rec[path] ?? "") === JSON.stringify(v)) return;
+      if (type === "date" && v && !(+v.slice(0, 4) >= 1990 && +v.slice(0, 4) <= 2100)) { toast("Check the year of that date."); render(); return; }   // e.g. 0002-11-01 typed by mistake
+      let ch = { [path]: v }; if (col === "investments") ch = invSyncDates(rec, ch);   // months <-> start / end dates stay in step
+      await patch(col, id, { ...ch, updatedAt: Date.now() }); }
     toast("Saved.");
   } catch (err) { toast("Couldn't save: " + ((err && err.message) || "try again.")); }
 });
@@ -7659,13 +7662,24 @@ function addMonths(d, k) {
   return `${ny}-${String(nm).padStart(2, "0")}-${String(nd).padStart(2, "0")}`;
 }
 const invMonthly = v => v.monthlyOverride ? Number(v.monthlyOverride) : Math.round((Number(v.amount) || 0) * (Number(v.rate) || 0)) / 100;
-const invTotalInterest = v => v.totalOverride ? Number(v.totalOverride) : invMonthly(v) * (Number(v.months) || 0);
+// Months follow the dates (K, Oct 22, 2026): from the payment start month to the end date month, both counted. No end date = the typed months.
+const validD = d => /^\d{4}-\d{2}-\d{2}$/.test(d || "") && +d.slice(0, 4) >= 2000 && +d.slice(0, 4) <= 2100;
+const monthsBetween = (a, b) => (+b.slice(0, 4) - +a.slice(0, 4)) * 12 + (+b.slice(5, 7) - +a.slice(5, 7)) + 1;
+const invMonths = v => validD(v.start) && validD(v.end) && monthsBetween(v.start, v.end) >= 1 ? monthsBetween(v.start, v.end) : Number(v.months) || 0;
+// When a date or the months change, keep the other one in step (dates win).
+function invSyncDates(rec, ch) {
+  const m = { ...rec, ...ch }, out = { ...ch };
+  if (("start" in ch || "end" in ch) && validD(m.start) && validD(m.end)) { const n = monthsBetween(m.start, m.end); if (n >= 1) out.months = n; }
+  else if ("months" in ch && validD(m.start) && Number(m.months) > 0) out.end = addMonths(m.start, Number(m.months) - 1);
+  return out;
+}
+const invTotalInterest = v => v.totalOverride ? Number(v.totalOverride) : invMonthly(v) * invMonths(v);
 const invEnd = v => v.end || (v.start && v.months ? addMonths(v.start, Number(v.months) - 1) : "");
 const invDue = v => v.dueOverride ? Number(v.dueOverride) : v.closed ? 0 : (Number(v.amount) || 0) + invMonthly(v);
-const invDur = v => v.durationText || (v.months ? String(v.months) : "–");
+const invDur = v => v.durationText || (invMonths(v) ? String(invMonths(v)) : "–");
 const invYear = v => v.group || (invEnd(v) || v.start || "").slice(0, 4) || "Undated";
 function invSchedule(v) {
-  const n = Number(v.months) || 0; if (v.closed || !v.start || !n) return [];
+  const n = invMonths(v); if (v.closed || !v.start || !n) return [];
   return Array.from({ length: n }, (_, i) => { const date = addMonths(v.start, i); return { i, date, ym: date.slice(0, 7), amount: invMonthly(v) + (i === n - 1 && v.kind !== "loan" ? Number(v.amount) || 0 : 0), final: i === n - 1, paid: (v.paid || []).includes(date.slice(0, 7)) }; });
 }
 function invStatus(v) {
@@ -7697,11 +7711,11 @@ function viewInvestors() {
     <td class="num nowrap">${ied("investments", v, "amount", "money", "Amount", { ro: !can })}</td>
     <td class="num">${ied("investments", v, "rate", "num", "% per month", { ro: !can, attrs: 'step="0.01" style="width:78px"' })}</td>
     <td class="r num nowrap">${invMonthly(v) ? peso2(invMonthly(v)) : "–"}${invMismatch(v) ? ` <span class="chip warn" title="${esc(Number(v.rate))}% of ${peso(v.amount)} is ${peso(Math.round(v.amount * v.rate) / 100)}">check</span>` : ""}</td>
-    <td class="num">${ied("investments", v, "months", "num", "Months", { ro: !can, attrs: 'style="width:70px"' })}</td>
+    <td class="num">${iedP("investments", v.id, "months", invMonths(v) || "", "num", "Months (counts itself from the dates)", { ro: !can, attrs: 'style="width:70px"' })}</td>
     <td class="r num nowrap">${invTotalInterest(v) ? peso2(invTotalInterest(v)) : "–"}</td>
     <td class="nowrap">${ied("investments", v, "start", "date", "Payment start", { ro: !can })}</td>
-    <td class="nowrap end-col">${fmtLong(invEnd(v))}</td>
-    <td class="r num nowrap" style="font-weight:700">${v.months ? peso2(invDue(v)) : "–"}</td>
+    <td class="nowrap end-col">${iedP("investments", v.id, "end", invEnd(v), "date", "End date", { ro: !can })}</td>
+    <td class="r num nowrap" style="font-weight:700">${invMonths(v) ? peso2(invDue(v)) : "–"}</td>
     <td class="nowrap"><span class="chip ${st.cls}">${st.name}</span>${s.length ? `<div class="s">${paidN}/${s.length} paid</div>` : ""}</td>${recHistTd("investments", v)}</tr>`; };
   return `<div class="kpis">
       <div class="kpi"><span class="label">Total investments</span><span class="value">${peso(inv.reduce((a, v) => a + (Number(v.amount) || 0), 0))}</span><span class="sub">${inv.filter(v => v.code).length} coded · ${inv.length} total</span></div>
@@ -7741,7 +7755,7 @@ function openInvForm(id, kind) {
     </div>
     <div class="row">
       <div class="field"><label for="v-mo">${loan ? "Monthly payment" : "Interest / month"} (leave blank to calculate)</label><input inputmode="decimal" class="money" id="v-mo" value="${moneyFmt(v.monthlyOverride ?? "")}" placeholder="Auto"></div>
-      <div class="field"><label for="v-months">Duration (months)</label><input id="v-months" type="number" min="0" step="1" value="${v.months ?? ""}"></div>
+      <div class="field"><label for="v-months">Duration (months) · counts itself when start and end dates are filled</label><input id="v-months" type="number" min="0" step="1" value="${v.months ?? ""}"></div>
     </div>
     <div class="row">
       <div class="field"><label for="v-start">Payment start date</label><input id="v-start" type="date" value="${esc(v.start || "")}"></div>
@@ -7757,6 +7771,8 @@ function openInvForm(id, kind) {
   S.readOnly ? null : async () => {
     if (!val("v-name")) return sheetError("Enter a name.");
     const data = { ...(id ? clean(v) : {}), kind: loan ? "loan" : "investor", name: val("v-name"), amount: numv("v-amt"), rate: val("v-rate") === "" ? 0 : numv("v-rate"), monthlyOverride: val("v-mo") === "" ? 0 : numv("v-mo"), months: Math.round(numv("v-months")), start: val("v-start"), end: val("v-end"), notes: val("v-notes"), paid: v.paid || [], updatedAt: Date.now() };
+    if ((data.start && !validD(data.start)) || (data.end && !validD(data.end))) return sheetError("Check the year of the dates (it must be between 2000 and 2100).");
+    if (validD(data.start) && validD(data.end)) { const n = monthsBetween(data.start, data.end); if (n < 1) return sheetError("The end date is before the start date."); data.months = n; }
     if (!loan) { data.code = val("v-code"); data.fb = val("v-fb"); data.closed = val("v-closed") === "1"; data.group = val("v-group"); }
     await save("investments", id || uid("v"), data);
     closeSheet(); toast("Saved.");
