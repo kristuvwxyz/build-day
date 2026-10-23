@@ -6038,9 +6038,17 @@ const varSort = (a, b) => ((a.status || "active") !== "active") - ((b.status || 
 const scentMainOf = list => list.find(x => x.scentMain) || [...list].sort(varSort)[0];
 const varLabel = p => [p.size, p.ptype, p.kind === "preorder" ? "Pre-order" + (p.eta ? " · " + p.eta : "") : "On hand"].filter(Boolean).join(" · ");
 const prNeeds = p => { const w = prWant(p); return !!w && JSON.stringify(w) !== JSON.stringify(tplImgs(p)); };
-const tplNeeds = p => { const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
+// Fragrantica's official scent card (K, Oct 23, 2026): when a listing has a Fragrantica link / id and NO scent card yet, copy Fragrantica's own
+// English perfume card in as photo 2 (https://www.fragrantica.com/mdimg/perfume-social-cards/en-p_c_<id>.jpeg). If a card photo is already there, nothing is fetched.
+// Runs for new / edited / restocked listings through the same auto-photo routine (tplOne). Listings without a link are left alone (add the link in Edit listing).
+const FCARD_ON = true;
+const fragIdOf = p => { const c = p.card && p.card.fragId; if (c) return String(c); const u = String(p.fragrantica || ""), m = /-(\d{3,7})\.html/.exec(u) || /\/p\/(\d{3,7})/.exec(u); return m ? m[1] : ""; };
+const fcardHas = p => !!(p.card && p.card.url && (p.imgs || []).includes(p.card.url));
+const fcardNeeds = p => FCARD_ON && (p.status || "active") !== "hidden" && !!fragIdOf(p) && prLead(p) && !fcardHas(p) && (p.card || {}).fcTried !== fragIdOf(p) && (p.imgs || []).length > 0;
+const tplNeeds = p => { if (p.category === "secondreign") return false;   // Second Reign (pre-loved) keeps its own photos: no background removal / template (K, Oct 23, 2026)
+  const L = tplImgs(p); if (!L.length || !L.every(u => OWN_PHOTO.test(u))) return false;
   if (prBroken(p)) return false;
-  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || prNeeds(p) || (prLead(p) && scKey(p) && !(p.card || {}).official && (p.card || {}).key !== scKey(p)) || (SC_ON && p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p) || (!!p.retpl && /^https?:/.test(p.tplFrom || "")); };
+  return (p.tplOk !== L[0] && p.tplFail !== L[0]) || fcardNeeds(p) || prNeeds(p) || (prLead(p) && scKey(p) && !(p.card || {}).official && (p.card || {}).key !== scKey(p)) || (SC_ON && p.card && p.card.url && p.card.chk !== 2) || (scKey(p) && typeof (p.card || {}).skip === "string") || shadeNeeds(p) || (!!p.retpl && /^https?:/.test(p.tplFrom || "")); };
 // Finds a scent card photo the listing already had (e.g. Fragrantica's), so it can be replaced by ours.
 async function oldCardOf(list, ours, skip = []) { for (const u of list) { if (u === ours || u === list[0] || skip.includes(u)) continue; try { if (await looksLikeCard(await annBlob(u))) return u; } catch (e) {} } return ""; }
 async function tplOne(id) {
@@ -6078,6 +6086,13 @@ async function tplOne(id) {
         if (url) { if (at >= 0) imgs[at] = url; else imgs.splice(Math.min(1, imgs.length), 0, url);
           u.card = { key, url, chk: 2 }; } }
     }
+    // Fragrantica's official card as photo 2, only when there is no scent card on the listing yet.
+    if (FCARD_ON && prLead(p) && fragIdOf(p) && !(p.card && p.card.url && imgs.includes(p.card.url)) && (p.card || {}).fcTried !== fragIdOf(p)) {
+      const fid = fragIdOf(p); let found = ""; try { found = await oldCardOf(imgs, "", []); } catch (e) {}   // a card-looking photo is already there: keep it, fetch nothing
+      if (found) u.card = { url: found, official: true, fragId: fid, chk: 2, existing: true };
+      else { const r = await S.photos.save({ url: `https://www.fragrantica.com/mdimg/perfume-social-cards/en-p_c_${fid}.jpeg` }).catch(() => null);
+        if (r && r.ok && r.url) { imgs.splice(Math.min(1, imgs.length), 0, r.url); u.card = { url: r.url, official: true, fragId: fid, chk: 2 }; }
+        else u.card = { ...(p.card || {}), fcTried: fid }; } }
     if (shadeNeeds(p)) { const sh = shadeOf(p), skey = shadeKey(p), old = (p.shadeCard || {}).url;
       const src = imgs.filter(x => x !== old && x !== u.tplOk && x !== p.tplOk && x !== (p.card || {}).url && x !== (u.card || {}).url);
       const hex = /^#[0-9a-f]{6}$/i.test(p.shadeHex || "") ? p.shadeHex : await shadeSample(src.length ? src : imgs, sh.kind);
