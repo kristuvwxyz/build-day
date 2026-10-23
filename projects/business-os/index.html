@@ -582,6 +582,7 @@ body.has-pomo #view { padding-bottom: 64px; }
 .ttable td.tl .chip { margin-top: 4px; }
 .ttable th, .ttable td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); } .ttable th:last-child, .ttable td:last-child { border-right: 0; } .ttable tbody tr:last-child td { border-bottom: 0; }
 .ttable tr.tgrp td { border-right: 0; }
+.pastebox { border: 2px dashed var(--line); border-radius: 12px; padding: 16px; text-align: center; background: var(--surface-2); display: flex; flex-direction: column; gap: 4px; align-items: center; outline: none; } .pastebox:focus, .pastebox:hover { border-color: var(--gold); } .pastebox.has-file { border-style: solid; border-color: var(--good); }
 .ttable td.tc { text-align: center; } .ttable td.tc select.ied { display: block; margin: 0 auto; min-width: 110px; text-align-last: center; padding: 4px 22px 4px 8px; }
 .ttable td.tl { min-width: 260px; } .ttable td.tq-due { min-width: 128px; white-space: nowrap; } .ttable th + th, .ttable td + td { border-left: 1px solid var(--line); } .ttable th.cb + th, .ttable td.cb + td { border-left: 0; }
 .dfmt { position: relative; display: inline-block; cursor: pointer; font-weight: 700; padding: 3px 6px; border-radius: 6px; } .dfmt:hover { background: var(--surface-2); } .dfmt span { pointer-events: none; } .dfmt input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
@@ -1459,10 +1460,11 @@ document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.ma
 // A date shown as text (Oct 2, 2026) with the real date box hidden on top: tapping the text opens the calendar.
 document.addEventListener("click", e => { const l = e.target.closest && e.target.closest(".dfmt"); if (!l) return; const i = l.querySelector("input"); try { if (i && i.showPicker) i.showPicker(); } catch (er) {} });
 // Check attachment: paste a copied picture or drop a file while the Add / Edit check form is open.
-const ckAttach = f => { const inp = document.getElementById("ck-file"); if (!inp || !f) return false; const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; const h = document.getElementById("ck-file-hint"); if (h) h.textContent = "Ready to attach: " + (f.name || "pasted picture") + ". Save the check to keep it."; return true; };
-document.addEventListener("paste", e => { if (!document.getElementById("ck-file")) return; const f = [...((e.clipboardData && e.clipboardData.files) || [])][0]; if (f && ckAttach(f)) e.preventDefault(); });
-document.addEventListener("dragover", e => { if (e.target.closest && e.target.closest("#ck-drop")) e.preventDefault(); });
-document.addEventListener("drop", e => { const z = e.target.closest && e.target.closest("#ck-drop"); if (!z) return; e.preventDefault(); ckAttach(((e.dataTransfer && e.dataTransfer.files) || [])[0]); });
+const fileAttach = (pre, f) => { const inp = document.getElementById(pre + "-file"); if (!inp || !f) return false; const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; const h = document.getElementById(pre + "-file-hint"); if (h) h.textContent = "Ready to attach: " + (f.name || "pasted picture") + ". Save to keep it."; const z = document.getElementById(pre + "-drop"); if (z) z.classList.add("has-file"); return true; };
+const ckAttach = f => fileAttach("ck", f);
+document.addEventListener("paste", e => { const pre = document.getElementById("ck-file") ? "ck" : document.getElementById("iv-file") ? "iv" : ""; if (!pre) return; const f = [...((e.clipboardData && e.clipboardData.files) || [])][0]; if (f && fileAttach(pre, f)) e.preventDefault(); });
+document.addEventListener("dragover", e => { if (e.target.closest && e.target.closest("#ck-drop, #iv-drop")) e.preventDefault(); });
+document.addEventListener("drop", e => { const z = e.target.closest && e.target.closest("#ck-drop, #iv-drop"); if (!z) return; e.preventDefault(); fileAttach(z.id.slice(0, 2), ((e.dataTransfer && e.dataTransfer.files) || [])[0]); });
 // A task remembers the day it was finished (doneAt), so a later edit doesn't make it look late.
 const stampDone = (col, id, data) => { if (col !== "tasks" || !data || data.status !== "done") return data; const old = (S.tasks || []).find(r => r.id === id); return !old || old.status !== "done" ? { ...data, doneAt: Date.now() } : data; };
 async function save(col, id, data) {
@@ -8088,7 +8090,7 @@ function openInvoiceForm(id, kind) {
   const x = id ? S.invoices.find(r => r.id === id) : { kind: kind || "invoice", status: "topay", invDate: today(), budget: "pending" };
   if (!x) return; const req = x.kind === "request";
   S.invFile = null;
-  openSheet(`<h3>${id ? "Edit " : ""}${req ? "budget request" : "supplier invoice"}</h3>
+  openSheet(`<h3>${id ? "Edit " : ""}${req ? "Budget Request" : "Supplier Invoice"}</h3>
     ${req ? `<div class="field"><label for="iv-title">What is it for?</label><input id="iv-title" value="${esc(x.title || "")}" placeholder="e.g. Bubble wrap and boxes, Lalamove for supplier pickup"></div>
       <div class="field"><label for="iv-purpose">Details</label><textarea id="iv-purpose" rows="2">${esc(x.purpose || "")}</textarea></div>`
     : `<div class="row"><div class="field"><label for="iv-sup">Supplier</label><input id="iv-sup" list="iv-sups" value="${esc(x.supplier || "")}" placeholder="e.g. S-JEFF" autocomplete="off"><datalist id="iv-sups">${supplierNames().map(n => `<option value="${esc(n)}">`).join("")}</datalist></div>
@@ -8098,8 +8100,8 @@ function openInvoiceForm(id, kind) {
       <div class="field"><label for="iv-due">${req ? "Needed by" : "Due date"}</label><input id="iv-due" type="date" value="${esc(x.dueDate || "")}"></div></div>
     ${req ? "" : `<div class="field"><label for="iv-date">Invoice date</label><input id="iv-date" type="date" value="${esc(x.invDate || "")}"></div>`}
     <div class="field"><label>Status</label><div class="seg" role="group">${Object.entries(INV_STATUS).map(([k, v]) => `<button type="button" data-ivst="${k}" aria-pressed="${(x.status || "topay") === k}">${v.name}</button>`).join("")}</div><input type="hidden" id="iv-st" value="${esc(x.status || "topay")}"></div>
-    <div class="field"><label for="iv-file">${req ? "Attachment (optional)" : "Invoice file (PDF or photo)"}</label><input id="iv-file" type="file" accept="application/pdf,image/*">
-      ${x.file ? `<div style="font-size:12.5px;color:var(--muted)">Current: 📎 ${esc(x.file.name || "file")}. Pick a new file to replace it.</div>` : ""}</div>
+    <div class="field"><label>${req ? "Attachment (optional)" : "Invoice file (PDF or photo)"}</label><input id="iv-file" type="file" accept="application/pdf,image/*" hidden>
+      <div id="iv-drop" class="pastebox" tabindex="0"><div style="font-size:22px">📋</div><div style="font-weight:600">Copy the invoice, then paste it here</div><div id="iv-file-hint" style="font-size:12.5px;color:var(--muted)">${x.file ? `Attached: 📎 ${esc(x.file.name || "file")} · paste another to replace it.` : "Press ⌘V (Mac) or Ctrl+V while this form is open. You can also drop a file on this box."}</div></div></div>
     <div class="field"><label for="iv-notes">Notes</label><textarea id="iv-notes" rows="2">${esc(x.notes || "")}</textarea></div>
     ${id ? recLogHtml("invoices", id) : ""}
     <div id="sheet-err" class="confirm" hidden></div>
