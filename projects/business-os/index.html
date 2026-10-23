@@ -4714,6 +4714,19 @@ function histPop(btn) {
   el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
   el.style.top = (r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px";
 }
+// Committed number in Edit listing -> a small list of the orders holding it (doesn't close the form).
+function commitPop(btn) {
+  closePop(); const p = S.products.find(x => x.id === btn.dataset.commitpop); if (!p) return;
+  const rows = committedOrders(p), n = rows.reduce((a, r) => a + r.q, 0), r0 = btn.getBoundingClientRect();
+  const el = document.createElement("div"); el.className = "ipop"; el.id = "ipop"; el.setAttribute("role", "dialog");
+  el.innerHTML = `<div class="ipop-h"><b>${n} committed</b><span>${esc([p.brand, p.name, p.size].filter(Boolean).join(" "))}</span></div><div class="olist" style="max-height:300px;overflow:auto">${rows.map(r => r.o
+    ? `<button type="button" class="orow" data-open="${r.o.id}"><span class="onum">#${esc(r.o.num)}</span><span class="ocust">${esc(r.o.customer || "No customer")}<small>${r.q} unit${r.q === 1 ? "" : "s"} · ${esc(ful(r.o.fulfillment).name)}</small></span></button>`
+    : `<button type="button" class="orow" data-webopen="${esc(r.w.ref)}"><span class="onum">#${esc(String(r.w.ref || "").replace(/^#/, ""))}</span><span class="ocust">${esc(r.w.name || "")}<small>${r.q} unit${r.q === 1 ? "" : "s"} · Website</small></span></button>`).join("")}</div>`;
+  document.body.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r0.left - w / 2)) + "px";
+  el.style.top = (r0.bottom + h + 8 > window.innerHeight ? Math.max(8, r0.top - h - 4) : r0.bottom + 4) + "px";
+}
 const closePop = () => { const p = $("#ipop"); if (p) p.remove(); };
 window.addEventListener("scroll", closePop, { passive: true });
 
@@ -6704,7 +6717,7 @@ function varRowHtml(v, main, isNew) {
     <td><input data-vf="cost" class="money" inputmode="decimal" value="${Number(v.cost) ? moneyFmt(v.cost) : ""}" aria-label="Cost" style="width:82px"></td>
     <td><input data-vf="stock" data-orig="${Number(v.stock) || 0}" type="number" step="1" value="${Number(v.stock) || 0}" aria-label="Stock" style="width:58px"></td>
     <td class="num var-cmt">${(() => { const rows = isNew ? [] : committedOrders(v), n = rows.reduce((a, r) => a + r.q, 0);
-      return n ? `<b title="${esc(rows.map(r => "#" + String(r.o ? r.o.num : r.w.ref || "").replace(/^#/, "") + " · " + r.q).join("\n"))}">${n}</b>` : `<span style="color:var(--muted)">0</span>`; })()}</td>
+      return n ? `<button type="button" class="linkish num" data-commitpop="${esc(v.id)}" title="See the orders holding these" style="font-weight:700">${n}</button>` : `<span style="color:var(--muted)">0</span>`; })()}</td>
     <td>${supSelect('data-vf="supplier" aria-label="Supplier" style="min-width:96px"', v.supplier)}</td>
     <td style="text-align:center"><input type="radio" name="v-main" value="${esc(v.id)}" ${main ? "checked" : ""} aria-label="Main photo"></td>
     <td style="text-align:center"><button type="button" class="var-del" data-act="var-del" title="Delete this variation" aria-label="Delete this variation">✕</button></td></tr>`;
@@ -8861,7 +8874,7 @@ document.addEventListener("click", guard(async ev => {
   if (nt) return openTaskForm(null, nt.dataset.date, S.view === "dept" ? S.dept : null);
   const dy = ev.target.closest("[data-day]");
   if (dy && !ev.target.closest("[data-act]")) { S.t.day = dy.dataset.day; render(); return; }
-  if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]") && !ev.target.closest("[data-notes]") && !ev.target.closest("[data-hist]")) closePop();
+  if (!ev.target.closest("#ipop") && !ev.target.closest("[data-items]") && !ev.target.closest("[data-notes]") && !ev.target.closest("[data-hist]") && !ev.target.closest("[data-commitpop]")) closePop();
   if (!ev.target.closest(".gs")) document.querySelectorAll(".gs-res").forEach(r => r.hidden = true);
   const gsr = ev.target.closest("[data-gso]");
   if (gsr) { document.querySelectorAll(".gs-res").forEach(r => r.hidden = true); document.querySelectorAll(".gs-in").forEach(i => i.value = ""); return openOrderDetails(gsr.dataset.gso); }
@@ -8992,6 +9005,8 @@ document.addEventListener("click", guard(async ev => {
   if (gf) { S.galf = gf.dataset.galf; S.galpage = 0; render(); return; }
   const gp = ev.target.closest("[data-galpage]");
   if (gp) { S.galpage = (S.galpage || 0) + Number(gp.dataset.galpage); render(); window.scrollTo(0, 0); return; }
+  const cpb = ev.target.closest("[data-commitpop]");
+  if (cpb) { if ($("#ipop") && S.popFor === "c" + cpb.dataset.commitpop) { closePop(); S.popFor = ""; return; } S.popFor = "c" + cpb.dataset.commitpop; commitPop(cpb); return; }
   const hb = ev.target.closest("[data-hist]");
   if (hb) { if ($("#ipop") && S.popFor === "h" + hb.dataset.hist) { closePop(); S.popFor = ""; return; } S.popFor = "h" + hb.dataset.hist; histPop(hb); return; }
   const te = ev.target.closest("[data-tagedit]");
