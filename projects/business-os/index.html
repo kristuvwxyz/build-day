@@ -567,7 +567,8 @@ body.has-pomo #view { padding-bottom: 64px; }
 .pager strong.mhl { font-size: 20px; font-weight: 800; color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); border-radius: 10px; padding: 4px 14px; letter-spacing: .01em; }
 .dept-auto { padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); font-weight: 600; min-height: 38px; display: flex; align-items: center; }
 .cal-d.today .cal-n span { background: var(--brand); color: var(--brand-ink); border-radius: 999px; padding: 1px 10px; }
-.ttable th, .ttable td { text-align: center; vertical-align: middle; } .ttable td.tl { text-align: left; } .ttable th + th, .ttable td + td { border-left: 1px solid var(--line); } .ttable th.cb + th, .ttable td.cb + td { border-left: 0; }
+.ttable th, .ttable td { text-align: left; vertical-align: middle; }   /* Tasks table is NOT centered (K, Oct 23, 2026) */
+.ttable .ied { text-align: left; text-align-last: left; } .ttable select.ied { margin: 0; } .ttable th + th, .ttable td + td { border-left: 1px solid var(--line); } .ttable th.cb + th, .ttable td.cb + td { border-left: 0; }
 .dfmt { position: relative; display: inline-block; cursor: pointer; font-weight: 700; padding: 3px 6px; border-radius: 6px; } .dfmt:hover { background: var(--surface-2); } .dfmt span { pointer-events: none; } .dfmt input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .cal-add { border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; padding: 0 4px; border-radius: 4px; opacity: 0; }
 .cal-d:hover .cal-add, .cal-add:focus-visible { opacity: 1; }
