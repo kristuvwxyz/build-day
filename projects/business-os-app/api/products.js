@@ -55,7 +55,7 @@ const DROP_SOLD_DUPES = "(function(){var P=window.RS_PRODUCTS;if(!P)return;var l
 // with "no-cache" (every page view downloaded them again and used up the Supabase free quota).
 function viaCdn(body) {
   const SB = process.env.SUPABASE_URL;
-  return SB ? body.split(SB.replace(/\/+$/, "") + "/storage/v1/object/public/listing-photos/").join("https://regal-spritz-os.vercel.app/img/") : body;
+  return SB ? body.split(SB.replace(/\/+$/, "") + "/storage/v1/object/public/listing-photos/").join(process.env.RS_IMG_BASE || "https://regal-spritz-os.vercel.app/img/") : body;
 }
 
 // Takes RS_PRODUCTS[0]._photos (about 530 KB of order-photo rows) out of the product list; returns it separately.
