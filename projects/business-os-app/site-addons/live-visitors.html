@@ -5,7 +5,7 @@
 -->
 <script>
 (function () {
-  var URL = "https://regal-spritz-os.vercel.app/api/live", sid = "";
+  var URL = "https://os.regalspritz.com/api/live", sid = "";
   try { sid = sessionStorage.getItem("rs-live-sid") || ""; } catch (e) {}
   if (!sid) { sid = (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)); try { sessionStorage.setItem("rs-live-sid", sid); } catch (e) {} }
   var last = 0;

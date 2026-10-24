@@ -2883,7 +2883,7 @@ function openTaskForm(id, date, forceDept, preset = {}) {
 }
 
 /* ---------- app on the phone's Home Screen ---------- */
-const APP_HOME = "https://regal-spritz-os.vercel.app/", APP_INSTALL_LINK = APP_HOME + "?install=1";
+const APP_HOME = "https://os.regalspritz.com/", APP_INSTALL_LINK = APP_HOME + "?install=1";
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; });
 window.addEventListener("appinstalled", () => { installEvt = null; toast("RS OS is on your Home Screen."); });
@@ -5675,7 +5675,7 @@ function annList() {
     const t = o.createdAt || 0, had = by.get(e); if (!had || t > had.t) by.set(e, { email: e, name: String(o.customer || "").split(" ")[0], t }); }
   return [...by.values()].sort((a, b) => b.t - a.t);
 }
-const ANN_HERO = "https://regal-spritz-os.vercel.app/email/new-home.gif";
+const ANN_HERO = "https://os.regalspritz.com/email/new-home.gif";
 // Bulk send through Brevo (free plan, 300 a day): the owner downloads the buyer list (CSV) + the email (HTML) and uploads both to Brevo.
 // The list is made in the owner's browser and never stored anywhere else. Brevo fills {{ contact.FIRSTNAME }} and its own unsubscribe link.
 const BREVO_NAME = "{{ contact.FIRSTNAME | default : 'there' }}";
@@ -6242,7 +6242,7 @@ function announceCard() {
   if (camps.length && !next && done.length === camps.length && Date.now() - last > 7 * 864e5) return "";   // all sent a week ago: card goes away
   const sum = k => done.reduce((a, c) => a + (Number(c[k]) || 0), 0), got = sum("delivered") || sum("sent");
   let body;
-  if (!S.site || !S.site.brevo) body = `<div style="font-size:13px;color:var(--muted)">Live Brevo numbers show in the RS App (regal-spritz-os.vercel.app).</div>`;
+  if (!S.site || !S.site.brevo) body = `<div style="font-size:13px;color:var(--muted)">Live Brevo numbers show in the RS App (os.regalspritz.com).</div>`;
   else if (!j) body = `<div style="font-size:13px;color:var(--muted)">Loading Brevo numbers…</div>`;
   else if (!j.ok && j.error === "no-key") body = `<div class="notice" style="font-size:13px">To see Brevo's numbers here, add your Brevo API key once: <a href="https://app.brevo.com/settings/keys/api" target="_blank" rel="noopener">Brevo → API keys</a> → Generate a new API key → copy it. Then <a href="https://vercel.com/kristuvwxyz/regal-spritz-os/settings/environment-variables" target="_blank" rel="noopener">Vercel → Environment Variables</a> → Key <b>BREVO_API_KEY</b>, paste, Sensitive, Production → Save → Redeploy.</div>`;
   else if (!j.ok) body = `<div class="notice" style="font-size:13px">${esc(j.error || "Couldn't load Brevo.")}</div>`;

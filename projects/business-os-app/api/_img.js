@@ -1,4 +1,4 @@
-// Listing photos for the website, served through Vercel's CDN and cached for a year: https://regal-spritz-os.vercel.app/img/listings/<file>
+// Listing photos for the website, served through Vercel's CDN and cached for a year: https://os.regalspritz.com/img/listings/<file>
 // (/img/* is routed to /api/products?img=…; it lives there because the Hobby plan allows only 12 server functions.)
 // Why: Supabase sends these photos with "no-cache", so every page view downloaded them again from Supabase, which used up the free quota
 // (Oct 2026: 22.8 GB cached egress of 5 GB). Photo files are named by their content (api/photo.js), so a file never changes and

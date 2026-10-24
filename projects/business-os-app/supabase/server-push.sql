@@ -2,7 +2,7 @@
 -- No keys to fill in: it uses the website key already saved in app_settings.site_key (the same as RS_BACKEND_KEY in Vercel).
 --
 -- What it does: when a listing is marked "pending" (changed, not yet on the website), the database calls
--- https://regal-spritz-os.vercel.app/api/push-listings, which sends the whole list to the website backend.
+-- https://os.regalspritz.com/api/push-listings, which sends the whole list to the website backend.
 -- The listing is then marked synced. No need to keep RS OS open.
 
 create extension if not exists pg_net with schema extensions;
@@ -15,7 +15,7 @@ begin
   select site_key into k from public.app_settings where id = 1;
   if k is null or k = '' then return null; end if;
   perform net.http_post(
-    url := 'https://regal-spritz-os.vercel.app/api/push-listings',
+    url := 'https://os.regalspritz.com/api/push-listings',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-rs-push-key', k),
     body := '{}'::jsonb,
     timeout_milliseconds := 25000

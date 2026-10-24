@@ -26,7 +26,7 @@
     return rows;
   }
   // The extra photo table is not in the product list any more; it is fetched once, only when an order line needs it.
-  var EXTRA_URL = 'https://regal-spritz-os.vercel.app/api/products?photos=1', extraState = 0;
+  var EXTRA_URL = 'https://os.regalspritz.com/api/products?photos=1', extraState = 0;
   function loadExtra() {
     if (extraState) return;
     extraState = 1;

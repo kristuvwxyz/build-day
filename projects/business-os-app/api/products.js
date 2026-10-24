@@ -1,6 +1,6 @@
 // Fast copy of the website's product list (the same products.js the Apps Script backend makes), served from Vercel's CDN.
 // Apps Script is slow to answer (often 1-3 s, more when it wakes up), so regalspritz.com loads this instead:
-//   https://regal-spritz-os.vercel.app/api/products
+//   https://os.regalspritz.com/api/products
 // The CDN answers at once and refreshes in the background, so a listing edit shows within about 15 seconds.
 // Public on purpose (it is the public product list); no keys, no customer data.
 // Before sending, every piece is checked against live RS OS stock: on-hand pieces with stock 0 are left out and
@@ -55,7 +55,7 @@ const DROP_SOLD_DUPES = "(function(){var P=window.RS_PRODUCTS;if(!P)return;var l
 // with "no-cache" (every page view downloaded them again and used up the Supabase free quota).
 function viaCdn(body) {
   const SB = process.env.SUPABASE_URL;
-  return SB ? body.split(SB.replace(/\/+$/, "") + "/storage/v1/object/public/listing-photos/").join(process.env.RS_IMG_BASE || "https://regal-spritz-os.vercel.app/img/") : body;
+  return SB ? body.split(SB.replace(/\/+$/, "") + "/storage/v1/object/public/listing-photos/").join(process.env.RS_IMG_BASE || "https://os.regalspritz.com/img/") : body;
 }
 
 // Takes RS_PRODUCTS[0]._photos (about 530 KB of order-photo rows) out of the product list; returns it separately.
