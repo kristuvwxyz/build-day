@@ -18,7 +18,7 @@ export function webProducts(products) {
       price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null,
       imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [],
       isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", ...(isOutW(p) ? { soldOut: true } : {}), vac: !!p.vac,
-      ...(p.inspiredBy ? { insp: p.inspiredBy } : {}), created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00"),
+      ...(p.inspiredBy ? { insp: p.inspiredBy } : {}), ...(p.category === "secondreign" && String(p.description || "").trim() ? { desc: String(p.description).trim().slice(0, 3000) } : {}), created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00"),
     }));
 }
 
