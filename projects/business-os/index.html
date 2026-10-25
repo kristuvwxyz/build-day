@@ -6802,6 +6802,7 @@ function openProductForm(id, preset = {}) {
     ${id ? varsHtml(p) : ""}
     <div class="field"><label for="p-brand">Brand</label><input id="p-brand" list="p-brand-list" value="${esc(p.brand || "")}" placeholder="Pick or type a brand" autocomplete="off"><datalist id="p-brand-list">${listOptions("brand").sort((a, b) => a.localeCompare(b)).map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
     <div class="field"><label for="p-name">Product name</label><input id="p-name" value="${esc(p.name || "")}" placeholder="e.g. Carolina Herrera Good Girl EDP 80ml"></div>
+    <div class="field"><label for="p-desc">Description</label><textarea id="p-desc" rows="3">${esc(p.description || "")}</textarea></div>
     <div class="row">
       ${id ? "" : `<div class="field"><label for="p-size">Size</label><input id="p-size" list="p-size-list" value="${esc(p.size || "")}" placeholder="Pick or type, e.g. 100ml" autocomplete="off"><datalist id="p-size-list">${listOptions("size", COMMON_SIZES).sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b)).map(z => `<option value="${esc(z)}"></option>`).join("")}</datalist></div>`}
       ${id ? "" : `<div class="field"><label for="p-type">Type</label><select id="p-type"><option value="">–</option>${[...new Set([...LIST_TYPES, p.ptype].filter(Boolean))].map(t => `<option ${p.ptype === t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>`}
@@ -6835,7 +6836,6 @@ function openProductForm(id, preset = {}) {
       <div class="field"><label for="p-nbase">Base notes</label><input id="p-nbase" value="${esc(((p.notes || {}).base || []).join(", "))}"></div>
     </div>
     <div class="field"><label for="p-acc">Main accords</label><input id="p-acc" value="${esc((p.accords || []).join(", "))}" placeholder="Fresh spicy, Citrus, Woody"></div>
-    <div class="field"><label for="p-desc">Description</label><textarea id="p-desc" rows="3">${esc(p.description || "")}</textarea></div>
     <div class="row">
       <div class="field"><label for="p-url">Website link${id ? ` · <a href="${esc(webUrl(p))}" target="_blank" rel="noopener">Open on site ↗</a>${onSite(p) ? "" : ` <span style="font-weight:400;color:var(--muted)">(not showing on the site: ${(p.status || "active") !== "active" ? "inactive" : "sold out"})</span>`}` : ""}</label><input id="p-url" value="${esc(id ? webUrl(p) : "")}" placeholder="Filled in after saving"></div>
       <div class="field"><label for="p-batch">Batch / lot no.</label><input id="p-batch" value="${esc(p.batch || "")}"></div>
