@@ -65,16 +65,26 @@ async function runApi(name, request, url, env, extraQuery) {
 }
 
 // Edge cache for public GETs (photos a year, product list a few seconds), so repeat visits don't re-run the code.
-async function cached(ctx, request, key, make) {
+// With swr (product list): a copy older than `fresh` ms is still sent at once while a new one is made in the background,
+// so shoppers never wait for the slow Apps Script backend; a copy older than `maxStale` ms is replaced before sending.
+async function cached(ctx, request, key, make, swr) {
   const cache = caches.default, hit = await cache.match(key);
-  if (hit) return hit;
-  const res = await make();
-  if (res.ok && /public/.test(res.headers.get("Cache-Control") || "")) {
+  const store = res => {
+    if (!res.ok || !/public/.test(res.headers.get("Cache-Control") || "")) return;
     const copy = new Response(res.clone().body, res);
     const sm = /s-maxage=(\d+)/.exec(res.headers.get("Cache-Control") || "");
-    if (sm) copy.headers.set("Cache-Control", "public, max-age=" + sm[1]);
+    copy.headers.set("x-rs-cached-at", String(Date.now()));
+    copy.headers.set("Cache-Control", "public, max-age=" + (swr ? Math.ceil(swr.maxStale / 1000) : sm ? sm[1] : 60));
     ctx.waitUntil(cache.put(key, copy));
+  };
+  if (hit) {
+    if (!swr) return hit;
+    const age = Date.now() - Number(hit.headers.get("x-rs-cached-at") || 0);
+    if (age < swr.fresh) return hit;
+    if (age < swr.maxStale) { ctx.waitUntil(make().then(store).catch(() => {})); return hit; }
   }
+  const res = await make();
+  store(res);
   return res;
 }
 
@@ -92,7 +102,7 @@ export default {
       // The public product list (no ?live / ?photos variations mixed up) is cached for its s-maxage (15 s).
       if (m[1] === "products" && request.method === "GET" && !url.searchParams.has("live")) {
         const key = new Request(url.origin + path + (url.searchParams.has("photos") ? "?photos=1" : ""));
-        return cached(ctx, request, key, () => runApi("products", request, url, env));
+        return cached(ctx, request, key, () => runApi("products", request, url, env), { fresh: 15e3, maxStale: 10 * 60e3 });
       }
       return runApi(m[1], request, url, env);
     }
