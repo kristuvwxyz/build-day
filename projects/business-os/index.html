@@ -1247,12 +1247,12 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview"], blurb: "Whole-business overview" },
   { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "logins", "homecontent", "expenses"], blurb: "Directory, logins, Home page, expenses & cash" },
-  { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "salesreport", "payroll", "payrecords", "fixed", "investors", "bir"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
+  { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "salesreport", "costcheck", "payroll", "payrecords", "fixed", "investors", "bir"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["suppliers", "customers"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory"], blurb: "Packing queue, barcode scan, stock", hidden: true },   // hidden from the menu (K, Oct 15, 2026): stock is done in Listings; the role stays for access rules
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", costcheck: "Cost & price check", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -2414,7 +2414,7 @@ function renderInner() {
   const tabs = `<div class="tabs pills" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}${t === "reviews" ? rvBadge() : ""}</button>`).join("")}${dtabs.length > 2 ? `<button type="button" class="tab-arrange" data-act="tabs-arrange" data-dept="${d.id}" title="Arrange these tabs" aria-label="Arrange tabs">⠿ Arrange</button>` : ""}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), budget: viewBudget, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
-    dashboard: viewDashboard, salesreport: viewSalesReport, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
+    dashboard: viewDashboard, salesreport: viewSalesReport, costcheck: viewCostCheck, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
   v.innerHTML = tabs + (S.dept === "FINANCE" && S.tab === "dues" ? duesAlert() : "") + `<div class="dc">${body}</div>`;   // K, Oct 16, 2026: the payment-due box lives under Due dates only
@@ -3856,6 +3856,81 @@ function viewSalesReport() {
     ${top.slice(0, 100).map(a => `<tr><td>${esc(a.k)}</td>${sr.by === "pay" || sr.by === "src" ? `<td class="r">${a.orders}</td>` : ""}<td class="r">${a.q}</td><td class="r">${peso(a.sales)}</td><td class="r">${T.gross - T.disc ? Math.round(a.sales / (T.gross - T.disc) * 100) : 0}%</td><td class="r">${a.cost ? peso(a.cost) : "–"}</td><td class="r">${peso(a.sales - a.cost)}</td></tr>`).join("")}</tbody></table></div>${top.length > 100 ? `<div style="font-size:12px;color:var(--muted)">Top 100 shown. Download CSV for all.</div>` : ""}` : `<div class="empty">Nothing to show.</div>`}
     <div style="font-size:12px;color:var(--muted)">Counts paid and partly paid orders from RS OS and the website (cancelled ones left out; refunded ones count as returns). Shopee and TikTok sales show here once they're entered as RS OS orders. Cost comes from the order line, else the listing's Cost.</div></section>`;
 }
+/* Finance → Cost & price check (K, Oct 26, 2026): sold items from Jan 2026 grouped per product, so the cost can be fixed in bulk and compared with the sold prices;
+   plus a check of the current listing prices. Saving a cost writes it onto every sold line of that product in the date range (and optionally the listing). */
+const ccNorm = s => String(s || "").toLowerCase().replace(/\s*\|.*$/, "").replace(/[^a-z0-9]+/g, " ").trim();
+function ccState() { return S.cc || (S.cc = { from: "2026-01-01", to: mToday(), f: "missing", q: "", pf: "nocost", pq: "", edit: {}, pedit: {}, list: true }); }
+function ccGroups() {
+  const cc = ccState(), byId = new Map(S.products.map(p => [p.id, p])), byName = new Map();
+  S.products.forEach(p => { for (const k of [ccNorm(p.name), ccNorm([p.brand, p.name].filter(Boolean).join(" ")), ccNorm([p.brand, p.name, p.size].filter(Boolean).join(" "))]) if (k && !byName.has(k)) byName.set(k, p); });
+  const g = new Map();
+  for (const o of S.orders) {
+    if (o.archived || o.web || !SR_PAID.has(o.payment) || o.fulfillment === "cancelled" || o.payment === "refunded") continue;
+    const d = srDay(o); if (d < cc.from || d > cc.to) continue;
+    (o.items || []).forEach((i, ix) => {
+      const p = byId.get(i.productId) || byName.get(ccNorm(i.name)), nm = p ? [p.brand, p.name, p.size].filter(Boolean).join(" · ") : String(i.name || "?").replace(/\s*\|.*$/, "");
+      const key = p ? "p:" + p.id : "n:" + (ccNorm(i.name) || i.productId || "?");
+      let r = g.get(key); if (!r) g.set(key, r = { key, name: nm, p, q: 0, sales: 0, cost: 0, lineCostQ: 0, min: Infinity, max: 0, refs: [] });
+      const q = Number(i.qty) || 0, pr = Number(i.price) || 0, c = Number(i.cost) || 0;
+      r.q += q; r.sales += q * pr; if (pr) { r.min = Math.min(r.min, pr); r.max = Math.max(r.max, pr); } if (c > 0) { r.cost += q * c; r.lineCostQ += q; }
+      r.refs.push([o.id, ix]);
+    });
+  }
+  return [...g.values()].map(r => { r.avg = r.q ? r.sales / r.q : 0; r.curCost = r.lineCostQ ? r.cost / r.lineCostQ : 0; r.listCost = r.p ? Number(r.p.cost) || 0 : 0; r.useCost = r.curCost || r.listCost; return r; });
+}
+const ccEff = r => { const e = ccState().edit[r.key]; return e !== undefined && e !== "" ? Number(e) || 0 : r.useCost; };
+const ccFlag = r => { const c = ccEff(r); return !c ? "missing" : c >= r.avg ? "neg" : (r.avg - c) / r.avg < 0.15 ? "low" : r.avg && r.min < Infinity && r.max / r.min > 1.5 ? "spread" : "ok"; };
+const CC_LABEL = { missing: ["bad", "No cost"], neg: ["bad", "Cost ≥ sold price"], low: ["warn", "Margin under 15%"], spread: ["warn", "Prices vary a lot"], ok: ["good", "OK"] };
+function viewCostCheck() {
+  const cc = ccState(), gs = ccGroups(), cnt = { all: gs.length, missing: 0, neg: 0, low: 0, spread: 0, ok: 0 }; gs.forEach(r => cnt[ccFlag(r)]++);
+  const q = ccNorm(cc.q), rows = gs.filter(r => (cc.f === "all" || ccFlag(r) === cc.f) && (!q || ccNorm(r.name).includes(q))).sort((a, b) => b.sales - a.sales);
+  const sales = gs.reduce((a, r) => a + r.sales, 0), cost = gs.reduce((a, r) => a + ccEff(r) * r.q, 0), edits = Object.keys(cc.edit).filter(k => cc.edit[k] !== "").length;
+  const F = [["missing", "No cost"], ["neg", "Cost ≥ price"], ["low", "Low margin"], ["spread", "Price varies"], ["ok", "OK"], ["all", "All"]];
+  const sold = `<div class="head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><label style="font-size:12px">From <input type="date" id="cc-from" value="${cc.from}"></label><label style="font-size:12px">To <input type="date" id="cc-to" value="${cc.to}"></label>
+    <input id="cc-q" placeholder="Search product" value="${esc(cc.q)}" style="max-width:200px">
+    <div class="seg" role="group" aria-label="Filter">${F.map(([k, l]) => `<button type="button" data-ccf="${k}" aria-pressed="${cc.f === k}">${l} (${cnt[k]})</button>`).join("")}</div>
+    <button class="btn" type="button" data-act="cc-save" ${edits ? "" : "disabled"}>Save ${edits} cost${edits === 1 ? "" : "s"}</button><label style="font-size:12px"><input type="checkbox" id="cc-list" ${cc.list ? "checked" : ""}> also update the listing's cost</label></div>
+  <div class="kpis"><div class="kpi"><span class="label">Sold products</span><span class="value">${gs.length}</span><span class="sub">${gs.reduce((a, r) => a + r.q, 0)} pcs since ${cc.from}</span></div><div class="kpi"><span class="label">Sales</span><span class="value">${peso(sales)}</span></div><div class="kpi"><span class="label">Cost (incl. your edits)</span><span class="value">${peso(cost)}</span></div><div class="kpi"><span class="label">Gross profit</span><span class="value">${peso(sales - cost)}</span><span class="sub">${sales ? Math.round((sales - cost) / sales * 100) : 0}% margin</span></div></div>
+  <section class="panel"><div class="table-wrap"><table><thead><tr><th>Product</th><th class="r">Qty sold</th><th class="r">Avg sold price</th><th class="r">Lowest – highest</th><th class="r">Cost per piece</th><th class="r">Margin</th><th class="r">Listing now</th><th>Check</th></tr></thead><tbody>
+  ${rows.slice(0, 300).map(r => { const f = ccFlag(r), c = ccEff(r), L = CC_LABEL[f], e = cc.edit[r.key]; return `<tr><td>${esc(r.name)}${r.p ? "" : ` <span style="color:var(--muted);font-size:11px">(no listing)</span>`}</td><td class="r">${r.q}</td><td class="r">${peso(r.avg)}</td><td class="r" style="color:var(--muted)">${r.min < Infinity ? peso(r.min) + " – " + peso(r.max) : "–"}</td>
+    <td class="r"><input type="number" min="0" step="1" data-ccc="${esc(r.key)}" value="${e !== undefined ? esc(e) : r.useCost || ""}" placeholder="${r.listCost || ""}" style="width:92px;text-align:right"></td><td class="r">${c && r.avg ? Math.round((r.avg - c) / r.avg * 100) + "%" : "–"}</td><td class="r">${r.p ? peso(r.p.price) + (r.listCost ? `<br><span style="color:var(--muted);font-size:11px">cost ${peso(r.listCost)}</span>` : "") : "–"}</td><td><span class="chip ${L[0]}">${L[1]}</span></td></tr>`; }).join("") || `<tr><td colspan="8" class="empty">Nothing in this filter.</td></tr>`}</tbody></table></div>
+  <div style="font-size:12px;color:var(--muted)">${rows.length > 300 ? `Showing the top 300 by sales of ${rows.length}. ` : ""}Type a cost and press Save: it is written on every sold line of that product in the date range (old costs are replaced). Greyed hint = the listing's cost. Items are matched to listings by id, else by name.</div></section>`;
+  return sold + viewPriceCheck(gs);
+}
+function viewPriceCheck(gs) {
+  const cc = ccState(), sold = new Map(gs.filter(r => r.p).map(r => [r.p.id, r])), pq = ccNorm(cc.pq);
+  const act = S.products.filter(p => (p.status || "active") === "active" && p.name && !p.varDeleted);
+  const flag = p => { const pr = Number(p.price) || 0, c = Number(p.cost) || 0, s = sold.get(p.id); return !c ? "nocost" : !pr ? "noprice" : pr <= c ? "below" : (pr - c) / pr < 0.15 ? "thin" : s && s.avg && Math.abs(pr - s.avg) / s.avg > 0.2 ? "drift" : p.compareAt && Number(p.compareAt) <= pr ? "cmp" : "ok"; };
+  const PL = { nocost: ["bad", "No cost"], noprice: ["bad", "No price"], below: ["bad", "Price ≤ cost"], thin: ["warn", "Margin under 15%"], drift: ["warn", "Sold at a different price"], cmp: ["warn", "Compare-at ≤ price"], ok: ["good", "OK"] };
+  const cnt = { all: act.length }; act.forEach(p => { const f = flag(p); cnt[f] = (cnt[f] || 0) + 1; });
+  const F = [["nocost", "No cost"], ["noprice", "No price"], ["below", "Price ≤ cost"], ["thin", "Thin margin"], ["drift", "Sold differently"], ["cmp", "Compare-at"], ["ok", "OK"], ["all", "All"]];
+  const rows = act.filter(p => (cc.pf === "all" || flag(p) === cc.pf) && (!pq || ccNorm([p.brand, p.name, p.size].join(" ")).includes(pq))).sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+  return `<section class="panel"><div class="head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h2>Current listing prices</h2><input id="pc-q" placeholder="Search listing" value="${esc(cc.pq)}" style="max-width:200px">
+    <div class="seg" role="group" aria-label="Price filter">${F.map(([k, l]) => `<button type="button" data-pcf="${k}" aria-pressed="${cc.pf === k}">${l} (${cnt[k] || 0})</button>`).join("")}</div>
+    <button class="btn" type="button" data-act="pc-save" ${Object.keys(cc.pedit).length ? "" : "disabled"}>Save ${Object.keys(cc.pedit).length} change${Object.keys(cc.pedit).length === 1 ? "" : "s"}</button></div>
+  <div class="table-wrap"><table><thead><tr><th>Listing</th><th class="r">Price</th><th class="r">Cost</th><th class="r">Margin</th><th class="r">Avg sold (since ${cc.from})</th><th>Check</th></tr></thead><tbody>
+  ${rows.slice(0, 200).map(p => { const f = flag(p), s = sold.get(p.id), L = PL[f], e = cc.pedit[p.id] || {}, pr = e.price ?? p.price ?? "", c = e.cost ?? p.cost ?? "", m = Number(pr) && Number(c) ? Math.round((pr - c) / pr * 100) + "%" : "–";
+    return `<tr><td>${esc([p.brand, p.name, p.size, p.ptype].filter(Boolean).join(" · "))}</td><td class="r"><input type="number" min="0" step="1" data-pcp="${p.id}|price" value="${esc(pr)}" style="width:92px;text-align:right"></td><td class="r"><input type="number" min="0" step="1" data-pcp="${p.id}|cost" value="${esc(c)}" style="width:92px;text-align:right"></td><td class="r">${m}</td><td class="r">${s ? peso(s.avg) + ` <span style="color:var(--muted);font-size:11px">×${s.q}</span>` : "–"}</td><td><span class="chip ${L[0]}">${L[1]}</span></td></tr>`; }).join("") || `<tr><td colspan="6" class="empty">Nothing in this filter.</td></tr>`}</tbody></table></div>
+  <div style="font-size:12px;color:var(--muted)">${rows.length > 200 ? `Showing the first 200 of ${rows.length} (highest price first). ` : ""}Edit price or cost and press Save; changed listings go back to the website.</div></section>`;
+}
+async function ccSave() {
+  const cc = ccState(), gs = new Map(ccGroups().map(r => [r.key, r])), byOrder = new Map(); let n = 0, lines = 0, lst = 0;
+  for (const [k, v] of Object.entries(cc.edit)) { const c = Number(v), r = gs.get(k); if (!r || v === "" || !(c >= 0)) continue; n++; r.refs.forEach(([oid, ix]) => (byOrder.get(oid) || byOrder.set(oid, new Map()).get(oid)).set(ix, c)); if (cc.list && r.p && c > 0 && Number(r.p.cost) !== c) { await patch("products", r.p.id, { cost: c, webSync: "pending" }); lst++; } }
+  let done = 0; for (const [oid, m] of byOrder) { const o = S.orders.find(x => x.id === oid); if (!o) continue; const items = (o.items || []).map((i, ix) => m.has(ix) ? { ...i, cost: m.get(ix) } : i); lines += m.size; await patch("orders", oid, { items }); if (++done % 25 === 0) toast(`Saving… ${done}/${byOrder.size} orders`); }
+  cc.edit = {}; toast(`Saved ${n} cost${n === 1 ? "" : "s"} on ${lines} sold lines${lst ? ` and ${lst} listing${lst === 1 ? "" : "s"}` : ""}.`); render();
+}
+async function pcSave() {
+  const cc = ccState(); let n = 0;
+  for (const [id, e] of Object.entries(cc.pedit)) { const u = {}; if (e.price !== undefined && e.price !== "") u.price = Number(e.price) || 0; if (e.cost !== undefined && e.cost !== "") u.cost = Number(e.cost) || 0; if (!Object.keys(u).length) continue; await patch("products", id, { ...u, webSync: "pending" }); n++; }
+  cc.pedit = {}; toast(`Saved ${n} listing${n === 1 ? "" : "s"}.`); render();
+}
+document.addEventListener("input", e => { const t = e.target; if (!t.dataset) return; const cc = ccState();
+  if (t.dataset.ccc !== undefined) { cc.edit[t.dataset.ccc] = t.value; const b = document.querySelector('[data-act="cc-save"]'); const n = Object.keys(cc.edit).filter(k => cc.edit[k] !== "").length; if (b) { b.disabled = !n; b.textContent = `Save ${n} cost${n === 1 ? "" : "s"}`; } }
+  else if (t.dataset.pcp) { const [id, f] = t.dataset.pcp.split("|"); (cc.pedit[id] || (cc.pedit[id] = {}))[f] = t.value; const b = document.querySelector('[data-act="pc-save"]'); const n = Object.keys(cc.pedit).length; if (b) { b.disabled = !n; b.textContent = `Save ${n} change${n === 1 ? "" : "s"}`; } } });
+document.addEventListener("change", e => { const t = e.target; if (!t.id) return; const cc = ccState();
+  if (t.id === "cc-from" || t.id === "cc-to") { if (t.value) cc[t.id === "cc-from" ? "from" : "to"] = t.value; render(); }
+  else if (t.id === "cc-q") { cc.q = t.value; render(); } else if (t.id === "pc-q") { cc.pq = t.value; render(); } else if (t.id === "cc-list") cc.list = t.checked; });
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-ccf],[data-pcf]"); if (!b) return; const cc = ccState(); if (b.dataset.ccf) cc.f = b.dataset.ccf; else cc.pf = b.dataset.pcf; render(); });
 function viewDashboard() {
   const orders = S.orders.filter(o => inPeriod(o.date));
   const live = orders.filter(o => !isVoid(o));
@@ -9209,6 +9284,8 @@ document.addEventListener("click", guard(async ev => {
     case "sup-mark": await supMark(b.dataset.sup); return;
     case "vat-other": await vatOther(); return;
     case "go-manual": if (!$("#scrim").hidden) closeSheet(); S.view = "orders"; S.cx.show = "manual"; S.sel.clear(); saveNav(); if (!S.web.loaded) webLoad(); render(); window.scrollTo(0, 0); return;
+    case "cc-save": return ccSave();
+    case "pc-save": return pcSave();
     case "sr-dl": try { await S.dl.save({ data: csv(S.srCsv || []), filename: `sales-report-${srRange().from}-to-${srRange().to}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
     case "sup-copy": S.supSent = { code: S.sp && S.sp.mode !== "orders" ? S.sp.tsup : "", ids: (S.supShownIds || []).slice(), at: Date.now() }; try { await navigator.clipboard.writeText(S.supText || ""); toast("Copied. Paste it to the supplier."); } catch (e) { toast("Couldn't copy."); } return;
     case "sup-dl": try { await S.dl.save({ data: csv(S.supRows || []), filename: `order-list-${String(S.supLabel || S.of.sup || "all").toLowerCase().replace(/\s+/g, "-")}-${mToday()}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
