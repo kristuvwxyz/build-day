@@ -3945,7 +3945,7 @@ function viewVouchers() {
   const days = [7, 14, 30, 60, 90], q = String(v.q || "").toLowerCase(), all = v.list || [];
   const cnt = s => all.filter(x => x.status === s).length, rows = all.filter(x => (v.f === "All" || x.status === v.f) && (!q || (x.email + " " + x.code + " " + x.note).toLowerCase().includes(q)));
   const last = v.last, msg = last ? vcMessage(last) : "";
-  return `<section class="panel"><h2>New voucher</h2>
+  return viewPromoCodes() + `<section class="panel"><h2>New voucher for one customer</h2>
    <div class="row"><div class="field"><label for="vc-email">Customer email (their website account)</label><input id="vc-email" list="vc-emails" value="${esc(f.email)}" placeholder="name@email.com" autocomplete="off"><datalist id="vc-emails">${[...emails].slice(0, 2500).map(([e, n]) => `<option value="${esc(e)}">${esc(n)}</option>`).join("")}</datalist></div>
    <div class="field"><label for="vc-type">Reason</label><select id="vc-type">${["Gift", "Sorry", "Thank you", "Loyalty", "Giveaway", "Birthday", "Promo"].map(t => `<option ${f.type === t ? "selected" : ""}>${t}</option>`).join("")}</select></div></div>
    <div class="row"><div class="field"><label for="vc-amount">Amount off (₱)</label><input id="vc-amount" type="number" min="1" step="1" value="${esc(f.amount)}"></div>
@@ -3963,6 +3963,44 @@ function viewVouchers() {
    ${rows.slice(0, 300).map(x => `<tr><td>${esc(x.at)}</td><td>${esc(x.email)}</td><td><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td class="r">${peso(x.amount)}</td><td class="r">${x.min ? peso(x.min) : "–"}</td><td>${esc(x.from)} → ${esc(x.until)}</td><td><span class="chip ${x.status === "Active" ? "good" : x.status === "Used" ? "info" : "warn"}">${esc(x.status)}</span></td><td>${esc(x.order)}</td><td style="max-width:220px">${esc(x.note)}</td>
    <td>${x.status === "Active" || x.status === "Upcoming" ? `<button class="btn sm" type="button" data-act="vc-set" data-row="${x.row}" data-code="${esc(x.code)}" data-st="Cancelled">Cancel</button>` : x.status === "Cancelled" ? `<button class="btn sm" type="button" data-act="vc-set" data-row="${x.row}" data-code="${esc(x.code)}" data-st="Active">Reactivate</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="11" class="empty">${v.loading ? "Loading…" : "No vouchers here."}</td></tr>`}</tbody></table></div></section>`;
 }
+
+function pcState() { return S.pr || (S.pr = { list: null, loading: false, err: "", f: "Active", form: { code: "", type: "Percent", value: "10", min: "0", max: "", limit: "100", once: true, days: "14", note: "" } }); }
+async function prLoad(force) {
+  const v = pcState(); if (v.loading || (v.list && !force)) return; v.loading = true; v.err = "";
+  const r = S.site && S.site.promoList ? await S.site.promoList().catch(e => ({ ok: false, error: e && e.message })) : { ok: false, error: "Shared codes work in the RS App only." };
+  v.loading = false; if (r && r.ok) v.list = r.promos || []; else { v.err = (r && r.error) || "Couldn't load codes."; v.list = v.list || []; } render();
+}
+function viewPromoCodes() {
+  const v = pcState(), f = v.form; if (!v.list && !v.loading && !v.err) setTimeout(() => prLoad(), 0);
+  const all = v.list || [], rows = all.filter(x => v.f === "All" || x.status === v.f), cnt = s => all.filter(x => x.status === s).length, pct = f.type === "Percent";
+  return `<section class="panel"><h2>New shared code</h2><div style="font-size:12px;color:var(--muted);margin-bottom:8px">A code anyone can type at checkout on regalspritz.com (like NEWHOME100). Every code needs an end date and stops by itself.</div>
+   <div class="row"><div class="field"><label for="pr-code">Code</label><input id="pr-code" value="${esc(f.code)}" placeholder="e.g. PAYDAY10" autocomplete="off" style="text-transform:uppercase"></div>
+   <div class="field"><label for="pr-type">Type</label><select id="pr-type"><option value="Percent" ${pct ? "selected" : ""}>Percent off (%)</option><option value="Peso" ${pct ? "" : "selected"}>Peso off (₱)</option></select></div>
+   <div class="field"><label for="pr-value">${pct ? "Percent off" : "Amount off (₱)"}</label><input id="pr-value" type="number" min="1" step="1" value="${esc(f.value)}"></div></div>
+   <div class="row"><div class="field"><label for="pr-min">Minimum spend (₱, 0 = none)</label><input id="pr-min" type="number" min="0" step="1" value="${esc(f.min)}"></div>
+   ${pct ? `<div class="field"><label for="pr-max">Most it can take off (₱, empty = no cap)</label><input id="pr-max" type="number" min="0" step="1" value="${esc(f.max)}"></div>` : ""}
+   <div class="field"><label for="pr-limit">Total uses allowed (0 = no limit)</label><input id="pr-limit" type="number" min="0" step="1" value="${esc(f.limit)}"></div>
+   <div class="field"><label for="pr-days">Ends after (days from today)</label><select id="pr-days">${[3, 7, 14, 30, 60, 90].map(d => `<option value="${d}" ${String(f.days) === String(d) ? "selected" : ""}>${d} days</option>`).join("")}</select></div></div>
+   <div class="row"><div class="field"><label for="pr-note">Note (only we see it)</label><input id="pr-note" value="${esc(f.note)}" placeholder="e.g. payday sale" autocomplete="off"></div>
+   <label style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="pr-once" ${f.once ? "checked" : ""}> One use per customer</label></div>
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" type="button" data-act="pr-make">Create code</button><span style="font-size:12px;color:var(--muted)">Can't be combined with an account voucher. Royal Points can still be used.</span></div></section>
+  <section class="panel"><div class="head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h2>Shared codes</h2>
+   <div class="seg" role="group" aria-label="Code status">${["Active", "Upcoming", "Fully used", "Expired", "Paused", "Cancelled", "All"].map(s => `<button type="button" data-prf="${s}" aria-pressed="${v.f === s}">${s}${s === "All" ? ` (${all.length})` : ` (${cnt(s)})`}</button>`).join("")}</div><button class="btn sm" type="button" data-act="pr-reload">${v.loading ? "Loading…" : "Refresh"}</button></div>
+   ${v.err ? `<div class="empty" style="color:var(--bad)">${esc(v.err)}</div>` : ""}
+   <div class="table-wrap"><table><thead><tr><th>Code</th><th>Off</th><th class="r">Min spend</th><th>Valid</th><th class="r">Used</th><th>Per customer</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>
+   ${rows.map(x => `<tr><td><b>${esc(x.code)}</b></td><td>${/percent/i.test(x.type) ? x.value + "%" + (x.max ? " (max " + peso(x.max) + ")" : "") : peso(x.value)}</td><td class="r">${x.min ? peso(x.min) : "–"}</td><td>${esc(x.from)} → ${esc(x.until)}</td><td class="r">${x.used}${x.limit ? " / " + x.limit : ""}</td><td>${x.once ? "Once" : "Any"}</td><td><span class="chip ${x.status === "Active" ? "good" : "warn"}">${esc(x.status)}</span></td><td style="max-width:200px">${esc(x.note)}</td>
+   <td>${["Active", "Upcoming"].includes(x.status) ? `<button class="btn sm" type="button" data-act="pr-set" data-row="${x.row}" data-code="${esc(x.code)}" data-st="Paused">Pause</button>` : x.status === "Paused" ? `<button class="btn sm" type="button" data-act="pr-set" data-row="${x.row}" data-code="${esc(x.code)}" data-st="Active">Resume</button>` : ""}${["Active", "Upcoming", "Paused"].includes(x.status) ? ` <button class="btn sm" type="button" data-act="pr-set" data-row="${x.row}" data-code="${esc(x.code)}" data-st="Cancelled">Cancel</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="9" class="empty">${v.loading ? "Loading…" : "No codes here."}</td></tr>`}</tbody></table></div></section>`;
+}
+async function prMake() {
+  const v = pcState(), f = v.form; if (!S.site || !S.site.promoAdd) return toast("Shared codes work in the RS App only.");
+  const until = mDate(Date.now() + (Number(f.days) || 14) * 864e5);
+  const r = await S.site.promoAdd({ code: f.code, type: f.type, value: f.value, min: f.min, max: f.max, limit: f.limit, once: f.once, from: mToday(), until, note: f.note }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok) return toast((r && r.error) || "Couldn't make the code.");
+  f.code = ""; f.note = ""; v.list = null; toast("Code " + r.code + " is live until " + r.until + "."); render(); prLoad(true);
+}
+document.addEventListener("input", e => { const t = e.target; if (!t.id || t.id.indexOf("pr-") !== 0) return; const f = pcState().form, k = { "pr-code": "code", "pr-value": "value", "pr-min": "min", "pr-max": "max", "pr-limit": "limit", "pr-note": "note" }[t.id]; if (k) f[k] = t.value; });
+document.addEventListener("change", e => { const t = e.target; if (!t.id || t.id.indexOf("pr-") !== 0) return; const f = pcState().form; if (t.id === "pr-type") { f.type = t.value; render(); } else if (t.id === "pr-days") f.days = t.value; else if (t.id === "pr-once") f.once = t.checked; });
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-prf]"); if (b) { pcState().f = b.dataset.prf; render(); } });
 function vcMessage(x) {
   const nm = (allOrderRows().find(o => String(o.email || "").trim().toLowerCase() === x.email) || {}).customer || "";
   return `Hi${nm ? " " + nm.split(/\s+/)[0] : ""}! 💜 Here is a ${peso(x.amount)} voucher from Regal Spritz PH.\n\nCode: ${x.code}\n${x.min ? `Minimum spend: ${peso(x.min)}\n` : ""}Valid until: ${x.until}\n\nSign in at regalspritz.com with ${x.email}, open My Account → Vouchers, or pick it at checkout. One use only. Thank you!`;
@@ -9335,6 +9373,9 @@ document.addEventListener("click", guard(async ev => {
     case "vat-other": await vatOther(); return;
     case "go-manual": if (!$("#scrim").hidden) closeSheet(); S.view = "orders"; S.cx.show = "manual"; S.sel.clear(); saveNav(); if (!S.web.loaded) webLoad(); render(); window.scrollTo(0, 0); return;
     case "cc-fill": { const cc = ccState(); let n = 0; ccGroups().forEach(r => { if (!r.curCost && r.listCost > 0 && cc.edit[r.key] === undefined) { cc.edit[r.key] = String(r.listCost); n++; } }); toast(n ? `Filled ${n} costs from listings. Check them, then press Save.` : "Nothing to fill."); render(); return; }
+    case "pr-make": return prMake();
+    case "pr-reload": return prLoad(true);
+    case "pr-set": { const x = b.dataset; const r = await S.site.promoSet({ row: Number(x.row), code: x.code, status: x.st }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? "Code " + x.code + " is now " + x.st + "." : (r && r.error) || "Couldn't change it."); prLoad(true); return; }
     case "vc-make": return vcMake();
     case "vc-reload": return vcLoad(true);
     case "vc-copy": { const t = $("#vc-msg"); try { await navigator.clipboard.writeText(t.value); toast("Message copied."); } catch (e) { t.select(); toast("Select and copy the message."); } return; }

@@ -100,6 +100,22 @@ export default async function handler(req, res) {
       if (!(row >= 2) || !code || !["Cancelled", "Active"].includes(body.status)) return res.status(400).json({ ok: false, error: "Nothing to change." });
       call = { action: "opsVoucherSet", key: KEY, row, code, status: body.status, by };
     }
+  } else if (body.action === "promoList" || body.action === "promoAdd" || body.action === "promoSet") {
+    // Shared promo codes (RS OS Marketing > Vouchers > Shared codes). Website backend v41.
+    const me = await fetch(`${SB}/rest/v1/rpc/my_member`, { method: "POST", headers: head, body: "{}" }).then(r => r.ok ? r.json() : null).catch(() => null);
+    const by = String((me && (me.nickname || me.name)) || "RS OS").slice(0, 60), s = v => String(v || "").replace(/[\r\n<>]+/g, " ").trim(), d = v => /^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : "";
+    if (body.action === "promoList") call = { action: "opsPromos", key: KEY };
+    else if (body.action === "promoAdd") {
+      const code = s(body.code).toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 24), pct = body.type === "Percent", value = Math.round(Number(body.value));
+      if (code.length < 3) return res.status(400).json({ ok: false, error: "The code needs at least 3 letters or numbers." });
+      if (!(value >= 1 && value <= (pct ? 90 : 50000))) return res.status(400).json({ ok: false, error: pct ? "Percent must be 1 to 90." : "The amount must be ₱1 to ₱50,000." });
+      if (!d(body.until)) return res.status(400).json({ ok: false, error: "Every code needs an end date." });
+      call = { action: "opsPromoAdd", key: KEY, code, type: pct ? "Percent" : "Peso", value, min: Math.max(0, Math.round(Number(body.min) || 0)), max: Math.max(0, Math.round(Number(body.max) || 0)), from: d(body.from), until: d(body.until), limit: Math.max(0, Math.round(Number(body.limit) || 0)), once: body.once !== false, note: s(body.note).slice(0, 200), by };
+    } else {
+      const row = Math.floor(Number(body.row)), code = s(body.code).toUpperCase().slice(0, 30);
+      if (!(row >= 2) || !code || !["Active", "Paused", "Cancelled"].includes(body.status)) return res.status(400).json({ ok: false, error: "Nothing to change." });
+      call = { action: "opsPromoSet", key: KEY, row, code, status: body.status };
+    }
   } else if (body.action === "maya") {
     // Maya Checkout (cards / Maya wallet) link for an RS OS order. With MAYA_PUBLIC_KEY in Vercel the link is made here;
     // otherwise the website backend makes it with its own Maya key (opsMayaCheckout, see docs/handoffs/rs-os-maya-link.md).
@@ -140,6 +156,7 @@ export default async function handler(req, res) {
     if (!j.ok && call.action === "opsSetProducts" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website can't receive listings yet. Update the website backend to v15 (see the setup guide)." });
     if (!j.ok && call.action === "opsMayaCheckout" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "Maya links aren't set up yet (add MAYA_PUBLIC_KEY in Vercel)." });
     if (!j.ok && call.action === "opsEmail" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "the website backend can't send emails yet (needs the opsEmail update). Backend said: " + String(j.error || "").slice(0, 120) });
+    if (!j.ok && /^opsPromo/.test(call.action) && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website backend can't make shared codes yet (needs v41, see docs/handoffs/promo-codes-backend.gs)." });
     if (!j.ok && /^opsVoucher/.test(call.action) && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website backend can't make vouchers yet (needs v40, see docs/handoffs/voucher-backend.md)." });
     if (!j.ok && call.action === "opsReturnSet" && /unknown|action/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website backend can't take return decisions yet (needs v31)." });
     if (!j.ok && /not allowed/i.test(j.error || "")) return res.status(502).json({ ok: false, error: "The website key in Vercel is wrong. Make a new one with newOpsKey and update RS_BACKEND_KEY." });
