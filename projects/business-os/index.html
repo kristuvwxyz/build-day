@@ -1249,10 +1249,10 @@ const DEPTS = [
   { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "logins", "homecontent", "expenses"], blurb: "Directory, logins, Home page, expenses & cash" },
   { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "salesreport", "costcheck", "payroll", "payrecords", "fixed", "investors", "bir"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
   { id: "SALES", name: "Sales", tabs: ["suppliers", "customers"], blurb: "Orders, product listings, customers" },
-  { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers"], blurb: "Channels, listings, audience" },
+  { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "vouchers"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory"], blurb: "Packing queue, barcode scan, stock", hidden: true },   // hidden from the menu (K, Oct 15, 2026): stock is done in Listings; the role stays for access rules
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", costcheck: "Cost & price check", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", costcheck: "Cost & price check", vouchers: "Vouchers", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -2414,7 +2414,7 @@ function renderInner() {
   const tabs = `<div class="tabs pills" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}${t === "reviews" ? rvBadge() : ""}</button>`).join("")}${dtabs.length > 2 ? `<button type="button" class="tab-arrange" data-act="tabs-arrange" data-dept="${d.id}" title="Arrange these tabs" aria-label="Arrange tabs">⠿ Arrange</button>` : ""}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), budget: viewBudget, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
-    dashboard: viewDashboard, salesreport: viewSalesReport, costcheck: viewCostCheck, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
+    dashboard: viewDashboard, salesreport: viewSalesReport, costcheck: viewCostCheck, vouchers: viewVouchers, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
   v.innerHTML = tabs + (S.dept === "FINANCE" && S.tab === "dues" ? duesAlert() : "") + `<div class="dc">${body}</div>`;   // K, Oct 16, 2026: the payment-due box lives under Due dates only
@@ -3931,6 +3931,56 @@ document.addEventListener("change", e => { const t = e.target; if (!t.id) return
   if (t.id === "cc-from" || t.id === "cc-to") { if (t.value) cc[t.id === "cc-from" ? "from" : "to"] = t.value; render(); }
   else if (t.id === "cc-q") { cc.q = t.value; render(); } else if (t.id === "pc-q") { cc.pq = t.value; render(); } else if (t.id === "cc-list") cc.list = t.checked; });
 document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-ccf],[data-pcf]"); if (!b) return; const cc = ccState(); if (b.dataset.ccf) cc.f = b.dataset.ccf; else cc.pf = b.dataset.pcf; render(); });
+/* Marketing → Vouchers (K, Oct 26, 2026): make a ₱-off voucher for one customer by hand. It goes into the website's Vouchers sheet (website backend v40),
+   so it shows in that customer's My Account and works at checkout (their account email, min spend, valid dates, one use). */
+function vcState() { return S.vc || (S.vc = { list: null, loading: false, err: "", f: "Active", q: "", last: null, form: { email: "", amount: "200", min: "1500", days: "30", type: "Gift", note: "", code: "" } }); }
+async function vcLoad(force) {
+  const v = vcState(); if (v.loading || (v.list && !force)) return; v.loading = true; v.err = "";
+  const r = S.site && S.site.voucherList ? await S.site.voucherList().catch(e => ({ ok: false, error: e && e.message })) : { ok: false, error: "Vouchers work in the RS App only." };
+  v.loading = false; if (r && r.ok) v.list = r.vouchers || []; else { v.err = (r && r.error) || "Couldn't load vouchers."; v.list = v.list || []; } render();
+}
+function viewVouchers() {
+  const v = vcState(), f = v.form; if (!v.list && !v.loading && !v.err) setTimeout(() => vcLoad(), 0);
+  const emails = new Map(); allOrderRows().forEach(o => { const e = String(o.email || "").trim().toLowerCase(); if (e && !emails.has(e)) emails.set(e, o.customer || ""); });
+  const days = [7, 14, 30, 60, 90], q = String(v.q || "").toLowerCase(), all = v.list || [];
+  const cnt = s => all.filter(x => x.status === s).length, rows = all.filter(x => (v.f === "All" || x.status === v.f) && (!q || (x.email + " " + x.code + " " + x.note).toLowerCase().includes(q)));
+  const last = v.last, msg = last ? vcMessage(last) : "";
+  return `<section class="panel"><h2>New voucher</h2>
+   <div class="row"><div class="field"><label for="vc-email">Customer email (their website account)</label><input id="vc-email" list="vc-emails" value="${esc(f.email)}" placeholder="name@email.com" autocomplete="off"><datalist id="vc-emails">${[...emails].slice(0, 2500).map(([e, n]) => `<option value="${esc(e)}">${esc(n)}</option>`).join("")}</datalist></div>
+   <div class="field"><label for="vc-type">Reason</label><select id="vc-type">${["Gift", "Sorry", "Thank you", "Loyalty", "Giveaway", "Birthday", "Promo"].map(t => `<option ${f.type === t ? "selected" : ""}>${t}</option>`).join("")}</select></div></div>
+   <div class="row"><div class="field"><label for="vc-amount">Amount off (₱)</label><input id="vc-amount" type="number" min="1" step="1" value="${esc(f.amount)}"></div>
+   <div class="field"><label for="vc-min">Minimum spend (₱, 0 = none)</label><input id="vc-min" type="number" min="0" step="1" value="${esc(f.min)}"></div>
+   <div class="field"><label for="vc-days">Valid for (days from today)</label><select id="vc-days">${days.map(d => `<option value="${d}" ${String(f.days) === String(d) ? "selected" : ""}>${d} days</option>`).join("")}</select></div></div>
+   <div class="row"><div class="field"><label for="vc-code">Code (leave empty to make one)</label><input id="vc-code" value="${esc(f.code)}" placeholder="auto, e.g. RS-4K9Q2X" autocomplete="off"></div>
+   <div class="field"><label for="vc-note">Note (only we see it)</label><input id="vc-note" value="${esc(f.note)}" placeholder="e.g. late parcel, RS10234" autocomplete="off"></div></div>
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" type="button" data-act="vc-make">Create voucher</button><span style="font-size:12px;color:var(--muted)">One use only. The customer must sign in with this email at regalspritz.com and pick it at checkout.</span></div>
+   ${last ? `<div class="panel" style="margin-top:12px"><b>Created ${esc(last.code)}</b> · ${peso(last.amount)} off${last.min ? " ₱" + NF0.format(last.min) + "+" : ""} · until ${esc(last.until)}<textarea id="vc-msg" rows="5" readonly style="width:100%;margin-top:8px">${esc(msg)}</textarea><button class="btn sm" type="button" data-act="vc-copy">Copy message</button></div>` : ""}
+  </section>
+  <section class="panel"><div class="head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><h2>All vouchers</h2><input id="vc-q" placeholder="Search email, code or note" value="${esc(v.q)}" style="max-width:220px">
+   <div class="seg" role="group" aria-label="Voucher status">${["Active", "Upcoming", "Used", "Expired", "Cancelled", "All"].map(s => `<button type="button" data-vcf="${s}" aria-pressed="${v.f === s}">${s}${s === "All" ? ` (${all.length})` : ` (${cnt(s)})`}</button>`).join("")}</div><button class="btn sm" type="button" data-act="vc-reload">${v.loading ? "Loading…" : "Refresh"}</button></div>
+   ${v.err ? `<div class="empty" style="color:var(--bad)">${esc(v.err)}</div>` : ""}
+   <div class="table-wrap"><table><thead><tr><th>Created</th><th>Customer</th><th>Code</th><th>Reason</th><th class="r">Off</th><th class="r">Min spend</th><th>Valid</th><th>Status</th><th>Order</th><th>Note</th><th></th></tr></thead><tbody>
+   ${rows.slice(0, 300).map(x => `<tr><td>${esc(x.at)}</td><td>${esc(x.email)}</td><td><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td class="r">${peso(x.amount)}</td><td class="r">${x.min ? peso(x.min) : "–"}</td><td>${esc(x.from)} → ${esc(x.until)}</td><td><span class="chip ${x.status === "Active" ? "good" : x.status === "Used" ? "info" : "warn"}">${esc(x.status)}</span></td><td>${esc(x.order)}</td><td style="max-width:220px">${esc(x.note)}</td>
+   <td>${x.status === "Active" || x.status === "Upcoming" ? `<button class="btn sm" type="button" data-act="vc-set" data-row="${x.row}" data-code="${esc(x.code)}" data-st="Cancelled">Cancel</button>` : x.status === "Cancelled" ? `<button class="btn sm" type="button" data-act="vc-set" data-row="${x.row}" data-code="${esc(x.code)}" data-st="Active">Reactivate</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="11" class="empty">${v.loading ? "Loading…" : "No vouchers here."}</td></tr>`}</tbody></table></div></section>`;
+}
+function vcMessage(x) {
+  const nm = (allOrderRows().find(o => String(o.email || "").trim().toLowerCase() === x.email) || {}).customer || "";
+  return `Hi${nm ? " " + nm.split(/\s+/)[0] : ""}! 💜 Here is a ${peso(x.amount)} voucher from Regal Spritz PH.\n\nCode: ${x.code}\n${x.min ? `Minimum spend: ${peso(x.min)}\n` : ""}Valid until: ${x.until}\n\nSign in at regalspritz.com with ${x.email}, open My Account → Vouchers, or pick it at checkout. One use only. Thank you!`;
+}
+async function vcMake() {
+  const v = vcState(), f = v.form, d = n => { const t = new Date(Date.now() + n * 864e5); return mDate(t.getTime()); };
+  const email = String(f.email || "").trim().toLowerCase(), amount = Math.round(Number(f.amount) || 0), min = Math.round(Number(f.min) || 0);
+  if (!/^[^\s@,;]+@[^\s@,;]+\.[a-z]{2,}$/i.test(email)) return toast("Enter the customer's email.");
+  if (!(amount >= 1)) return toast("Enter the amount off.");
+  if (!S.site || !S.site.voucherAdd) return toast("Vouchers work in the RS App only.");
+  const from = mToday(), until = d(Number(f.days) || 30);
+  const r = await S.site.voucherAdd({ email, amount, min, from, until, code: f.code, type: f.type, note: f.note }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok) return toast((r && r.error) || "Couldn't make the voucher.");
+  v.last = { code: r.code, email, amount, min, until: r.until || until }; f.code = ""; f.note = ""; v.list = null; toast("Voucher " + r.code + " created."); render(); vcLoad(true);
+}
+document.addEventListener("input", e => { const t = e.target; if (!t.id || t.id.indexOf("vc-") !== 0) return; const f = vcState().form, k = { "vc-email": "email", "vc-amount": "amount", "vc-min": "min", "vc-code": "code", "vc-note": "note" }[t.id]; if (k) f[k] = t.value; });
+document.addEventListener("change", e => { const t = e.target; if (!t.id || t.id.indexOf("vc-") !== 0) return; const v = vcState(); if (t.id === "vc-type") v.form.type = t.value; else if (t.id === "vc-days") v.form.days = t.value; else if (t.id === "vc-q") { v.q = t.value; render(); } });
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-vcf]"); if (b) { vcState().f = b.dataset.vcf; render(); } });
 function viewDashboard() {
   const orders = S.orders.filter(o => inPeriod(o.date));
   const live = orders.filter(o => !isVoid(o));
@@ -9285,6 +9335,10 @@ document.addEventListener("click", guard(async ev => {
     case "vat-other": await vatOther(); return;
     case "go-manual": if (!$("#scrim").hidden) closeSheet(); S.view = "orders"; S.cx.show = "manual"; S.sel.clear(); saveNav(); if (!S.web.loaded) webLoad(); render(); window.scrollTo(0, 0); return;
     case "cc-fill": { const cc = ccState(); let n = 0; ccGroups().forEach(r => { if (!r.curCost && r.listCost > 0 && cc.edit[r.key] === undefined) { cc.edit[r.key] = String(r.listCost); n++; } }); toast(n ? `Filled ${n} costs from listings. Check them, then press Save.` : "Nothing to fill."); render(); return; }
+    case "vc-make": return vcMake();
+    case "vc-reload": return vcLoad(true);
+    case "vc-copy": { const t = $("#vc-msg"); try { await navigator.clipboard.writeText(t.value); toast("Message copied."); } catch (e) { t.select(); toast("Select and copy the message."); } return; }
+    case "vc-set": { const x = btn.dataset; const r = await S.site.voucherSet({ row: Number(x.row), code: x.code, status: x.st }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? "Voucher " + x.code + " is now " + x.st + "." : (r && r.error) || "Couldn't change it."); vcLoad(true); return; }
     case "cc-save": return ccSave();
     case "pc-save": return pcSave();
     case "sr-dl": try { await S.dl.save({ data: csv(S.srCsv || []), filename: `sales-report-${srRange().from}-to-${srRange().to}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;

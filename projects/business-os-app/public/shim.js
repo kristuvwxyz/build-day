@@ -328,7 +328,7 @@
         if (!r.ok && !j.error) j.error = "Website request failed (" + r.status + ")";
         return j;
       };
-      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }), pushProducts: products => call({ action: "pushProducts", products }), statuses: orders => call({ action: "statuses", orders }), email: m => call({ action: "email", ...(m || {}) }), maya: m => call({ action: "maya", ...(m || {}) }),
+      return { list: o => call({ action: "list", ...(o || {}) }), update: (ref, patch) => call({ action: "update", ref, ...(patch || {}) }), nextNumber: () => call({ action: "nextOrderNumber" }), pushProducts: products => call({ action: "pushProducts", products }), statuses: orders => call({ action: "statuses", orders }), email: m => call({ action: "email", ...(m || {}) }), voucherList: () => call({ action: "voucherList" }), voucherAdd: m => call({ action: "voucherAdd", ...(m || {}) }), voucherSet: m => call({ action: "voucherSet", ...(m || {}) }), maya: m => call({ action: "maya", ...(m || {}) }),
         // "New website" email progress from Brevo (our /api/brevo server route).
         brevo: async () => { const { data: { session } } = await sb.auth.getSession(); const r = await fetch("/api/brevo", { headers: { Authorization: "Bearer " + (session && session.access_token) } }); const j = await r.json().catch(() => ({})); if (!r.ok && !j.error) j.error = "Brevo request failed (" + r.status + ")"; return j; }, returnSet: m => call({ action: "returnSet", ...(m || {}) }),
         // Notes and accords from a Fragrantica page (our /api/fragrantica server route).
