@@ -9338,7 +9338,7 @@ document.addEventListener("click", guard(async ev => {
     case "vc-make": return vcMake();
     case "vc-reload": return vcLoad(true);
     case "vc-copy": { const t = $("#vc-msg"); try { await navigator.clipboard.writeText(t.value); toast("Message copied."); } catch (e) { t.select(); toast("Select and copy the message."); } return; }
-    case "vc-set": { const x = btn.dataset; const r = await S.site.voucherSet({ row: Number(x.row), code: x.code, status: x.st }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? "Voucher " + x.code + " is now " + x.st + "." : (r && r.error) || "Couldn't change it."); vcLoad(true); return; }
+    case "vc-set": { const x = b.dataset; const r = await S.site.voucherSet({ row: Number(x.row), code: x.code, status: x.st }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? "Voucher " + x.code + " is now " + x.st + "." : (r && r.error) || "Couldn't change it."); vcLoad(true); return; }
     case "cc-save": return ccSave();
     case "pc-save": return pcSave();
     case "sr-dl": try { await S.dl.save({ data: csv(S.srCsv || []), filename: `sales-report-${srRange().from}-to-${srRange().to}.csv` }); } catch (e) { if (e && e.code !== "declined") toast("Couldn't download."); } return;
