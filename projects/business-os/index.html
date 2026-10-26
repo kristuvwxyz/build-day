@@ -3858,7 +3858,7 @@ function viewSalesReport() {
 }
 /* Finance → Cost & price check (K, Oct 26, 2026): sold items from Jan 2026 grouped per product, so the cost can be fixed in bulk and compared with the sold prices;
    plus a check of the current listing prices. Saving a cost writes it onto every sold line of that product in the date range (and optionally the listing). */
-const ccNorm = s => String(s || "").toLowerCase().replace(/\s*\|.*$/, "").replace(/[^a-z0-9]+/g, " ").trim();
+const ccNorm = s => String(s || "").toLowerCase().replace(/\s*\|.*$/, "").replace(/\((pre-?order|on-?hand)\)/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 function ccState() { return S.cc || (S.cc = { from: "2026-01-01", to: mToday(), f: "missing", q: "", pf: "nocost", pq: "", edit: {}, pedit: {}, list: true }); }
 function ccGroups() {
   const cc = ccState(), byId = new Map(S.products.map(p => [p.id, p])), byName = new Map();
@@ -3884,7 +3884,7 @@ const CC_LABEL = { missing: ["bad", "No cost"], neg: ["bad", "Cost ≥ sold pric
 function viewCostCheck() {
   const cc = ccState(), gs = ccGroups(), cnt = { all: gs.length, missing: 0, neg: 0, low: 0, spread: 0, ok: 0 }; gs.forEach(r => cnt[ccFlag(r)]++);
   const q = ccNorm(cc.q), rows = gs.filter(r => (cc.f === "all" || ccFlag(r) === cc.f) && (!q || ccNorm(r.name).includes(q))).sort((a, b) => b.sales - a.sales);
-  const sales = gs.reduce((a, r) => a + r.sales, 0), cost = gs.reduce((a, r) => a + ccEff(r) * r.q, 0), edits = Object.keys(cc.edit).filter(k => cc.edit[k] !== "").length;
+  const sales = Math.round(gs.reduce((a, r) => a + r.sales, 0)), cost = Math.round(gs.reduce((a, r) => a + ccEff(r) * r.q, 0)), edits = Object.keys(cc.edit).filter(k => cc.edit[k] !== "").length;
   const F = [["missing", "No cost"], ["neg", "Cost ≥ price"], ["low", "Low margin"], ["spread", "Price varies"], ["ok", "OK"], ["all", "All"]];
   const sold = `<div class="head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><label style="font-size:12px">From <input type="date" id="cc-from" value="${cc.from}"></label><label style="font-size:12px">To <input type="date" id="cc-to" value="${cc.to}"></label>
     <input id="cc-q" placeholder="Search product" value="${esc(cc.q)}" style="max-width:200px">
