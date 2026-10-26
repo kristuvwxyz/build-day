@@ -12,7 +12,7 @@
 <script>
 (function () {
   var BTN = /add to (cart|bag)|pre-?order|buy now|reserve/i;
-  var SKIP = '.o2-it, .ord-it, [class*="cart"], [class*="Cart"], [class*="checkout"], [class*="drawer"], [id*="cart"], [id*="account"]';
+  var SKIP = '.o2-it, .ord-it, .rv, [class*="rv-"], [class*="cart"], [class*="Cart"], [class*="checkout"], [class*="drawer"], [id*="cart"], [id*="account"]';
   function soldIds() {
     var list = window.RS_PRODUCTS || window.PRODUCTS, out = {};
     if (!list || !list.length) return null;
