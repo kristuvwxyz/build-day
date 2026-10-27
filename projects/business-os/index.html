@@ -1090,6 +1090,7 @@ const STAGES = [
 const FULFILLMENTS = [
   ...STAGES,
   { id: "unfulfilled", name: "To ship", cls: "amber hollow" },
+  { id: "ready_pickup", name: "Ready for pickup", cls: "teal" },   // Lalamove / Same-Day: emails the customer to book their rider
   { id: "on_hold", name: "On hold", cls: "orange hollow" },
   { id: "fulfilled", name: "Shipped", cls: "grey" },
   { id: "delivered", name: "Delivered", cls: "green" },
@@ -1098,7 +1099,7 @@ const FULFILLMENTS = [
 ];
 const VOIDPAY = new Set(["refunded", "voided"]);
 const STAGE_IDS = new Set(STAGES.map(x => x.id));
-const OPEN_FUL = new Set(["unfulfilled", "on_hold", ...STAGE_IDS]);
+const OPEN_FUL = new Set(["unfulfilled", "ready_pickup", "on_hold", ...STAGE_IDS]);
 const normTag = t => String(t || "").toUpperCase().replace(/\s+/g, "");
 const isDispute = o => (o.tags || []).some(t => normTag(t) === "DISPUTE");
 const custLink = o => o.customer ? `<button type="button" class="cust-link" data-custof="${o.id}">${esc(o.customer)}</button>` : "";
@@ -3210,7 +3211,7 @@ function webAsOrders() {
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
 // RS OS Fulfillment status is the one the team edits; the customer's profile on regalspritz.com shows this status for it.
 const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", in_transit: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
-  sorted: "Packed", unfulfilled: "Packed", fulfilled: "Shipped", delivered: "Shipped", cancelled: "Cancelled" };
+  sorted: "Packed", unfulfilled: "Packed", ready_pickup: "Packed", fulfilled: "Shipped", delivered: "Shipped", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
   const site = {}, keep = {}, msgs = [];
@@ -5713,7 +5714,7 @@ async function receiptSend(o, quiet) {
 /* ---------- customer update emails (store Gmail via the website backend opsEmail) ----------
    Sent once per step: payment link ready, order confirmed, pre-order arrived, packing, shipped, cancelled.
    Internal steps (FWD, Billed, DP, On hold…) are one "confirmed" email, so customers aren't flooded. */
-const MAIL_STEP = { fwd: "confirmed", billed: "confirmed", dp: "confirmed", on_hold: "confirmed", arrived: "arrived", sorted: "arrived", arrived_hold: "arrived", unfulfilled: "packing", fulfilled: "shipped", delivered: "shipped", cancelled: "cancelled" };
+const MAIL_STEP = { fwd: "confirmed", billed: "confirmed", dp: "confirmed", on_hold: "confirmed", arrived: "arrived", sorted: "arrived", arrived_hold: "arrived", unfulfilled: "packing", ready_pickup: "pickup", fulfilled: "shipped", delivered: "shipped", cancelled: "cancelled" };
 const SITE_ORDERS = "https://www.regalspritz.com/account";
 const JNT_TRACK = "https://www.jtexpress.ph/";
 function custMailHTML(o, m) {
@@ -5742,6 +5743,9 @@ function custMailMsg(o, step, x) {
     paylink: { subject: `Your payment link is ready · order ${onum(o)}`, title: "Your payment link is ready", lines: [`Hi ${n}, your ${esc(x && x.method || "")} payment link for order <b>${num}</b> is ready.`, x && x.until ? `Please pay by <b>${esc(x.until)}</b> so we can keep your order.` : "Tap the button below to pay. Thank you!"], button: x && x.url ? { label: "Pay now", url: x.url } : null },
     confirmed: { subject: `Order ${onum(o)} confirmed`, title: "Your order is confirmed", lines: [`Hi ${n}, thank you! Order <b>${num}</b> is confirmed${pre ? " and your pre-order is now being processed with our supplier" : " and we're preparing it"}.`, pre ? "We'll email you again when it arrives in the Philippines." : "We'll email you when it ships."] },
     arrived: { subject: `Your pre-order has arrived · order ${onum(o)}`, title: "Your pre-order has arrived", lines: [`Hi ${n}, good news: your pre-order for order <b>${num}</b> has arrived in the Philippines.`, part ? "We'll send the remaining balance details, then ship it right away." : "We're getting it ready to ship."] },
+    pickup: { subject: `Order ${onum(o)} is ready for pickup`, title: "Your order is ready for pickup", lines: [`Hi ${n}, order <b>${num}</b> is packed and ready. You can book your Lalamove rider now.`],
+      block: `<div style="margin:14px 0;padding:16px;border:1px dashed ${RR.gold};border-radius:10px;background:#FFFBF2"><div style="font-size:11px;letter-spacing:2px;color:${RR.muted};font-weight:700;margin-bottom:8px">PICKUP DETAILS</div><div style="font-size:14px;line-height:1.6;color:${RR.ink}"><b>Where:</b> Regal Spritz PH, Mandaluyong City<br><b>Name the rider should ask for:</b> Regal Spritz PH<br><b>Order number to show:</b> ${num}</div></div><p style="margin:0 0 10px;font-size:15px;line-height:1.5;color:${RR.ink}">Please book the rider within <b>24 hours</b> and message us the rider's name and plate number so we can hand it over right away.</p>`,
+      button: { label: "Message us your rider's details", url: "https://m.me/regalspritzph2" } },
     packing: { subject: `We're packing order ${onum(o)}`, title: "We're packing your order", lines: [`Hi ${n}, order <b>${num}</b> is being packed and will ship soon.`] },
     shipped: { subject: `Order ${onum(o)} has shipped`, title: "Your order is on its way", lines: [`Hi ${n}, order <b>${num}</b> has shipped.`, o.tracking ? "Here's your tracking number:" : "We'll email your tracking number as soon as it's ready."], block: trkBox },
     tracking: { subject: `Your tracking number · order ${onum(o)}`, title: "Track your order", lines: [`Hi ${n}, order <b>${num}</b> is on its way! Here's your tracking number:`], block: trkBox },
