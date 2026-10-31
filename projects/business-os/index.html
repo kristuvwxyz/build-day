@@ -4166,7 +4166,7 @@ async function openShopFound(num) {
 function filteredOrders() {
   const q = S.of.q.trim().toLowerCase();
   const vw = S.of.view;
-  return allOrderRows().filter(o => {
+  const rows = allOrderRows().filter(o => {
     if (o.web && o.fulfillment === "cancelled" && S.of.ful !== "cancelled") return false; // shown in Cancelled orders
     if (S.cx.show === "shipped" && (o.fulfillment !== "fulfilled" || o.archived)) return false;   // Shipped tab
     if (S.of.ful !== "all" && o.fulfillment !== S.of.ful) return false;
@@ -4184,7 +4184,10 @@ function filteredOrders() {
     if (q && !orderMatchesQ(o, q)) return false;
     return true;
   }).sort(orderSorter());
+  // Searching: active orders first, finished ones (shipped and paid, cancelled) after, each group keeping the chosen sort.
+  return q ? [...rows.filter(activeRow), ...rows.filter(o => !activeRow(o))] : rows;
 }
+const activeRow = o => !isVoid(o) && (OPEN_FUL.has(o.fulfillment) || o.payment !== "paid") && o.fulfillment !== "fulfilled" && o.fulfillment !== "delivered" && o.fulfillment !== "cancelled";
 
 const ORDER_SORTS = {
   num: o => Number(String(o.num).replace(/\D/g, "")) || 0, date: o => o.createdAt || 0, items: o => itemCount(o), customer: o => (o.customer || "").toLowerCase(),
@@ -4506,7 +4509,6 @@ function viewOrders() {
     <button class="btn" type="button" data-act="columns" data-table="orders">⚙︎ Columns</button>
   </div>
   ${S.of.q && !all.length && ofActive() && (S.of.month || S.of.view !== "all" || S.of.ful !== "all" || S.of.pay !== "all") && S.orders.some(o => orderMatchesQ(o, S.of.q.trim().toLowerCase())) ? `<div class="notice">Some orders match “${esc(S.of.q)}” but your filters hide them. <button class="btn sm" type="button" data-act="of-clear-keepq">Show them</button></div>` : ""}
-  ${(() => { const q = (S.of.q || "").trim().toLowerCase(); if (!q) return ""; const am = S.archived.filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10); return am.length ? `<div class="panel shopfind"><div class="head"><h2>In Cancelled orders</h2><span class="s">${am.length} match${am.length === 1 ? "" : "es"}</span></div>${am.map(o => `<div class="sf-row"><div style="min-width:0"><b>${esc(onum(o))}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date || dstr(o.createdAt || 0))}${o.archivedReason ? " · " + esc(o.archivedReason) : ""} · archived ${esc(relTime(o.archivedAt))}</div></div><button class="btn sm" type="button" data-open="${o.id}">Open</button></div>`).join("")}</div>` : ""; })()}
   <div id="shopfind-slot">${shopFindPanel()}</div>
   ${bulk}
   ${ordersTable(rows, "orders", S.of, "osort", "sel-all")}
@@ -4514,7 +4516,8 @@ function viewOrders() {
     <button class="btn sm" type="button" data-page="-1" ${S.page === 0 ? "disabled" : ""} aria-label="Previous page">‹</button>
     <span>${all.length ? `${S.page * PAGE + 1}–${Math.min(all.length, S.page * PAGE + PAGE)} of ${all.length.toLocaleString("en-PH")}` : "0 orders"}</span>
     <button class="btn sm" type="button" data-page="1" ${S.page >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button>
-  </div><span style="font-size:12px;color:var(--muted)">${orderRole() === "status" ? "Finance can change payment and fulfillment status." : orderRole() === "pack" ? "Packing can change fulfillment, courier and tracking." : orderRole() === "view" ? "View only." : ""}</span></div>`;
+  </div><span style="font-size:12px;color:var(--muted)">${orderRole() === "status" ? "Finance can change payment and fulfillment status." : orderRole() === "pack" ? "Packing can change fulfillment, courier and tracking." : orderRole() === "view" ? "View only." : ""}</span></div>
+${(() => { const q = (S.of.q || "").trim().toLowerCase(); if (!q) return ""; const am = S.archived.filter(o => orderMatchesQ(o, q)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10); return am.length ? `<div class="panel shopfind"><div class="head"><h2>In Cancelled orders</h2><span class="s">${am.length} match${am.length === 1 ? "" : "es"}</span></div>${am.map(o => `<div class="sf-row"><div style="min-width:0"><b>${esc(onum(o))}</b> · ${esc(o.customer || "")}<div class="s">${fmtDate(o.date || dstr(o.createdAt || 0))}${o.archivedReason ? " · " + esc(o.archivedReason) : ""} · archived ${esc(relTime(o.archivedAt))}</div></div><button class="btn sm" type="button" data-open="${o.id}">Open</button></div>`).join("")}</div>` : ""; })()}`;
 }
 
 /* Supplier "To order" lists (K, Oct 13, 2026): paid / downpaid orders for a supplier's pre-orders that haven't been placed with
