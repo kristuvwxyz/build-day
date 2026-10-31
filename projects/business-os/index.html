@@ -8019,6 +8019,8 @@ function viewAttendance() {
 
 function openAttForm(mid) {
   const date = S.att.date, r = attRec(date, mid) || {}, cur = r.status && r.status !== "present" ? r.status : (r.in ? "present" : "");
+  // Split-shift days: each shift has its own in / out; the time between shifts is a "gap" break that must stay a gap when saved.
+  const own = (r.breaks || []).filter(b => !b.gap), segsOld = shiftSegs(r), nRows = Math.max(segsOld.length, shiftBlocks(date, mid).length), split = nRows > 1;
   openSheet(`
     <h3>${esc(memberName(mid))}</h3>
     <div style="color:var(--muted);font-size:13px">${longDate(date)} · times in Manila time</div>
@@ -8027,29 +8029,42 @@ function openAttForm(mid) {
       ${ATT_STATUS.filter(s => ["leave", "sick", "off", "holiday", "absent"].includes(s.id)).map(s => `<option value="${s.id}" ${cur === s.id ? "selected" : ""}>${s.name}</option>`).join("")}
       ${cur ? "" : `<option value="" selected>No record</option>`}
     </select></div>
-    <div class="row">
+    ${split ? Array.from({ length: nRows }, (_, i) => `<div class="row">
+      <div class="field"><label for="at-in-${i}">${esc(shiftName(date, mid, i) || "Shift " + (i + 1))} · time in</label><input id="at-in-${i}" type="time" value="${hhmm(segsOld[i] && segsOld[i].in)}"></div>
+      <div class="field"><label for="at-out-${i}">Time out</label><input id="at-out-${i}" type="time" value="${hhmm(segsOld[i] && segsOld[i].out)}"></div>
+    </div>`).join("") : `<div class="row">
       <div class="field"><label for="at-in">Time in</label><input id="at-in" type="time" value="${hhmm(r.in)}"></div>
       <div class="field"><label for="at-out">Time out</label><input id="at-out" type="time" value="${hhmm(r.out)}"></div>
-    </div>
+    </div>`}
     <div class="row">
-      <div class="field"><label for="at-bs">Break start</label><input id="at-bs" type="time" value="${hhmm(r.breaks && r.breaks[0] && r.breaks[0].s)}"></div>
-      <div class="field"><label for="at-be">Break end</label><input id="at-be" type="time" value="${hhmm(r.breaks && r.breaks[0] && r.breaks[0].e)}"></div>
+      <div class="field"><label for="at-bs">Break start</label><input id="at-bs" type="time" value="${hhmm(own[0] && own[0].s)}"></div>
+      <div class="field"><label for="at-be">Break end</label><input id="at-be" type="time" value="${hhmm(own[0] && own[0].e)}"></div>
     </div>
-    ${r.breaks && r.breaks.length > 1 ? `<div style="font-size:12px;color:var(--muted)">Plus ${r.breaks.length - 1} more break${r.breaks.length > 2 ? "s" : ""} (${fmtMin(breakMs({ ...r, breaks: r.breaks.slice(1) }))}), kept as is.</div>` : ""}
+    ${own.length > 1 ? `<div style="font-size:12px;color:var(--muted)">Plus ${own.length - 1} more break${own.length > 2 ? "s" : ""} (${fmtMin(breakMs({ ...r, breaks: own.slice(1) }))}), kept as is.</div>` : ""}
     <div class="field"><label for="at-note">Note</label><input id="at-note" value="${esc(r.note || "")}" placeholder="e.g. Half day, approved by CEO"></div>
     ${r.recordedByName ? `<div style="font-size:12px;color:var(--muted)">Last recorded by ${esc(r.recordedByName)}${r.updatedAt ? " · " + relTime(r.updatedAt) : ""}</div>` : ""}
     <div id="sheet-err" class="confirm" hidden></div>
     ${r.id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="ask-del-att" data-id="${r.id}">Clear this record</button></div>` : ""}
     <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
   async () => {
-    const tin = fromHHMM(date, val("at-in")), tout = fromHHMM(date, val("at-out"));
+    let tin, tout, gaps = [];
+    if (split) {
+      const pr = Array.from({ length: nRows }, (_, i) => ({ i, a: fromHHMM(date, val("at-in-" + i)), z: fromHHMM(date, val("at-out-" + i)) })).filter(x => x.a);
+      for (let k = 0; k < pr.length; k++) {
+        if (pr[k].z && pr[k].z < pr[k].a) return sheetError(`Shift ${pr[k].i + 1}: time out is earlier than time in.`);
+        if (k < pr.length - 1 && !pr[k].z) return sheetError(`Shift ${pr[k].i + 1}: enter a time out before the next shift.`);
+        if (k > 0 && pr[k].a < pr[k - 1].z) return sheetError(`Shift ${pr[k].i + 1} starts before shift ${pr[k - 1].i + 1} ends.`);
+        if (k > 0) gaps.push({ s: pr[k - 1].z, e: pr[k].a, gap: true });
+      }
+      tin = pr.length ? pr[0].a : 0; tout = pr.length ? pr[pr.length - 1].z : 0;
+    } else { tin = fromHHMM(date, val("at-in")); tout = fromHHMM(date, val("at-out")); }
     const status = val("at-status") || (tin ? "present" : "");
     if (!status) { closeSheet(); return; }
     if (status === "present" && !tin) return sheetError("Enter a time in, or choose a leave status.");
     if (tin && tout && tout < tin) return sheetError("Time out is earlier than time in.");
     const bs = fromHHMM(date, val("at-bs")), be = fromHHMM(date, val("at-be"));
     if (bs && be && be < bs) return sheetError("Break end is earlier than break start.");
-    const breaks = status === "present" ? [...(bs ? [{ s: bs, e: be || 0 }] : []), ...((r.breaks || []).slice(1))] : [];
+    const breaks = status === "present" ? [...(bs ? [{ s: bs, e: be || 0 }] : []), ...own.slice(1), ...gaps].sort((a, b) => a.s - b.s) : [];
     const by = (member(myMemberId()) || {}).name || (S.me && S.me.name) || "";
     await save("attendance", attId(date, mid), { date, memberId: mid, status, in: status === "present" ? tin : 0, out: status === "present" ? tout : 0, breaks, note: val("at-note"), recordedByName: by, updatedAt: Date.now() });
     closeSheet(); toast("Attendance saved.");
