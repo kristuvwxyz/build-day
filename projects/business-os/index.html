@@ -2662,7 +2662,9 @@ function myTaskBadge() {
 // Tasks: CEO sees all, Admin all except CEO's, everyone else only their own department (plus tasks assigned to them).
 const taskDepts = () => allowedDepts();
 const fullTaskView = () => taskDepts().length === DEPTS.length;
+const ceoTask = t => t.department === "CEO" || (member(t.assigneeId) || {}).department === "CEO";   // the owner's own tasks: only the owner / CEO see them
 function taskVisible(t) {
+  if (ceoTask(t) && !isCEO()) return false;
   if (fullTaskView() || isAllTask(t)) return true;
   if (t.assigneeId && t.assigneeId === myMemberId()) return true;
   const ds = taskDepts(), am = member(t.assigneeId), td = t.department || (am && am.department) || "";
@@ -3200,7 +3202,7 @@ function webAsOrders() {
     return { receivedAt: o.receivedAt ? webMs(o.receivedAt) : 0, shippedAt: m.shippedAt || (o.shippedAt ? webMs(o.shippedAt) : 0) || (((m.log || []).find(l => /Fulfillment Status → Shipped/.test(l.msg || "")) || {}).at || 0), id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
       supOrdered: m.supOrdered, items: (o.items || []).map(i => ({ productId: (webItemProduct(i) || {}).id || "", name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0, kind: i.kind === "preorder" || i.preorder === true ? "preorder" : i.kind === "onhand" ? "onhand" : "" })),
-      shipFee: Number(o.shipping) || 0, adjust: (Number(o.total) || 0) - (Number(o.shipping) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
+      shipFee: Number(o.shipping) || 0, dueRaw: Number(o.due) || 0, bill: m.bill || null, paidAmt: m.paidAmt, adjust: (Number(o.total) || 0) - (Number(o.shipping) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
       payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
       tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", payVia: m.payVia || (/manual/i.test(o.payment || "") ? "" : undefined), payLink: m.payLink || "", mayaId: m.mayaId || "", receipt: m.receipt || null, cancel: o.cancel || null, shipPref: o.shipPref || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
@@ -4479,13 +4481,14 @@ function viewOrders() {
       ${canFul() || canAll() ? `<button class="btn sm cancel-btn" type="button" data-bulk="cancel">✕ Cancel order${S.sel.size === 1 ? "" : "s"}</button>` : ""}
       <button class="btn ghost sm" type="button" data-bulk="clear">Clear</button>
       ${canShip() ? `<button class="btn sm primary" type="button" data-act="jnt-file" style="margin-left:auto">J&T booking file</button>` : ""}</div>` : "";
-  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT, bdOn = S.cx.show === "bdo" && S.site && canPay(), rtOn = S.cx.show === "ret" && S.site, mpOn = S.cx.show === "manual" && S.site && canPay(), shOn = S.cx.show === "shipped";
-  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn && !bdOn && !rtOn && !mpOn && !shOn}">Orders</button><button type="button" data-cx="shipped" aria-pressed="${shOn}">Shipped <span style="color:var(--muted)">${allOrderRows().filter(o => o.fulfillment === "fulfilled" && !o.archived).length}</span></button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button><button type="button" data-cx="ret" aria-pressed="${!!rtOn}">Returns${retBadge()}</button>` : ""}${S.site && canPay() ? `<button type="button" data-cx="manual" aria-pressed="${!!mpOn}">Manual Processing${manualBadge()}</button><button type="button" data-cx="bdo" aria-pressed="${!!bdOn}">BDO link requests${bdoBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
+  const arT = canAll(), cxOn = S.cx.show === true && S.site, arOn = S.cx.show === "arch" && arT, bdOn = S.cx.show === "bdo" && S.site && canPay(), rtOn = S.cx.show === "ret" && S.site, mpOn = S.cx.show === "manual" && S.site && canPay(), shOn = S.cx.show === "shipped", blOn = S.cx.show === "bill" && canPay();
+  const cxTabs = S.site || arT ? `<div class="seg cx-seg" role="group" aria-label="Orders, cancellation requests or cancelled orders"><button type="button" data-cx="0" aria-pressed="${!cxOn && !arOn && !bdOn && !rtOn && !mpOn && !shOn && !blOn}">Orders</button>${canPay() ? `<button type="button" data-cx="bill" aria-pressed="${blOn}">To bill${billBadge()}</button>` : ""}<button type="button" data-cx="shipped" aria-pressed="${shOn}">Shipped <span style="color:var(--muted)">${allOrderRows().filter(o => o.fulfillment === "fulfilled" && !o.archived).length}</span></button>${S.site ? `<button type="button" data-cx="1" aria-pressed="${!!cxOn}">Cancellation requests${cxBadge()}</button><button type="button" data-cx="ret" aria-pressed="${!!rtOn}">Returns${retBadge()}</button>` : ""}${S.site && canPay() ? `<button type="button" data-cx="manual" aria-pressed="${!!mpOn}">Manual Processing${manualBadge()}</button><button type="button" data-cx="bdo" aria-pressed="${!!bdOn}">BDO link requests${bdoBadge()}</button>` : ""}${arT ? `<button type="button" data-cx="arch" aria-pressed="${arOn}">Cancelled <span style="color:var(--muted)">${archivedCount()}</span></button>` : ""}</div>` : "";
   if (cxOn) return `${webErrNotice()}${cxTabs}${cancelPanel()}`;
   if (rtOn) return `${webErrNotice()}${cxTabs}${returnsPanel()}`;
   if (arOn) return `${cxTabs}${viewArchived()}`;
   if (bdOn) return `${webErrNotice()}${cxTabs}${bdoPanel()}`;
   if (mpOn) return `${webErrNotice()}${cxTabs}${manualPanel()}`;
+  if (blOn) return `${webErrNotice()}${cxTabs}${billPanel()}`;
   return `${webErrNotice()}${cxTabs}
   <div class="shop-slot shop-line">${shopChip()}</div>
   ${S.site && canOrders() ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 4px">Website orders: <span id="web-state">${S.web.loading || !S.web.loaded ? "Loading…" : S.web.at ? "Updated " + new Date(S.web.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" }) + (S.web.ms ? ` · ${(S.web.ms / 1e3).toFixed(1)}s` : "") : ""}</span></div>` : ""}
@@ -5559,7 +5562,7 @@ const rrFind = id => S.orders.find(x => x.id === id) || S.archived.find(x => x.i
 async function rrPatch(o, data) {
   if (!o.web) return patch("orders", o.id, data);
   const m = S.webmeta.find(d => d.ref === o.ref) || {}, keep = {};
-  for (const k of ["payVia", "payLink", "mop", "mayaId", "receipt"]) if (k in data) keep[k] = data[k];
+  for (const k of ["payVia", "payLink", "mop", "mayaId", "receipt", "bill", "paidAmt"]) if (k in data) keep[k] = data[k];
   if (data.log) keep.log = data.log.filter(l => l.by !== "Website").slice(-80);
   if (data.payLink && /bdo\.com\.ph/i.test(data.payLink) && S.site) await S.site.update(o.ref, { bdoLink: data.payLink }).catch(() => null);
   const row = { ...clean(m), ref: o.ref, ...keep }; await save("webmeta", webMetaId(o.ref), row);
@@ -5630,7 +5633,7 @@ function rrViaPanel(o) {
 }
 const payBtns = o => o.payLink && rrPayable(o) && o.payVia !== "manual" ? `<a class="btn sm" href="${esc(o.payLink)}" target="_blank" rel="noopener">💳 Pay link</a><button class="btn sm" type="button" data-copy="${esc(o.payLink)}">Copy pay link</button>` : "";
 const RR = { brand: "#3d1a6e", gold: "#b8913a", ink: "#2a2230", muted: "#7a6f80", line: "#e8e1ec", bg: "#faf7fb" };
-const rrDue = o => o.payment === "paid" || VOIDPAY.has(o.payment) ? 0 : total(o);
+const rrDue = o => o.payment === "paid" || VOIDPAY.has(o.payment) ? 0 : o._bill != null ? o._bill : total(o);
 const rrState = o => o.payment === "paid" ? "PAID" : o.payment === "partial" ? "PARTIALLY PAID" : VOIDPAY.has(o.payment) ? pay(o.payment).name.toUpperCase() : "UNPAID";
 const rrPayable = o => !["paid", "refunded", "voided", "to_refund"].includes(o.payment) && !o.archived;
 const rrDate = o => new Date(o.createdAt || Date.now()).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" });
@@ -5710,6 +5713,101 @@ async function receiptSend(o, quiet) {
   // Manual Processing: the website's 24 h pay timer starts when the first receipt is sent (backend keeps the first time, so a resend won't restart it).
   if (o.web && isManualWeb(o) && S.site.update) { const x = await S.site.update(o.ref, { receiptSent: true }).catch(() => null); const i = S.web.orders.findIndex(w => w.ref === o.ref); if (x && x.ok && x.order && i >= 0) { S.web.orders[i] = x.order; S.web.dirty = true; } }
   toast(`Royal Receipt emailed to ${o.email}.`); return true;
+}
+/* ---------- Balance bill: arrived pre-orders that still owe the balance and / or the shipping fee ---------- */
+const ARRIVED_FUL = ["arrived", "sorted", "arrived_hold"];
+const billRows = () => [...S.orders, ...(S.web.loaded ? webAsOrders() : [])].filter(o => !o.archived && ARRIVED_FUL.includes(o.fulfillment) && rrPayable(o) && o.payment !== "paid" && !VOIDPAY.has(o.payment));
+const billBadge = () => { const n = billRows().length; return n ? `<span class="badge red cx-n" title="${n} arrived order${n > 1 ? "s" : ""} to bill">${n}</span>` : ""; };
+// Already paid: what staff typed in the bill sheet, else the website's down payment, else half the items for a Partially paid order.
+const billPaid = o => o.paidAmt !== undefined && o.paidAmt !== "" && o.paidAmt !== null ? Number(o.paidAmt) || 0 : o.payment === "partial" ? (o.web && o.dueRaw ? Math.min(o.dueRaw, total(o)) : Math.round(itemsTotal(o) / 2)) : 0;
+const billShip = o => o.pickup || o.shipFree ? 0 : Number(o.shipFee) || Number(o.bill && o.bill.sf) || sfAuto((o.ship || shipOf(o)).province) || 0;
+function billCalc(o, paid, sf) {
+  const goods = itemsTotal(o) + (Number(o.adjust) || 0) - (Number(o.discount) || 0), tot = goods + sf, amt = Math.max(0, Math.round((tot - paid) * 100) / 100);
+  return { goods, sf, tot, paid, bal: Math.max(0, goods - paid), amt };
+}
+function billHTML(o, c, link, via) {
+  const e = esc, k = RR, row = (l, v, b) => `<tr><td style="padding:5px 0;color:${b ? k.ink : k.muted};font-size:14px;${b ? "font-weight:700" : ""}">${l}</td><td align="right" style="padding:5px 0;color:${k.ink};font-size:14px;${b ? "font-weight:700" : ""}">${v}</td></tr>`;
+  const ob = { ...o, _bill: c.amt, payment: "pending" };
+  const pay = link ? `<tr><td align="center" style="padding:18px 28px 6px"><a href="${e(link)}" target="_blank" style="display:inline-block;background:${k.brand};color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 34px;border-radius:10px;border-bottom:3px solid ${k.gold}">Pay ${e(peso2(c.amt))} now</a><div style="font-size:12px;color:${k.muted};margin-top:8px">Card or Maya wallet. If the button doesn't work, open: <a href="${e(link)}" style="color:${k.brand};word-break:break-all">${e(link)}</a></div></td></tr>` : via === "manual" ? rrManualHTML(ob, true) : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Balance due ${e(onum(o))}</title></head>
+<body style="margin:0;padding:0;background:${k.bg};font-family:Helvetica,Arial,sans-serif;color:${k.ink}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${k.bg}"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${k.line};border-radius:14px;overflow:hidden">
+<tr><td style="background:${k.brand};padding:26px 28px;text-align:center"><div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#ffffff;letter-spacing:.5px">Regal Spritz PH</div><div style="font-size:11px;letter-spacing:4px;color:${k.gold};margin-top:6px;font-weight:700">&#9819; YOUR ORDER HAS ARRIVED &#9819;</div></td></tr>
+<tr><td style="padding:24px 28px 8px"><p style="font-size:15px;line-height:1.5;margin:0 0 6px">Hi ${e((o.customer || "").split(" ")[0] || "there")}, good news: your pre-order <b>${e(onum(o))}</b> is here! To ship it out, please settle the remaining balance${c.sf ? " and shipping fee" : ""} below.</p></td></tr>
+<tr><td style="padding:8px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${k.line}">
+${(o.items || []).map(i => `<tr><td style="padding:8px 8px 8px 0;font-size:14px;border-top:1px solid ${k.line}">${e(i.name)}</td><td align="right" style="padding:8px 0;font-size:14px;border-top:1px solid ${k.line};white-space:nowrap">${e(i.qty)} × ${e(peso2(i.price))}</td></tr>`).join("")}
+</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid ${k.ink};margin-top:4px">
+${row("Order total", e(peso2(c.goods)))}${c.paid ? row("Already paid", "−" + e(peso2(c.paid))) : ""}${row("Balance", e(peso2(c.bal)))}${row("Shipping fee", c.sf ? e(peso2(c.sf)) : "Free")}${row("Amount to pay", e(peso2(c.amt)), true)}
+</table></td></tr>
+${pay}
+<tr><td style="padding:14px 28px 0;font-size:13px;line-height:1.5;color:${k.muted}">We ship right after your payment is confirmed.</td></tr>
+<tr><td style="padding:6px 28px 26px;text-align:center;font-size:12px;color:${k.muted};line-height:1.6">Questions? Just reply to this email.<br><a href="https://regalspritz.com" style="color:${k.brand};text-decoration:none;font-weight:700">regalspritz.com</a> · Fragrance, fit for royalty.</td></tr>
+</table></td></tr></table></body></html>`;
+}
+function billText(o, c, link, via) {
+  return [`👑 REGAL SPRITZ PH · YOUR ORDER HAS ARRIVED`, `Order ${onum(o)}`, "", `Hi ${(o.customer || "").split(" ")[0] || "there"}, your pre-order is here! To ship it, please settle the balance${c.sf ? " and shipping fee" : ""}:`, "",
+    ...(o.items || []).map(i => `• ${i.qty}× ${i.name}`), "", `Order total: ${peso2(c.goods)}`, ...(c.paid ? [`Already paid: −${peso2(c.paid)}`] : []), `Balance: ${peso2(c.bal)}`, `Shipping fee: ${c.sf ? peso2(c.sf) : "Free"}`, `AMOUNT TO PAY: ${peso2(c.amt)}`, "",
+    ...(link ? [`💳 Pay here: ${link}`] : via === "manual" ? ["💳 Pay by e-wallet or bank transfer:", ...payMethods().map(m => `• ${m.title} · ${m.name} · ${m.num}`), "After paying, reply with a screenshot of your payment receipt."] : []), "", "We ship right after your payment is confirmed. Thank you! · regalspritz.com"].join("\n");
+}
+function openBill(id) {
+  const o = rrFind(id); if (!o) return;
+  S.sheetReopen = () => openBill(id); S.sheetBill = id;
+  const paid = billPaid(o), sf = billShip(o), b = o.bill && o.bill.at ? `<span class="badge green">Billed ${esc(relTime(o.bill.at))} · ${peso2(o.bill.amt)}${o.bill.to ? " · " + esc(o.bill.to) : ""}</span>` : `<span class="badge grey">Not billed yet</span>`;
+  openSheet(`<h3>Bill · ${esc(onum(o))} · ${esc(o.customer || "")}</h3>
+    <div class="rr-bar">${b}${o.email ? "" : `<span style="font-size:12.5px;color:var(--muted)">No email on this order. Use Copy text and send it in chat.</span>`}</div>
+    <div style="font-size:13px;color:var(--muted);margin:4px 0 8px">${(o.items || []).map(i => `${esc(i.qty)}× ${esc(i.name)}`).join("<br>")}</div>
+    <div class="rr-sf"><label for="bl-paid">Already paid (₱)</label><input id="bl-paid" inputmode="decimal" class="money" value="${moneyFmt(paid || "")}" placeholder="0">
+      <label for="bl-sf">Shipping fee (₱)</label><input id="bl-sf" inputmode="decimal" class="money" value="${moneyFmt(sf || "")}" placeholder="0"><label class="rr-free"><input type="checkbox" id="bl-free" ${o.shipFree || o.pickup ? "checked" : ""}> Free</label></div>
+    <div id="bl-sum" class="notice" style="margin:10px 0"></div>
+    <div class="rr-act">
+      ${o.email && !(o.web && isManualWeb(o)) ? `<button class="btn primary sm" type="button" data-act="bill-send" data-via="maya" data-id="${o.id}">Maya link & email</button>` : ""}
+      ${o.email ? `<button class="btn ${o.web && isManualWeb(o) ? "primary " : ""}sm" type="button" data-act="bill-send" data-via="manual" data-id="${o.id}">Email with e-wallet / bank QR</button>` : ""}
+      <button class="btn sm" type="button" data-act="bill-copy" data-id="${o.id}">Copy text (for chat)</button>
+      <button class="btn sm" type="button" data-act="bill-paid" data-id="${o.id}">✓ Mark fully paid</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted)">Check the amount first, then send. The buyer is emailed a balance bill with a Pay button (Maya) or our QR codes. When the money comes in, tap Mark fully paid.</div>`);
+  billSum(o);
+}
+function billSum(o) {
+  const el = $("#bl-sum"); if (!el) return; const free = !!($("#bl-free") && $("#bl-free").checked), c = billCalc(o, numv("bl-paid"), free ? 0 : numv("bl-sf"));
+  el.innerHTML = `Order total <b>${peso2(c.goods)}</b> − paid <b>${peso2(c.paid)}</b> = balance <b>${peso2(c.bal)}</b> · shipping <b>${peso2(c.sf)}</b><div style="font-size:17px;margin-top:4px">Amount to bill: <b>${peso2(c.amt)}</b></div>`;
+}
+document.addEventListener("input", e => { const t = e.target; if (!t.id || (t.id !== "bl-paid" && t.id !== "bl-sf")) return; const o = S.sheetBill && rrFind(S.sheetBill); if (o) billSum(o); });
+document.addEventListener("change", e => { if (e.target.id === "bl-free") { const o = S.sheetBill && rrFind(S.sheetBill); if (o) billSum(o); } });
+async function billSend(id, via, copyOnly) {
+  const o = rrFind(id); if (!o) return;
+  const free = !!($("#bl-free") && $("#bl-free").checked), paid = numv("bl-paid"), c = billCalc(o, paid, free ? 0 : numv("bl-sf"));
+  if (!(c.amt > 0)) return sheetError("Nothing to bill: the amount is ₱0.");
+  const mode = via === "maya" ? "maya" : "manual";
+  if (copyOnly) { try { await navigator.clipboard.writeText(billText(o, c, "", "manual")); toast("Bill copied. Paste it in Messenger or Viber."); } catch (e) { toast("Could not copy. Try again."); } return; }
+  if (!S.site || !S.site.email) return sheetError("Emailing works in the RS App. Use Copy text instead.");
+  let link = "";
+  if (mode === "maya") {
+    if (!S.site.maya) return sheetError("Maya links work in the RS App.");
+    const r = await S.site.maya({ ref: o.num + "-BAL", amount: c.amt, name: o.customer || "", email: o.email || "", phone: o.phone || "", items: [{ name: `Balance & shipping · order ${o.num}`, qty: 1, price: c.amt }] }).catch(e => ({ ok: false, error: e && e.message }));
+    if (!r || !r.ok || !PAYLINK_RE.test(r.url || "")) return sheetError(`Maya link not made: ${(r && r.error) || "no answer"}.`);
+    link = r.url;
+  }
+  const cur = rrFind(id) || o;
+  const r = await S.site.email({ to: o.email, subject: `Your order ${onum(o)} has arrived · balance due ${peso2(c.amt)}`, html: billHTML(o, c, link, mode), text: billText(o, c, link, mode), kind: "update" }).catch(e => ({ ok: false, error: e && e.message }));
+  if (!r || !r.ok) { if (r && MAIL_LIMIT_RE.test(r.error || "")) { mailLimitHit(); return sheetError("Gmail's daily email limit is reached. Use Copy text for chat, or send tomorrow."); } return sheetError(`Bill not sent: ${(r && r.error) || "the website didn't answer"}.`); }
+  const data = { paidAmt: paid, bill: { at: Date.now(), amt: c.amt, sf: c.sf, to: o.email, via: mode, link, by: actor() }, log: logAdd(cur, [`emailed a balance bill of ${peso2(c.amt)} (balance ${peso2(c.bal)} + shipping ${peso2(c.sf)}) to ${o.email}`]) };
+  if (link) Object.assign(data, { payLink: link, payVia: "maya", mop: "Maya" }); else Object.assign(data, { payVia: "manual" });
+  if (!o.web) Object.assign(data, { shipFee: c.sf, ...(free ? { shipFree: true } : {}) });
+  await rrPatch(cur, data);
+  toast(`Bill for ${peso2(c.amt)} emailed to ${o.email}.`); openBill(id);
+}
+function billPanel() {
+  if (!S.web.loaded && S.site) return `<div class="panel"><div class="empty">Loading website orders…</div></div>`;
+  const rows = billRows().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  if (!rows.length) return `<div class="panel"><div class="empty">No arrived orders waiting to be billed. 🎉</div></div>`;
+  return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Orders that have <b>arrived</b> but are not fully paid. Tap <b>🧾 Bill</b> to email the balance + shipping fee with a Pay button. When the money is in, tap <b>Mark fully paid</b>. Oldest first.</div>
+  <div class="cx-list">${rows.map(o => { const c = billCalc(o, billPaid(o), billShip(o)), sent = o.bill && o.bill.at;
+    return `<div class="panel cx-card${sent ? "" : " pend"}"><div class="cx-top"><button type="button" class="onum linkish" ${o.web ? `data-webopen="${esc(o.ref)}"` : `data-open="${esc(o.id)}"`}>${o.web ? "#" + esc(o.num) : esc(onum(o))}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${(o.items || []).length} item${(o.items || []).length === 1 ? "" : "s"} · ${o.web ? "Website" : "RS OS"}</span></div>
+      <div class="cx-foot"><span style="font-size:13px">Paid ${peso(c.paid)} · balance ${peso(c.bal)} + shipping ${peso(c.sf)} = <b>${peso(c.amt)}</b></span>${sent ? `<span class="badge green">Billed ${esc(relTime(o.bill.at))}</span>` : `<span class="badge amber">Not billed</span>`}${o.email ? "" : ` <span class="badge red">No email</span>`}
+      <span style="flex:1"></span><button class="btn sm" type="button" data-act="bill-paid" data-id="${esc(o.id)}">✓ Mark fully paid</button><button class="btn ${sent ? "" : "primary "}sm" type="button" data-act="bill" data-id="${esc(o.id)}">🧾 ${sent ? "Bill again" : "Bill"}</button></div></div>`; }).join("")}</div>`;
 }
 /* ---------- customer update emails (store Gmail via the website backend opsEmail) ----------
    Sent once per step: payment link ready, order confirmed, pre-order arrived, packing, shipped, cancelled.
@@ -6485,9 +6583,9 @@ function openOrderDetails(id) {
   const showFrom = multi || (o.items || []).some(i => i.from && i.from !== o.num);
   openSheet(`
     <div class="sheet-title"><h3>${esc(onum(o))}</h3></div>
-    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}<button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm cancel-btn" type="button" data-act="archive-order" data-id="${o.id}">✕ Cancel order</button></div>` : ""}
-    ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${arch ? "" : `<button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${payBtns(o)}`}${cp ? `<button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button>` : ""}</div>` : ""}
-    ${(() => { const ts = S.tasks.filter(t => t.orderId === o.id).sort((a, b) => (a.due || "").localeCompare(b.due || "")); return ts.length ? `<div class="oactions" style="font-size:13px">📅 On the calendar: ${ts.map(t => `<button type="button" class="chip" data-task="${t.id}">${t.due ? fmtDate(t.due) : "No date"} · ${esc(t.title.slice(0, 40))} · ${esc(tstat(t.status).name)}</button>`).join("")}</div>` : ""; })()}
+    ${all ? `<div class="oactions"><button class="btn sm" type="button" data-act="edit-items" data-id="${o.id}">✏️ Edit items</button><button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button><button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${ARRIVED_FUL.includes(o.fulfillment) && o.payment !== "paid" ? `<button class="btn sm" type="button" data-act="bill" data-id="${o.id}">🧾 Bill balance</button>` : ""}${payBtns(o)}<button class="btn sm" type="button" data-act="merge-pick" data-id="${o.id}">⇄ Merge</button><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${(o.mergedParts || []).length ? `<button class="btn sm" type="button" data-act="unmerge" data-id="${o.id}">Unmerge</button>` : ""}<span style="flex:1"></span><button class="btn sm cancel-btn" type="button" data-act="archive-order" data-id="${o.id}">✕ Cancel order</button></div>` : ""}
+    ${!all && !S.readOnly ? `<div class="oactions"><button class="btn sm" type="button" data-act="order-cal" data-id="${o.id}">📅 Add to calendar</button>${arch ? "" : `<button class="btn sm" type="button" data-act="receipt" data-id="${o.id}">👑 Royal Receipt</button>${ARRIVED_FUL.includes(o.fulfillment) && o.payment !== "paid" ? `<button class="btn sm" type="button" data-act="bill" data-id="${o.id}">🧾 Bill balance</button>` : ""}${payBtns(o)}`}${cp ? `<button class="btn sm" type="button" data-act="edit-contact" data-id="${o.id}">📍 Contact & shipping</button>` : ""}</div>` : ""}
+    ${(() => { const ts = S.tasks.filter(t => t.orderId === o.id && (isCEO() || !ceoTask(t))).sort((a, b) => (a.due || "").localeCompare(b.due || "")); return ts.length ? `<div class="oactions" style="font-size:13px">📅 On the calendar: ${ts.map(t => `<button type="button" class="chip" data-task="${t.id}">${t.due ? fmtDate(t.due) : "No date"} · ${esc(t.title.slice(0, 40))} · ${esc(tstat(t.status).name)}</button>`).join("")}</div>` : ""; })()}
     ${isDispute(o) ? `<div class="notice" style="border-color:var(--bad);color:var(--bad)">⚠️ <b>Dispute.</b> Check that this is resolved before dispatch. Remove the DISPUTE tag once it is.</div>` : ""}
     <div style="color:var(--muted);font-size:13px">${relTime(o.createdAt)}${o.ref ? " · ref " + esc(o.ref) : ""}${o.imported ? " · imported from Shopify" : ""}${o.assignee ? " · assigned to " + esc(memberName(o.assignee)) : ""}</div>
     ${arch ? `<div class="notice">Cancelled ${relTime(o.archivedAt)}${o.archivedReason ? " · " + esc(o.archivedReason) : ""}${o.archivedBy ? " · by " + esc(o.archivedBy) : ""}.${canAll() ? ` <button class="btn sm" type="button" data-act="restore-order" data-id="${o.id}">Restore</button>` : ""}</div>` : `<div style="display:flex;gap:6px;flex-wrap:wrap">${badge(pay(o.payment))}${badge(ful(o.fulfillment))}<span class="badge grey">${esc(COURIER_LABEL[courierOf(o)])}</span></div>`}
@@ -8864,17 +8962,23 @@ function payslipText(c, per) {
   return L.join("\n");
 }
 function payslipHTML(c, per) {
-  const e = esc, rowsA = ADD_FIELDS.filter(([k]) => Number(c.rec[k])).map(([k, n]) => `<tr><td>${n}</td><td class="r">${peso2(c.rec[k])}</td></tr>`).join("");
-  const rowsD = (c.lateDed ? `<tr><td>Late (${c.lateMin} min)</td><td class="r">${peso2(c.lateDed)}</td></tr>` : "") + DED_FIELDS.filter(([k]) => Number(c.rec[k])).map(([k, n]) => `<tr><td>${n}</td><td class="r">${peso2(c.rec[k])}</td></tr>`).join("");
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Payslip ${e(c.m.name)} ${e(per.label)}</title><style>body{font-family:Arial,sans-serif;color:#231A23;max-width:640px;margin:32px auto;padding:0 16px}h1{font-family:Georgia,serif;font-weight:400;color:#4A2545;margin:0}table{width:100%;border-collapse:collapse;margin:8px 0 18px}td,th{padding:6px 8px;border-bottom:1px solid #E2DCE2;font-size:14px;text-align:left}.r{text-align:right}.net{font-size:20px;font-weight:700;background:#F0ECF0}.muted{color:#6E636D;font-size:13px}h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#A9814A;margin:18px 0 0}</style></head><body>
-  <h1>Regal Spritz PH</h1><div class="muted">Payslip · ${e(per.label)}</div>
-  <table><tr><td>Employee</td><td>${e(c.m.name)}</td></tr><tr><td>ID number</td><td>${e(c.m.idNumber || "")}</td></tr><tr><td>Position</td><td>${e(positionOf(c.m))}</td></tr><tr><td>Daily rate</td><td>${peso2(c.rate)}</td></tr></table>
-  <h2>Earnings</h2><table><tr><td>Basic pay (${c.paidDays} day${c.paidDays === 1 ? "" : "s"} × ${peso2(c.rate)})</td><td class="r">${peso2(c.basic)}</td></tr>${rowsA}</table>
-  ${rowsD ? `<h2>Deductions</h2><table>${rowsD}</table>` : ""}
-  <table><tr class="net"><td>NET PAY</td><td class="r">${peso2(c.net)}</td></tr></table>
-  <h2>Attendance</h2><table><tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th class="r">Hours</th></tr>${c.days.map(x => `<tr><td>${fmtDate(x.d)}</td><td>${astat(x.st).name}</td><td>${mTime(x.r && x.r.in)}</td><td>${mTime(x.r && x.r.out)}</td><td class="r">${fmtHours(hoursOf(x.r))}</td></tr>`).join("")}</table>
-  ${c.rec.notes ? `<p class="muted">Notes: ${e(c.rec.notes)}</p>` : ""}
-  <p class="muted" style="margin-top:40px">Received by: ____________________ &nbsp; Date: __________</p></body></html>`;
+  const e = esc, row = (n, v) => `<tr><td>${n}</td><td class="r">${v}</td></tr>`;
+  const rowsA = ADD_FIELDS.filter(([k]) => Number(c.rec[k])).map(([k, n]) => row(n, peso2(c.rec[k]))).join("");
+  const rowsD = (c.lateDed ? row(`Late (${c.lateMin} min)`, peso2(c.lateDed)) : "") + DED_FIELDS.filter(([k]) => Number(c.rec[k])).map(([k, n]) => row(n, peso2(c.rec[k]))).join("");
+  const gross = c.basic + c.adds;
+  const css = `*{box-sizing:border-box}body{margin:0;background:#F4F0F6;font-family:'Helvetica Neue',Arial,sans-serif;color:#231A23}.page{max-width:720px;margin:24px auto;background:#fff;border:1px solid #E2DCE2;border-radius:12px;overflow:hidden}.hd{background:#3D1A6E;color:#fff;padding:26px 32px;border-bottom:4px solid #B8913A;display:flex;justify-content:space-between;align-items:flex-end}.hd h1{margin:0;font-family:Georgia,'Cormorant Garamond',serif;font-weight:400;font-size:28px;letter-spacing:.04em}.hd .sub{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:#E6CB8A;margin-top:4px}.hd .per{text-align:right;font-size:13px;color:#E8DFF3}.hd .per b{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#E6CB8A;margin-bottom:3px}.bd{padding:24px 32px 30px}.emp{display:flex;gap:24px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid #E2DCE2}.emp div{min-width:140px}.emp small{display:block;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#6E636D}.emp b{font-size:15px}.cols{display:flex;gap:24px;margin-top:20px}.col{flex:1}h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#A9814A;margin:0 0 6px;padding-bottom:6px;border-bottom:2px solid #B8913A}table{width:100%;border-collapse:collapse}td,th{padding:7px 4px;border-bottom:1px solid #EEE9EE;font-size:13.5px;text-align:left;vertical-align:top}th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6E636D}.r{text-align:right;white-space:nowrap}.tot td{border-bottom:0;font-weight:700;border-top:1px solid #231A23}.net{margin:22px 0 4px;background:#3D1A6E;color:#fff;border-radius:10px;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;border-left:6px solid #B8913A}.net span{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:#E6CB8A}.net b{font-family:Georgia,serif;font-size:28px;font-weight:400}.stats{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}.stat{flex:1;min-width:90px;background:#FBF8F2;border:1px solid #EADFC8;border-radius:8px;padding:10px;text-align:center}.stat b{display:block;font-size:18px;color:#3D1A6E}.stat small{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6E636D}.note{margin-top:16px;font-size:13px;color:#6E636D}.sig{display:flex;gap:40px;margin-top:44px}.sig div{flex:1;border-top:1px solid #231A23;padding-top:6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6E636D}.ft{text-align:center;font-size:11px;color:#6E636D;padding:14px;background:#FBF8F2;border-top:1px solid #EADFC8}.att{page-break-before:auto;margin-top:24px}@media(max-width:560px){.cols{flex-direction:column}.hd{flex-direction:column;align-items:flex-start;gap:10px}.hd .per{text-align:left}}@media print{body{background:#fff}.page{border:0;margin:0;max-width:none}.hd,.net{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payslip ${e(c.m.name)} ${e(per.label)}</title><style>${css}</style></head><body><div class="page">
+  <div class="hd"><div><h1>Regal Spritz PH</h1><div class="sub">Payslip</div></div><div class="per"><b>Pay period</b>${e(per.label)}</div></div>
+  <div class="bd">
+  <div class="emp"><div><small>Employee</small><b>${e(c.m.name)}</b></div><div><small>Position</small><b>${e(positionOf(c.m))}</b></div><div><small>ID number</small><b>${e(c.m.idNumber || "-")}</b></div><div><small>Daily rate</small><b>${peso2(c.rate)}</b></div></div>
+  <div class="cols"><div class="col"><h2>Earnings</h2><table>${row(`Basic pay<br><span style="font-size:11.5px;color:#6E636D">${c.paidDays} day${c.paidDays === 1 ? "" : "s"} × ${peso2(c.rate)}</span>`, peso2(c.basic))}${rowsA}<tr class="tot"><td>Gross pay</td><td class="r">${peso2(gross)}</td></tr></table></div>
+  <div class="col"><h2>Deductions</h2><table>${rowsD || row('<span style="color:#6E636D">None</span>', peso2(0))}<tr class="tot"><td>Total deductions</td><td class="r">${peso2(c.deds)}</td></tr></table></div></div>
+  <div class="net"><span>Net pay</span><b>${peso2(c.net)}</b></div>
+  <div class="stats"><div class="stat"><b>${c.worked}</b><small>Days worked</small></div><div class="stat"><b>${c.late}</b><small>Late</small></div><div class="stat"><b>${c.leave}</b><small>Leave</small></div><div class="stat"><b>${c.absent}</b><small>Absent</small></div><div class="stat"><b>${fmtHours(c.hours)}</b><small>Hours</small></div></div>
+  ${c.rec.notes ? `<div class="note"><b>Notes:</b> ${e(c.rec.notes)}</div>` : ""}
+  <div class="att"><h2>Attendance</h2><table><tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th class="r">Hours</th></tr>${c.days.map(x => `<tr><td>${fmtDate(x.d)}</td><td>${astat(x.st).name}</td><td>${mTime(x.r && x.r.in)}</td><td>${mTime(x.r && x.r.out)}</td><td class="r">${fmtHours(hoursOf(x.r))}</td></tr>`).join("")}</table></div>
+  <div class="sig"><div>Prepared by</div><div>Received by / Date</div></div></div>
+  <div class="ft">Regal Spritz PH · Mandaluyong City · This payslip is confidential</div></div></body></html>`;
 }
 
 function openPayslip(mid) {
@@ -9105,7 +9209,7 @@ document.addEventListener("click", guard(async ev => {
   const cpy = ev.target.closest("[data-copy]"); if (cpy) { const t = cpy.dataset.copy; try { await navigator.clipboard.writeText(t); } catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); } const was = cpy.textContent; cpy.textContent = "Copied ✓"; setTimeout(() => { cpy.textContent = was; }, 1200); return; }
   const bv = ev.target.closest("[data-bdoview]"); if (bv) { S.cx.show = false; S.of.view = "bdo"; S.of.month = ""; S.page = 0; render(); return; }
   const rvt = ev.target.closest("[data-rvtab]"); if (rvt) { S.rv.status = rvt.dataset.rvtab; render(); return; }
-  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "manual" ? "manual" : cxt.dataset.cx === "shipped" ? "shipped" : cxt.dataset.cx === "ret" ? "ret" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
+  const cxt = ev.target.closest("[data-cx]"); if (cxt) { S.cx.show = cxt.dataset.cx === "arch" ? "arch" : cxt.dataset.cx === "bdo" ? "bdo" : cxt.dataset.cx === "manual" ? "manual" : cxt.dataset.cx === "shipped" ? "shipped" : cxt.dataset.cx === "bill" ? "bill" : cxt.dataset.cx === "ret" ? "ret" : cxt.dataset.cx === "1"; S.page = 0; if (S.cx.show && !S.web.loaded) webLoad(); render(); return; }
   const rtf = ev.target.closest("[data-retf]"); if (rtf) { S.cx.rf = rtf.dataset.retf; render(); return; }
   const rtd = ev.target.closest("[data-retdec]"); if (rtd) { await returnDecide(rtd.dataset.ref, rtd.dataset.retdec, rtd); return; }
   const rtr = ev.target.closest("[data-retdone]"); if (rtr) { const ref = rtr.dataset.retdone; if (!confirm(`Mark #${String(ref).replace(/^#/, "")} as Refunded? Do this after the return / refund is finished. The buyer sees it under Cancelled.`)) return; rtr.disabled = true; const r = await S.site.update(ref, { status: "Refunded" }).catch(e => ({ ok: false, error: e && e.message })); if (!r || !r.ok) { toast("Website: " + ((r && r.error) || "couldn't save.")); rtr.disabled = false; return; } toast(`#${String(ref).replace(/^#/, "")} marked Refunded.`); await webLoad(true); return; }
@@ -9212,6 +9316,10 @@ document.addEventListener("click", guard(async ev => {
     case "edit-contact": return openContactEdit(b.dataset.id);
     case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
+    case "bill": return openBill(b.dataset.id);
+    case "bill-send": return billSend(b.dataset.id, b.dataset.via);
+    case "bill-copy": return billSend(b.dataset.id, "manual", true);
+    case "bill-paid": { const o = rrFind(b.dataset.id); if (!o) return; if (!confirm(`Mark ${onum(o)} fully paid?`)) return; await updateOrder(o, { payment: "paid" }); if (!$("#scrim").hidden) closeSheet(); toast("Marked fully paid."); render(); return; }
     case "ann-preview": { if (S.photos && !S.webmeta.some(d => d.id === "_annpicks" && d.v === ANN_PICKS_V)) { b.disabled = true; await annPrepare(); b.disabled = false; } const x = annList()[0] || { name: "Maria" }; openSheet(`<h3>New website email</h3><div style="font-size:13px;color:var(--muted)">Subject: <b>${esc(ANN_SUBJECT)}</b> · to ${annList().length} past buyers</div><iframe class="rr-frame" title="Email preview" sandbox="allow-popups" style="height:min(1500px,75vh)" srcdoc="${esc(annHTML(x.name))}"></iframe><div class="sheet-foot"><button class="btn" type="button" data-act="close">Close</button></div>`, null); return; }
     case "ann-test": { if (!S.site || !S.site.email) { toast("Emails send from the RS App."); return; } b.disabled = true; await annPrepare(); const r = await S.site.email({ kind: "test", to: S.me.email, subject: "[Test] " + ANN_SUBJECT, html: annHTML(firstName() || "there"), text: annText(firstName() || "there") }).catch(e => ({ ok: false, error: e && e.message })); toast(r && r.ok ? `Test sent to ${S.me.email}.` : `Test not sent: ${(r && r.error) || "no answer"}`); b.disabled = false; return; }
     case "ann-start": { await annPrepare(); if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = `Tap again to email ${annList().length} buyers`; return; } const d = annDoc() || {}; await save("webmeta", "_announce", { ...clean(d), status: "sending", sent: d.sent || [], startedAt: d.startedAt || Date.now(), by: actor(), at: Date.now() }); toast("Started. Emails go out in batches while your RS App is open."); render(); setTimeout(announceRun, 1500); return; }
