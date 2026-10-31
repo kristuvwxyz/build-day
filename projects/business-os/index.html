@@ -207,6 +207,29 @@ body .field select, body .item-row select { -webkit-appearance: none; appearance
 .lwrap > table > thead th { position: sticky; top: 0; z-index: 3; background: var(--surface); box-shadow: inset 0 -1px 0 var(--line); }
 /* Phones: the Listings table only scrolls sideways inside its box; up/down scrolling belongs to the page (no two-way inner scroller, so nothing drifts). */
 @media (max-width: 720px) { .lwrap { max-height: none; overflow-y: hidden; } .lwrap > table > thead th { position: static; } }
+/* Phones: the Orders table becomes one card per order (no sideways scrolling). */
+@media (max-width: 640px) {
+  .ordtable, .ordtable tbody { display: block; width: 100%; min-width: 0; }
+  .ordtable thead { display: none; }
+  .ordtable tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; position: relative; padding: 12px 12px 12px 12px; margin: 0 0 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .ordtable tr.sel { border-color: var(--info); }
+  .ordtable td { display: block; padding: 0 !important; border: 0 !important; background: transparent !important; white-space: normal; text-align: left !important; min-width: 0; grid-column: 1 / -1; order: 20; font-size: 13.5px; }
+  .ordtable td:empty { display: none; }
+  .ordtable td.cb { position: absolute; top: 12px; right: 12px; grid-column: auto; order: 0; }
+  .ordtable td[data-k="num"] { grid-column: 1; order: 1; font-size: 15px; font-weight: 700; padding-right: 34px !important; }
+  .ordtable td[data-k="date"] { grid-column: 2; order: 2; text-align: right !important; color: var(--muted); font-size: 12px; padding-right: 34px !important; align-self: center; }
+  .ordtable td[data-k="customer"] { order: 3; font-size: 15px; }
+  .ordtable td[data-k="items"] { grid-column: 1; order: 4; }
+  .ordtable td[data-k="total"] { grid-column: 2; order: 5; text-align: right !important; font-weight: 700; font-size: 15px; }
+  .ordtable td[data-k="ikind"] { order: 6; }
+  .ordtable td[data-k="payment"], .ordtable td[data-k="fulfillment"], .ordtable td[data-k="mop"], .ordtable td[data-k="courier"], .ordtable td[data-k="assigned"] { grid-column: auto; order: 7; }
+  .ordtable td[data-k="payment"]::before, .ordtable td[data-k="fulfillment"]::before, .ordtable td[data-k="mop"]::before, .ordtable td[data-k="courier"]::before, .ordtable td[data-k="assigned"]::before,
+  .ordtable td[data-k="tracking"]::before, .ordtable td[data-k="waybill"]::before, .ordtable td[data-k="note"]::before, .ordtable td[data-k="phone"]::before, .ordtable td[data-k="address"]::before, .ordtable td[data-k="tags"]::before, .ordtable td[data-k="activity"]::before { content: attr(data-l); display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  .ordtable td select.status { width: 100%; }
+  .ordtable td[data-k="activity"] { display: none; }
+  .ordtable td[data-k="source"] { order: 8; }
+  .ordtable td[data-k="actions"] { order: 30; }
+}
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -4411,7 +4434,7 @@ function ordersTable(rows, table, st, attr, selAllId) {
   return `<div class="table-wrap lwrap"><table class="otable ordtable" data-own="1">
     <thead><tr>${selectable ? `<th class="cb"><input type="checkbox" id="${selAllId}" aria-label="Select all" ${allSel ? "checked" : ""}></th>` : ""}${cols.map(k => ORDER_COLS[k].nosort ? `<th>${ORDER_COLS[k].label}</th>` : sortTh(k, ORDER_COLS[k].label, ORDER_COLS[k].cls || "", st, attr)).join("")}</tr></thead>
     <tbody>${rows.map(o => { const v = isVoid(o) && o.payment === "voided"; const done = !v && (isVoid(o) || (o.payment === "paid" && !OPEN_FUL.has(o.fulfillment)));
-      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>` : ""}${cols.map(k => orderCell(k, o, table)).join("")}</tr>`; }).join("")}</tbody>
+      return `<tr data-row="${o.id}" class="${S.sel.has(o.id) ? "sel" : ""} ${done ? "done" : ""} ${v ? "void" : ""}">${selectable ? `<td class="cb"><input type="checkbox" data-sel="${o.id}" aria-label="Select ${esc(onum(o))}" ${S.sel.has(o.id) ? "checked" : ""}></td>` : ""}${cols.map(k => orderCell(k, o, table).replace(/^<td/, `<td data-k="${k}" data-l="${esc(ORDER_COLS[k].label || "")}"`)).join("")}</tr>`; }).join("")}</tbody>
   </table>${rows.length ? "" : `<div class="empty" style="padding:16px">${S.orders.length ? "No orders match these filters." : "No orders yet."}</div>`}</div>`;
 }
 function supplierBar(list) {
