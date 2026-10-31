@@ -3202,7 +3202,7 @@ function webAsOrders() {
     return { receivedAt: o.receivedAt ? webMs(o.receivedAt) : 0, shippedAt: m.shippedAt || (o.shippedAt ? webMs(o.shippedAt) : 0) || (((m.log || []).find(l => /Fulfillment Status → Shipped/.test(l.msg || "")) || {}).at || 0), id: "web:" + o.ref, web: true, ref: o.ref, num: String(o.ref || "").replace(/^#/, ""), createdAt: t, date: t ? dstr(t) : "", customer: o.name || "",
       phone: o.mobile || "", email: o.email || "", ship: { address1: o.address || "", city: o.city || "", province: o.province || "", phone: o.mobile || "", name: o.name || "" },
       supOrdered: m.supOrdered, items: (o.items || []).map(i => ({ productId: (webItemProduct(i) || {}).id || "", name: [i.title, i.variant].filter(Boolean).join(" | "), qty: Number(i.qty) || 1, price: Number(i.price) || 0, kind: i.kind === "preorder" || i.preorder === true ? "preorder" : i.kind === "onhand" ? "onhand" : "" })),
-      shipFee: Number(o.shipping) || 0, dueRaw: Number(o.due) || 0, bill: m.bill || null, paidAmt: m.paidAmt, adjust: (Number(o.total) || 0) - (Number(o.shipping) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
+      shipFee: Number(o.shipping) || 0, dueRaw: Number(o.due) || 0, bill: m.bill || null, paidAmt: m.paidAmt, toBill: !!m.toBill, adjust: (Number(o.total) || 0) - (Number(o.shipping) || 0) - (o.items || []).reduce((a, i) => a + (Number(i.qty) || 1) * (Number(i.price) || 0), 0),
       payment, fulfillment, tracking: o.tracking || "", courier: m.courier || "J&T", assignee: m.assignee || (cancel || webDone(o) ? "" : ownerOf({ phone: o.mobile, email: o.email, customer: o.name })),
       tags: m.tags || [], note: m.note || "", siteNote: o.note || "", platform: "website", payMethod: o.payment || "", payVia: m.payVia || (/manual/i.test(o.payment || "") ? "" : undefined), payLink: m.payLink || "", mayaId: m.mayaId || "", receipt: m.receipt || null, cancel: o.cancel || null, shipPref: o.shipPref || "",
       log: [{ at: t, by: "Website", msg: "order placed on the website" + (o.mayaPaid ? " · paid via Maya" : "") }, ...(m.log || [])] };
@@ -5562,7 +5562,7 @@ const rrFind = id => S.orders.find(x => x.id === id) || S.archived.find(x => x.i
 async function rrPatch(o, data) {
   if (!o.web) return patch("orders", o.id, data);
   const m = S.webmeta.find(d => d.ref === o.ref) || {}, keep = {};
-  for (const k of ["payVia", "payLink", "mop", "mayaId", "receipt", "bill", "paidAmt"]) if (k in data) keep[k] = data[k];
+  for (const k of ["payVia", "payLink", "mop", "mayaId", "receipt", "bill", "paidAmt", "toBill"]) if (k in data) keep[k] = data[k];
   if (data.log) keep.log = data.log.filter(l => l.by !== "Website").slice(-80);
   if (data.payLink && /bdo\.com\.ph/i.test(data.payLink) && S.site) await S.site.update(o.ref, { bdoLink: data.payLink }).catch(() => null);
   const row = { ...clean(m), ref: o.ref, ...keep }; await save("webmeta", webMetaId(o.ref), row);
@@ -5716,7 +5716,9 @@ async function receiptSend(o, quiet) {
 }
 /* ---------- Balance bill: arrived pre-orders that still owe the balance and / or the shipping fee ---------- */
 const ARRIVED_FUL = ["arrived", "sorted", "arrived_hold"];
-const billRows = () => [...S.orders, ...(S.web.loaded ? webAsOrders() : [])].filter(o => !o.archived && ARRIVED_FUL.includes(o.fulfillment) && rrPayable(o) && o.payment !== "paid" && !VOIDPAY.has(o.payment));
+const billArrived = () => [...S.orders, ...(S.web.loaded ? webAsOrders() : [])].filter(o => !o.archived && ARRIVED_FUL.includes(o.fulfillment) && rrPayable(o) && o.payment !== "paid" && !VOIDPAY.has(o.payment));
+// Manual: the team checks each arrived order first and adds it to the bill list; only those show as "To bill".
+const billRows = () => billArrived().filter(o => o.toBill);
 const billBadge = () => { const n = billRows().length; return n ? `<span class="badge red cx-n" title="${n} arrived order${n > 1 ? "s" : ""} to bill">${n}</span>` : ""; };
 // Already paid: what staff typed in the bill sheet, else the website's down payment, else half the items for a Partially paid order.
 const billPaid = o => o.paidAmt !== undefined && o.paidAmt !== "" && o.paidAmt !== null ? Number(o.paidAmt) || 0 : o.payment === "partial" ? (o.web && o.dueRaw ? Math.min(o.dueRaw, total(o)) : Math.round(itemsTotal(o) / 2)) : 0;
@@ -5801,13 +5803,19 @@ async function billSend(id, via, copyOnly) {
 }
 function billPanel() {
   if (!S.web.loaded && S.site) return `<div class="panel"><div class="empty">Loading website orders…</div></div>`;
-  const rows = billRows().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  if (!rows.length) return `<div class="panel"><div class="empty">No arrived orders waiting to be billed. 🎉</div></div>`;
-  return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Orders that have <b>arrived</b> but are not fully paid. Tap <b>🧾 Bill</b> to email the balance + shipping fee with a Pay button. When the money is in, tap <b>Mark fully paid</b>. Oldest first.</div>
-  <div class="cx-list">${rows.map(o => { const c = billCalc(o, billPaid(o), billShip(o)), sent = o.bill && o.bill.at;
-    return `<div class="panel cx-card${sent ? "" : " pend"}"><div class="cx-top"><button type="button" class="onum linkish" ${o.web ? `data-webopen="${esc(o.ref)}"` : `data-open="${esc(o.id)}"`}>${o.web ? "#" + esc(o.num) : esc(onum(o))}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${(o.items || []).length} item${(o.items || []).length === 1 ? "" : "s"} · ${o.web ? "Website" : "RS OS"}</span></div>
-      <div class="cx-foot"><span style="font-size:13px">Paid ${peso(c.paid)} · balance ${peso(c.bal)} + shipping ${peso(c.sf)} = <b>${peso(c.amt)}</b></span>${sent ? `<span class="badge green">Billed ${esc(relTime(o.bill.at))}</span>` : `<span class="badge amber">Not billed</span>`}${o.email ? "" : ` <span class="badge red">No email</span>`}
-      <span style="flex:1"></span><button class="btn sm" type="button" data-act="bill-paid" data-id="${esc(o.id)}">✓ Mark fully paid</button><button class="btn ${sent ? "" : "primary "}sm" type="button" data-act="bill" data-id="${esc(o.id)}">🧾 ${sent ? "Bill again" : "Bill"}</button></div></div>`; }).join("")}</div>`;
+  const by = (a, b) => (a.createdAt || 0) - (b.createdAt || 0), rows = billRows().sort(by), rest = billArrived().filter(o => !o.toBill).sort(by);
+  const open = o => o.web ? `data-webopen="${esc(o.ref)}"` : `data-open="${esc(o.id)}"`, num = o => o.web ? "#" + esc(o.num) : esc(onum(o));
+  const line = o => { const c = billCalc(o, billPaid(o), billShip(o)); return { c, txt: `Paid ${peso(c.paid)} · balance ${peso(c.bal)} + shipping ${peso(c.sf)} = <b>${peso(c.amt)}</b>` }; };
+  const ready = rows.length ? rows.map(o => { const { txt } = line(o), sent = o.bill && o.bill.at;
+    return `<div class="panel cx-card${sent ? "" : " pend"}"><div class="cx-top"><button type="button" class="onum linkish" ${open(o)}>${num(o)}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${(o.items || []).length} item${(o.items || []).length === 1 ? "" : "s"} · ${o.web ? "Website" : "RS OS"}</span></div>
+      <div class="cx-foot"><span style="font-size:13px">${txt}</span>${sent ? `<span class="badge green">Billed ${esc(relTime(o.bill.at))}</span>` : `<span class="badge amber">Not billed</span>`}${o.email ? "" : ` <span class="badge red">No email</span>`}
+      <span style="flex:1"></span><button class="btn ghost sm" type="button" data-act="bill-remove" data-id="${esc(o.id)}">Remove</button><button class="btn sm" type="button" data-act="bill-paid" data-id="${esc(o.id)}">✓ Mark fully paid</button><button class="btn ${sent ? "" : "primary "}sm" type="button" data-act="bill" data-id="${esc(o.id)}">🧾 ${sent ? "Bill again" : "Bill"}</button></div></div>`; }).join("") : `<div class="panel"><div class="empty">Nothing on the bill list yet. Check the arrived orders below and tap <b>+ Add to bill list</b>.</div></div>`;
+  const check = rest.length ? rest.map(o => { const { txt } = line(o);
+    return `<div class="panel cx-card"><div class="cx-top"><button type="button" class="onum linkish" ${open(o)}>${num(o)}</button><span>${esc(o.customer || "")}</span><span class="cx-when">${(o.items || []).length} item${(o.items || []).length === 1 ? "" : "s"} · ${o.web ? "Website" : "RS OS"} · ${esc(pay(o.payment).name)}</span></div>
+      <div class="cx-foot"><span style="font-size:13px">${txt}</span><span style="flex:1"></span><button class="btn sm" type="button" data-act="bill-add" data-id="${esc(o.id)}">+ Add to bill list</button></div></div>`; }).join("") : `<div class="panel"><div class="empty">No other arrived orders. 🎉</div></div>`;
+  return `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Step 1: check each <b>arrived</b> order below (is it really unpaid? is the paid amount right?) and tap <b>+ Add to bill list</b>. Step 2: tap <b>🧾 Bill</b> to email the balance + shipping fee with a Pay button. Step 3: when the money is in, tap <b>Mark fully paid</b>. Nothing is sent by itself.</div>
+  <h3 style="margin:8px 0">Bill list (${rows.length})</h3><div class="cx-list">${ready}</div>
+  <h3 style="margin:18px 0 8px">Arrived orders to check (${rest.length})</h3><div class="cx-list">${check}</div>`;
 }
 /* ---------- customer update emails (store Gmail via the website backend opsEmail) ----------
    Sent once per step: payment link ready, order confirmed, pre-order arrived, packing, shipped, cancelled.
@@ -9317,6 +9325,7 @@ document.addEventListener("click", guard(async ev => {
     case "cm-merge": case "cm-sep": S.mergeAns = b.dataset.act === "cm-merge" ? "merge" : "separate"; if (sheetSubmit) await sheetSubmit(); return;
     case "receipt": return openReceipt(b.dataset.id);
     case "bill": return openBill(b.dataset.id);
+    case "bill-add": case "bill-remove": { const o = rrFind(b.dataset.id); if (!o) return; const on = b.dataset.act === "bill-add"; await rrPatch(o, { toBill: on, log: logAdd(o, [on ? "added to the bill list (arrived, balance + shipping to collect)" : "removed from the bill list"]) }); render(); return; }
     case "bill-send": return billSend(b.dataset.id, b.dataset.via);
     case "bill-copy": return billSend(b.dataset.id, "manual", true);
     case "bill-paid": { const o = rrFind(b.dataset.id); if (!o) return; if (!confirm(`Mark ${onum(o)} fully paid?`)) return; await updateOrder(o, { payment: "paid" }); if (!$("#scrim").hidden) closeSheet(); toast("Marked fully paid."); render(); return; }
