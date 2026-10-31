@@ -207,6 +207,25 @@ body .field select, body .item-row select { -webkit-appearance: none; appearance
 .lwrap > table > thead th { position: sticky; top: 0; z-index: 3; background: var(--surface); box-shadow: inset 0 -1px 0 var(--line); }
 /* Phones: the Listings table only scrolls sideways inside its box; up/down scrolling belongs to the page (no two-way inner scroller, so nothing drifts). */
 @media (max-width: 720px) { .lwrap { max-height: none; overflow-y: hidden; } .lwrap > table > thead th { position: static; } }
+/* Phones: the Listings table becomes one card per listing. */
+@media (max-width: 640px) {
+  .ltable, .ltable tbody { display: block; width: 100%; min-width: 0; }
+  .ltable thead { display: none; }
+  .ltable tbody tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; position: relative; padding: 12px; margin: 0 0 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .ltable tbody tr.sel { border-color: var(--info); }
+  .ltable tbody td { display: block; padding: 0 !important; border: 0 !important; background: transparent !important; text-align: left !important; min-width: 0 !important; grid-column: span 2; font-size: 13.5px; white-space: normal; }
+  .ltable tbody td.cb { position: absolute; top: 10px; right: 10px; width: auto; }
+  .ltable tbody td.lthumb { grid-column: 1 / 2; width: auto; }
+  .ltable tbody td.lthumb + td { grid-column: 2 / 5; padding-right: 30px !important; }
+  .ltable tbody td.lvar { grid-column: 2 / 5; }
+  .ltable tbody td[data-k]::before { content: attr(data-l); display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  .ltable tbody td[data-k="compare"], .ltable tbody td[data-k="committed"], .ltable tbody td[data-k="cat"] { display: none; }
+  .ltable tbody td input.lcell, .ltable tbody td select.lcell, .ltable tbody td select.status { width: 100% !important; max-width: none; text-align: left;  text-align-last: left; }
+  .ltable tbody td .pbox { display: flex; width: 100%; }
+  .ltable tbody td .pbox input.lcell { text-align: left; }
+  .ltable tbody td.lgrp, .ltable tbody tr.lgrp td, .ltable tbody tr:not([data-lrow]) td { grid-column: 1 / -1; }
+  .ltable tbody tr:not([data-lrow]) { display: block; border-radius: 8px; padding: 8px 12px; margin: 6px 0; }
+}
 /* Phones: the Orders table becomes one card per order (no sideways scrolling). */
 @media (max-width: 640px) {
   .ordtable, .ordtable tbody { display: block; width: 100%; min-width: 0; }
@@ -7242,7 +7261,7 @@ function viewListings() {
         committed: () => `<td class="r num nowrap">${(() => { const c = committedOf(p); return c ? `<button type="button" class="linkish num" data-commit="${p.id}" title="See the orders holding these" style="font-weight:700">${c}</button>` : `<span style="color:var(--muted)">0</span>`; })()}</td>`,
         status: () => `<td>${can ? `<select class="status st-${(p.status || "active") === "active" ? "green" : (p.status === "hidden" ? "red" : "grey")}" data-lset="status" data-id="${p.id}" aria-label="Status">${Object.entries(LIST_STATUS).map(([k, st]) => `<option value="${k}" ${(p.status || "active") === k ? "selected" : ""}>${k === "hidden" ? "Inactive" : st.name}</option>`).join("")}</select>` : esc((LIST_STATUS[p.status || "active"] || {}).name)}</td>`,
         web: () => `<td class="nowrap">${p.webSync === "pending" ? `<span class="chip info">Sending…</span>` : onSite(p) ? `<a class="site-link" href="${esc(webUrl(p))}" target="_blank" rel="noopener" title="Open this product on regalspritz.com">View on site ↗</a>` : `<span style="color:var(--muted);font-size:12px">Not on site</span>`}</td>`
-      })[k]()).join("")}</tr>`; }).join("")).join("")}</tbody></table>
+      })[k]().replace(/^<td/, `<td data-k="${k}" data-l="${esc(TABLE_COLS.listings.labels[k].label)}"`)).join("")}</tr>`; }).join("")).join("")}</tbody></table>
     ${rows.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No listings match." : "No listings yet. Click “Add listing”."}</div>`}</div>
     <div class="head"><div class="pager"><button class="btn sm" type="button" data-lpage="-1" ${S.lpage === 0 ? "disabled" : ""} aria-label="Previous page">‹</button><span>${groups.length ? `${S.lpage * PAGE + 1}–${Math.min(groups.length, S.lpage * PAGE + PAGE)} of ${groups.length} listings · ${rows.length} options` : "0 listings"}</span><button class="btn sm" type="button" data-lpage="1" ${S.lpage >= pages - 1 ? "disabled" : ""} aria-label="Next page">›</button></div></div>`;
 }
