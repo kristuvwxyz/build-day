@@ -220,6 +220,10 @@ body .field select, body .item-row select { -webkit-appearance: none; appearance
   table.stk tbody td:empty { display: none; }
   table.stk tbody td input, table.stk tbody td select { max-width: 60%; }
 }
+.lay-seg { border: 2px solid var(--brand); border-radius: 12px; padding: 3px; background: var(--surface); }
+.lay-seg button { font-size: 15px; font-weight: 700; padding: 10px 20px; min-height: 44px; border-radius: 9px; color: var(--brand); }
+.lay-seg button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); }
+@media (max-width: 640px) { .lay-seg { width: 100%; display: flex; } .lay-seg button { flex: 1; padding: 10px 8px; } }
 /* Phones: the Listings table becomes one card per listing. */
 @media (max-width: 640px) {
   .ltable, .ltable tbody { display: block; width: 100%; min-width: 0; }
@@ -1332,7 +1336,7 @@ const S = {
   of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
   page: 0, sel: new Set(),
   pq: "", cq: "", cpage: 0,
-  t: { scope: "me", person: "", dept: "", mode: "calendar", range: "month", month: today().slice(0, 7), day: today() },
+  t: { scope: "me", person: "", dept: "", mode: "list", range: "month", month: today().slice(0, 7), day: today() },
   slide: 0, slidePaused: false,
   unlocked: new Set(),
   accessreq: [], db: null, dl: null, user: null, uid: null, me: null, isOwner: false, canEdit: false, readOnly: false,
@@ -2815,7 +2819,7 @@ function viewTasks(forceDept) {
     ${!forceDept && S.t.scope === "person" ? `<select id="t-person" aria-label="Person"><option value="">Choose person…</option>${taskTeam().map(m => `<option value="${m.id}" ${S.t.person === m.id ? "selected" : ""}>${esc(m.name)}${(() => { const ts = dueTasksOf(m.id), o = ts.filter(isOverdue).length; return ts.length ? ` · ${o ? o + " overdue" : ""}${o && ts.length - o ? ", " : ""}${ts.length - o ? ts.length - o + " due today" : ""}` : ""; })()}</option>`).join("")}</select>` : ""}
     ${!forceDept && S.t.scope === "dept" ? `<select id="t-dept" aria-label="Department"><option value="">${fullTaskView() ? "All departments" : "All my departments"}</option>${DEPTS.filter(d => taskDepts().includes(d.id)).map(d => `<option value="${d.id}" ${S.t.dept === d.id ? "selected" : ""}>${d.name}</option>`).join("")}</select>` : ""}
     <span class="tbar-sp"></span>
-    ${seg("Layout", "data-tmode", [["calendar", "Calendar"], ["list", "List"]], S.t.mode)}
+    ${seg("Layout", "data-tmode", [["calendar", "📅 Calendar"], ["list", "☰ List"]], S.t.mode).replace('class="seg"', 'class="seg lay-seg"')}
     ${seg("Range", "data-trange", [["month", "Month"], ["today", "Today"]], S.t.range || "month")}
   </div>`;
   // Today view: tasks due today (or spanning today) plus overdue ones not yet done, grouped by person or department.
@@ -3794,7 +3798,7 @@ function viewMcal() {
   for (let i = 0; i < weeks * 7; i++) cells.push(dstr(new Date(y, m - 1, 1 - first.getDay() + i, 12).getTime()));
   const on = d => ev.filter(e => mcOn(e, d)).sort((a, b) => Object.keys(MC_KINDS).indexOf(a.kind) - Object.keys(MC_KINDS).indexOf(b.kind));
   const canE = mcEdit();
-  const seg = `<div class="seg" role="group" aria-label="Layout">${[["calendar", "Calendar"], ["list", "List"]].map(([k, l]) => `<button type="button" data-mcmode="${k}" aria-pressed="${S.mc.mode === k}">${l}</button>`).join("")}</div>`;
+  const seg = `<div class="seg lay-seg" role="group" aria-label="Layout">${[["calendar", "📅 Calendar"], ["list", "☰ List"]].map(([k, l]) => `<button type="button" data-mcmode="${k}" aria-pressed="${S.mc.mode === k}">${l}</button>`).join("")}</div>`;
   const bar = `<div class="tbar"><div class="pager"><button class="btn sm" type="button" data-mcmonth="-1" aria-label="Previous month">‹</button><strong>${monthLabel(ym)}</strong><button class="btn sm" type="button" data-mcmonth="1" aria-label="Next month">›</button>${ym === today().slice(0, 7) ? "" : `<button class="btn ghost sm" type="button" data-mcmonth="0">This month</button>`}</div><span class="tbar-sp"></span>${seg}</div>`;
   const keys = `<div class="mc-keys">${Object.entries(MC_KINDS).map(([k, [l, c]]) => `<button type="button" class="mc-key${S.mc.off.has(k) ? " off" : ""}" data-mckind="${k}" style="--c:${c}" aria-pressed="${!S.mc.off.has(k)}">${l}</button>`).join("")}</div>`;
   let main;
