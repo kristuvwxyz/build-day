@@ -3151,7 +3151,7 @@ const WEB_STATUSES = ["Placed", "Confirmed", "Packed", "Shipped", "Cancelled"];
 const webStatusName = s => /^(shipped|delivered)$/i.test(s || "") ? "Completed" : s || "";
 // Website backend v31 stage: shipped orders are "To receive" until the buyer confirms (or 3/5/7 days pass), then Completed.
 const webStageName = o => retRefunded(o) ? "Refunded" : o.stage === "toReceive" ? "Shipped · to receive" : o.stage === "done" ? "Completed" : webStatusName(o.status);
-const webDone = o => /^(completed|shipped|delivered|cancelled)$/i.test(o.status || "");
+const webDone = o => /^(completed|shipped|delivered|cancelled|refunded)$/i.test(o.status || "");
 const webPayKind = o => /maya/i.test(o.payment || "") ? "maya" : /bdo/i.test(o.payment || "") ? "bdo" : "";
 const webBadge = o => o.paid ? `<span class="badge green">Paid${o.mayaPaid ? " via Maya" : ""}</span>` : `<span class="badge amber">Unpaid</span>`;
 const webTime = (d, o) => { const ms = d || o ? webMs(d, o) : 0, t = ms ? new Date(ms) : null; return t && !isNaN(t) ? t.toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""; };
@@ -3178,7 +3178,12 @@ function payDeadline(startMs) {
 let acBusy = false;
 async function autoCancelUnpaid() {
   if (acBusy || !S.site || !S.web.loaded || !canOrders() || S.readOnly || S.viewAs || !S.loaded.webmeta) return;
-  const due = S.web.orders.filter(o => { const t = webOMs(o); return t >= AUTOCANCEL_FROM && Date.now() - t > PAY_WINDOW && !o.paid && !o.mayaPaid && !o.payRef && /maya/i.test(o.payment || "") && /^placed$/i.test(o.status || "Placed") && !(o.cancel && o.cancel.status === "Pending"); });
+  // Maya: 24 h after the order. BDO: 24 h after the bill (BDO link) was sent, with the day-off extension (K, Nov 13, 2026). Manual Processing is cancelled by the website backend.
+  const billSentAt = o => { const m = S.webmeta.find(d => d.id === webMetaId(o.ref)) || {}; return (m.receipt && m.receipt.at) || 0; };
+  const due = S.web.orders.filter(o => { const t = webOMs(o); if (t < AUTOCANCEL_FROM || o.paid || o.mayaPaid || o.payRef || !/^placed$/i.test(o.status || "Placed") || (o.cancel && o.cancel.status === "Pending")) return false;
+    if (/maya/i.test(o.payment || "")) return Date.now() - t > PAY_WINDOW;
+    if (/bdo/i.test(o.payment || "")) { const at = billSentAt(o); return !!at && Date.now() > payDeadline(at); }
+    return false; });
   if (!due.length) return;
   const lock = S.webmeta.find(d => d.id === "_autocancel"); if (lock && Date.now() - (lock.at || 0) < 120e3 && lock.uid !== S.uid) return;
   acBusy = true;
@@ -3188,11 +3193,11 @@ async function autoCancelUnpaid() {
       const r = await S.site.update(src.ref, { status: "Cancelled" }).catch(() => null); if (!r || !r.ok) continue;
       const i = S.web.orders.findIndex(x => x.ref === src.ref); if (i >= 0) S.web.orders[i] = r.order || { ...src, status: "Cancelled" };
       const id = String(src.ref).replace(/[^A-Za-z0-9_-]/g, "_"), cur = S.webmeta.find(d => d.id === id) || {};
-      await save("webmeta", id, { ...clean(cur), ref: src.ref, siteAt: (webSiteAt = Date.now()), log: [...(cur.log || []), { at: Date.now(), by: "Auto", msg: "cancelled: not paid within 24 hours (Maya Checkout)" }].slice(-50), at: Date.now() });
+      await save("webmeta", id, { ...clean(cur), ref: src.ref, siteAt: (webSiteAt = Date.now()), log: [...(cur.log || []), { at: Date.now(), by: "Auto", msg: `cancelled: not paid within 24 hours (${/bdo/i.test(src.payment || "") ? "BDO" : "Maya"} Checkout)` }].slice(-50), at: Date.now() });
       S.web.dirty = true;
       const wo = webAsOrders().find(x => x.ref === src.ref); if (wo) await custMail(wo, "cancelled", { reason: "we didn't receive the payment within 24 hours" }).catch(() => {});
     }
-    toast(`${due.length} unpaid Maya order${due.length === 1 ? "" : "s"} cancelled (not paid within 24 hours).`); bgRender();
+    toast(`${due.length} unpaid order${due.length === 1 ? "" : "s"} cancelled (not paid within 24 hours).`); bgRender();
   } finally { acBusy = false; }
 }
 // Someone changed a website order's payment / status on another device: reload website orders now (not on the next 60s check).
@@ -3331,7 +3336,7 @@ async function webStockSync() {
   const me = S.uid || myMemberId() || "rs", now = Date.now(), metaOf = o => S.webmeta.find(d => d.id === webMetaId(o.ref)) || {};
   const todo = S.web.orders.filter(o => {
     const t = webOMs(o); if (!o.ref || !t || t < cfg.from) return false;
-    const m = metaOf(o), cancel = /cancel/i.test(o.status || ""), taken = m.stock === "taken";
+    const m = metaOf(o), cancel = /cancel|refund/i.test(o.status || ""), taken = m.stock === "taken";
     if (cancel === !taken && !(taken && !cancel && !m.poTaken && t >= PO_STOCK_FROM && !webDone(o))) return false;
     return !(m.stockClaim && m.stockClaim.by !== me && now - m.stockClaim.at < 60000);
   });
@@ -3342,7 +3347,7 @@ async function webStockSync() {
     await new Promise(r => setTimeout(r, 4000));
     for (const o of todo) {
       const m = metaOf(o); if (!m.stockClaim || m.stockClaim.by !== me) continue;
-      const cancel = /cancel/i.test(o.status || ""), upd = { ...clean(m), ref: o.ref, stockClaim: null, at: Date.now() };
+      const cancel = /cancel|refund/i.test(o.status || ""), upd = { ...clean(m), ref: o.ref, stockClaim: null, at: Date.now() };
       let msg;
       if (!cancel && m.stock === "taken") {   // counted before pre-orders were: take its pre-order items now, once
         const add = {}; for (const i of o.items || []) { const p = webItemProduct(i); if (p && p.kind === "preorder") add[p.id] = (add[p.id] || 0) + (Number(i.qty) || 1); }
@@ -3363,7 +3368,7 @@ async function webStockSync() {
         msg = "stock taken off for " + (Object.keys(map).length ? Object.entries(map).map(([pid, q]) => q + "× " + ((S.products.find(x => x.id === pid) || {}).name || "item")).join(", ") : (o.items || []).length && !miss.length ? "no on-hand items (pre-order only)" : "nothing on hand") + (miss.length ? " · not found in Listings: " + miss.join(", ") : "") + (short.length ? " · ⚠️ OVERSOLD: " + short.join(", ") : "");
       } else {
         await applyStockMap(m.stockMap || {}, 1);
-        upd.stock = "returned"; msg = "order cancelled · stock returned";
+        upd.stock = "returned"; msg = (/refund/i.test(o.status || "") ? "order refunded" : "order cancelled") + " · stock returned";
       }
       for (const pid of Object.keys(upd.stock === "taken" ? upd.stockMap : m.stockMap || {})) await patch("products", pid, { webSync: "pending" });
       upd.log = [...(m.log || []), { at: Date.now(), by: "RS OS", msg }].slice(-50);
@@ -3874,7 +3879,7 @@ function viewCEO() {
 /* Finance → Sales report (K, Oct 13, 2026), Shopify-style: every paid / partly paid / refunded order (RS OS + website) in the date range.
    Gross sales = item prices × qty · Discounts = discount + negative adjustments · Returns = refunded orders · Net sales = gross − discounts − returns
    · Shipping = buyer-paid shipping · Total sales = net + shipping + other charges · Cost = item cost (else the listing's cost) · Gross profit = net − cost. */
-const SR_PAID = new Set(["paid", "partial", "refunded"]);
+const SR_PAID = new Set(["paid", "refunded"]);   // K, Nov 13, 2026: only fully paid sales count (refunds show as returns)
 const srDay = o => !o.web && /^\d{4}-\d\d-\d\d$/.test(o.date || "") ? o.date : o.createdAt ? mDate(o.createdAt) : "";
 function srRange() { const sr = S.sr || (S.sr = { from: mToday().slice(0, 8) + "01", to: mToday(), group: "day", by: "product" }); return sr; }
 function srRows() {
@@ -4084,8 +4089,8 @@ document.addEventListener("input", e => { const t = e.target; if (!t.id || t.id.
 document.addEventListener("change", e => { const t = e.target; if (!t.id || t.id.indexOf("vc-") !== 0) return; const v = vcState(); if (t.id === "vc-type") v.form.type = t.value; else if (t.id === "vc-days") v.form.days = t.value; else if (t.id === "vc-q") { v.q = t.value; render(); } });
 document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-vcf]"); if (b) { vcState().f = b.dataset.vcf; render(); } });
 function viewDashboard() {
-  const orders = S.orders.filter(o => inPeriod(o.date));
-  const live = orders.filter(o => !isVoid(o));
+  const orders = allOrderRows().filter(o => !o.archived && inPeriod(o.date || dstr(o.createdAt || 0)));
+  const live = orders.filter(o => o.payment === "paid" && o.fulfillment !== "cancelled");   // K, Nov 13, 2026: fully paid only, RS OS + website
   const sales = live.reduce((a, o) => a + total(o), 0);
   const gross = live.reduce((a, o) => a + profit(o), 0);
   const exp = realExpenses().filter(e => inPeriod(e.date)).reduce((a, e) => a + (Number(e.amount) || 0), 0);
@@ -4101,7 +4106,7 @@ function viewDashboard() {
   return `
   <div class="head">${periodSeg()}</div>
   <div class="kpis">
-    <div class="kpi"><span class="label">Sales</span><span class="value">${peso(sales)}</span><span class="sub">${live.length} order${live.length === 1 ? "" : "s"} ${periodLabel()}</span></div>
+    <div class="kpi"><span class="label">Sales</span><span class="value">${peso(sales)}</span><span class="sub">${live.length} fully paid order${live.length === 1 ? "" : "s"} ${periodLabel()}</span></div>
     <div class="kpi"><span class="label">Net profit</span><span class="value" style="color:${net < 0 ? "var(--bad)" : "inherit"}">${peso(net)}</span><span class="sub">After product cost, fees, shipping and ${peso(exp)} expenses</span></div>
     <div class="kpi"><span class="label">Average order</span><span class="value">${peso(live.length ? sales / live.length : 0)}</span><span class="sub">${periodLabel()}</span></div>
     <div class="kpi"><span class="label">To fulfill</span><span class="value">${toShip.length}</span><span class="sub">Unfulfilled or on hold</span></div>
