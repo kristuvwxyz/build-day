@@ -1142,6 +1142,7 @@ const STAGES = [
   { id: "to_confirm", name: "To Confirm", tag: "7.CONF", cls: "violet hollow" },
   { id: "billed", name: "Billed", tag: "6.BILLED", cls: "blue hollow" },
   { id: "dp", name: "Partially paid", tag: "5.DP", cls: "blue hollow" },
+  { id: "to_bill", name: "To Bill", tag: "5.TOBILL", cls: "orange hollow" },   // placed with the supplier, buyer still has to be billed (Manual Processing)
   { id: "in_transit", name: "In Transit", tag: "4.TRANSIT", cls: "violet" },
   { id: "arrived", name: "Arrived", tag: "4.ARRIVED", cls: "teal hollow" },
   { id: "sorted", name: "Sorted", tag: "3.SORTED", cls: "teal hollow" },
@@ -3272,7 +3273,7 @@ function webAsOrders() {
 // Edits on a website order: payment, status and tracking go to the website; assignee, courier, tags,
 // team note and the finer status choices are kept in RS OS under the order number (no customer details).
 // RS OS Fulfillment status is the one the team edits; the customer's profile on regalspritz.com shows this status for it.
-const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", in_transit: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
+const WEB_STATUS_OF = { to_confirm: "Placed", fwd: "Confirmed", billed: "Confirmed", dp: "Confirmed", to_bill: "Confirmed", in_transit: "Confirmed", arrived: "Confirmed", arrived_hold: "Confirmed", on_hold: "Confirmed",
   sorted: "Packed", unfulfilled: "Packed", ready_pickup: "Packed", fulfilled: "Shipped", delivered: "Shipped", cancelled: "Cancelled" };
 async function webOrderUpdate(o, ch) {
   const src = S.web.orders.find(x => x.ref === o.ref); if (!src) return;
@@ -5790,9 +5791,9 @@ async function receiptSend(o, quiet) {
 }
 /* ---------- Balance bill: arrived pre-orders that still owe the balance and / or the shipping fee ---------- */
 const ARRIVED_FUL = ["arrived", "sorted", "arrived_hold"];
-const billArrived = () => [...S.orders, ...(S.web.loaded ? webAsOrders() : [])].filter(o => !o.archived && ARRIVED_FUL.includes(o.fulfillment) && rrPayable(o) && o.payment !== "paid" && !VOIDPAY.has(o.payment));
+const billArrived = () => [...S.orders, ...(S.web.loaded ? webAsOrders() : [])].filter(o => !o.archived && (ARRIVED_FUL.includes(o.fulfillment) || o.fulfillment === "to_bill") && rrPayable(o) && o.payment !== "paid" && !VOIDPAY.has(o.payment));
 // Manual: the team checks each arrived order first and adds it to the bill list; only those show as "To bill".
-const billRows = () => billArrived().filter(o => o.toBill);
+const billRows = () => billArrived().filter(o => o.toBill || o.fulfillment === "to_bill");
 const billBadge = () => { const n = billRows().length; return n ? `<span class="badge red cx-n" title="${n} arrived order${n > 1 ? "s" : ""} to bill">${n}</span>` : ""; };
 // Already paid: what staff typed in the bill sheet, else the website's down payment, else half the items for a Partially paid order.
 const billPaid = o => o.paidAmt !== undefined && o.paidAmt !== "" && o.paidAmt !== null ? Number(o.paidAmt) || 0 : o.payment === "partial" ? (o.web && o.dueRaw ? Math.min(o.dueRaw, total(o)) : Math.round(itemsTotal(o) / 2)) : 0;
@@ -5877,7 +5878,7 @@ async function billSend(id, via, copyOnly) {
 }
 function billPanel() {
   if (!S.web.loaded && S.site) return `<div class="panel"><div class="empty">Loading website orders…</div></div>`;
-  const by = (a, b) => (a.createdAt || 0) - (b.createdAt || 0), rows = billRows().sort(by), rest = billArrived().filter(o => !o.toBill).sort(by);
+  const by = (a, b) => (a.createdAt || 0) - (b.createdAt || 0), rows = billRows().sort(by), rest = billArrived().filter(o => !(o.toBill || o.fulfillment === "to_bill")).sort(by);
   const open = o => o.web ? `data-webopen="${esc(o.ref)}"` : `data-open="${esc(o.id)}"`, num = o => o.web ? "#" + esc(o.num) : esc(onum(o));
   const line = o => { const c = billCalc(o, billPaid(o), billShip(o)); return { c, txt: `Paid ${peso(c.paid)} · balance ${peso(c.bal)} + shipping ${peso(c.sf)} = <b>${peso(c.amt)}</b>` }; };
   const ready = rows.length ? rows.map(o => { const { txt } = line(o), sent = o.bill && o.bill.at;
@@ -5894,7 +5895,7 @@ function billPanel() {
 /* ---------- customer update emails (store Gmail via the website backend opsEmail) ----------
    Sent once per step: payment link ready, order confirmed, pre-order arrived, packing, shipped, cancelled.
    Internal steps (FWD, Billed, DP, On hold…) are one "confirmed" email, so customers aren't flooded. */
-const MAIL_STEP = { fwd: "confirmed", billed: "confirmed", dp: "confirmed", on_hold: "confirmed", arrived: "arrived", sorted: "arrived", arrived_hold: "arrived", unfulfilled: "packing", ready_pickup: "pickup", fulfilled: "shipped", delivered: "shipped", cancelled: "cancelled" };
+const MAIL_STEP = { fwd: "confirmed", billed: "confirmed", dp: "confirmed", to_bill: "confirmed", on_hold: "confirmed", arrived: "arrived", sorted: "arrived", arrived_hold: "arrived", unfulfilled: "packing", ready_pickup: "pickup", fulfilled: "shipped", delivered: "shipped", cancelled: "cancelled" };
 const SITE_ORDERS = "https://www.regalspritz.com/account";
 const JNT_TRACK = "https://www.jtexpress.ph/";
 function custMailHTML(o, m) {
