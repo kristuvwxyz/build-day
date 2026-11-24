@@ -3103,15 +3103,7 @@ function viewHome() {
     ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="tasks"><b class="num">${visTasks().filter(t => t.status === "in_progress").length}</b><span>In progress</span></button>`}
     ${showOrders && S.live != null ? `<button type="button" data-act="live-now" title="People on regalspritz.com right now (updates every 30 seconds)"><b class="num" id="live-n">${S.live}</b><span><span class="live-dot"></span>Live on website</span></button>` : ""}
   </section>
-  ${alerts ? `<div class="home-alerts"><div class="home-h">Needs attention</div>${alerts}</div>` : ""}
-  <div class="home-grid${side ? " has-side" : ""}">
-  <section class="panel quiet"><div class="head"><h2>My tasks</h2><button class="btn ghost sm" type="button" data-nav="tasks">Open calendar</button></div>
-    ${mid ? (mine.length ? `<div class="table-wrap" style="border:0"><table><tbody>${mine.slice(0, 6).map(taskRow).join("")}</tbody></table></div>${mine.length > 6 ? `<button type="button" class="linkish" data-nav="tasks" style="font-size:12.5px">+${mine.length - 6} more in Tasks</button>` : ""}` : `<div class="empty">You're all caught up.</div>`)
-      : `<div class="empty">Link your account to your name in <button type="button" class="linkish" data-nav="account">My Account</button> to see your tasks here.</div>`}
-  </section>
-  ${side ? `<div class="home-side">${side}</div>` : ""}
-  </div>
-  ${vatCard()}
+  ${"" /* K, Nov 25, 2026: Home kept clean — no task list, alerts or update cards here (they live in Tasks, Orders and Finance) */}
   ${orgChart(false)}
   <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>`;
 }
