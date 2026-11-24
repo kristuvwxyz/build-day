@@ -2385,6 +2385,8 @@ function render() {
 // dropdown is open so it doesn't snap shut under the user's finger.
 let bgT = 0; S.lastAct = 0;
 const pickerOpen = () => { const a = document.activeElement; return !!(a && a.tagName === "SELECT" && a.closest("#view")) && Date.now() - S.lastAct > 800; };
+// Typing a password / passphrase (Logins vault, member vault): never redraw under the cursor (K, Nov 25, 2026: the box emptied by itself).
+const typingSecret = () => { const a = document.activeElement; return !!(a && a.tagName === "INPUT" && a.type === "password" && a.closest("#view, #sheet")); };
 // RS App only: a long-open app loads new versions on its own (checks /build.txt), keeping the page, filters and scroll.
 const APP_BUILD = (document.querySelector('meta[name="rs-build"]') || {}).content || "";
 let appUpdT = 0;
@@ -2400,7 +2402,7 @@ async function appUpdateCheck(force) {
 if (APP_BUILD) { setInterval(() => appUpdateCheck(false), 5 * 60e3); document.addEventListener("visibilitychange", () => { if (!document.hidden) appUpdateCheck(false); }); }
 function bgRender() {
   if (bgT) return;
-  bgT = setTimeout(() => { bgT = 0; if (!$("#scrim").hidden) { renderNav(); return; } if (pickerOpen()) { S.renderPending = true; return; } render(); }, 120);
+  bgT = setTimeout(() => { bgT = 0; if (!$("#scrim").hidden) { renderNav(); return; } if (pickerOpen() || typingSecret()) { S.renderPending = true; return; } render(); }, 120);
 }
 document.addEventListener("change", e => { S.lastAct = Date.now(); if (e.target.matches && e.target.matches(".toolbar select")) fitSelects(); }, true);
 let fitCtx = null;
@@ -2413,6 +2415,7 @@ function fitSelects() {
   });
 }
 document.addEventListener("focusout", e => { const t = e.target; if (t.classList && t.classList.contains("money") && t.value.trim()) { const n = Number(t.value.replace(/,/g, "")); if (!isNaN(n)) t.value = moneyFmt(n); } });
+document.addEventListener("focusout", e => { if (S.renderPending && e.target.tagName === "INPUT" && e.target.type === "password") setTimeout(() => { if (!S.renderPending || typingSecret()) return; S.renderPending = false; if ($("#scrim").hidden) render(); }, 0); });
 document.addEventListener("focusout", e => { if (S.renderPending && e.target.tagName === "SELECT") setTimeout(() => { if (!S.renderPending || pickerOpen()) return; S.renderPending = false; if ($("#scrim").hidden) render(); }, 0); });
 function enhanceSearch() {
   document.querySelectorAll("#view input[type=search], #sheet input[type=search]").forEach(inp => {
