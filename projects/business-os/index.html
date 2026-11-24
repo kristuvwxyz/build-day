@@ -1028,6 +1028,7 @@ body.no-orders .gs { display: none !important; }
 .gs .gs-ico::after { content: ""; position: absolute; width: 6px; height: 2px; background: var(--muted); right: -6px; bottom: -3px; transform: rotate(45deg); }
 .gs-res { position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 260px; z-index: 45; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 4px; display: flex; flex-direction: column; }
 .gs-res[hidden] { display: none; }
+.gs { display: none !important; }   /* K, Nov 25, 2026: no global order search; searching lives only in the Orders tab */
 .gs-res button { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; text-align: left; border: 0; background: none; padding: 8px; border-radius: 8px; font: inherit; color: inherit; cursor: pointer; }
 .gs-res button:hover { background: var(--surface-2); } .gs-res small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; } .gs-res span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .gs-empty { padding: 10px; font-size: 13px; color: var(--muted); }
