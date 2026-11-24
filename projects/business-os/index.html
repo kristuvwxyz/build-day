@@ -3098,9 +3098,6 @@ function viewHome() {
     ${att}
   </section>
   <section class="kpis" aria-label="Today">
-    <button type="button" data-nav="tasks"${overdue ? ' class="hot"' : ""}><b class="num">${mine.length}</b><span>My open tasks${overdue ? ` · ${overdue} late` : ""}</span></button>
-    <button type="button" data-nav="tasks"><b class="num">${dueToday}</b><span>Due today · team</span></button>
-    ${showOrders ? `<button type="button" data-goorders="unfulfilled"><b class="num">${toShip}</b><span>Orders to ship</span></button>` : `<button type="button" data-nav="tasks"><b class="num">${visTasks().filter(t => t.status === "in_progress").length}</b><span>In progress</span></button>`}
     ${showOrders && S.live != null ? `<button type="button" data-act="live-now" title="People on regalspritz.com right now (updates every 30 seconds)"><b class="num" id="live-n">${S.live}</b><span><span class="live-dot"></span>Live on website</span></button>` : ""}
   </section>
   ${"" /* K, Nov 25, 2026: Home kept clean — no task list, alerts or update cards here (they live in Tasks, Orders and Finance) */}
