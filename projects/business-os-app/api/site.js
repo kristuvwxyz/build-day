@@ -116,6 +116,9 @@ export default async function handler(req, res) {
       if (!(row >= 2) || !code || !["Active", "Paused", "Cancelled"].includes(body.status)) return res.status(400).json({ ok: false, error: "Nothing to change." });
       call = { action: "opsPromoSet", key: KEY, row, code, status: body.status };
     }
+  } else if (body.action === "requests") {
+    // "Request a Perfume" form entries from regalspritz.com (website backend v42, opsRequests). Read-only, passed straight through.
+    call = { action: "opsRequests", key: KEY, limit: Math.min(1000, Math.max(1, Number(body.limit) || 300)) };
   } else if (body.action === "maya") {
     // Maya Checkout (cards / Maya wallet) link for an RS OS order. With MAYA_PUBLIC_KEY in Vercel the link is made here;
     // otherwise the website backend makes it with its own Maya key (opsMayaCheckout, see docs/handoffs/rs-os-maya-link.md).

@@ -8709,7 +8709,13 @@ function viewPerfumeReq() {
   // most asked perfumes
   const top = new Map(); for (const r of all) { const k = String(r.perfume || "").trim().toLowerCase(); if (k) top.set(k, (top.get(k) || 0) + 1); }
   const topList = [...top.entries()].sort((a, b) => b[1] - a[1]).filter(x => x[1] > 1).slice(0, 5).map(([k, n]) => `${esc(k)} (${n})`).join(" · ");
-  return `<div class="kpis">
+  // Website "Request a Perfume" form entries (website backend opsRequests, read live through /api/site; nothing copied until staff tap Add).
+  if (S.site && S.site.requests && !S.wreq) { S.wreq = { loading: true, list: [] }; S.site.requests({ limit: 300 }).then(r => { S.wreq = { list: (r && r.ok && r.requests) || [], err: r && !r.ok ? (r.error || "Couldn't load") : "" }; render(); }).catch(e => { S.wreq = { list: [], err: (e && e.message) || "Couldn't load" }; render(); }); }
+  const wq = S.wreq || { list: [] }, done = new Set(all.map(r => r.webRow).filter(Boolean));
+  const wNew = (wq.list || []).filter(w => !done.has(String(w.row)));
+  const webPanel = S.site && S.site.requests ? `<section class="panel" style="margin-bottom:12px"><div class="head"><h2>From the website form</h2><span class="s">${wq.loading ? "Loading…" : wq.err ? esc(wq.err) : `${wNew.length} not added yet`}</span></div>
+    ${wNew.length ? `<div class="table-wrap" style="border:0"><table class="otable"><thead><tr><th>Date</th><th class="l">Name</th><th class="l">Contact</th><th class="l">Perfumes</th><th></th></tr></thead><tbody>${wNew.slice(0, 30).map(w => `<tr style="cursor:default"><td class="nowrap">${esc(String(w.date || "").slice(0, 10))}</td><td class="l"><b>${esc(w.name || "")}</b></td><td class="l">${esc([w.mobile, w.email].filter(Boolean).join(" · "))}</td><td class="l" style="font-weight:600">${esc(w.perfumes || "")}</td><td>${can ? `<button class="btn sm primary" type="button" data-act="preq-web-add" data-row="${esc(String(w.row))}">＋ Add</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : ""}</section>` : "";
+  return `${webPanel}<div class="kpis">
       <div class="kpi"><span class="label">All requests</span><span class="value">${all.length}</span><span class="sub">${all.filter(r => r.date === mToday()).length} today</span></div>
       <div class="kpi"><span class="label">New (to answer)</span><span class="value" style="color:${cnt("new") ? "var(--bad)" : "inherit"}">${cnt("new")}</span><span class="sub">not quoted yet</span></div>
       <div class="kpi"><span class="label">Quoted</span><span class="value">${cnt("quoted")}</span><span class="sub">waiting for the buyer</span></div>
@@ -9581,6 +9587,10 @@ document.addEventListener("click", guard(async ev => {
     case "fixed-paid": return toggleFixedPaid(id, b.dataset.ym);
     case "new-check": return openCheckForm(null, b.dataset.date);
     case "new-preq": return openPreqForm();
+    case "preq-web-add": { const w = ((S.wreq || {}).list || []).find(x => String(x.row) === b.dataset.row); if (!w) return;
+      const by = ((member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "");
+      await save("preq", uid("pq"), { createdAt: Date.now(), by, date: String(w.date || "").slice(0, 10) || mToday(), channel: "Website", customer: w.name || "", contact: [w.mobile, w.email].filter(Boolean).join(" · "), perfume: w.perfumes || "", status: "new", webRow: String(w.row), updatedAt: Date.now() });
+      toast("Added to perfume requests."); return; }
     case "edit-preq": return openPreqForm(id);
     case "del-preq": await remove("preq", id); closeSheet(); toast("Request deleted."); return;
     case "preq-filter": S.pqf.st = b.dataset.v; render(); return;
