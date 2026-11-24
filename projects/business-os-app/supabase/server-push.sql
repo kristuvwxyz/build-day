@@ -61,7 +61,7 @@ language sql stable security definer set search_path = public as $$
       'webOrder', data->'webOrder', 'createdAt', data->'createdAt', 'rank', data->'rank', 'category', data->'category',
       'price', data->'price', 'compareAt', data->'compareAt', 'wasNull', data->'wasNull', 'notes', data->'notes',
       'accords', data->'accords', 'isNew', data->'isNew', 'badges', data->'badges', 'eta', data->'eta',
-      'soldOut', data->'soldOut', 'vac', data->'vac', 'inspiredBy', data->'inspiredBy', 'webCreated', data->'webCreated',
+      'soldOut', data->'soldOut', 'vac', data->'vac', 'inspiredBy', data->'inspiredBy', 'gender', case when data->>'category' = 'arabian' then data->'gender' else null end, 'webCreated', data->'webCreated',
       'description', case when data->>'category' = 'secondreign' then data->'description' else null end))
     else jsonb_strip_nulls(jsonb_build_object(
       'status', data->'status', 'name', data->'name', 'brand', data->'brand', 'size', data->'size',

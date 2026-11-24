@@ -1310,11 +1310,11 @@ const DEPTS = [
   { id: "CEO", name: "CEO", tabs: ["overview"], blurb: "Whole-business overview" },
   { id: "ADMIN", name: "Admin", tabs: ["team", "orgchart", "disputes", "logins", "homecontent", "expenses"], blurb: "Directory, logins, Home page, expenses & cash" },
   { id: "FINANCE", name: "Finance", tabs: ["dues", "budget", "checks", "expenses", "dashboard", "salesreport", "costcheck", "payroll", "payrecords", "fixed", "investors", "bir"], blurb: "Profit, bills, checks, payroll, BIR, investors" },
-  { id: "SALES", name: "Sales", tabs: ["suppliers", "customers"], blurb: "Orders, product listings, customers" },
+  { id: "SALES", name: "Sales", tabs: ["suppliers", "customers", "requests"], blurb: "Orders, product listings, customers" },
   { id: "MARKETING", name: "Marketing", tabs: ["channels", "customers", "vouchers"], blurb: "Channels, listings, audience" },
   { id: "PACKING", name: "Packing", tabs: ["inventory"], blurb: "Packing queue, barcode scan, stock", hidden: true },   // hidden from the menu (K, Oct 15, 2026): stock is done in Listings; the role stays for access rules
 ];
-const TAB_NAMES = { overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", costcheck: "Cost & price check", vouchers: "Vouchers", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
+const TAB_NAMES = { requests: "Perfume requests", overview: "Overview", dtasks: "Tasks", team: "Directory", budget: "Budget requests", orgchart: "Org chart", listings: "Listings", logins: "Logins", passwords: "Passwords", homecontent: "Home page", reviews: "Reviews", dashboard: "Profit", salesreport: "Sales report", costcheck: "Cost & price check", vouchers: "Vouchers", investors: "Investors", payroll: "Payroll", fixed: "Fixed expenses", dues: "Due dates", checks: "Checks", payrecords: "Payroll records", bir: "BIR records", expenses: "Expenses", orders: "Orders", suppliers: "Suppliers", archived: "Cancelled orders", disputes: "Disputes", customers: "Customers", channels: "Channels", packing: "To pack", inventory: "Inventory" };
 const TASK_STATUS = [
   { id: "todo", name: "To do", cls: "" },
   { id: "in_progress", name: "In progress", cls: "info" },
@@ -1327,12 +1327,12 @@ const tstat = id => TASK_STATUS.find(s => s.id === id) || TASK_STATUS[0];
 
 const S = {
   web: { orders: [], at: "", err: "", loading: false, loaded: false }, oSrc: "all", wf: { f: "all", q: "" }, site: null, cx: { show: false, f: "pending" },
-  webmeta: [], products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "new", source: "" }, rvq: "", eomMonth: "",
+  webmeta: [], products: [], orders: [], expenses: [], customers: [], tasks: [], team: [], attendance: [], investments: [], payroll: [], scents: [], logins: [], archived: [], colprefs: [], fixedexp: [], dues: [], checks: [], preq: [], payrecords: [], bir: [], birtax: [], reviews: [], eom: [], eomvotes: [], invoices: [], gallery: [], rv: { stars: "", status: "", sort: "new", source: "" }, rvq: "", eomMonth: "",
   birMonth: "", prPerson: "",
   vault: null, vaultKey: null, pwShown: {}, lq: "",
   home: {}, security: {}, profile: {}, attSettings: {},
   att: { mode: "day", date: "", month: "", dept: "" },
-  loaded: { colprefs: false, products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, payrecords: false, bir: false, birtax: false, reviews: false, eom: false, eomvotes: false },
+  loaded: { colprefs: false, products: false, orders: false, expenses: false, customers: false, tasks: false, team: false, attendance: false, investments: false, payroll: false, scents: false, logins: false, fixedexp: false, dues: false, checks: false, preq: false, payrecords: false, bir: false, birtax: false, reviews: false, eom: false, eomvotes: false },
   pay: { month: "", half: 1 }, paySettings: {},
   view: "home", dept: "SALES", tab: "overview", period: "month",
   of: { view: "all", platform: "all", q: "", range: "today", ful: "all", pay: "all", sort: "date", dir: "desc" },
@@ -1469,7 +1469,7 @@ document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && /^y$
 /* ---------- Records: history log + edit right in the table (K, Oct 16, 2026) ----------
    Every Admin / Finance record keeps a small history like orders do: who changed what and when, plus notes and pasted photos.
    Table cells are editable in place (class "ied"); a change is saved at once and written to the record's history. */
-const LOGGED = { dues: "due date", checks: "check", expenses: "expense", fixedexp: "fixed expense", investments: "investment", invoices: "invoice", payrecords: "pay record", bir: "BIR record", team: "team member", logins: "login" };
+const LOGGED = { dues: "due date", checks: "check", preq: "perfume request", expenses: "expense", fixedexp: "fixed expense", investments: "investment", invoices: "invoice", payrecords: "pay record", bir: "BIR record", team: "team member", logins: "login" };
 const LOG_ONLY = { team: ["nickname", "name", "phone", "email", "address", "role", "department", "status", "birthday", "started", "sched", "ended", "payPosition", "dailyRate"] };
 const LOG_SKIP = new Set(["log", "updatedAt", "at", "id", "editedBy", "createdAt", "order", "rows", "by"]);
 const LOG_LAB = { items: "breakdown", itemsAuto: "total as amount", checkNo: "check no.", checkDate: "check date", paidWith: "paid with", dueDate: "due date", invDate: "invoice date", method: "paid via", day: "due day", desc: "description", fb: "FB account", rate: "% per month", accountName: "account name", payPosition: "position", orderNum: "order ID", mop: "payment", item: "description", idNumber: "ID number" };
@@ -2347,6 +2347,7 @@ function headActions() {
     fixed: can ? `<button class="btn primary" type="button" data-act="new-fixed">Add expense line</button>` : "",
     dues: can ? `<button class="btn primary" type="button" data-act="new-due">Add due date</button>` : "",
     checks: ex("checks") + (can ? `<button class="btn primary" type="button" data-act="new-check">Add check</button>` : ""),
+    requests: ex("preq") + (can ? `<button class="btn primary" type="button" data-act="new-preq">Add request</button>` : ""),
     payrecords: ex("payrecords") + (can ? `<button class="btn primary" type="button" data-act="new-pr">Add record</button>` : ""),
     bir: ex("bir") + (can ? `<button class="btn primary" type="button" data-act="new-bir">Add sale</button>` : ""),
     investors: ex("investments") + (can ? `<button class="btn primary" type="button" data-act="new-inv">Add investment</button>` : ""),
@@ -2476,7 +2477,7 @@ function renderInner() {
   const tabs = `<div class="tabs pills" role="tablist">${dtabs.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${S.tab === t}">${TAB_NAMES[t]}${t === "reviews" ? rvBadge() : ""}</button>`).join("")}${dtabs.length > 2 ? `<button type="button" class="tab-arrange" data-act="tabs-arrange" data-dept="${d.id}" title="Arrange these tabs" aria-label="Arrange tabs">⠿ Arrange</button>` : ""}</div>`;
   const body = ({
     overview: viewCEO, dtasks: () => viewTasks(d.id), team: viewTeam, orgchart: () => orgChart(true), budget: viewBudget, listings: viewListings, logins: viewLogins, passwords: viewPasswords, homecontent: viewHomeContent, reviews: viewReviews,
-    dashboard: viewDashboard, salesreport: viewSalesReport, costcheck: viewCostCheck, vouchers: viewVouchers, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
+    dashboard: viewDashboard, salesreport: viewSalesReport, costcheck: viewCostCheck, vouchers: viewVouchers, investors: viewInvestors, payroll: viewPayroll, fixed: viewFixed, dues: viewDues, checks: viewChecks, requests: viewPerfumeReq, payrecords: viewPayRecords, bir: viewBir, expenses: viewExpenses, orders: viewOrders, suppliers: viewSuppliers, archived: viewArchived, disputes: viewDisputes, customers: viewCustomers, channels: viewChannels,
     packing: viewPacking, inventory: viewInventory,
   })[S.tab]();
   v.innerHTML = tabs + (S.dept === "FINANCE" && S.tab === "dues" ? duesAlert() : "") + `<div class="dc">${body}</div>`;   // K, Oct 16, 2026: the payment-due box lives under Due dates only
@@ -4730,7 +4731,7 @@ setInterval(() => { if (S.vaultKey && Date.now() - vaultIdleAt > 5 * 60e3) { S.v
 // Offline warning: saves made without internet can't reach the cloud.
 window.addEventListener("offline", () => { try { const t = document.createElement("div"); t.id = "offbar"; t.setAttribute("role", "alert"); t.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#B42318;color:#fff;text-align:center;padding:8px;font:600 13px system-ui"; t.textContent = "No internet. Changes you make now may NOT be saved. Reconnect before continuing."; document.body.appendChild(t); } catch (e) {} });
 window.addEventListener("online", () => { const t = document.getElementById("offbar"); if (t) t.remove(); try { toast("Back online."); } catch (e) {} });
-const BACKUP_COLS = ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices"];
+const BACKUP_COLS = ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "preq", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices"];
 const BACKUP_DOCS = ["config/home", "config/payroll", "config/attendance", "config/eom", "config/reviews", "config/vault", "config/security", "config/supadj", "config/backupmeta"];
 // Full copy of the shared data (not anyone's private settings), for moving to the standalone app.
 async function downloadBackup() {
@@ -7173,6 +7174,7 @@ function openProductForm(id, preset = {}) {
       <div class="field"><label for="p-sku">SKU</label><input id="p-sku" value="${esc(p.sku || "")}"></div>
       <div class="field"><label for="p-barcode">Barcode</label><div style="display:flex;gap:6px"><input id="p-barcode" value="${esc(p.barcode || "")}" style="flex:1;min-width:0"><button class="btn sm" type="button" data-act="p-bc-scan" title="Scan with camera" aria-label="Scan barcode with camera">📷 Scan</button><input id="p-bc-cam" type="file" accept="image/*" capture="environment" hidden></div></div>
       ${id ? "" : `<div class="field"><label for="p-cat">Collection</label><select id="p-cat"><option value="">–</option>${[...WEB_CATS, ...(p.category && !WEB_CATS.some(c => c[0] === p.category) ? [[p.category, p.category]] : [])].map(([k, l]) => `<option value="${esc(k)}" ${p.category === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`}
+      <div class="field"><label for="p-gender">Gender <span style="font-weight:400;color:var(--muted)">(Middle Eastern perfumes only)</span></label><select id="p-gender"><option value="">–</option>${[["him", "Men"], ["her", "Women"], ["unisex", "Unisex"]].map(([k, l]) => `<option value="${k}" ${p.gender === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     </div>
     ${id ? "" : `<div class="row">
       <div class="field"><label for="p-kind">Availability</label><select id="p-kind"><option value="onhand" ${p.kind !== "preorder" ? "selected" : ""}>On hand (ships in 24h)</option><option value="preorder" ${p.kind === "preorder" ? "selected" : ""}>Pre-order</option></select></div>
@@ -7202,7 +7204,7 @@ function openProductForm(id, preset = {}) {
     if (!val("p-name")) return sheetError("Give the product a name.");
     const bc = val("p-barcode");
     if (bc && S.products.some(x => x.id !== id && String(x.barcode || "") === bc)) return sheetError("Another product already has that barcode.");
-    const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : "active", kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), supplier: val("p-supplier").toUpperCase().replace(/\s+/g, ""), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
+    const data = { ...(id ? clean(p) : {}), name: shortConc(val("p-name")), brand: val("p-brand"), size: val("p-size"), ptype: id ? p.ptype || "" : val("p-type"), sku: val("p-sku"), barcode: bc, category: id ? p.category || "" : val("p-cat"), gender: (id ? p.category : val("p-cat")) === "arabian" ? val("p-gender") : (p.gender || ""), price: numv("p-price"), compareAt: numv("p-compare"), cost: numv("p-cost"), stock: Math.round(numv("p-stock")), reorder: Math.round(numv("p-reorder")), status: id ? p.status || "active" : "active", kind: id ? (p.kind === "preorder" ? "preorder" : "onhand") : val("p-kind"), eta: id ? p.eta || "" : val("p-eta"), badges: [...document.querySelectorAll(".p-badge:checked")].map(x => x.value), isNew: !!document.querySelector('.p-badge[value="New arrival"]:checked'), notes: Object.fromEntries([["top", "p-ntop"], ["heart", "p-nheart"], ["base", "p-nbase"]].map(([k, f]) => [k, val(f).split(",").map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length)), accords: val("p-acc").split(",").map(x => x.trim()).filter(Boolean), fragrantica: val("p-frag"), description: val("p-desc"), url: (() => { const v = webUrl0({ url: val("p-url") }); return id && (v === webProdUrl(p) || !v) ? "" : v; })(), batch: val("p-batch"), supplier: val("p-supplier").toUpperCase().replace(/\s+/g, ""), photo: pgalGet()[0] || "", imgs: pgalGet().filter(u => !String(u).startsWith("data:")), webSync: "pending", editedAt: Date.now(), editedBy: (member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "" };
     // Fields that are edited in the Listings table aren't in Edit listing: keep them as they are.
     const live = (id && S.products.find(x => x.id === id)) || p;   // newest copy, not the one from when the form was opened (a sale may have changed the stock since)
     if (id) for (const k of ["size", "price", "compareAt", "cost", "stock"]) { if (k in live) data[k] = live[k]; else delete data[k]; }
@@ -7374,7 +7376,7 @@ function webProducts() {
   const isOutW = p => p.kind === "preorder" ? !!p.soldOut : !((Number(p.stock) || 0) > 0);
   const live = S.products.filter(p => (p.status || "active") === "active" && p.name);
   return live.sort((a, b) => (a.kind === "preorder") - (b.kind === "preorder") || isOutW(a) - isOutW(b) || (a.webOrder ?? -1) - (b.webOrder ?? -1) || (b.createdAt || 0) - (a.createdAt || 0))
-    .map(p => ({ id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: (p.category === "secondreign" ? "beauty" : p.category) || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [], isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", ...(isOutW(p) ? { soldOut: true } : {}), vac: !!p.vac, ...(p.inspiredBy ? { insp: p.inspiredBy } : {}), ...(p.category === "secondreign" && String(p.description || "").trim() ? { desc: String(p.description).trim().slice(0, 3000) } : {}), created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
+    .map(p => ({ id: webIdOf(p), kind: p.kind === "preorder" ? "preorder" : "onhand", rank: p.rank ?? 9999, brand: p.brand || "", name: p.name, size: p.size || "", cond: p.ptype || "", cat: (p.category === "secondreign" ? "beauty" : p.category) || "unisex", price: Number(p.price) || 0, was: Number(p.compareAt) > 0 ? Number(p.compareAt) : p.wasNull === false ? 0 : null, imgs: (p.imgs && p.imgs.length ? p.imgs : p.photo && !p.photo.startsWith("data:") ? [p.photo] : []), notes: p.notes || {}, accords: p.accords || [], isNew: !!p.isNew || badgesOf(p).includes("New arrival"), badges: badgesOf(p), eta: p.eta || "", ...(isOutW(p) ? { soldOut: true } : {}), vac: !!p.vac, ...(p.inspiredBy ? { insp: p.inspiredBy } : {}), ...(p.category === "arabian" && p.gender ? { gd: p.gender } : {}), ...(p.category === "secondreign" && String(p.description || "").trim() ? { desc: String(p.description).trim().slice(0, 3000) } : {}), created: p.webCreated || new Date(p.createdAt || Date.now()).toISOString().replace(/\.\d+Z$/, "+00:00") }));
 }
 const webCodeText = () => "<script>\nwindow.PRODUCTS=" + JSON.stringify(webProducts()).replace(/<\//g, "<\\/") + ";\n</" + "script>";
 function openWebCode() {
@@ -8697,6 +8699,66 @@ function openCheckForm(id, date) {
   });
 }
 
+/* ---------- Sales: perfume requests (K, Nov 25, 2026): staff log every buyer who asks for a perfume we don't list (PM / chat inquiries) ---------- */
+const PREQ_STATUS = { new: { name: "New", cls: "info" }, quoted: { name: "Quoted", cls: "warn" }, ordered: { name: "Ordered", cls: "good" }, notavail: { name: "Not available", cls: "bad" }, lost: { name: "No reply / lost", cls: "" } };
+const PREQ_CHANNELS = ["FB Messenger", "Instagram", "TikTok", "Viber", "Shopee", "Walk-in", "Website", "Other"];
+S.pqf = { st: "all", q: "" };
+function viewPerfumeReq() {
+  const can = !S.readOnly, f = S.pqf, q = (f.q || "").trim().toLowerCase();
+  const all = [...S.preq].sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
+  const list = all.filter(r => (f.st === "all" || (r.status || "new") === f.st) && (!q || [r.customer, r.contact, r.perfume, r.notes, r.orderNo].some(x => String(x || "").toLowerCase().includes(q))));
+  const cnt = k => all.filter(r => (r.status || "new") === k).length;
+  // most asked perfumes
+  const top = new Map(); for (const r of all) { const k = String(r.perfume || "").trim().toLowerCase(); if (k) top.set(k, (top.get(k) || 0) + 1); }
+  const topList = [...top.entries()].sort((a, b) => b[1] - a[1]).filter(x => x[1] > 1).slice(0, 5).map(([k, n]) => `${esc(k)} (${n})`).join(" · ");
+  return `<div class="kpis">
+      <div class="kpi"><span class="label">All requests</span><span class="value">${all.length}</span><span class="sub">${all.filter(r => r.date === mToday()).length} today</span></div>
+      <div class="kpi"><span class="label">New (to answer)</span><span class="value" style="color:${cnt("new") ? "var(--bad)" : "inherit"}">${cnt("new")}</span><span class="sub">not quoted yet</span></div>
+      <div class="kpi"><span class="label">Quoted</span><span class="value">${cnt("quoted")}</span><span class="sub">waiting for the buyer</span></div>
+      <div class="kpi"><span class="label">Ordered</span><span class="value">${cnt("ordered")}</span><span class="sub">became orders</span></div>
+    </div>
+    ${topList ? `<div style="font-size:13px;color:var(--muted);margin:2px 0 10px">Asked more than once: ${topList}</div>` : ""}
+    <div class="toolbar"><div class="seg" role="group" aria-label="Status">${[["all", "All"], ...Object.entries(PREQ_STATUS).map(([k, v]) => [k, v.name])].map(([k, l]) => `<button type="button" data-act="preq-filter" data-v="${k}" aria-pressed="${f.st === k}">${l}</button>`).join("")}</div>
+      <div class="osearch">${svg("search")}<input id="pq-q" type="search" placeholder="Search name, perfume, notes" value="${esc(f.q)}" autocomplete="off" aria-label="Search perfume requests"></div></div>
+    <div class="table-wrap"><table class="otable"><thead><tr><th>Date</th><th>Channel</th><th class="l">Customer</th><th class="l">Perfume wanted</th><th>Size · type</th><th>Budget</th><th>Status</th><th>Quoted</th><th class="l">Notes</th><th>By</th></tr></thead>
+    <tbody>${list.map(r => `<tr ${can ? `data-act="edit-preq" data-id="${r.id}"` : 'style="cursor:default"'}>
+      <td class="nowrap">${esc(r.date || "")}</td><td class="nowrap">${esc(r.channel || "")}</td>
+      <td class="l"><b>${esc(r.customer || "")}</b>${r.contact ? `<div class="s">${esc(r.contact)}</div>` : ""}</td>
+      <td class="l" style="font-weight:600">${esc(r.perfume || "")}</td><td class="nowrap">${esc([r.size, r.ptype].filter(Boolean).join(" · "))}</td>
+      <td class="num nowrap">${r.budget ? peso(r.budget) : "–"}</td>
+      <td>${ied("preq", r, "status", "sel", "Status", { ro: !can, st: stMap(PREQ_STATUS), opts: Object.entries(PREQ_STATUS).map(([k, v]) => [k, v.name]) })}</td>
+      <td class="num nowrap">${r.quoted ? peso(r.quoted) : "–"}${r.eta ? `<div class="s">ETA ${esc(r.eta)}</div>` : ""}${r.orderNo ? `<div class="s">#${esc(r.orderNo)}</div>` : ""}</td>
+      <td class="l">${esc(r.notes || "")}</td><td class="nowrap">${esc(r.by || "")}</td></tr>`).join("")}</tbody></table>
+    ${list.length ? "" : `<div class="empty" style="padding:16px">${all.length ? "No requests match." : "No requests yet. Tap “Add request” whenever a buyer asks for a perfume through PM."}</div>`}</div>`;
+}
+document.addEventListener("input", e => { if (e.target && e.target.id === "pq-q") { S.pqf.q = e.target.value; const pos = e.target.selectionStart; render(); const el = $("#pq-q"); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (x) {} } } });
+function openPreqForm(id) {
+  const r = id ? S.preq.find(x => x.id === id) : { status: "new", date: mToday(), channel: "FB Messenger" };
+  openSheet(`<h3>${id ? "Edit perfume request" : "Add perfume request"}</h3>
+    <div class="row"><div class="field"><label for="pq-date">Date</label><input id="pq-date" type="date" value="${esc(r.date || "")}"></div>
+      <div class="field"><label for="pq-ch">Channel</label><select id="pq-ch">${PREQ_CHANNELS.map(c => `<option ${r.channel === c ? "selected" : ""}>${c}</option>`).join("")}</select></div></div>
+    <div class="row"><div class="field"><label for="pq-name">Customer name</label><input id="pq-name" value="${esc(r.customer || "")}" autocomplete="off"></div>
+      <div class="field"><label for="pq-contact">Contact (phone / FB name)</label><input id="pq-contact" value="${esc(r.contact || "")}" autocomplete="off"></div></div>
+    <div class="field"><label for="pq-perf">Perfume wanted</label><input id="pq-perf" value="${esc(r.perfume || "")}" placeholder="e.g. Baccarat Rouge 540, Delina, Aventus" autocomplete="off"></div>
+    <div class="row"><div class="field"><label for="pq-size">Size</label><input id="pq-size" value="${esc(r.size || "")}" placeholder="e.g. 100ml, 50ml, decant"></div>
+      <div class="field"><label for="pq-type">Type</label><select id="pq-type">${["", "Sealed", "Tester", "Any"].map(c => `<option ${r.ptype === c ? "selected" : ""} value="${c}">${c || "Not sure"}</option>`).join("")}</select></div></div>
+    <div class="row"><div class="field"><label for="pq-budget">Buyer's budget (₱)</label><input id="pq-budget" inputmode="decimal" class="money" value="${moneyFmt(r.budget ?? "")}"></div>
+      <div class="field"><label for="pq-status">Status</label><select id="pq-status">${Object.entries(PREQ_STATUS).map(([k, v]) => `<option value="${k}" ${(r.status || "new") === k ? "selected" : ""}>${v.name}</option>`).join("")}</select></div></div>
+    <div class="row"><div class="field"><label for="pq-quoted">Price we quoted (₱)</label><input id="pq-quoted" inputmode="decimal" class="money" value="${moneyFmt(r.quoted ?? "")}"></div>
+      <div class="field"><label for="pq-eta">ETA told to the buyer</label><input id="pq-eta" value="${esc(r.eta || "")}" placeholder="e.g. December"></div></div>
+    <div class="field"><label for="pq-order">Order # (if it became an order)</label><input id="pq-order" value="${esc(r.orderNo || "")}" placeholder="e.g. RS10300"></div>
+    <div class="field"><label for="pq-notes">Notes</label><input id="pq-notes" value="${esc(r.notes || "")}"></div>
+    ${id ? recLogHtml("preq", id) : ""}
+    <div id="sheet-err" class="confirm" hidden></div>
+    ${id ? `<div id="del-slot"><button class="btn danger sm" type="button" data-act="del-preq" data-id="${id}">Delete request</button></div>` : ""}
+    <div class="sheet-foot"><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">Save</button></div>`,
+  async () => {
+    if (!val("pq-perf")) return sheetError("Enter the perfume the buyer asked for.");
+    const data = { ...(id ? clean(r) : { createdAt: Date.now(), by: ((member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "") }), date: val("pq-date") || mToday(), channel: val("pq-ch"), customer: val("pq-name"), contact: val("pq-contact"), perfume: val("pq-perf"), size: val("pq-size"), ptype: val("pq-type"), budget: numv("pq-budget") || "", status: val("pq-status"), quoted: numv("pq-quoted") || "", eta: val("pq-eta"), orderNo: val("pq-order"), notes: val("pq-notes"), updatedAt: Date.now() };
+    await save("preq", id || uid("pq"), data); closeSheet(); toast("Request saved.");
+  });
+}
+
 function payRecRows() {
   const out = [];
   for (const d of S.payrecords) (d.rows || []).forEach((r, i) => out.push({ ...r, payDate: d.id, doc: d.id, i }));
@@ -9156,6 +9218,7 @@ async function exportCol(col) {
   if (col === "products") rows = [["Name", "Brand", "Size", "Type", "Price", "Compare at", "Cost", "Stock", "SKU", "Barcode", "Category", "Status", "Description", "Website link", "Needs website sync"], ...S.products.map(p => [p.name, p.brand, p.size, p.ptype, p.price, p.compareAt, p.cost, p.stock, p.sku, p.barcode, p.category, (LIST_STATUS[p.status || "active"] || {}).name, p.description, webUrl(p), p.webSync === "pending" ? "Yes" : "No"])];
   if (col === "expenses") rows = [["Date", "Type", "Category", "Note", "Paid with", "By", "Amount"], ...S.expenses.map(e => [e.date, isCashIn(e) ? "Cash in" : "Expense", e.category || "", e.note, e.paidWith || "", e.by || "", e.amount])];
   if (col === "customers") rows = [["Name", "Email", "Phone", "Address", "Channels", "Orders", "Amount spent", "Last order", "Tags", "Note"], ...customerList().map(c => [c.name, c.email, c.phone, c.address, [...c.platforms].join("; "), c.orders, c.spent, c.last ? new Date(c.last).toLocaleDateString("en-CA") : "", (c.tags || []).join(", "), c.note])];
+  if (col === "preq") rows = [["Date", "Channel", "Customer", "Contact", "Perfume wanted", "Size", "Type", "Budget", "Status", "Quoted price", "ETA", "Order #", "Notes", "Added by"], ...S.preq.map(r => [r.date, r.channel, r.customer, r.contact, r.perfume, r.size, r.ptype, r.budget, (PREQ_STATUS[r.status || "new"] || {}).name, r.quoted, r.eta, r.orderNo, r.notes, r.by])];
   if (col === "checks") rows = [["Check date", "Check no.", "Bank / account", "Payee", "Amount", "Purpose", "Status", "Issued", "Notes"], ...S.checks.map(c => [c.checkDate, c.checkNo, c.bank, c.payee, c.amount, c.purpose, CHECK_STATUS[c.status || "pending"].name, c.issued, c.notes])];
   if (col === "payrecords") rows = [["Pay date", "ID", "Name", "Position", "Daily rate", "Net pay", "Note"], ...payRecRows().map(r => [r.payDate, r.idNumber, r.name, r.position, r.rate, r.net, r.note])];
   if (col === "bir") { const d = S.bir.find(x => x.id === S.birMonth) || { rows: [] }; rows = [["Date", "Order ID", "Customer", "Description", "Qty", "MOP", "Amount"], ...(d.rows || []).map(r => [r.date, "#" + r.orderNum, r.customer, r.item, r.qty, r.mop, r.amount])]; }
@@ -9517,6 +9580,10 @@ document.addEventListener("click", guard(async ev => {
     case "due-paid": return toggleDuePaid(id, b.dataset.ym);
     case "fixed-paid": return toggleFixedPaid(id, b.dataset.ym);
     case "new-check": return openCheckForm(null, b.dataset.date);
+    case "new-preq": return openPreqForm();
+    case "edit-preq": return openPreqForm(id);
+    case "del-preq": await remove("preq", id); closeSheet(); toast("Request deleted."); return;
+    case "preq-filter": S.pqf.st = b.dataset.v; render(); return;
     case "edit-check": return openCheckForm(id);
     case "del-check": await remove("checks", id); closeSheet(); toast("Check deleted."); return;
     case "new-pr": return openPayRecForm();
@@ -10423,7 +10490,7 @@ render();
     db.doc("config/supadj").onSnapshot(s => { S.supAdj = s.exists ? s.data() : {}; keep(); }, () => {});
     db.doc("config/security").onSnapshot(s => { S.security = s.exists ? s.data() : {}; keep(); }, () => {});
     if (S.uid) db.doc("data/users/" + S.uid + "/profile").onSnapshot(s => { S.profile = s.exists ? s.data() : {}; keep(); }, () => {});
-    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery", "webmeta"]) {
+    for (const col of ["colprefs", "products", "orders", "expenses", "customers", "tasks", "team", "attendance", "investments", "payroll", "scents", "logins", "fixedexp", "dues", "checks", "preq", "payrecords", "bir", "birtax", "reviews", "eom", "eomvotes", "accessreq", "invoices", "gallery", "webmeta"]) {
       db.collection(col).onSnapshot(snap => {
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         S.raw[col] = snap.docs;
