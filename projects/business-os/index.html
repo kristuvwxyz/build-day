@@ -709,6 +709,10 @@ body.has-pomo #view { padding-bottom: 64px; }
 .bday-title { font-family: var(--font-display); font-size: clamp(22px, 3.4vw, 30px); line-height: 1.15; }
 .bday-cake { margin-left: auto; font-size: 34px; }
 .otable tr.grp td { background: var(--surface-2); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: default; }
+table.logins .cpw { display: flex; align-items: center; gap: 4px; }
+table.logins .cpw .ied { flex: 1; min-width: 150px; text-overflow: clip; }
+table.logins .cpb { flex: none; padding: 3px 8px; font-size: 12px; }
+table.logins td { vertical-align: middle; }
 code.pw { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: var(--surface-2); padding: 2px 6px; border-radius: 5px; }
 /* Phones: the page itself never slides sideways (K, Oct 2026). Only tables / tab strips scroll left-right, inside their own box. */
 html, body { overflow-x: hidden; max-width: 100%; overscroll-behavior-x: none; touch-action: pan-y pinch-zoom; }
@@ -8972,9 +8976,11 @@ function viewLogins() {
   const can = !S.readOnly;
   const pwCell = l => !l.pw ? `<span style="color:var(--muted)">${esc(l.pwHint || "")}</span>` : `<span class="nowrap" style="display:inline-flex;gap:6px;align-items:center"><code class="pw">${S.pwShown[l.id] != null ? esc(S.pwShown[l.id]) : "••••••••"}</code>
     <button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="${S.pwShown[l.id] != null ? "hide" : "show"}">${S.pwShown[l.id] != null ? "Hide" : "Show"}</button><button class="btn sm ghost" type="button" data-pw="${l.id}" data-do="copy">Copy</button></span>`;
+  // Easy copy (K, Nov 25, 2026): every logins cell has its own Copy button (account, name, username, phone, notes, link).
+  const cpd = (l, f, lab) => `<span class="cpw">${ied("logins", l, f, "text", lab, { ro: !can })}${l[f] ? `<button type="button" class="btn sm ghost cpb" data-copy="${esc(l[f])}" title="Copy ${esc(lab)}" aria-label="Copy ${esc(lab)}">Copy</button>` : ""}</span>`;
   const section = (title, rows) => `<tr class="grp"><td colspan="${can && pickOn() ? 8 : 7}">${title} <span style="font-weight:500;color:var(--muted)">${rows.length}</span></td></tr>` + rows.map(l => `<tr ${can ? `data-act="edit-login" data-id="${l.id}"` : 'style="cursor:default"'}>${can ? pickTd("login", l.id) : ""}
-      <td style="font-weight:600">${ied("logins", l, "account", "text", "Account", { ro: !can })}</td><td class="l">${ied("logins", l, "accountName", "text", "Account name", { ro: !can })}</td><td>${ied("logins", l, "username", "text", "Username / email", { ro: !can })}</td>
-      <td>${pwCell(l)}</td><td class="nowrap num">${ied("logins", l, "phone", "text", "Phone number", { ro: !can })}</td><td class="l" style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> ` : ""}${ied("logins", l, "notes", "text", "Notes", { ro: !can })}</td>${recHistTd("logins", l)}</tr>`).join("");
+      <td style="font-weight:600">${cpd(l, "account", "Account")}</td><td class="l">${cpd(l, "accountName", "Account name")}</td><td>${cpd(l, "username", "Username / email")}</td>
+      <td>${pwCell(l)}</td><td class="nowrap num">${cpd(l, "phone", "Phone number")}</td><td class="l" style="min-width:200px;font-size:12.5px">${l.url ? `<a href="${esc(/^https?:/.test(l.url) ? l.url : "https://" + l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a> <button type="button" class="btn sm ghost cpb" data-copy="${esc(l.url)}" aria-label="Copy link">Copy</button> ` : ""}${cpd(l, "notes", "Notes")}</td>${recHistTd("logins", l)}</tr>`).join("");
   return `<div class="toolbar"><input id="lq" type="search" placeholder="Search account, name, username, notes" value="${esc(S.lq)}" aria-label="Search logins">${can ? `<span style="flex:1"></span><button class="btn" type="button" data-act="login-import">Import from spreadsheet</button>` : ""}</div>
     ${pickBar("login", [["select", "Set status…", "login-status", [["active", "Active"], ["inactive", "Inactive"]]], ["Delete…", "login-sel-del", "danger"]], list.map(l => l.id))}
     <div class="table-wrap"><table class="otable logins"><thead><tr>${can ? pickTh("login", list.map(l => l.id)) : ""}<th>Account</th><th class="l">Account name</th><th>Username / email</th><th>Password</th><th>Phone number</th><th class="l">Notes</th></tr></thead>
