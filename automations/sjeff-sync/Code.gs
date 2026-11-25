@@ -8,6 +8,7 @@
 var SHEET_ID = '1Hz8rMaSkWMgDe0NW6vtNm_2etkAEfiGf7iDod3O_UKE';
 var TAB_GID = 894065226;            // Nov '26
 var API = 'https://os.regalspritz.com/api/sjeff';
+var SJEFF_KEY_INLINE = '__KEY__';   // filled in when the project is set up (private to K's Google account)
 
 function setup() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sync') ScriptApp.deleteTrigger(t); });
@@ -39,7 +40,7 @@ function sync(dry) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return;
   try {
-    var key = PropertiesService.getScriptProperties().getProperty('SJEFF_KEY');
+    var key = PropertiesService.getScriptProperties().getProperty('SJEFF_KEY') || SJEFF_KEY_INLINE;
     if (!key) throw new Error('Add SJEFF_KEY in Script properties.');
     var sh = tab_();
     var rows = readRows_(sh);

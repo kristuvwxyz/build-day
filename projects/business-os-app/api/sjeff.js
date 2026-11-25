@@ -30,9 +30,13 @@ export default async function handler(req, res) {
   const dry = body.dry === true;
 
   // Sheet rows by key: "SECTION|barcode" and "SECTION|DESCRIPTION" (the sheet repeats barcodes across Testers / Sealed sections).
-  const byKey = new Map();
-  for (const r of rows) { const sec = norm(r.section); if (r.barcode) byKey.set(sec + "|" + norm(r.barcode), r); if (r.desc) byKey.set(sec + "|" + norm(r.desc), r); }
-  const rowKey = r => norm(r.section) + "|" + norm(r.desc);
+  // One key per row: SECTION|barcode, or SECTION|DESCRIPTION|PRICE when the barcode is missing, not a real barcode (e.g. "PFM")
+  // or repeated in the same section. RS OS listings store this key in sjeffKey (same rule in RS OS).
+  const goodBc = b => /^\d{8,14}$/.test(String(b || "").trim());
+  const bcCount = new Map(); for (const r of rows) if (goodBc(r.barcode)) { const k = norm(r.section) + "|" + norm(r.barcode); bcCount.set(k, (bcCount.get(k) || 0) + 1); }
+  const keyOf = r => { const sec = norm(r.section), kb = sec + "|" + norm(r.barcode); return goodBc(r.barcode) && bcCount.get(kb) === 1 ? kb : sec + "|" + norm(r.desc) + "|" + Math.round(Number(r.price) || 0); };
+  const byKey = new Map(); for (const r of rows) byKey.set(keyOf(r), r);
+  const rowKey = r => keyOf(r);
 
   const products = (db.products || []).map(d => ({ ...d.data, id: d.id }));
   const pById = new Map(products.map(p => [p.id, p]));
