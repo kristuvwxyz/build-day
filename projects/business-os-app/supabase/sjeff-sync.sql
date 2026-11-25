@@ -25,7 +25,7 @@ language sql stable security definer set search_path = public as $$
         'num', d.data->'num', 'customer', d.data->'customer', 'payment', d.data->'payment', 'fulfillment', d.data->'fulfillment',
         'archived', d.data->'archived', 'items', d.data->'items')))
       from public.docs d where d.col = 'orders' and coalesce((d.data->>'archived')::boolean, false) = false
-        and case when d.data->>'createdAt' ~ '^[0-9.]+$' then (d.data->>'createdAt')::numeric else 0 end > extract(epoch from now()) * 1000 - 200 * 86400000
+        and case when d.data->>'createdAt' ~ '^[0-9.]+$' then (d.data->>'createdAt')::numeric else 0 end > extract(epoch from now())::numeric * 1000 - 17280000000::numeric
         and coalesce(d.data->>'fulfillment', '') not in ('fulfilled', 'delivered', 'cancelled')), '[]'::jsonb),
     'webmeta', coalesce((select jsonb_agg(jsonb_build_object('id', d.id, 'data', d.data - 'log'))
       from public.docs d where d.col = 'webmeta' and d.id <> '_sjeff' and d.data ? 'fulfillment'), '[]'::jsonb),
