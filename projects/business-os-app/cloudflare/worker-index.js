@@ -14,8 +14,9 @@ import shopify from "./api/shopify.js";
 import brevo from "./api/brevo.js";
 import mayaCheck from "./api/maya-check.js";
 import config from "./api/config.js";
+import sjeff from "./api/sjeff.js";
 
-const API = { products, stock, reviews, live, site, "push-listings": pushListings, photo, fragrantica, shopify, brevo, "maya-check": mayaCheck, config };
+const API = { products, stock, reviews, live, site, "push-listings": pushListings, photo, fragrantica, shopify, brevo, "maya-check": mayaCheck, config, sjeff };
 
 // Vercel-style request: method, url, headers (lowercase), query (object), body (parsed JSON or text).
 async function makeReq(request, url) {

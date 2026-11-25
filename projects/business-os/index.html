@@ -3074,6 +3074,19 @@ async function vatOther() {
   months[ym.trim()] = { shopee, tiktok, other, by: actor(), at: Date.now() };
   await save("webmeta", "_vatother", { ...clean(d), ref: "_vatother", months }); toast("VAT tracker updated."); render();
 }
+/* S-JEFF sheet sync alerts (K, Nov 25, 2026): the 30-min sync (api/sjeff.js + Apps Script) writes webmeta/_sjeff.
+   Owner's Home shows new alerts: orders S-JEFF removed from the sheet (appeal to Jeff) and items that couldn't be placed. */
+function sjeffCard() {
+  const st = S.webmeta.find(d => d.id === "_sjeff"); if (!st) return "";
+  const al = (st.alerts || []).filter(a => !a.seen);
+  const last = st.lastRun ? relTime(st.lastRun) : "never";
+  if (!al.length) return `<div style="font-size:12.5px;color:var(--muted);margin:6px 0 10px">S-JEFF sheet sync: last run ${esc(last)} · no alerts</div>`;
+  return `<section class="panel" style="border-left:4px solid var(--bad);margin:10px 0"><div class="head"><h2>S-JEFF sheet · ${al.length} alert${al.length > 1 ? "s" : ""}</h2><span class="s">last sync ${esc(last)}</span>
+    <button class="btn sm" type="button" data-act="sjeff-seen">Mark all seen</button></div>
+    ${al.slice(0, 10).map(a => `<div style="padding:8px 0;border-top:1px solid var(--line)"><b>${a.type === "removed" ? "⚠️ Removed by S-JEFF" : "🚫 Couldn't place"}</b> · <span class="s">${esc(relTime(a.at))}</span><div>${esc(a.text || "")}</div>
+      ${(a.orders || []).length ? `<div class="s">Our orders on that row: ${a.orders.map(esc).join(", ")}</div>` : ""}
+      ${(a.items || []).length ? `<ul style="margin:4px 0 0 18px">${a.items.map(i => `<li><b>${esc(i.ref)}</b> ${esc(i.cust || "")} · ${esc(i.item)} ×${i.qty} <span class="s">(${esc(i.why)})</span></li>`).join("")}</ul>` : ""}</div>`).join("")}</section>`;
+}
 function viewHome() {
   const h = S.home || {}, mid = myMemberId(), fn = ((member(mid) || {}).nickname || "").trim() || firstName();
   const [q, who] = quoteOfDay();
@@ -3099,6 +3112,7 @@ function viewHome() {
     ${showOrders && S.live != null ? `<button type="button" data-act="live-now" title="People on regalspritz.com right now (updates every 30 seconds)"><b class="num" id="live-n">${S.live}</b><span><span class="live-dot"></span>Live on website</span></button>` : ""}
   </section>
   ${"" /* K, Nov 25, 2026: Home kept clean — no task list, alerts or update cards here (they live in Tasks, Orders and Finance) */}
+  ${isCEO() ? sjeffCard() : ""}
   ${orgChart(false)}
   <div class="ot-note" role="note">⏰ <b>Overtime isn't paid.</b> Be on time and make the most of your scheduled work hours.</div>`;
 }
@@ -9590,6 +9604,7 @@ document.addEventListener("click", guard(async ev => {
     case "due-paid": return toggleDuePaid(id, b.dataset.ym);
     case "fixed-paid": return toggleFixedPaid(id, b.dataset.ym);
     case "new-check": return openCheckForm(null, b.dataset.date);
+    case "sjeff-seen": { const st = S.webmeta.find(d => d.id === "_sjeff"); if (!st) return; await save("webmeta", "_sjeff", { ...clean(st), alerts: (st.alerts || []).map(a => ({ ...a, seen: true })) }); toast("S-JEFF alerts marked seen."); return; }
     case "new-preq": return openPreqForm();
     case "preq-web-add": { const w = ((S.wreq || {}).list || []).find(x => String(x.row) === b.dataset.row); if (!w) return;
       const by = ((member(myMemberId()) || {}).nickname || (S.me && S.me.name) || "");
