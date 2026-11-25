@@ -5214,7 +5214,7 @@ function viewInventory() {
 // Remembers a result until its inputs change (same arrays, same settings), so redraws stay fast.
 const _memo = new Map();
 function memo(name, deps, fn) { const m = _memo.get(name); if (m && m.deps.length === deps.length && m.deps.every((d, i) => d === deps[i])) return m.v; const v = fn(); _memo.set(name, { deps, v }); return v; }
-const customerList = () => memo("cust", [S.orders, S.orders.length, S.customers, S.customers.length], customerListRaw);
+const customerList = () => memo("cust", [S.orders, S.orders.length, S.customers, S.customers.length, S.web.orders, (S.web.orders || []).length], customerListRaw);
 function customerListRaw() {
   const map = new Map(), byName = new Map();
   for (const c of S.customers) {
@@ -5222,7 +5222,8 @@ function customerListRaw() {
     if (c.name) byName.set(c.name.toLowerCase(), k);
     map.set(k, { ...c, docId: c.id, platforms: new Set(c.shopifyOrders ? ["Website"] : []), base: { orders: c.shopifyOrders || 0, spent: c.shopifySpent || 0 }, imp: { orders: 0, spent: 0 }, man: { orders: 0, spent: 0 }, last: 0, orderIds: [], example: false });
   }
-  for (const o of S.orders) {
+  // Website buyers too (K, Nov 25, 2026): read live from the loaded website orders, never saved to the database.
+  for (const o of [...S.orders, ...(S.web && S.web.loaded ? webAsOrders().filter(w => !/cancel/i.test(w.fulfillment || "")) : [])]) {
     const name = (o.customer || "").trim();
     const k = (o.email && map.has(o.email.toLowerCase())) ? o.email.toLowerCase() : (o.email || name.toLowerCase());
     if (!k) continue;
@@ -5243,6 +5244,7 @@ function customerListRaw() {
 }
 
 function viewCustomers() {
+  if (S.site && !S.web.loaded && !S.web.loading) webLoad(true);   // website buyers are counted from the live website orders
   const q = S.cq.trim().toLowerCase();
   const all = customerList();
   const cs = S.csort || { sort: "spent", dir: "desc" };
