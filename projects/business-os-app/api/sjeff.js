@@ -23,8 +23,9 @@ export default async function handler(req, res) {
   const rpc = (fn, args) => fetch(`${SB}/rest/v1/rpc/${fn}`, { method: "POST", headers: { apikey: ANON, Authorization: "Bearer " + ANON, "Content-Type": "application/json" }, body: JSON.stringify({ p_key: KEY, p_secret: secret, ...args }) })
     .then(r => r.ok ? r.json() : null).catch(() => null);
 
-  const db = await rpc("sjeff_read", {});
-  if (!db) return res.status(403).json({ ok: false, error: "Not allowed (wrong key, or supabase/sjeff-sync.sql not run)." });
+  let db = await rpc("sjeff_read", {});
+  if (!db) { await new Promise(r => setTimeout(r, 1500)); db = await rpc("sjeff_read", {}); }   // one retry (database can be briefly busy)
+  if (!db) return res.status(403).json({ ok: false, error: "Not allowed or database busy (wrong key, or supabase/sjeff-sync.sql not run)." });
   const rows = Array.isArray(body.rows) ? body.rows : [];
   if (rows.length < 50) return res.status(400).json({ ok: false, error: `Only ${rows.length} sheet rows (safety check).` });
   const dry = body.dry === true;
