@@ -58,13 +58,15 @@ export default async function handler(req, res) {
   // Open orders → S-JEFF lines.
   const lines = [];   // { ref, kind: "rs"|"web", id, ful, pid, qty }
   for (const d of db.orders || []) { const o = d.data || {}; if (["voided", "refunded"].includes(o.payment)) continue;
-    for (const i of o.items || []) { const p = pById.get(i.productId); if (p) lines.push({ ref: o.num || d.id, kind: "rs", id: d.id, ful: o.fulfillment || "", pid: p.id, qty: Number(i.qty) || 1, cust: o.customer || "" }); } }
+    for (const i of o.items || []) { const p = pById.get(i.productId); if (p) lines.push({ ref: o.num || d.id, kind: "rs", id: d.id, ful: o.fulfillment || "", pid: p.id, qty: Number(i.qty) || 1, cust: o.customer || "", paid: ["paid", "partial"].includes(o.payment) }); } }
   for (const o of web) { if (/cancel|refund|ship|complete|deliver|receiv/i.test(o.status || "")) continue; const m = meta.get(o.ref) || {};
     if (DONE_FUL.has(m.fulfillment)) continue; const ful = m.fulfillment || (o.status === "Placed" ? "to_confirm" : "");
-    for (const i of o.items || []) { const p = webProduct(i); if (p) lines.push({ ref: o.ref, kind: "web", id: o.ref, ful, pid: p.id, qty: Number(i.qty) || 1, cust: o.name || "" }); } }
+    for (const i of o.items || []) { const p = webProduct(i); if (p) lines.push({ ref: o.ref, kind: "web", id: o.ref, ful, pid: p.id, qty: Number(i.qty) || 1, cust: o.name || "", paid: o.paid === true || o.paid === "TRUE" || Number(o.paid) > 0, site: o.status || "" }); } }
 
   const prev = db.state || {}, first = !prev.placed;
-  const st = { placed: { ...(prev.placed || {}) }, seen: { ...(prev.seen || {}) }, alerts: [...(prev.alerts || [])].slice(0, 200), log: [...(prev.log || [])].slice(0, 100) };
+  const st = { placed: { ...(prev.placed || {}) }, seen: { ...(prev.seen || {}) }, alerts: [...(prev.alerts || [])].slice(0, 200), log: [...(prev.log || [])].slice(0, 100),
+    rowQ: JSON.parse(JSON.stringify(prev.rowQ || {})) };   // rowQ: per row, our placed lines still waiting in column H (S-JEFF hasn't moved them to Orders F yet)
+  const mig = !prev.rowQ;   // first run with the FWD / In Transit flow (K, Nov 26, 2026)
   const now = Date.now(), alerts = [], writes = [], placedNow = [];
   const lk = l => l.ref + "|" + l.pid;
 
@@ -73,6 +75,21 @@ export default async function handler(req, res) {
     if (was != null && tot < was) alerts.push({ at: now, type: "removed", row: r.row, item: r.desc, was, now: tot,
       text: `S-JEFF removed ${was - tot} of our order${was - tot > 1 ? "s" : ""}: ${r.desc} (row ${r.row}) was ${was}, now ${tot}.`,
       orders: Object.keys(st.placed).filter(x => { const p = pById.get(x.split("|")[1]); return p && rowOf(p) && rowKey(rowOf(p)) === k; }).map(x => x.split("|")[0]) }); }
+
+  // S-JEFF confirms our orders by moving them from Additional (H) into Orders (F). Units still in H = unconfirmed.
+  if (mig) {   // one time: the newest placed lines on each row fill whatever is in H now
+    const byRow = {};
+    for (const [k, v] of Object.entries(st.placed)) { const p = pById.get(k.split("|")[1]), r = p && rowOf(p); if (!r) continue;
+      (byRow[rowKey(r)] = byRow[rowKey(r)] || []).push({ k, qty: Number(v.qty) || 1, ref: k.split("|")[0] }); }
+    for (const [rk, ls] of Object.entries(byRow)) { let h = Number((byKey.get(rk) || {}).H) || 0; const q = [];
+      for (const l of ls.sort((a, b) => String(b.ref).localeCompare(String(a.ref)))) { if (h <= 0) break; q.unshift({ k: l.k, qty: Math.min(l.qty, h) }); h -= l.qty; }
+      if (q.length) st.rowQ[rk] = q; }
+  } else for (const [rk, q] of Object.entries(st.rowQ)) {
+    const r = byKey.get(rk); if (!r) continue;
+    let conf = q.reduce((a, x) => a + x.qty, 0) - (Number(r.H) || 0);
+    while (conf > 0 && q.length) { if (q[0].qty <= conf) { conf -= q[0].qty; q.shift(); } else { q[0].qty -= conf; conf = 0; } }
+    if (!q.length) delete st.rowQ[rk];
+  }
 
   // 1. Place new lines.
   const need = new Map();   // rowKey -> { row, lines: [] }
@@ -86,7 +103,7 @@ export default async function handler(req, res) {
   for (const [k, { row, lines: ls }] of need) {
     let free = Math.max(0, (Number(row.avail) || 0) - (Number(row.H) || 0)), add = 0;
     for (const l of ls.sort((a, b) => String(a.ref).localeCompare(String(b.ref)))) {
-      if (l.qty <= free) { free -= l.qty; add += l.qty; st.placed[lk(l)] = { qty: l.qty, at: now, row: row.row }; placedNow.push(l); }
+      if (l.qty <= free) { free -= l.qty; add += l.qty; st.placed[lk(l)] = { qty: l.qty, at: now, row: row.row }; placedNow.push(l); (st.rowQ[k] = st.rowQ[k] || []).push({ k: lk(l), qty: l.qty }); }
       else blocked.push({ ...l, why: `S-JEFF has only ${free} free`, name: row.desc }); }
     if (add) { addH.set(k, add); writes.push({ row: row.row, desc: row.desc, col: "H", value: (Number(row.H) || 0) + add, was: Number(row.H) || 0 }); }
   }
@@ -104,17 +121,26 @@ export default async function handler(req, res) {
     const r = rowOf(p), free = r ? Math.max(0, (Number(r.avail) || 0) - (Number(r.H) || 0) - (addH.get(rowKey(r)) || 0)) : 0;
     if (Number(p.stock) !== free || (p.kind === "preorder" && !!p.soldOut !== (free === 0))) prodSet.push({ id: p.id, set: { stock: free, ...(p.kind === "preorder" ? { soldOut: free === 0 } : {}) }, from: p.stock }); }
 
-  // 2. To Confirm -> To Bill when every S-JEFF line of the order is placed.
+  // 2. Status flow (K, Nov 26, 2026): placed on the sheet → FWD; S-JEFF confirmed (moved to Orders F) →
+  //    paid / partly paid (Maya) → In Transit, unpaid (BDO / Manual) → To Bill (staff bill the buyer and move it on themselves).
   const byOrder = new Map(); for (const l of lines) { const k = l.kind + "|" + l.id; if (!byOrder.has(k)) byOrder.set(k, []); byOrder.get(k).push(l); }
-  const ordSet = [], webSet = [], webStatus = [];
-  if (!first) for (const [k, ls] of byOrder) { const l0 = ls[0]; if (l0.ful !== "to_confirm") continue; if (!ls.every(l => st.placed[lk(l)])) continue;
-    if (l0.kind === "rs") ordSet.push({ id: l0.id, set: { fulfillment: "to_bill" }, log: "S-JEFF items placed on the supplier sheet → To Bill" });
-    else { webSet.push({ id: l0.ref, set: { ref: l0.ref, fulfillment: "to_bill" }, log: "S-JEFF items placed on the supplier sheet → To Bill" }); webStatus.push(l0.ref); } }
+  const unconf = new Set(Object.values(st.rowQ).flat().map(x => x.k));
+  const ordSet = [], webSet = [], webStatus = [], changes = [];
+  const NAME = { fwd: "FWD", in_transit: "In Transit", to_bill: "To Bill" };
+  if (!first) for (const [k, ls] of byOrder) { const l0 = ls[0]; if (!ls.every(l => st.placed[lk(l)])) continue;
+    const cur = l0.ful, allConf = ls.every(l => !unconf.has(lk(l)));
+    const want = !allConf ? "fwd" : (l0.paid ? "in_transit" : "to_bill");
+    const ok = cur === "to_confirm" || (cur === "fwd" && want !== "fwd") || (mig && cur === "to_bill" && (l0.paid || want === "fwd"));
+    if (!ok || cur === want) continue;
+    const msg = want === "fwd" ? "S-JEFF items placed on the supplier sheet → FWD" : want === "in_transit" ? "S-JEFF confirmed the order (moved to Orders) → In Transit" : "S-JEFF confirmed the order → To Bill (bill the buyer)";
+    changes.push(`${l0.ref} ${NAME[cur] || cur} → ${NAME[want]}`);
+    if (l0.kind === "rs") ordSet.push({ id: l0.id, set: { fulfillment: want }, log: msg });
+    else { webSet.push({ id: l0.ref, set: { ref: l0.ref, fulfillment: want }, log: msg }); if (l0.site === "Placed") webStatus.push(l0.ref); } }
 
   // Remember F + H after our writes.
   for (const r of rows) st.seen[rowKey(r)] = (Number(r.F) || 0) + (Number(r.H) || 0) + (addH.get(rowKey(r)) || 0);
   st.alerts = [...alerts, ...st.alerts].slice(0, 200);
-  st.log = [{ at: now, first, placed: placedNow.map(l => `${l.ref} ${pById.get(l.pid).name} ×${l.qty}`), toBill: [...ordSet.map(o => o.id), ...webStatus], stock: prodSet.length, alerts: alerts.length, writes: writes.length }, ...st.log].slice(0, 100);
+  st.log = [{ at: now, first, placed: placedNow.map(l => `${l.ref} ${pById.get(l.pid).name} ×${l.qty}`), status: changes, stock: prodSet.length, alerts: alerts.length, writes: writes.length }, ...st.log].slice(0, 100);
   st.lastRun = now; st.rows = rows.length;
 
   if (!dry) {
@@ -122,6 +148,6 @@ export default async function handler(req, res) {
     if (n == null) return res.status(502).json({ ok: false, error: "Couldn't save." });
     for (const ref of webStatus) { try { await fetch(process.env.RS_BACKEND_URL || DEFAULT_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "opsUpdate", key: KEY, ref, status: "Confirmed", by: "S-JEFF sync" }), redirect: "follow" }); } catch (e) {} }
   }
-  return res.status(200).json({ ok: true, dry, first, writes, placed: placedNow.length, toBill: ordSet.length + webSet.length, stock: prodSet.length, alerts: alerts.map(a => a.text),
+  return res.status(200).json({ ok: true, dry, first, writes, placed: placedNow.length, status: changes, stock: prodSet.length, alerts: alerts.map(a => a.text),
     ...(dry ? { preview: { prodSet: prodSet.slice(0, 60).map(x => ({ id: x.id, from: x.from, to: x.set.stock })), ordSet, webSet, blocked: blocked.map(b => ({ ref: b.ref, item: b.name, why: b.why })) } } : {}) });
 }
