@@ -3084,8 +3084,8 @@ function sjeffCard() {
   return `<section class="panel" style="border-left:4px solid var(--bad);margin:10px 0"><div class="head"><h2>S-JEFF sheet · ${al.length} alert${al.length > 1 ? "s" : ""}</h2><span class="s">last sync ${esc(last)}</span>
     <button class="btn sm" type="button" data-act="sjeff-seen">Mark all seen</button></div>
     ${al.slice(0, 10).map(a => `<div style="padding:8px 0;border-top:1px solid var(--line)"><b>${a.type === "removed" ? "⚠️ Removed by S-JEFF" : "🚫 Couldn't place"}</b> · <span class="s">${esc(relTime(a.at))}</span><div>${esc(a.text || "")}</div>
-      ${(a.orders || []).length ? `<div class="s">Our orders on that row: ${a.orders.map(esc).join(", ")}</div>` : ""}
-      ${(a.items || []).length ? `<ul style="margin:4px 0 0 18px">${a.items.map(i => `<li><b>${esc(i.ref)}</b> ${esc(i.cust || "")} · ${esc(i.item)} ×${i.qty} <span class="s">(${esc(i.why)})</span></li>`).join("")}</ul>` : ""}</div>`).join("")}</section>`;
+      ${(a.orders || []).length ? `<div class="s">Our orders on that row: ${a.orders.map(r => `<button type="button" class="linkish" data-act="sjeff-open" data-ref="${esc(r)}">${esc(r)}</button>`).join(", ")}</div>` : ""}
+      ${(a.items || []).length ? `<ul style="margin:4px 0 0 18px">${a.items.map(i => `<li><button type="button" class="linkish" data-act="sjeff-open" data-ref="${esc(i.ref)}" style="font-weight:700">${esc(i.ref)}</button> ${esc(i.cust || "")} · ${esc(i.item)} ×${i.qty} <span class="s">(${esc(i.why)})</span></li>`).join("")}</ul>` : ""}</div>`).join("")}</section>`;
 }
 function viewHome() {
   const h = S.home || {}, mid = myMemberId(), fn = ((member(mid) || {}).nickname || "").trim() || firstName();
@@ -9604,6 +9604,8 @@ document.addEventListener("click", guard(async ev => {
     case "due-paid": return toggleDuePaid(id, b.dataset.ym);
     case "fixed-paid": return toggleFixedPaid(id, b.dataset.ym);
     case "new-check": return openCheckForm(null, b.dataset.date);
+    case "sjeff-open": { const ref = b.dataset.ref; const o = S.orders.find(x => x.num === ref || x.id === ref); if (o) return openOrderDetails(o.id);
+      if (S.site && !S.web.loaded) await webLoad(true); const w = webAsOrders().find(x => x.ref === ref); if (w) return openOrderDetails(w.id); toast(`Order ${ref} not found.`); return; }
     case "sjeff-seen": { const st = S.webmeta.find(d => d.id === "_sjeff"); if (!st) return; await save("webmeta", "_sjeff", { ...clean(st), alerts: (st.alerts || []).map(a => ({ ...a, seen: true })) }); toast("S-JEFF alerts marked seen."); return; }
     case "new-preq": return openPreqForm();
     case "preq-web-add": { const w = ((S.wreq || {}).list || []).find(x => String(x.row) === b.dataset.row); if (!w) return;
