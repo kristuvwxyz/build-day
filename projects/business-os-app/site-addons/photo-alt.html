@@ -1,0 +1,41 @@
+<!--
+  Regal Spritz PH: photo descriptions (alt text) for Google and screen readers (2026-11-28).
+  Gives every photo that has no description one: product photos get "Brand Name Size (Condition)",
+  the logo gets the shop name. Existing descriptions are never changed.
+-->
+<script>
+(function () {
+  var map = null, count = 0, timer = 0;
+  function products() {
+    var L = window.RS_PRODUCTS || window.PRODUCTS || [];
+    if (map && count === L.length) return map;
+    map = {}; count = L.length;
+    for (var i = 0; i < L.length; i++) if (L[i] && L[i].id) map[L[i].id] = L[i];
+    return map;
+  }
+  function describe(p, second) {
+    var t = [p.brand, p.name, p.size].filter(Boolean).join(' ');
+    if (p.cond) t += ' (' + p.cond + ')';
+    return t + (second ? ', second photo' : '');
+  }
+  function run() {
+    timer = 0;
+    var P = products(), imgs = document.images;
+    for (var i = 0; i < imgs.length; i++) {
+      var img = imgs[i];
+      if ((img.getAttribute('alt') || '').trim()) continue;
+      var a = img.closest('a[href*="#/p/"]'), m = a && /#\/p\/([^?&#\/]+)/.exec(a.getAttribute('href'));
+      var p = m && P[decodeURIComponent(m[1])];
+      var th = !p && img.closest('.thumbs'), here = th && /#\/p\/([^?&#\/]+)/.exec(location.hash);
+      var cur = here && P[decodeURIComponent(here[1])];
+      if (p) img.alt = describe(p, img.classList.contains('alt'));
+      else if (cur) img.alt = describe(cur) + ', photo ' + (Array.prototype.indexOf.call(th.querySelectorAll('img'), img) + 1);
+      else if (img.closest('.brand, .mn-home, .ftx-brand, .trio-t')) img.alt = 'Regal Spritz PH';
+      else if (/_view\.gif/.test(img.src)) img.setAttribute('role', 'presentation');
+    }
+  }
+  function soon() { if (!timer) timer = setTimeout(run, 400); }
+  function start() { run(); new MutationObserver(soon).observe(document.body, { childList: true, subtree: true }); }
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();
+</script>
